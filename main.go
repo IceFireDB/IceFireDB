@@ -1,3 +1,11 @@
+/*
+ * @Author: gitsrc
+ * @Date: 2021-03-05 14:46:31
+ * @LastEditors: gitsrc
+ * @LastEditTime: 2021-03-05 14:46:57
+ * @FilePath: /IceFireDB/main.go
+ */
+
 package main
 
 import (
@@ -35,17 +43,17 @@ func main() {
 	// Set up a rafthub configuration
 	var conf rafthub.Config
 
-	conf.Name = "raft_leveldb_kv" // raft memory kv
-	conf.Version = "0.0.1"
+	conf.Name = "IceFireDB" // Hot and cold hybrid KV storage database, support redis protocol.
+	conf.Version = "1.0.0"
 
 	// Set the initial data. This is state of the data when first server in the
 	// cluster starts for the first time ever.
 	levelDBObj, err := leveldb.OpenFile(localStoragePath, nil)
 
-	log.Println(localStoragePath)
 	if err != nil {
 		log.Fatalln(err)
 	}
+
 	defer levelDBObj.Close()
 
 	conf.InitialData = &data{LevelDBStorage: levelDBObj}
