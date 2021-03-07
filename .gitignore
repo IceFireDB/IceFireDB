@@ -16,3 +16,8 @@ vendor/
 
 IceFireDB
 db_storage/
+LOCK
+*.ldb
+*.log
+var
+
