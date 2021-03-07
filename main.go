@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-05 14:46:31
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-05 14:46:57
+ * @LastEditTime: 2021-03-07 12:02:16
  * @FilePath: /IceFireDB/main.go
  */
 
@@ -11,33 +11,30 @@ package main
 import (
 	"errors"
 	"log"
-	"os"
 	"sync"
 
-	"github.com/syndtr/goleveldb/leveldb"
+	"context"
+
+	"github.com/go-redis/redis/v8"
 	"gitlab.com/gitsrc/rafthub"
 )
 
 type data struct {
-	Count          int64
-	LevelDBStorage *leveldb.DB
+	Count int64
+	DB    *redis.Client
 	sync.RWMutex
 }
 
-var localStoragePath string
+var remoteStoragePath string
 
 func init() {
-	localStoragePathTemp, err := os.Getwd()
-	if err == nil {
-		localStoragePathTemp += "/db_storage"
-	}
-	if _, err := os.Stat(localStoragePathTemp); os.IsNotExist(err) {
-		log.Fatalf("The leveldb storage directory does not exist, please create the directory: (%s)\n", localStoragePathTemp)
-	}
+	remoteStoragePath = "/tmp/ledis.socks"
 
-	localStoragePath = localStoragePathTemp
 	log.SetFlags(log.Llongfile | log.Ldate | log.Ltime)
+
 }
+
+var ctx = context.Background()
 
 func main() {
 	// Set up a rafthub configuration
@@ -48,28 +45,29 @@ func main() {
 
 	// Set the initial data. This is state of the data when first server in the
 	// cluster starts for the first time ever.
-	levelDBObj, err := leveldb.OpenFile(localStoragePath, nil)
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	defer levelDBObj.Close()
-
-	conf.InitialData = &data{LevelDBStorage: levelDBObj}
+	rdb := redis.NewClient(&redis.Options{
+		Network:  "unix",
+		Addr:     remoteStoragePath,
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	conf.InitialData = &data{DB: rdb}
 
 	conf.UseJSONSnapshots = true
 
-	// Add a command that will change the value of a Ticket.
-	conf.AddWriteCommand("set", cmdKVSet)
-	conf.AddReadCommand("get", cmdKVGet)
-	conf.AddWriteCommand("del", cmdKVDel)
+	conf.AddWriteCommand("set", cmdSet)
+	conf.AddReadCommand("get", cmdGet)
+	conf.AddWriteCommand("del", cmdDel)
+	conf.AddWriteCommand("hset", cmdHSET)
+	conf.AddWriteCommand("hget", cmdHGET)
+	conf.AddWriteCommand("hdel", cmdHDEL)
+
 	// conf.AddReadCommand("count", cmdKVCount)
 	// Finally, hand off all processing to rafthub.
 	rafthub.Main(conf)
 }
 
-func cmdKVSet(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdSet(m rafthub.Machine, args []string) (interface{}, error) {
 	// The the current data from the machine
 	data := m.Data().(*data)
 
@@ -77,49 +75,78 @@ func cmdKVSet(m rafthub.Machine, args []string) (interface{}, error) {
 		return nil, errors.New("The number of set parameters is illegal")
 	}
 
-	err := data.LevelDBStorage.Put([]byte(args[1]), []byte(args[2]), nil)
+	cmdStatus := data.DB.Set(ctx, args[1], args[2], 0)
 
-	return "OK", err
+	return cmdStatus.Result()
 }
 
-func cmdKVGet(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdGet(m rafthub.Machine, args []string) (interface{}, error) {
 	// The the current data from the machine
 	data := m.Data().(*data)
-	var value interface{}
 
 	if len(args) != 2 {
 		return nil, errors.New("The number of get parameters is illegal")
 	}
 
-	value, err := data.LevelDBStorage.Get([]byte(args[1]), nil)
-	if err == leveldb.ErrNotFound {
-		return nil, nil
-	}
+	cmdStatus := data.DB.Get(ctx, args[1])
 
-	if err != nil {
-		return nil, err
-	}
-
-	return value, nil
+	return cmdStatus.Result()
 }
 
-func cmdKVDel(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHSET(m rafthub.Machine, args []string) (interface{}, error) {
 	// The the current data from the machine
 	data := m.Data().(*data)
-	var value interface{}
+
+	if len(args) < 2 {
+		return nil, errors.New("The number of hset parameters is illegal")
+	}
+
+	respArgs := make([]interface{}, len(args)-2)
+	for i := 0; i < len(respArgs); i++ {
+		respArgs[i] = args[i+2]
+	}
+	cmdStatus := data.DB.HSet(ctx, args[1], respArgs...)
+
+	return cmdStatus.Result()
+}
+
+func cmdHGET(m rafthub.Machine, args []string) (interface{}, error) {
+	// The the current data from the machine
+	data := m.Data().(*data)
+
+	if len(args) < 2 {
+		return nil, errors.New("The number of hget parameters is illegal")
+	}
+
+	cmdStatus := data.DB.HGet(ctx, args[1], args[2])
+
+	return cmdStatus.Result()
+}
+
+func cmdHDEL(m rafthub.Machine, args []string) (interface{}, error) {
+	// The the current data from the machine
+	data := m.Data().(*data)
+
+	if len(args) < 2 {
+		return nil, errors.New("The number of hdel parameters is illegal")
+	}
+
+	respArgs := args[2:]
+
+	cmdStatus := data.DB.HDel(ctx, args[1], respArgs...)
+
+	return cmdStatus.Result()
+}
+
+func cmdDel(m rafthub.Machine, args []string) (interface{}, error) {
+	// The the current data from the machine
+	data := m.Data().(*data)
 
 	if len(args) != 2 {
 		return nil, errors.New("The number of del parameters is illegal")
 	}
 
-	value = -1
+	cmdStatus := data.DB.Del(ctx, args[1])
 
-	err := data.LevelDBStorage.Delete([]byte(args[1]), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	value = 1
-
-	return value, nil
+	return cmdStatus.Result()
 }
