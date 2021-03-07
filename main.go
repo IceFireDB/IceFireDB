@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-05 14:46:31
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-07 12:02:16
+ * @LastEditTime: 2021-03-07 19:19:58
  * @FilePath: /IceFireDB/main.go
  */
 
@@ -16,12 +16,15 @@ import (
 	"context"
 
 	"github.com/go-redis/redis/v8"
+	lediscfg "github.com/ledisdb/ledisdb/config"
+	"github.com/ledisdb/ledisdb/ledis"
 	"gitlab.com/gitsrc/rafthub"
 )
 
 type data struct {
 	Count int64
 	DB    *redis.Client
+	LDB   *ledis.DB
 	sync.RWMutex
 }
 
@@ -48,10 +51,16 @@ func main() {
 	rdb := redis.NewClient(&redis.Options{
 		Network:  "unix",
 		Addr:     remoteStoragePath,
+		PoolSize: 1024,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
-	conf.InitialData = &data{DB: rdb}
+
+	cfg := lediscfg.NewConfigDefault()
+	l, _ := ledis.Open(cfg)
+	ldb, _ := l.Select(0)
+
+	conf.InitialData = &data{DB: rdb, LDB: ldb}
 
 	conf.UseJSONSnapshots = true
 
@@ -75,9 +84,16 @@ func cmdSet(m rafthub.Machine, args []string) (interface{}, error) {
 		return nil, errors.New("The number of set parameters is illegal")
 	}
 
-	cmdStatus := data.DB.Set(ctx, args[1], args[2], 0)
+	//cmdStatus := data.DB.Set(ctx, args[1], args[2], 0)
+	//log.Println(cmdStatus)
 
-	return cmdStatus.Result()
+	err := data.LDB.Set([]byte(args[1]), []byte(args[2]))
+
+	if err != nil {
+		return err, err
+	}
+	//return cmdStatus.Result()
+	return "OK", nil
 }
 
 func cmdGet(m rafthub.Machine, args []string) (interface{}, error) {
