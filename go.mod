@@ -8,7 +8,6 @@ require (
 	github.com/onsi/gomega v1.10.5 // indirect
 	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/syndtr/goleveldb v1.0.0
-	github.com/tidwall/match v1.0.3
 	github.com/tidwall/redcon v1.4.0
 	github.com/tidwall/sds v0.1.0
 	github.com/tidwall/uhaha v0.6.2
