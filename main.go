@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 13:09:44
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-08 19:21:47
+ * @LastEditTime: 2021-03-09 18:34:28
  * @FilePath: /IceFireDB/main.go
  */
 
@@ -56,18 +56,42 @@ func main() {
 	conf.Snapshot = snapshot
 	conf.Restore = restore
 
+	conf.AddWriteCommand("SET", cmdSET)
+	conf.AddWriteCommand("SETEX", cmdSETEX)
+	conf.AddWriteCommand("SETNX", cmdSETNX)
+	conf.AddWriteCommand("MSET", cmdMSET)
+
 	conf.AddReadCommand("GET", cmdGET)
+	conf.AddReadCommand("TTL", cmdTTL)
 	conf.AddReadCommand("MGET", cmdMGET)
 	//conf.AddReadCommand("KEYS", cmdKEYS)
-	conf.AddWriteCommand("SET", cmdSET)
+
 	conf.AddWriteCommand("DEL", cmdDEL)
-	conf.AddWriteCommand("MSET", cmdMSET)
 
 	//conf.AddWriteCommand("PDEL", cmdPDEL)
 
 	conf.AddWriteCommand("HSET", cmdHSET)
 	conf.AddReadCommand("HGET", cmdHGET)
 	conf.AddWriteCommand("HDEL", cmdHDEL)
+	conf.AddReadCommand("HEXISTS", cmdHEXISTS)
+	conf.AddReadCommand("HGETALL", cmdHGETALL)
+	conf.AddWriteCommand("HINCRBY", cmdHINCRBY)
+	conf.AddReadCommand("HKEYS", cmdHKEYS)
+	conf.AddReadCommand("HLEN", cmdHLEN)
+	conf.AddReadCommand("HMGET", cmdHMGET)
+	conf.AddWriteCommand("HMSET", cmdHMSET)
+	conf.AddWriteCommand("HSETNX", cmdHSETNX)
+	conf.AddReadCommand("HSTRLEN", cmdHSTRLEN)
+	conf.AddReadCommand("HVALS", cmdHVALS)
+
+	//IceFireDB special command
+	conf.AddWriteCommand("HCLEAR", cmdHCLEAR)
+	conf.AddWriteCommand("HMCLEAR", cmdHMCLEAR)
+	conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)
+	conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT)
+	conf.AddReadCommand("HTTL", cmdHTTL)
+	conf.AddWriteCommand("HPERSIST", cmdHPERSIST)
+	conf.AddReadCommand("HKEYEXISTS", cmdHKEYEXISTS)
 
 	uhaha.Main(conf)
 }
