@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 13:29:03
+ * @LastEditTime: 2021-03-10 13:30:33
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -30,7 +30,7 @@ func init() {
 	conf.AddReadCommand("MGET", cmdMGET)
 	//conf.AddReadCommand("KEYS", cmdKEYS)
 
-	conf.AddWriteCommand("DEL", cmdDEL
+	conf.AddWriteCommand("DEL", cmdDEL)
 }
 
 func cmdSET(m rafthub.Machine, args []string) (interface{}, error) {
