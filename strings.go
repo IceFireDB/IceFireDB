@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 16:17:29
+ * @LastEditTime: 2021-03-10 16:20:01
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -13,7 +13,6 @@ import (
 
 	"github.com/gitsrc/IceFireDB/rafthub"
 	"github.com/ledisdb/ledisdb/ledis"
-	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/tidwall/redcon"
 )
@@ -34,6 +33,7 @@ func init() {
 	conf.AddWriteCommand("GETSET", cmdGETSET)
 	conf.AddWriteCommand("INCR", cmdINCR)
 	conf.AddWriteCommand("INCRBY", cmdINCRBY)
+	conf.AddReadCommand("MGET", cmdMGET)
 
 	conf.AddWriteCommand("SET", cmdSET)
 	conf.AddWriteCommand("SETEX", cmdSETEX)
@@ -41,7 +41,7 @@ func init() {
 	conf.AddWriteCommand("MSET", cmdMSET)
 
 	conf.AddReadCommand("TTL", cmdTTL)
-	conf.AddReadCommand("MGET", cmdMGET)
+
 	//conf.AddReadCommand("KEYS", cmdKEYS)
 
 }
@@ -382,19 +382,19 @@ func cmdMGET(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
-	var vals []interface{}
+
+	keys := make([][]byte, len(args)-1)
+
 	for i := 1; i < len(args); i++ {
-		val, err := ldb.Get([]byte(args[i]))
-		if err != nil {
-			if err == leveldb.ErrNotFound {
-				vals = append(vals, nil)
-				continue
-			}
-			return nil, err
-		}
-		vals = append(vals, val)
+		keys[i-1] = []byte(args[i])
 	}
-	return vals, nil
+
+	v, err := ldb.MGet(keys...)
+	if err != nil {
+		return nil, err
+	}
+
+	return v, nil
 }
 
 func cmdTTL(m rafthub.Machine, args []string) (interface{}, error) {
