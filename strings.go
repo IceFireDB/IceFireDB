@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 16:14:58
+ * @LastEditTime: 2021-03-10 16:17:29
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -33,6 +33,7 @@ func init() {
 	conf.AddReadCommand("GETRANGE", cmdGETRANGE)
 	conf.AddWriteCommand("GETSET", cmdGETSET)
 	conf.AddWriteCommand("INCR", cmdINCR)
+	conf.AddWriteCommand("INCRBY", cmdINCRBY)
 
 	conf.AddWriteCommand("SET", cmdSET)
 	conf.AddWriteCommand("SETEX", cmdSETEX)
@@ -43,6 +44,23 @@ func init() {
 	conf.AddReadCommand("MGET", cmdMGET)
 	//conf.AddReadCommand("KEYS", cmdKEYS)
 
+}
+
+func cmdINCRBY(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 3 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	delta, err := ledis.StrInt64([]byte(args[2]), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	n, err := ldb.IncrBy([]byte(args[1]), delta)
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(n), nil
 }
 
 func cmdINCR(m rafthub.Machine, args []string) (interface{}, error) {
