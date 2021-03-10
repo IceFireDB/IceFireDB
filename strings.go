@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-09 18:35:34
+ * @LastEditTime: 2021-03-10 11:47:14
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -12,15 +12,30 @@ import (
 	"log"
 	"strconv"
 
+	"github.com/gitsrc/IceFireDB/rafthub"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
+
 	"github.com/tidwall/redcon"
-	"github.com/tidwall/uhaha"
 )
 
-func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
+func init() {
+	conf.AddWriteCommand("SET", cmdSET)
+	conf.AddWriteCommand("SETEX", cmdSETEX)
+	conf.AddWriteCommand("SETNX", cmdSETNX)
+	conf.AddWriteCommand("MSET", cmdMSET)
+
+	conf.AddReadCommand("GET", cmdGET)
+	conf.AddReadCommand("TTL", cmdTTL)
+	conf.AddReadCommand("MGET", cmdMGET)
+	//conf.AddReadCommand("KEYS", cmdKEYS)
+
+	conf.AddWriteCommand("DEL", cmdDEL)
+}
+
+func cmdSET(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
-		return nil, uhaha.ErrWrongNumArgs
+		return nil, rafthub.ErrWrongNumArgs
 	}
 
 	//Direct processing for simple SET KEY VALUE commands
@@ -39,9 +54,9 @@ func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleString("OK"), nil
 }
 
-func cmdSETEX(m uhaha.Machine, args []string) (interface{}, error) {
+func cmdSETEX(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 4 {
-		return nil, uhaha.ErrWrongNumArgs
+		return nil, rafthub.ErrWrongNumArgs
 	}
 	ttl, err := strconv.Atoi(args[3])
 
@@ -56,9 +71,9 @@ func cmdSETEX(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleString("OK"), nil
 }
 
-func cmdSETNX(m uhaha.Machine, args []string) (interface{}, error) {
+func cmdSETNX(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
-		return nil, uhaha.ErrWrongNumArgs
+		return nil, rafthub.ErrWrongNumArgs
 	}
 
 	n, err := ldb.SetNX([]byte(args[1]), []byte(args[2]))
@@ -70,9 +85,9 @@ func cmdSETNX(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
+func cmdGET(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, uhaha.ErrWrongNumArgs
+		return nil, rafthub.ErrWrongNumArgs
 	}
 	count, err := ldb.Exists([]byte(args[1]))
 	if err != nil || count == 0 {
@@ -91,9 +106,9 @@ func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
 	return val, nil
 }
 
-func cmdDEL(m uhaha.Machine, args []string) (interface{}, error) {
+func cmdDEL(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, uhaha.ErrWrongNumArgs
+		return nil, rafthub.ErrWrongNumArgs
 	}
 	var n int
 	for i := 1; i < len(args); i++ {
@@ -112,9 +127,9 @@ func cmdDEL(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdMSET(m uhaha.Machine, args []string) (interface{}, error) {
+func cmdMSET(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 || (len(args)-1)%2 != 0 {
-		return nil, uhaha.ErrWrongNumArgs
+		return nil, rafthub.ErrWrongNumArgs
 	}
 
 	kvPairCount := (len(args) - 1) / 2
@@ -135,9 +150,9 @@ func cmdMSET(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleString("OK"), nil
 }
 
-func cmdMGET(m uhaha.Machine, args []string) (interface{}, error) {
+func cmdMGET(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, uhaha.ErrWrongNumArgs
+		return nil, rafthub.ErrWrongNumArgs
 	}
 	var vals []interface{}
 	for i := 1; i < len(args); i++ {
@@ -154,9 +169,9 @@ func cmdMGET(m uhaha.Machine, args []string) (interface{}, error) {
 	return vals, nil
 }
 
-func cmdTTL(m uhaha.Machine, args []string) (interface{}, error) {
+func cmdTTL(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, uhaha.ErrWrongNumArgs
+		return nil, rafthub.ErrWrongNumArgs
 	}
 
 	v, err := ldb.TTL([]byte(args[1]))
