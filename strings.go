@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 15:37:05
+ * @LastEditTime: 2021-03-10 15:43:13
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -26,6 +26,7 @@ func init() {
 	conf.AddReadCommand("BITPOS", cmdBITPOS)
 	conf.AddWriteCommand("DECR", cmdDECR)
 	conf.AddWriteCommand("DECRBY", cmdDECRBY)
+	conf.AddWriteCommand("DEL", cmdDEL)
 
 	conf.AddWriteCommand("SET", cmdSET)
 	conf.AddWriteCommand("SETEX", cmdSETEX)
@@ -37,7 +38,6 @@ func init() {
 	conf.AddReadCommand("MGET", cmdMGET)
 	//conf.AddReadCommand("KEYS", cmdKEYS)
 
-	conf.AddWriteCommand("DEL", cmdDEL)
 }
 
 func cmdDECRBY(m rafthub.Machine, args []string) (interface{}, error) {
@@ -220,19 +220,16 @@ func cmdDEL(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
-	var n int
+
+	keys := make([][]byte, len(args)-1)
+
 	for i := 1; i < len(args); i++ {
-		ok, err := ldb.Exists([]byte(args[i]))
-		if err != nil {
-			return nil, err
-		}
-		if ok > 0 { //if key exist
-			_, err := ldb.Del([]byte(args[i]))
-			if err != nil {
-				return nil, err
-			}
-			n++
-		}
+		keys[i-1] = []byte(args[i])
+	}
+
+	n, err := ldb.Del(keys...)
+	if err != nil {
+		return nil, err
 	}
 	return redcon.SimpleInt(n), nil
 }
