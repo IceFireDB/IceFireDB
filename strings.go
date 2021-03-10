@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 17:14:06
+ * @LastEditTime: 2021-03-10 17:30:49
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -434,8 +434,6 @@ func cmdMSET(m rafthub.Machine, args []string) (interface{}, error) {
 	batch := make([]ledis.KVPair, kvPairCount)
 	loopI := 0
 	for i := 1; i < len(args); i += 2 {
-
-		//batch.Put([]byte(args[i]), []byte(args[i+1]))
 		batch[loopI].Key = []byte(args[i])
 		batch[loopI].Value = []byte(args[i+1])
 		loopI++
