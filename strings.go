@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 13:30:33
+ * @LastEditTime: 2021-03-10 15:18:59
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -20,6 +20,9 @@ import (
 )
 
 func init() {
+	conf.AddWriteCommand("APPEND", cmdAPPEND)
+	conf.AddReadCommand("BITCOUNT", cmdBITCOUNT)
+	conf.AddWriteCommand("BITOP", cmdBITOP)
 	conf.AddWriteCommand("SET", cmdSET)
 	conf.AddWriteCommand("SETEX", cmdSETEX)
 	conf.AddWriteCommand("SETNX", cmdSETNX)
@@ -31,6 +34,57 @@ func init() {
 	//conf.AddReadCommand("KEYS", cmdKEYS)
 
 	conf.AddWriteCommand("DEL", cmdDEL)
+}
+
+func cmdBITOP(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) < 4 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	op := args[1]
+	destKey := args[2]
+	//srcKeys := args[3:]
+
+	srcKeys := make([][]byte, len(args)-3)
+	for i := 3; i < len(args); i++ {
+		srcKeys[i-3] = []byte(args[i])
+	}
+
+	n, err := ldb.BitOP(op, []byte(destKey), srcKeys...)
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(n), nil
+}
+
+func cmdAPPEND(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 3 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	n, err := ldb.Append([]byte(args[1]), []byte(args[2]))
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(n), nil
+}
+
+func cmdBITCOUNT(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) < 2 || len(args) > 4 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	key := []byte(args[1])
+	start, end, err := parseBitRange(args[2:])
+	if err != nil {
+		return nil, err
+	}
+
+	n, err := ldb.BitCount(key, start, end)
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(n), nil
 }
 
 func cmdSET(m rafthub.Machine, args []string) (interface{}, error) {
@@ -179,4 +233,21 @@ func cmdTTL(m rafthub.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 	return redcon.SimpleInt(v), nil
+}
+
+func parseBitRange(args []string) (start int, end int, err error) {
+	start = 0
+	end = -1
+	if len(args) > 0 {
+		if start, err = strconv.Atoi(args[0]); err != nil {
+			return
+		}
+	}
+
+	if len(args) == 2 {
+		if end, err = strconv.Atoi(args[1]); err != nil {
+			return
+		}
+	}
+	return
 }
