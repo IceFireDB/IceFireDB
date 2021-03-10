@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 16:32:26
+ * @LastEditTime: 2021-03-10 17:08:38
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -40,10 +40,60 @@ func init() {
 	conf.AddWriteCommand("SETEX", cmdSETEX)
 	conf.AddWriteCommand("SETRANGE", cmdSETRANGE)
 	conf.AddReadCommand("STRLEN", cmdSTRLEN)
+	conf.AddWriteCommand("EXPIRE", cmdEXPIRE)
+	conf.AddWriteCommand("EXPIREAT", cmdEXPIREAT)
 	conf.AddReadCommand("TTL", cmdTTL)
+	conf.AddWriteCommand("PERSIST", cmdPERSIST)
 
 	//conf.AddReadCommand("KEYS", cmdKEYS)
 
+}
+
+func cmdPERSIST(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	n, err := ldb.Persist([]byte(args[1]))
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(n), nil
+}
+
+func cmdEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 3 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	when, err := ledis.StrInt64([]byte(args[2]), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	v, err := ldb.ExpireAt([]byte(args[1]), when)
+	if err != nil {
+		return nil, err
+	}
+
+	return redcon.SimpleInt(v), nil
+}
+
+func cmdEXPIRE(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 3 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	duration, err := ledis.StrInt64([]byte(args[2]), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	v, err := ldb.Expire([]byte(args[1]), duration)
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(v), nil
 }
 
 func cmdSTRLEN(m rafthub.Machine, args []string) (interface{}, error) {
