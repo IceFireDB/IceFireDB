@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 17:08:38
+ * @LastEditTime: 2021-03-10 17:14:06
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -44,9 +44,6 @@ func init() {
 	conf.AddWriteCommand("EXPIREAT", cmdEXPIREAT)
 	conf.AddReadCommand("TTL", cmdTTL)
 	conf.AddWriteCommand("PERSIST", cmdPERSIST)
-
-	//conf.AddReadCommand("KEYS", cmdKEYS)
-
 }
 
 func cmdPERSIST(m rafthub.Machine, args []string) (interface{}, error) {
