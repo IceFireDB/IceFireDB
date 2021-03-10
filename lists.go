@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 18:51:53
+ * @LastEditTime: 2021-03-10 19:44:29
  * @FilePath: /IceFireDB/lists.go
  */
 
@@ -31,6 +31,21 @@ func init() {
 	conf.AddWriteCommand("LSET", cmdLSET)
 	conf.AddReadCommand("LLEN", cmdLLEN)
 	conf.AddWriteCommand("RPOPLPUSH", cmdRPOPLPUSH)
+
+	//IceFireDB special command
+	conf.AddWriteCommand("LCLEAR", cmdLCLEAR)
+}
+
+func cmdLCLEAR(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	n, err := ldb.LClear([]byte(args[1]))
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(n), nil
 }
 
 func cmdRPOPLPUSH(m rafthub.Machine, args []string) (interface{}, error) {
