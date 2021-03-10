@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 19:44:29
+ * @LastEditTime: 2021-03-10 20:09:03
  * @FilePath: /IceFireDB/lists.go
  */
 
@@ -34,6 +34,127 @@ func init() {
 
 	//IceFireDB special command
 	conf.AddWriteCommand("LCLEAR", cmdLCLEAR)
+	conf.AddWriteCommand("LMCLEAR", cmdLMCLEAR)
+	conf.AddWriteCommand("LEXPIRE", cmdLEXPIRE) //谨慎，raft日志回滚，造成脏数据
+	conf.AddWriteCommand("LEXPIREAT", cmdLEXPIREAT)
+	conf.AddReadCommand("LTTL", cmdLTTL)
+	conf.AddWriteCommand("LPERSIST", cmdLPERSIST)
+	conf.AddReadCommand("LKEYEXISTS", cmdLKEYEXISTS)
+
+	conf.AddWriteCommand("LTRIM", cmdLTRIM)
+	/*
+
+	 */
+}
+
+func cmdLTRIM(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 4 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	var start int64
+	var stop int64
+	var err error
+
+	start, err = ledis.StrInt64([]byte(args[2]), nil)
+	if err != nil {
+		return nil, err
+	}
+	stop, err = ledis.StrInt64([]byte(args[3]), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ldb.LTrim([]byte(args[1]), start, stop); err != nil {
+		return nil, err
+	}
+	return redcon.SimpleString("OK"), nil
+}
+
+func cmdLKEYEXISTS(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	n, err := ldb.LKeyExists([]byte(args[1]))
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(n), nil
+}
+
+func cmdLPERSIST(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	n, err := ldb.LPersist([]byte(args[1]))
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(n), nil
+}
+
+func cmdLTTL(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	v, err := ldb.LTTL([]byte(args[1]))
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(v), nil
+}
+
+func cmdLEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 3 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	when, err := ledis.StrInt64([]byte(args[2]), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	v, err := ldb.LExpireAt([]byte(args[1]), when)
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(v), nil
+}
+
+func cmdLEXPIRE(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 3 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	duration, err := ledis.StrInt64([]byte(args[2]), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	v, err := ldb.LExpire([]byte(args[1]), duration)
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(v), nil
+}
+
+func cmdLMCLEAR(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) < 2 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	keys := make([][]byte, len(args)-1)
+	for i := 1; i < len(args); i++ {
+		keys[i-1] = []byte(args[i])
+	}
+	n, err := ldb.LMclear(keys...)
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(n), nil
 }
 
 func cmdLCLEAR(m rafthub.Machine, args []string) (interface{}, error) {
