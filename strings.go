@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 15:28:37
+ * @LastEditTime: 2021-03-10 15:33:42
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -24,6 +24,7 @@ func init() {
 	conf.AddReadCommand("BITCOUNT", cmdBITCOUNT)
 	conf.AddWriteCommand("BITOP", cmdBITOP)
 	conf.AddReadCommand("BITPOS", cmdBITPOS)
+	conf.AddWriteCommand("DECR", cmdDECR)
 
 	conf.AddWriteCommand("SET", cmdSET)
 	conf.AddWriteCommand("SETEX", cmdSETEX)
@@ -36,6 +37,18 @@ func init() {
 	//conf.AddReadCommand("KEYS", cmdKEYS)
 
 	conf.AddWriteCommand("DEL", cmdDEL)
+}
+
+func cmdDECR(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	n, err := ldb.Decr([]byte(args[1]))
+	if err != nil {
+		return nil,err
+	}
+	return redcon.SimpleInt(n), nil
 }
 
 func cmdBITPOS(m rafthub.Machine, args []string) (interface{}, error) {
