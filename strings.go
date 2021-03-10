@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 16:20:01
+ * @LastEditTime: 2021-03-10 16:26:33
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -34,11 +34,10 @@ func init() {
 	conf.AddWriteCommand("INCR", cmdINCR)
 	conf.AddWriteCommand("INCRBY", cmdINCRBY)
 	conf.AddReadCommand("MGET", cmdMGET)
-
-	conf.AddWriteCommand("SET", cmdSET)
-	conf.AddWriteCommand("SETEX", cmdSETEX)
-	conf.AddWriteCommand("SETNX", cmdSETNX)
 	conf.AddWriteCommand("MSET", cmdMSET)
+	conf.AddWriteCommand("SET", cmdSET)
+	conf.AddWriteCommand("SETNX", cmdSETNX)
+	conf.AddWriteCommand("SETEX", cmdSETEX)
 
 	conf.AddReadCommand("TTL", cmdTTL)
 
@@ -267,19 +266,11 @@ func cmdBITCOUNT(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
+//此处和redis标准有区别,需要丰富算法，支撑更多原子指令
 func cmdSET(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
-
-	//Direct processing for simple SET KEY VALUE commands
-	// if len(args) == 3 {
-	// 	if err := ldb.Set([]byte(args[1]), []byte(args[2])); err != nil {
-	// 		return nil, err
-	// 	}
-
-	// 	return redcon.SimpleString("OK"), nil
-	// }
 
 	if err := ldb.Set([]byte(args[1]), []byte(args[2])); err != nil {
 		return nil, err
@@ -292,13 +283,12 @@ func cmdSETEX(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 4 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
-	ttl, err := strconv.Atoi(args[3])
-
+	sec, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := ldb.SetEX([]byte(args[1]), int64(ttl), []byte(args[2])); err != nil {
+	if err := ldb.SetEX([]byte(args[1]), sec, []byte(args[3])); err != nil {
 		return nil, err
 	}
 
