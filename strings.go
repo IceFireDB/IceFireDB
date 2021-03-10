@@ -2,14 +2,13 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 15:43:13
+ * @LastEditTime: 2021-03-10 16:09:23
  * @FilePath: /IceFireDB/strings.go
  */
 
 package main
 
 import (
-	"log"
 	"strconv"
 
 	"github.com/gitsrc/IceFireDB/rafthub"
@@ -27,17 +26,98 @@ func init() {
 	conf.AddWriteCommand("DECR", cmdDECR)
 	conf.AddWriteCommand("DECRBY", cmdDECRBY)
 	conf.AddWriteCommand("DEL", cmdDEL)
+	conf.AddReadCommand("EXISTS", cmdEXISTS)
+	conf.AddReadCommand("GET", cmdGET)
+	conf.AddReadCommand("GETBIT", cmdGETBIT)
+	conf.AddWriteCommand("SETBIT", cmdSETBIT)
+	conf.AddReadCommand("GETRANGE", cmdGETRANGE)
 
 	conf.AddWriteCommand("SET", cmdSET)
 	conf.AddWriteCommand("SETEX", cmdSETEX)
 	conf.AddWriteCommand("SETNX", cmdSETNX)
 	conf.AddWriteCommand("MSET", cmdMSET)
 
-	conf.AddReadCommand("GET", cmdGET)
 	conf.AddReadCommand("TTL", cmdTTL)
 	conf.AddReadCommand("MGET", cmdMGET)
 	//conf.AddReadCommand("KEYS", cmdKEYS)
 
+}
+
+func cmdGETRANGE(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 4 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	key := []byte(args[1])
+	start, err := strconv.Atoi(args[2])
+	if err != nil {
+		return nil, err
+	}
+
+	end, err := strconv.Atoi(args[3])
+	if err != nil {
+		return nil, err
+	}
+
+	v, err := ldb.GetRange(key, start, end)
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+func cmdSETBIT(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 4 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	key := args[1]
+	offset, err := strconv.Atoi(args[2])
+	if err != nil {
+		return nil, err
+	}
+
+	value, err := strconv.Atoi(args[3])
+	if err != nil {
+		return nil, err
+	}
+
+	n, err := ldb.SetBit([]byte(key), offset, value)
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(n), nil
+}
+
+func cmdGETBIT(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 3 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	key := []byte(args[1])
+	offset, err := strconv.Atoi(args[2])
+	if err != nil {
+		return nil, err
+	}
+
+	n, err := ldb.GetBit(key, offset)
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(n), nil
+}
+
+//此处和redis标准有区别，当前只支持一个key的判断过程
+func cmdEXISTS(m rafthub.Machine, args []string) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
+
+	n, err := ldb.Exists([]byte(args[1]))
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(n), nil
 }
 
 func cmdDECRBY(m rafthub.Machine, args []string) (interface{}, error) {
@@ -204,18 +284,15 @@ func cmdGET(m rafthub.Machine, args []string) (interface{}, error) {
 		return nil, nil
 	}
 	val, err := ldb.Get([]byte(args[1]))
-	log.Println("22222", err)
-	ttl, error := ldb.TTL([]byte(args[1]))
-	log.Println(ttl, error)
+
 	if err != nil {
-		if err == leveldb.ErrNotFound {
-			return nil, nil
-		}
 		return nil, err
 	}
+
 	return val, nil
 }
 
+//此处和redis标准有区别，为了事务一致性考虑，没有进行key存在判断
 func cmdDEL(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
 		return nil, rafthub.ErrWrongNumArgs
