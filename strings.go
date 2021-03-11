@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-11 11:36:11
+ * @LastEditTime: 2021-03-11 17:58:38
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -10,6 +10,7 @@ package main
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/gitsrc/IceFireDB/rafthub"
 	"github.com/ledisdb/ledisdb/ledis"
@@ -37,26 +38,27 @@ func init() {
 	conf.AddWriteCommand("MSET", cmdMSET)
 	conf.AddWriteCommand("SET", cmdSET)
 	conf.AddWriteCommand("SETNX", cmdSETNX)
-	conf.AddWriteCommand("SETEX", cmdSETEX)
+	//conf.AddWriteCommand("SETEX", cmdSETEX) // SETEX => SETEXAT
+	conf.AddWriteCommand("SETEXAT", cmdSETEXAT)
 	conf.AddWriteCommand("SETRANGE", cmdSETRANGE)
 	conf.AddReadCommand("STRLEN", cmdSTRLEN)
-	conf.AddWriteCommand("EXPIRE", cmdEXPIRE)     //超时指令
+	//conf.AddWriteCommand("EXPIRE", cmdEXPIRE)     //EXPIRE => EXPIREAT
 	conf.AddWriteCommand("EXPIREAT", cmdEXPIREAT) //超时指令
 	conf.AddReadCommand("TTL", cmdTTL)
-	conf.AddWriteCommand("PERSIST", cmdPERSIST)
+	//conf.AddWriteCommand("PERSIST", cmdPERSIST) //禁止:时间持久化
 }
 
-func cmdPERSIST(m rafthub.Machine, args []string) (interface{}, error) {
-	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
-	}
+// func cmdPERSIST(m rafthub.Machine, args []string) (interface{}, error) {
+// 	if len(args) != 2 {
+// 		return nil, rafthub.ErrWrongNumArgs
+// 	}
 
-	n, err := ldb.Persist([]byte(args[1]))
-	if err != nil {
-		return nil, err
-	}
-	return redcon.SimpleInt(n), nil
-}
+// 	n, err := ldb.Persist([]byte(args[1]))
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return redcon.SimpleInt(n), nil
+// }
 
 func cmdEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
@@ -68,6 +70,17 @@ func cmdEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
+	//如果时间戳小于当前时间，则进行删除操作
+	if when < time.Now().Unix() {
+		keys := make([][]byte, 1)
+		keys[0] = []byte(args[1])
+		_, err := ldb.Del(keys...)
+		if err != nil {
+			return nil, err
+		}
+		return redcon.SimpleInt(1), nil
+	}
+
 	v, err := ldb.ExpireAt([]byte(args[1]), when)
 	if err != nil {
 		return nil, err
@@ -76,22 +89,22 @@ func cmdEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(v), nil
 }
 
-func cmdEXPIRE(m rafthub.Machine, args []string) (interface{}, error) {
-	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
-	}
+// func cmdEXPIRE(m rafthub.Machine, args []string) (interface{}, error) {
+// 	if len(args) != 3 {
+// 		return nil, rafthub.ErrWrongNumArgs
+// 	}
 
-	duration, err := ledis.StrInt64([]byte(args[2]), nil)
-	if err != nil {
-		return nil, err
-	}
+// 	duration, err := ledis.StrInt64([]byte(args[2]), nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	v, err := ldb.Expire([]byte(args[1]), duration)
-	if err != nil {
-		return nil, err
-	}
-	return redcon.SimpleInt(v), nil
-}
+// 	v, err := ldb.Expire([]byte(args[1]), duration)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return redcon.SimpleInt(v), nil
+// }
 
 func cmdSTRLEN(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
@@ -359,16 +372,43 @@ func cmdSET(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleString("OK"), nil
 }
 
-func cmdSETEX(m rafthub.Machine, args []string) (interface{}, error) {
+// func cmdSETEX(m rafthub.Machine, args []string) (interface{}, error) {
+// 	if len(args) < 4 {
+// 		return nil, rafthub.ErrWrongNumArgs
+// 	}
+// 	sec, err := ledis.StrInt64([]byte(args[2]), nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	if err := ldb.SetEX([]byte(args[1]), sec, []byte(args[3])); err != nil {
+// 		return nil, err
+// 	}
+
+// 	return redcon.SimpleString("OK"), nil
+// }
+
+func cmdSETEXAT(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) < 4 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
-	sec, err := ledis.StrInt64([]byte(args[2]), nil)
+	timestamp, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := ldb.SetEX([]byte(args[1]), sec, []byte(args[3])); err != nil {
+	//如果时间戳小于当前时间，则进行删除操作
+	if timestamp < time.Now().Unix() {
+		keys := make([][]byte, 1)
+		keys[0] = []byte(args[1])
+		_, err := ldb.Del(keys...)
+		if err != nil {
+			return nil, err
+		}
+		return redcon.SimpleString("OK"), nil
+	}
+
+	if err := ldb.SetEXAT([]byte(args[1]), timestamp, []byte(args[3])); err != nil {
 		return nil, err
 	}
 

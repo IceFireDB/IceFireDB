@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-11 11:55:20
+ * @LastEditTime: 2021-03-11 18:31:35
  * @FilePath: /IceFireDB/lists.go
  */
 
@@ -35,10 +35,10 @@ func init() {
 	//IceFireDB special command
 	conf.AddWriteCommand("LCLEAR", cmdLCLEAR)
 	conf.AddWriteCommand("LMCLEAR", cmdLMCLEAR)
-	conf.AddWriteCommand("LEXPIRE", cmdLEXPIRE) //超时时间指令：谨慎，raft日志回滚，造成脏数据:超时时间
+	//conf.AddWriteCommand("LEXPIRE", cmdLEXPIRE) //超时时间指令：谨慎，raft日志回滚，造成脏数据:超时时间  LEXPIRE => LEXPIREAT
 	conf.AddWriteCommand("LEXPIREAT", cmdLEXPIREAT)
 	conf.AddReadCommand("LTTL", cmdLTTL)
-	conf.AddWriteCommand("LPERSIST", cmdLPERSIST)
+	// conf.AddWriteCommand("LPERSIST", cmdLPERSIST)
 	conf.AddReadCommand("LKEYEXISTS", cmdLKEYEXISTS)
 
 	conf.AddWriteCommand("LTRIM", cmdLTRIM)
@@ -80,17 +80,17 @@ func cmdLKEYEXISTS(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdLPERSIST(m rafthub.Machine, args []string) (interface{}, error) {
-	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
-	}
+// func cmdLPERSIST(m rafthub.Machine, args []string) (interface{}, error) {
+// 	if len(args) != 2 {
+// 		return nil, rafthub.ErrWrongNumArgs
+// 	}
 
-	n, err := ldb.LPersist([]byte(args[1]))
-	if err != nil {
-		return nil, err
-	}
-	return redcon.SimpleInt(n), nil
-}
+// 	n, err := ldb.LPersist([]byte(args[1]))
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return redcon.SimpleInt(n), nil
+// }
 
 func cmdLTTL(m rafthub.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
@@ -112,6 +112,15 @@ func cmdLEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
 	when, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	//如果时间戳小于当前时间，则进行删除操作 :此处有边界条件：因为是队列，raft 日志回滚是顺序的
+	if when < time.Now().Unix() {
+		_, err := ldb.LClear([]byte(args[1]))
+		if err != nil {
+			return nil, err
+		}
+		return redcon.SimpleInt(0), nil
 	}
 
 	v, err := ldb.LExpireAt([]byte(args[1]), when)

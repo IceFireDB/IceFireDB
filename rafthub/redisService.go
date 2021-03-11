@@ -2,8 +2,8 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 14:26:19
  * @LastEditors: gitsrc
- * @LastEditTime: 2020-12-23 14:51:06
- * @FilePath: /RaftHub/redisService.go
+ * @LastEditTime: 2021-03-11 18:37:16
+ * @FilePath: /IceFireDB/rafthub/redisService.go
  */
 
 package rafthub
@@ -13,7 +13,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/tidwall/redcon"
@@ -144,6 +146,59 @@ func redisServiceHandler(s Service, ln net.Listener) {
 			for _, cmd := range conn.ReadPipeline() {
 				args = append(args, redisCommandToArgs(cmd))
 			}
+
+			/*
+				这边针对raft分布式，进行指令重写，SETEX => SETEXAT
+			*/
+			for _, cmdArgs := range args {
+				if len(cmdArgs) == 0 {
+					continue
+				}
+
+				switch strings.ToUpper(cmdArgs[0]) {
+				case "SETEX": //重写SETEX指令到 SETEXAT指令
+					if len(cmdArgs) < 4 {
+						continue
+					}
+					ttl, err := strconv.ParseInt(cmdArgs[2], 10, 64)
+					if err != nil {
+						continue
+					}
+					timestamp := time.Now().Unix() + ttl
+					cmdArgs[2] = strconv.FormatInt(timestamp, 10)
+					cmdArgs[0] = "SETEXAT"
+
+				case "EXPIRE": //重写EXPIRE指令到 EXPIREAT指令
+					if len(cmdArgs) < 3 {
+						continue
+					}
+
+					ttl, err := strconv.ParseInt(cmdArgs[2], 10, 64)
+					if err != nil {
+						continue
+					}
+					timestamp := time.Now().Unix() + ttl
+					cmdArgs[2] = strconv.FormatInt(timestamp, 10)
+					cmdArgs[0] = "EXPIREAT"
+				case "HEXPIRE": //重写HEXPIRE指令到 HEXPIREAT指令
+					if len(cmdArgs) < 3 {
+						continue
+					}
+
+					ttl, err := strconv.ParseInt(cmdArgs[2], 10, 64)
+					if err != nil {
+						continue
+					}
+
+					timestamp := time.Now().Unix() + ttl
+					cmdArgs[2] = strconv.FormatInt(timestamp, 10)
+					cmdArgs[0] = "HEXPIREAT"
+
+				}
+
+				//log.Println(args[index])
+			}
+
 			redisServiceExecArgs(s, client, conn, args)
 		},
 		// handle opened connection
