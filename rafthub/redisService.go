@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 14:26:19
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-11 17:56:27
+ * @LastEditTime: 2021-03-11 18:37:16
  * @FilePath: /IceFireDB/rafthub/redisService.go
  */
 
@@ -150,7 +150,7 @@ func redisServiceHandler(s Service, ln net.Listener) {
 			/*
 				这边针对raft分布式，进行指令重写，SETEX => SETEXAT
 			*/
-			for index, cmdArgs := range args {
+			for _, cmdArgs := range args {
 				if len(cmdArgs) == 0 {
 					continue
 				}
@@ -180,6 +180,19 @@ func redisServiceHandler(s Service, ln net.Listener) {
 					timestamp := time.Now().Unix() + ttl
 					cmdArgs[2] = strconv.FormatInt(timestamp, 10)
 					cmdArgs[0] = "EXPIREAT"
+				case "HEXPIRE": //重写HEXPIRE指令到 HEXPIREAT指令
+					if len(cmdArgs) < 3 {
+						continue
+					}
+
+					ttl, err := strconv.ParseInt(cmdArgs[2], 10, 64)
+					if err != nil {
+						continue
+					}
+
+					timestamp := time.Now().Unix() + ttl
+					cmdArgs[2] = strconv.FormatInt(timestamp, 10)
+					cmdArgs[0] = "HEXPIREAT"
 
 				}
 

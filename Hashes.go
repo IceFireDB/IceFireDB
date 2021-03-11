@@ -2,13 +2,15 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 21:53:02
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 11:46:54
+ * @LastEditTime: 2021-03-11 18:34:43
  * @FilePath: /IceFireDB/Hashes.go
  */
 
 package main
 
 import (
+	"time"
+
 	"github.com/gitsrc/IceFireDB/rafthub"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -33,10 +35,10 @@ func init() {
 	//IceFireDB special command
 	conf.AddWriteCommand("HCLEAR", cmdHCLEAR)
 	conf.AddWriteCommand("HMCLEAR", cmdHMCLEAR)
-	conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)     //超时指令
+	//conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)     //超时指令 HEXPIRE => HEXPIREAT
 	conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT) //超时指令
 	conf.AddReadCommand("HTTL", cmdHTTL)
-	conf.AddWriteCommand("HPERSIST", cmdHPERSIST)
+	// conf.AddWriteCommand("HPERSIST", cmdHPERSIST)
 	conf.AddReadCommand("HKEYEXISTS", cmdHKEYEXISTS)
 
 }
@@ -331,6 +333,15 @@ func cmdHEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
 	when, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	//如果时间戳小于当前时间，则进行删除操作
+	if when < time.Now().Unix() {
+		_, err := ldb.HClear([]byte(args[1]))
+		if err != nil {
+			return nil, err
+		}
+		return redcon.SimpleInt(0), nil
 	}
 
 	v, err := ldb.HExpireAt([]byte(args[1]), when)
