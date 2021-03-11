@@ -33,8 +33,8 @@ func init() {
 	//IceFireDB special command
 	conf.AddWriteCommand("HCLEAR", cmdHCLEAR)
 	conf.AddWriteCommand("HMCLEAR", cmdHMCLEAR)
-	conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)
-	conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT)
+	conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)     //超时指令
+	conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT) //超时指令
 	conf.AddReadCommand("HTTL", cmdHTTL)
 	conf.AddWriteCommand("HPERSIST", cmdHPERSIST)
 	conf.AddReadCommand("HKEYEXISTS", cmdHKEYEXISTS)

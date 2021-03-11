@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 20:09:03
+ * @LastEditTime: 2021-03-11 11:55:20
  * @FilePath: /IceFireDB/lists.go
  */
 
@@ -35,16 +35,13 @@ func init() {
 	//IceFireDB special command
 	conf.AddWriteCommand("LCLEAR", cmdLCLEAR)
 	conf.AddWriteCommand("LMCLEAR", cmdLMCLEAR)
-	conf.AddWriteCommand("LEXPIRE", cmdLEXPIRE) //谨慎，raft日志回滚，造成脏数据
+	conf.AddWriteCommand("LEXPIRE", cmdLEXPIRE) //超时时间指令：谨慎，raft日志回滚，造成脏数据:超时时间
 	conf.AddWriteCommand("LEXPIREAT", cmdLEXPIREAT)
 	conf.AddReadCommand("LTTL", cmdLTTL)
 	conf.AddWriteCommand("LPERSIST", cmdLPERSIST)
 	conf.AddReadCommand("LKEYEXISTS", cmdLKEYEXISTS)
 
 	conf.AddWriteCommand("LTRIM", cmdLTRIM)
-	/*
-
-	 */
 }
 
 func cmdLTRIM(m rafthub.Machine, args []string) (interface{}, error) {
