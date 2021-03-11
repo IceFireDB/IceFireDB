@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 17:30:49
+ * @LastEditTime: 2021-03-11 11:36:11
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -40,8 +40,8 @@ func init() {
 	conf.AddWriteCommand("SETEX", cmdSETEX)
 	conf.AddWriteCommand("SETRANGE", cmdSETRANGE)
 	conf.AddReadCommand("STRLEN", cmdSTRLEN)
-	conf.AddWriteCommand("EXPIRE", cmdEXPIRE)
-	conf.AddWriteCommand("EXPIREAT", cmdEXPIREAT)
+	conf.AddWriteCommand("EXPIRE", cmdEXPIRE)     //超时指令
+	conf.AddWriteCommand("EXPIREAT", cmdEXPIREAT) //超时指令
 	conf.AddReadCommand("TTL", cmdTTL)
 	conf.AddWriteCommand("PERSIST", cmdPERSIST)
 }
