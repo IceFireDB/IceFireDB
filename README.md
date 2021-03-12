@@ -2,11 +2,12 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-12 14:00:16
+ * @LastEditTime: 2021-03-12 14:27:26
  * @FilePath: /IceFireDB/README.md
 -->
 # IceFireDB
 
+[![](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)
 # Overview
 Distributed Redis Disk Storage System Based on Raft Protocol.
 
