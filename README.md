@@ -2,9 +2,16 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-12 15:02:10
+ * @LastEditTime: 2021-03-12 15:44:38
  * @FilePath: /IceFireDB/README.md
 -->
+
+<p align="center">
+<img 
+    src="logo.png" 
+    width="242" height="200" border="0" alt="Doppio">
+</p>
+
 # IceFireDB  [![](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)
 
 Distributed disk storage system based on Raft and RESP protocol.
