@@ -2,13 +2,14 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 13:09:44
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-10 18:01:00
+ * @LastEditTime: 2021-03-12 14:21:15
  * @FilePath: /IceFireDB/main.go
  */
 
 package main
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -21,8 +22,10 @@ import (
 )
 
 func main() {
+	fmt.Println(banner)
 	conf.Name = "IceFireDB"
 	conf.Version = "1.0.0"
+	conf.GitSHA = BuildVersion
 	conf.DataDirReady = func(dir string) {
 		os.RemoveAll(filepath.Join(dir, "main.db"))
 
