@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-12 15:00:53
+ * @LastEditTime: 2021-03-12 15:02:10
  * @FilePath: /IceFireDB/README.md
 -->
 # IceFireDB  [![](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)
@@ -89,5 +89,6 @@ GET: 2130875.50 requests per second
 
 # Thanks
 * https://github.com/tidwall/uhaha
-* https://github.com/ledisdb/ledisdb
 * https://github.com/syndtr/goleveldb
+* https://github.com/dgraph-io/ristretto
+* https://github.com/ledisdb/ledisdb
