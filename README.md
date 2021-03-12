@@ -2,12 +2,12 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-12 14:29:00
+ * @LastEditTime: 2021-03-12 14:42:26
  * @FilePath: /IceFireDB/README.md
 -->
 # IceFireDB  [![](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)
 
-Distributed Redis Disk Storage System Based on Raft Protocol.
+Distributed disk storage system based on Raft and RESP protocol.
 
 1. High performance
 2. Distributed consistency
