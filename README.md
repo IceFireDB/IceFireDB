@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-12 14:42:26
+ * @LastEditTime: 2021-03-12 15:00:53
  * @FilePath: /IceFireDB/README.md
 -->
 # IceFireDB  [![](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)
@@ -85,4 +85,9 @@ corerman@ubuntu:~/DATA/ICODE/GoLang/IceFireDB$ redis-benchmark  -h 127.0.0.1 -p 
 
 SET: 253232.12 requests per second
 GET: 2130875.50 requests per second
+```
 
+# Thanks
+* https://github.com/tidwall/uhaha
+* https://github.com/ledisdb/ledisdb
+* https://github.com/syndtr/goleveldb
