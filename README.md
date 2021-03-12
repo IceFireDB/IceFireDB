@@ -2,14 +2,14 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-12 15:44:38
+ * @LastEditTime: 2021-03-12 15:53:27
  * @FilePath: /IceFireDB/README.md
 -->
 
 <p align="center">
 <img 
     src="logo.png" 
-    width="242" height="200" border="0" alt="Doppio">
+    width="201" height="300" border="0" alt="IceFireDB">
 </p>
 
 # IceFireDB  [![](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)
