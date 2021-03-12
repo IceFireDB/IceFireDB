@@ -2,16 +2,17 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-12 13:55:50
+ * @LastEditTime: 2021-03-12 13:58:22
  * @FilePath: /IceFireDB/README.md
 -->
 # IceFireDB
 
 Distributed Redis Disk Storage System Based on Raft Protocol.
 
-1. Distributed
-2. Reliable LSM disk storage
-3. Cold and hot mixed data storage structure（Upgrading soon）
+1. High performance
+2. Distributed consistency
+3. Reliable LSM disk storage
+4. Cold and hot mixed data storage structure（Upgrading soon）
 
 # Command support
 ## 1. String operating
