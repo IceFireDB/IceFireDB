@@ -21,4 +21,5 @@ LOCK
 *.log
 var
 bin/
+.idea
 
