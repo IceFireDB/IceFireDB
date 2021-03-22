@@ -22,4 +22,4 @@ LOCK
 var
 bin/
 .idea
-
+release_bin
