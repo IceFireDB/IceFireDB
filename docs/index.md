@@ -2,15 +2,9 @@
  * @Author: gitsrc
  * @Date: 2021-08-17 11:27:19
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-17 11:36:22
+ * @LastEditTime: 2021-08-17 11:40:20
  * @FilePath: /IceFireDB/docs/index.md
 -->
-
-<p align="center">
-<img 
-    src="../logo.png" 
-    width="201" height="300" border="0" alt="IceFireDB">
-</p>
 
 ## Welcome to IceFireDB
 
@@ -21,8 +15,6 @@
  * @LastEditTime: 2021-06-10 11:26:39
  * @FilePath: /IceFireDB/README.md
 -->
-
-# IceFireDB  [![](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)
 
 Distributed disk storage system based on Raft and RESP protocol.
 
@@ -96,7 +88,6 @@ Distributed disk storage system based on Raft and RESP protocol.
 * LTRIM
 * LTTL
 # Performance
-### 
 ```shell
 corerman@ubuntu:~/DATA/ICODE/GoLang/IceFireDB$ redis-benchmark  -h 127.0.0.1 -p 11001 -n 10000000 -t set,get -c 512 -P 512 -q
 
