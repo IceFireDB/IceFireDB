@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-08-17 11:27:19
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-17 11:49:07
+ * @LastEditTime: 2021-08-17 14:38:49
  * @FilePath: /IceFireDB/docs/index.md
 -->
 
@@ -95,6 +95,9 @@ corerman@ubuntu:~/DATA/ICODE/GoLang/IceFireDB$ redis-benchmark  -h 127.0.0.1 -p 
 SET: 253232.12 requests per second
 GET: 2130875.50 requests per second
 ```
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB?ref=badge_large)
 
 # Thanks
 * https://github.com/tidwall/uhaha
