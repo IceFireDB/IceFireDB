@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-11 17:58:38
+ * @LastEditTime: 2021-08-17 10:39:41
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -43,9 +43,9 @@ func init() {
 	conf.AddWriteCommand("SETRANGE", cmdSETRANGE)
 	conf.AddReadCommand("STRLEN", cmdSTRLEN)
 	//conf.AddWriteCommand("EXPIRE", cmdEXPIRE)     //EXPIRE => EXPIREAT
-	conf.AddWriteCommand("EXPIREAT", cmdEXPIREAT) //超时指令
+	conf.AddWriteCommand("EXPIREAT", cmdEXPIREAT) //Timeout command
 	conf.AddReadCommand("TTL", cmdTTL)
-	//conf.AddWriteCommand("PERSIST", cmdPERSIST) //禁止:时间持久化
+	//conf.AddWriteCommand("PERSIST", cmdPERSIST) //Prohibition: time persistence
 }
 
 // func cmdPERSIST(m rafthub.Machine, args []string) (interface{}, error) {

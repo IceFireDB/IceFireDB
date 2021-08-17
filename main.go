@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 13:09:44
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-12 14:21:15
+ * @LastEditTime: 2021-08-17 10:38:38
  * @FilePath: /IceFireDB/main.go
  */
 
@@ -46,7 +46,7 @@ func main() {
 			panic(err)
 		}
 
-		//这块代码谨慎判断
+		//Obtain the leveldb object and handle it carefully
 		driver := ldb.GetSDB().GetDriver().GetStorageEngine()
 		db = driver.(*leveldb.DB)
 	}

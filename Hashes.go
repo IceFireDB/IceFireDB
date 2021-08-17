@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 21:53:02
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-11 18:34:43
+ * @LastEditTime: 2021-08-17 10:41:12
  * @FilePath: /IceFireDB/Hashes.go
  */
 
@@ -35,8 +35,8 @@ func init() {
 	//IceFireDB special command
 	conf.AddWriteCommand("HCLEAR", cmdHCLEAR)
 	conf.AddWriteCommand("HMCLEAR", cmdHMCLEAR)
-	//conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)     //超时指令 HEXPIRE => HEXPIREAT
-	conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT) //超时指令
+	//conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)     //Timeout command HEXPIRE => HEXPIREAT
+	conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT) //Timeout command
 	conf.AddReadCommand("HTTL", cmdHTTL)
 	// conf.AddWriteCommand("HPERSIST", cmdHPERSIST)
 	conf.AddReadCommand("HKEYEXISTS", cmdHKEYEXISTS)
@@ -236,7 +236,7 @@ func cmdHSETNX(m rafthub.Machine, args []string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if v != nil { //存在数据,返回0
+	if v != nil { //Data exists, return zero
 		n = 0
 		return redcon.SimpleInt(n), nil
 	}
@@ -335,7 +335,7 @@ func cmdHEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	//如果时间戳小于当前时间，则进行删除操作
+	//If the timestamp is less than the current time, delete operation
 	if when < time.Now().Unix() {
 		_, err := ldb.HClear([]byte(args[1]))
 		if err != nil {
