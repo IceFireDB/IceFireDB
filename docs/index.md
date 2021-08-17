@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-08-17 11:27:19
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-17 14:38:49
+ * @LastEditTime: 2021-08-17 17:46:00
  * @FilePath: /IceFireDB/docs/index.md
 -->
 
@@ -89,12 +89,11 @@ Distributed disk storage system based on Raft and RESP protocol.
 * LTTL
 
 # Performance
-```shell
+
 corerman@ubuntu:~/DATA/ICODE/GoLang/IceFireDB$ redis-benchmark  -h 127.0.0.1 -p 11001 -n 10000000 -t set,get -c 512 -P 512 -q
 
 SET: 253232.12 requests per second
 GET: 2130875.50 requests per second
-```
 
 ## License
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB?ref=badge_large)
