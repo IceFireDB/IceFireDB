@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-11 18:31:35
+ * @LastEditTime: 2021-08-17 10:42:40
  * @FilePath: /IceFireDB/lists.go
  */
 
@@ -21,6 +21,7 @@ import (
 
 func init() {
 	//队列的block类型指令均需要避免，危险操作
+	//All block type instructions of the queue need to be avoided, dangerous operation
 	//conf.AddReadCommand("BLPOP", cmdBLPOP) //此处危险：如果是raft写指令，则raft会进行指令回滚=>卡住raft，如果是raft读指令，则会因为raft无法回滚队列消费日志，出现队列脏数据
 	conf.AddWriteCommand("RPUSH", cmdRPUSH)
 	conf.AddWriteCommand("LPOP", cmdLPOP)
@@ -35,6 +36,7 @@ func init() {
 	//IceFireDB special command
 	conf.AddWriteCommand("LCLEAR", cmdLCLEAR)
 	conf.AddWriteCommand("LMCLEAR", cmdLMCLEAR)
+	//Timeout instruction: be cautious, the raft log is rolled back, causing dirty data: timeout LEXPIRE => LEXPIREAT
 	//conf.AddWriteCommand("LEXPIRE", cmdLEXPIRE) //超时时间指令：谨慎，raft日志回滚，造成脏数据:超时时间  LEXPIRE => LEXPIREAT
 	conf.AddWriteCommand("LEXPIREAT", cmdLEXPIREAT)
 	conf.AddReadCommand("LTTL", cmdLTTL)
@@ -115,6 +117,7 @@ func cmdLEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
 	}
 
 	//如果时间戳小于当前时间，则进行删除操作 :此处有边界条件：因为是队列，raft 日志回滚是顺序的
+	//If the timestamp is less than the current time, delete operation: There are boundary conditions here: because it is a queue, the rollback of the raft log is sequential
 	if when < time.Now().Unix() {
 		_, err := ldb.LClear([]byte(args[1]))
 		if err != nil {
