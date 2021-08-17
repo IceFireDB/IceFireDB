@@ -22,7 +22,7 @@ all:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	go build $(CFLAGS) -mod vendor -o $(PROG) $(SRCS)
+	go build $(CFLAGS) -o $(PROG) $(SRCS)
 
 # 编译race版本
 race:
