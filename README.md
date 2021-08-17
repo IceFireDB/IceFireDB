@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-17 14:32:05
+ * @LastEditTime: 2021-08-17 14:40:34
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -96,11 +96,11 @@ SET: 253232.12 requests per second
 GET: 2130875.50 requests per second
 ```
 
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB?ref=badge_large)
+
 # Thanks
 * https://github.com/tidwall/uhaha
 * https://github.com/syndtr/goleveldb
 * https://github.com/dgraph-io/ristretto
 * https://github.com/ledisdb/ledisdb
-
-## License
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB?ref=badge_large)
