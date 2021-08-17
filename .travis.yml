@@ -3,3 +3,6 @@ go:
   - 1.16.x
 script:
   - make
+branches:
+  only:
+    - main
