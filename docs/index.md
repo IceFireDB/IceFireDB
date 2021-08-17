@@ -1,37 +1,103 @@
-## Welcome to GitHub Pages
+<!--
+ * @Author: gitsrc
+ * @Date: 2021-08-17 11:27:19
+ * @LastEditors: gitsrc
+ * @LastEditTime: 2021-08-17 11:49:07
+ * @FilePath: /IceFireDB/docs/index.md
+-->
 
-You can use the [editor on GitHub](https://github.com/gitsrc/IceFireDB/edit/site/docs/index.md) to maintain and preview the content for your website in Markdown files.
+# Welcome to IceFireDB
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+<!--
+ * @Author: gitsrc
+ * @Date: 2020-12-23 13:30:07
+ * @LastEditors: gitsrc
+ * @LastEditTime: 2021-06-10 11:26:39
+ * @FilePath: /IceFireDB/README.md
+-->
 
-### Markdown
+Distributed disk storage system based on Raft and RESP protocol.
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+1. High performance
+2. Distributed consistency
+3. Reliable LSM disk storage
+4. Cold and hot mixed data storage structure（Upgrading soon）
 
-```markdown
-Syntax highlighted code block
+# Command support
+## 1. String operating
+* APPEND
+* BITCOUNT
+* BITOP
+* BITPOS
+* DECR
+* DECRBY
+* DEL
+* EXISTS
+* GET
+* GETBIT
+* SETBIT
+* GETRANGE
+* GETSET
+* INCR
+* INCRBY
+* MGET
+* MSET
+* SET
+* SETEX
+* SETEXAT
+* SETRANGE
+* EXPIRE
+* EXPIREAT
+* TTL
+## 2. Hash operating
+* HSET
+* HGET
+* HDEL
+* HEXISTS
+* HGETALL
+* HINCRBY
+* HKEYS
+* HLEN
+* HMGET
+* HMSET
+* HSETEX
+* HSTRLEN
+* HVALS
+* HCLEAR
+* HMCLEAR
+* HEXPIRE
+* HEXPIREAT
+* HKEYEXIST
+* HTTL
 
-# Header 1
-## Header 2
-### Header 3
+## 3. List operating
+* RPUSH
+* LPOP
+* LINDEX
+* LPUSH
+* RPOP
+* LRANGE
+* LSET
+* LLEN
+* RPOPLPUSH
+* LCLEAR
+* LMCLEAR
+* LEXPIRE
+* LEXPIREAT
+* LKEYEXISTS
+* LTRIM
+* LTTL
 
-- Bulleted
-- List
+# Performance
+```shell
+corerman@ubuntu:~/DATA/ICODE/GoLang/IceFireDB$ redis-benchmark  -h 127.0.0.1 -p 11001 -n 10000000 -t set,get -c 512 -P 512 -q
 
-1. Numbered
-2. List
-
-**Bold** and _Italic_ and `Code` text
-
-[Link](url) and ![Image](src)
+SET: 253232.12 requests per second
+GET: 2130875.50 requests per second
 ```
 
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/gitsrc/IceFireDB/settings/pages). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://docs.github.com/categories/github-pages-basics/) or [contact support](https://support.github.com/contact) and we’ll help you sort it out.
+# Thanks
+* https://github.com/tidwall/uhaha
+* https://github.com/syndtr/goleveldb
+* https://github.com/dgraph-io/ristretto
+* https://github.com/ledisdb/ledisdb
