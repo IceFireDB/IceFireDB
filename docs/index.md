@@ -1,10 +1,3 @@
-<!--
- * @Author: gitsrc
- * @Date: 2021-08-19 23:14:35
- * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-19 23:15:42
- * @FilePath: /IceFireDB/docs/index.md
--->
 # Welcome to IceFireDB
 
 Distributed disk storage system based on Raft and RESP protocol.
