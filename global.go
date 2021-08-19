@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-10 11:17:13
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-17 15:45:29
+ * @LastEditTime: 2021-08-19 22:51:21
  * @FilePath: /IceFireDB/global.go
  */
 
@@ -11,7 +11,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/gitsrc/IceFireDB/rafthub"
+	"github.com/gitsrc/rafthub"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
 )
