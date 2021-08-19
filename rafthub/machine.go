@@ -1,10 +1,6 @@
-/*
- * @Author: gitsrc
- * @Date: 2020-12-23 13:54:15
- * @LastEditors: gitsrc
- * @LastEditTime: 2020-12-23 14:36:03
- * @FilePath: /RaftHub/machine.go
- */
+// Copyright 2020 Joshua J Baker. All rights reserved.
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file.
 
 package rafthub
 

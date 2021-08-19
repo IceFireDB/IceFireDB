@@ -1,10 +1,6 @@
-/*
- * @Author: gitsrc
- * @Date: 2020-12-23 14:26:19
- * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-11 18:37:16
- * @FilePath: /IceFireDB/rafthub/redisService.go
- */
+// Copyright 2020 Joshua J Baker. All rights reserved.
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file.
 
 package rafthub
 
