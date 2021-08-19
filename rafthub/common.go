@@ -1,10 +1,6 @@
-/*
- * @Author: gitsrc
- * @Date: 2020-12-23 13:43:41
- * @LastEditors: gitsrc
- * @LastEditTime: 2020-12-23 14:39:40
- * @FilePath: /RaftHub/common.go
- */
+// Copyright 2020 Joshua J Baker. All rights reserved.
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file.
 
 package rafthub
 

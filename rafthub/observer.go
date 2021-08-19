@@ -1,10 +1,6 @@
-/*
- * @Author: gitsrc
- * @Date: 2020-12-23 13:58:37
- * @LastEditors: gitsrc
- * @LastEditTime: 2020-12-23 13:59:15
- * @FilePath: /RaftHub/observer.go
- */
+// Copyright 2020 Joshua J Baker. All rights reserved.
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file.
 
 package rafthub
 

@@ -1,10 +1,6 @@
-/*
- * @Author: gitsrc
- * @Date: 2020-12-23 14:10:40
- * @LastEditors: gitsrc
- * @LastEditTime: 2020-12-23 14:13:51
- * @FilePath: /RaftHub/raftwrap.go
- */
+// Copyright 2020 Joshua J Baker. All rights reserved.
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file.
 
 package rafthub
 
