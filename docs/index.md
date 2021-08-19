@@ -1,20 +1,11 @@
 <!--
  * @Author: gitsrc
- * @Date: 2021-08-17 11:27:19
+ * @Date: 2021-08-19 23:14:35
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-17 17:56:40
+ * @LastEditTime: 2021-08-19 23:15:42
  * @FilePath: /IceFireDB/docs/index.md
 -->
-
 # Welcome to IceFireDB
-
-<!--
- * @Author: gitsrc
- * @Date: 2020-12-23 13:30:07
- * @LastEditors: gitsrc
- * @LastEditTime: 2021-06-10 11:26:39
- * @FilePath: /IceFireDB/README.md
--->
 
 Distributed disk storage system based on Raft and RESP protocol.
 
@@ -22,6 +13,8 @@ Distributed disk storage system based on Raft and RESP protocol.
 2. Distributed consistency
 3. Reliable LSM disk storage
 4. Cold and hot mixed data storage structure（Upgrading soon）
+5. Multiple groups of raft clusters, horizontal expansion and contraction of data groups
+6. More advanced cache implementation, faster LSM persistent storage
 
 # Command support
 ## 1. String operating
@@ -100,6 +93,8 @@ GET: 2130875.50 requests per second
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB?ref=badge_large)
 
 # Thanks
+
+### I stood on the shoulders of giants and did only simple things. Thank you for your attention.
 * https://github.com/tidwall/uhaha
 * https://github.com/syndtr/goleveldb
 * https://github.com/dgraph-io/ristretto

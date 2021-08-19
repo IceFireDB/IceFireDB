@@ -11,7 +11,7 @@ package main
 import (
 	"time"
 
-	"github.com/gitsrc/IceFireDB/rafthub"
+	"github.com/gitsrc/rafthub"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/tidwall/redcon"

@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gitsrc/IceFireDB/rafthub"
+	"github.com/gitsrc/rafthub"
 	"github.com/ledisdb/ledisdb/ledis"
 
 	"github.com/tidwall/redcon"

@@ -2,14 +2,16 @@
  * @Author: gitsrc
  * @Date: 2021-03-10 11:17:13
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-03-12 14:16:42
+ * @LastEditTime: 2021-08-19 22:51:21
  * @FilePath: /IceFireDB/global.go
  */
 
 package main
 
 import (
-	"github.com/gitsrc/IceFireDB/rafthub"
+	"fmt"
+
+	"github.com/gitsrc/rafthub"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -30,11 +32,12 @@ var conf rafthub.Config //raft config
 var banner string
 
 func init() {
-	banner = `██╗ ██████╗███████╗███████╗██╗██████╗ ███████╗██████╗ ██████╗ 
-██║██╔════╝██╔════╝██╔════╝██║██╔══██╗██╔════╝██╔══██╗██╔══██╗
-██║██║     █████╗  █████╗  ██║██████╔╝█████╗  ██║  ██║██████╔╝
-██║██║     ██╔══╝  ██╔══╝  ██║██╔══██╗██╔══╝  ██║  ██║██╔══██╗
-██║╚██████╗███████╗██║     ██║██║  ██║███████╗██████╔╝██████╔╝
-╚═╝ ╚═════╝╚══════╝╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚═════╝ ╚═════╝ 
-                                                              `
+	banner = `  ____        _____         ___  ___ 
+  /  _/______ / __(_)______ / _ \/ _ )
+ _/ // __/ -_) _// / __/ -_) // / _  |
+/___/\__/\__/_/ /_/_/  \__/____/____/ 
+                                      
+`
+
+	fmt.Println(banner)
 }
