@@ -86,8 +86,8 @@ GET: 2130875.50 requests per second
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB?ref=badge_large)
 
 # Thanks
+I stood on the shoulders of giants and did only simple things. Thank you for your attention.
 
-### I stood on the shoulders of giants and did only simple things. Thank you for your attention.
 * https://github.com/tidwall/uhaha
 * https://github.com/syndtr/goleveldb
 * https://github.com/dgraph-io/ristretto
