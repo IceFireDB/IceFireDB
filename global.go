@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-10 11:17:13
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-19 22:51:21
+ * @LastEditTime: 2021-08-20 10:47:35
  * @FilePath: /IceFireDB/global.go
  */
 
@@ -11,9 +11,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/gitsrc/rafthub"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
+	rafthub "github.com/tidwall/uhaha"
 )
 
 //BuildDate: Binary file compilation time
