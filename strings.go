@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-20 10:43:40
+ * @LastEditTime: 2021-08-20 11:58:37
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -39,7 +39,9 @@ func init() {
 	conf.AddWriteCommand("MSET", cmdMSET)
 	conf.AddWriteCommand("SET", cmdSET)
 	conf.AddWriteCommand("SETNX", cmdSETNX)
-	//conf.AddWriteCommand("SETEX", cmdSETEX) // SETEX => SETEXAT
+	//TODO SETEX => SETEXAT : 当raft节点宕机、日志回放时 还是回放了setex指令，所以需要在网络层拦截进行指令修改
+	// 由于raft 日志回滚问题，所以推荐大家使用SETEXAT 指令
+	conf.AddWriteCommand("SETEX", cmdSETEX)
 	conf.AddWriteCommand("SETEXAT", cmdSETEXAT)
 	conf.AddWriteCommand("SETRANGE", cmdSETRANGE)
 	conf.AddReadCommand("STRLEN", cmdSTRLEN)
@@ -373,21 +375,36 @@ func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleString("OK"), nil
 }
 
-// func cmdSETEX(m uhaha.Machine, args []string) (interface{}, error) {
-// 	if len(args) < 4 {
-// 		return nil, rafthub.ErrWrongNumArgs
-// 	}
-// 	sec, err := ledis.StrInt64([]byte(args[2]), nil)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+// Setex is rewritten as setexat to avoid the exception of raft log playback
+func cmdSETEX(m uhaha.Machine, args []string) (interface{}, error) {
+	if len(args) < 3 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
 
-// 	if err := ldb.SetEX([]byte(args[1]), sec, []byte(args[3])); err != nil {
-// 		return nil, err
-// 	}
+	sec, err := ledis.StrInt64([]byte(args[2]), nil)
+	if err != nil {
+		return nil, err
+	}
 
-// 	return redcon.SimpleString("OK"), nil
-// }
+	timestamp := time.Now().Unix() + sec
+
+	//如果时间戳小于当前时间，则进行删除操作
+	if timestamp < time.Now().Unix() {
+		keys := make([][]byte, 1)
+		keys[0] = []byte(args[1])
+		_, err := ldb.Del(keys...)
+		if err != nil {
+			return nil, err
+		}
+		return redcon.SimpleString("OK"), nil
+	}
+
+	if err := ldb.SetEXAT([]byte(args[1]), timestamp, []byte(args[3])); err != nil {
+		return nil, err
+	}
+
+	return redcon.SimpleString("OK"), nil
+}
 
 func cmdSETEXAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 4 {
