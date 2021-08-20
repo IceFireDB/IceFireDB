@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 17:57:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-17 10:42:40
+ * @LastEditTime: 2021-08-20 10:43:33
  * @FilePath: /IceFireDB/lists.go
  */
 
@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gitsrc/rafthub"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/siddontang/go/hack"
 	"github.com/tidwall/redcon"
+	rafthub "github.com/tidwall/uhaha"
 )
 
 func init() {

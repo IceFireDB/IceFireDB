@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 21:53:02
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-17 10:41:12
+ * @LastEditTime: 2021-08-20 10:42:42
  * @FilePath: /IceFireDB/Hashes.go
  */
 
@@ -11,10 +11,10 @@ package main
 import (
 	"time"
 
-	"github.com/gitsrc/rafthub"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/tidwall/redcon"
+	rafthub "github.com/tidwall/uhaha"
 )
 
 func init() {
