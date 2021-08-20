@@ -14,6 +14,7 @@ import (
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/tidwall/redcon"
+	"github.com/tidwall/uhaha"
 	rafthub "github.com/tidwall/uhaha"
 )
 
@@ -43,7 +44,7 @@ func init() {
 
 }
 
-func cmdHSET(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 || (len(args))%2 != 0 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -58,7 +59,7 @@ func cmdHSET(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdHGET(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -79,7 +80,7 @@ func cmdHGET(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 //HDEL key field [field ...]
-func cmdHDEL(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHDEL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -98,7 +99,7 @@ func cmdHDEL(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 //HEXISTS key field
-func cmdHEXISTS(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -115,7 +116,7 @@ func cmdHEXISTS(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdHGETALL(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHGETALL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -133,7 +134,7 @@ func cmdHGETALL(m rafthub.Machine, args []string) (interface{}, error) {
 	return dataMap, nil
 }
 
-func cmdHINCRBY(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -151,7 +152,7 @@ func cmdHINCRBY(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 // conf.AddReadCommand("HKEYS", cmdHKEYS)
-func cmdHKEYS(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHKEYS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -165,7 +166,7 @@ func cmdHKEYS(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 //conf.AddReadCommand("HLEN", cmdHLEN)
-func cmdHLEN(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -179,7 +180,7 @@ func cmdHLEN(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 // conf.AddReadCommand("HMGET", cmdHMGET)
-func cmdHMGET(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHMGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -199,7 +200,7 @@ func cmdHMGET(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 //conf.AddWriteCommand("HMSET", cmdHMSET)
-func cmdHMSET(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHMSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -226,7 +227,7 @@ func cmdHMSET(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 // conf.AddWriteCommand("HSETNX", cmdHSETNX)
-func cmdHSETNX(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHSETNX(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -250,7 +251,7 @@ func cmdHSETNX(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 // conf.AddReadCommand("HSTRLEN", cmdHSTRLEN)
-func cmdHSTRLEN(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -264,7 +265,7 @@ func cmdHSTRLEN(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 //conf.AddReadCommand("HVALS", cmdHVALS)
-func cmdHVALS(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHVALS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -277,7 +278,7 @@ func cmdHVALS(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 //conf.AddWriteCommand("HCLEAR", cmdHCLEAR)
-func cmdHCLEAR(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -290,7 +291,7 @@ func cmdHCLEAR(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 //conf.AddWriteCommand("HMCLEAR", cmdHMCLEAR)
-func cmdHMCLEAR(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHMCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -307,7 +308,7 @@ func cmdHMCLEAR(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 // conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)
-func cmdHEXPIRE(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -325,7 +326,7 @@ func cmdHEXPIRE(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 //conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT)
-func cmdHEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -352,7 +353,7 @@ func cmdHEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 // conf.AddReadCommand("HTTL", cmdHTTL)
-func cmdHTTL(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHTTL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -365,7 +366,7 @@ func cmdHTTL(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 // conf.AddWriteCommand("HPERSIST", cmdHPERSIST)
-func cmdHPERSIST(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHPERSIST(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -378,7 +379,7 @@ func cmdHPERSIST(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 //conf.AddReadCommand("HKEYEXISTS", cmdHKEYEXISTS)
-func cmdHKEYEXISTS(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdHKEYEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}

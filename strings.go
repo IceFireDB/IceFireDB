@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ledisdb/ledisdb/ledis"
+	"github.com/tidwall/uhaha"
 	rafthub "github.com/tidwall/uhaha"
 
 	"github.com/tidwall/redcon"
@@ -48,7 +49,7 @@ func init() {
 	//conf.AddWriteCommand("PERSIST", cmdPERSIST) //Prohibition: time persistence
 }
 
-// func cmdPERSIST(m rafthub.Machine, args []string) (interface{}, error) {
+// func cmdPERSIST(m uhaha.Machine, args []string) (interface{}, error) {
 // 	if len(args) != 2 {
 // 		return nil, rafthub.ErrWrongNumArgs
 // 	}
@@ -60,7 +61,7 @@ func init() {
 // 	return redcon.SimpleInt(n), nil
 // }
 
-func cmdEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -89,7 +90,7 @@ func cmdEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(v), nil
 }
 
-// func cmdEXPIRE(m rafthub.Machine, args []string) (interface{}, error) {
+// func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 // 	if len(args) != 3 {
 // 		return nil, rafthub.ErrWrongNumArgs
 // 	}
@@ -106,7 +107,7 @@ func cmdEXPIREAT(m rafthub.Machine, args []string) (interface{}, error) {
 // 	return redcon.SimpleInt(v), nil
 // }
 
-func cmdSTRLEN(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -118,7 +119,7 @@ func cmdSTRLEN(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdSETRANGE(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdSETRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -138,7 +139,7 @@ func cmdSETRANGE(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdINCRBY(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -155,7 +156,7 @@ func cmdINCRBY(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdINCR(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdINCR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -167,7 +168,7 @@ func cmdINCR(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdGETSET(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdGETSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -179,7 +180,7 @@ func cmdGETSET(m rafthub.Machine, args []string) (interface{}, error) {
 	return v, nil
 }
 
-func cmdGETRANGE(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdGETRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -202,7 +203,7 @@ func cmdGETRANGE(m rafthub.Machine, args []string) (interface{}, error) {
 	return v, nil
 }
 
-func cmdSETBIT(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdSETBIT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -225,7 +226,7 @@ func cmdSETBIT(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdGETBIT(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdGETBIT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -244,7 +245,7 @@ func cmdGETBIT(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 //此处和redis标准有区别，当前只支持一个key的判断过程
-func cmdEXISTS(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -256,7 +257,7 @@ func cmdEXISTS(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdDECRBY(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdDECRBY(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -273,7 +274,7 @@ func cmdDECRBY(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdDECR(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdDECR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -285,7 +286,7 @@ func cmdDECR(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdBITPOS(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdBITPOS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -308,7 +309,7 @@ func cmdBITPOS(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdBITOP(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdBITOP(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 4 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -329,7 +330,7 @@ func cmdBITOP(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdAPPEND(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdAPPEND(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -341,7 +342,7 @@ func cmdAPPEND(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdBITCOUNT(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 || len(args) > 4 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -360,7 +361,7 @@ func cmdBITCOUNT(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 //此处和redis标准有区别,需要丰富算法，支撑更多原子指令
-func cmdSET(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -372,7 +373,7 @@ func cmdSET(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleString("OK"), nil
 }
 
-// func cmdSETEX(m rafthub.Machine, args []string) (interface{}, error) {
+// func cmdSETEX(m uhaha.Machine, args []string) (interface{}, error) {
 // 	if len(args) < 4 {
 // 		return nil, rafthub.ErrWrongNumArgs
 // 	}
@@ -388,7 +389,7 @@ func cmdSET(m rafthub.Machine, args []string) (interface{}, error) {
 // 	return redcon.SimpleString("OK"), nil
 // }
 
-func cmdSETEXAT(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdSETEXAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 4 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -415,7 +416,7 @@ func cmdSETEXAT(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleString("OK"), nil
 }
 
-func cmdSETNX(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdSETNX(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -429,7 +430,7 @@ func cmdSETNX(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdGET(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -447,7 +448,7 @@ func cmdGET(m rafthub.Machine, args []string) (interface{}, error) {
 }
 
 //此处和redis标准有区别，为了事务一致性考虑，没有进行key存在判断
-func cmdDEL(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdDEL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -465,7 +466,7 @@ func cmdDEL(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-func cmdMSET(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdMSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 || (len(args)-1)%2 != 0 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -486,7 +487,7 @@ func cmdMSET(m rafthub.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleString("OK"), nil
 }
 
-func cmdMGET(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdMGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
@@ -505,7 +506,7 @@ func cmdMGET(m rafthub.Machine, args []string) (interface{}, error) {
 	return v, nil
 }
 
-func cmdTTL(m rafthub.Machine, args []string) (interface{}, error) {
+func cmdTTL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
