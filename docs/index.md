@@ -13,7 +13,7 @@ Distributed disk storage system based on Raft and RESP protocol.
 
 <p align="center">
 <img 
-    src="../IceFireDB_Architecture.png" 
+    src="https://raw.githubusercontent.com/gitsrc/IceFireDB/main/IceFireDB_Architecture.png" 
      alt="IceFireDB_Architecture">
 </p>
 
