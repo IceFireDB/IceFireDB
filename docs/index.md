@@ -9,6 +9,14 @@ Distributed disk storage system based on Raft and RESP protocol.
 5. Multiple groups of raft clusters, horizontal expansion and contraction of data groups
 6. More advanced cache implementation, faster LSM persistent storage
 
+# Imagine Architecture
+
+<p align="center">
+<img 
+    src="../IceFireDB_Architecture.png" 
+     alt="IceFireDB_Architecture">
+</p>
+
 # Command support
 ## 1. String operating
 * APPEND
