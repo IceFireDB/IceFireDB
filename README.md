@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-19 20:24:49
+ * @LastEditTime: 2021-08-21 22:56:37
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -24,6 +24,14 @@ Distributed disk storage system based on Raft and RESP protocol.
 4. Cold and hot mixed data storage structure（Upgrading soon）
 5. Multiple groups of raft clusters, horizontal expansion and contraction of data groups
 6. More advanced cache implementation, faster LSM persistent storage
+
+# Imagine Architecture
+
+<p align="center">
+<img 
+    src="IceFireDB_Architecture.png" 
+     alt="IceFireDB_Architecture">
+</p>
 
 # Command support
 ## 1. String operating
