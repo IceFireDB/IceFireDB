@@ -23,6 +23,7 @@ var
 bin/
 .idea
 release_bin
+vendor
 
 #vscode
 .vscode
