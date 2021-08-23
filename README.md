@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-21 23:20:25
+ * @LastEditTime: 2021-08-23 19:00:45
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -98,6 +98,16 @@ Distributed disk storage system based on Raft and RESP protocol.
 * LKEYEXISTS
 * LTRIM
 * LTTL
+
+## 4. Sorted Sets
+* ZADD
+* ZCARD
+* ZCOUNT
+* ZREM
+* ZCLEAR
+* ZRANK
+* ZRANGE
+
 # Performance
 ### 
 ```shell
