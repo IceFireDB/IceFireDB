@@ -364,7 +364,7 @@ func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 
 //此处和redis标准有区别,需要丰富算法，支撑更多原子指令
 func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) < 3 {
+	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
@@ -377,7 +377,7 @@ func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
 
 // Setex is rewritten as setexat to avoid the exception of raft log playback
 func cmdSETEX(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) < 3 {
+	if len(args) != 4 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
@@ -434,7 +434,7 @@ func cmdSETEXAT(m uhaha.Machine, args []string) (interface{}, error) {
 }
 
 func cmdSETNX(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) < 3 {
+	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 

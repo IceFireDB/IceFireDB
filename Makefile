@@ -63,3 +63,6 @@ run:
 
 run_dev:
 	go run ./main.go
+
+test:
+	go run 
