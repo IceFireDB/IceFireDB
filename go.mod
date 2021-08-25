@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/armon/go-metrics v0.3.6 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/fatih/color v1.10.0 // indirect
 	github.com/go-redis/redis/v8 v8.11.3
