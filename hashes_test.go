@@ -9,7 +9,6 @@ import (
 
 func TestHash(t *testing.T) {
 	c := getTestConn()
-	defer c.Close()
 
 	key := []byte("a")
 	if n, err := c.Do(c.Context(), "hkeyexists", key).Int64(); err != nil {
@@ -87,7 +86,6 @@ func testHashArray(ay []interface{}, checkValues ...int) error {
 
 func TestHashM(t *testing.T) {
 	c := getTestConn()
-	defer c.Close()
 
 	key := []byte("b")
 	if ok, err := c.Do(c.Context(), "hmset", key, 1, 1, 2, 2, 3, 3).Text(); err != nil {
@@ -139,7 +137,6 @@ func TestHashM(t *testing.T) {
 
 func TestHashIncr(t *testing.T) {
 	c := getTestConn()
-	defer c.Close()
 
 	key := []byte("c")
 	if n, err := c.Do(c.Context(), "hincrby", key, 1, 1).Int64(); err != nil {
@@ -176,7 +173,6 @@ func TestHashIncr(t *testing.T) {
 
 func TestHashGetAll(t *testing.T) {
 	c := getTestConn()
-	defer c.Close()
 
 	key := []byte("d")
 
@@ -225,7 +221,6 @@ func TestHashGetAll(t *testing.T) {
 
 func TestHashErrorParams(t *testing.T) {
 	c := getTestConn()
-	defer c.Close()
 
 	if _, err := c.Do(c.Context(), "hset", "test_hset").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)

@@ -8,7 +8,6 @@ import (
 
 func TestKV(t *testing.T) {
 	c := getTestConn()
-	defer c.Close()
 
 	if ok, err := c.Set(c.Context(), "a", "1234", 0).Result(); err != nil {
 		t.Fatal(err)
@@ -148,7 +147,6 @@ func TestKV(t *testing.T) {
 
 func TestKVM(t *testing.T) {
 	c := getTestConn()
-	defer c.Close()
 
 	if ok, err := c.MSet(c.Context(), "a", "1", "b", "2").Result(); err != nil {
 		t.Error(err)
@@ -177,7 +175,6 @@ func TestKVM(t *testing.T) {
 
 func TestKVIncrDecr(t *testing.T) {
 	c := getTestConn()
-	defer c.Close()
 
 	if n, err := c.Incr(c.Context(), "n").Result(); err != nil {
 		t.Error(err)
@@ -212,7 +209,6 @@ func TestKVIncrDecr(t *testing.T) {
 
 func TestKVErrorParams(t *testing.T) {
 	c := getTestConn()
-	defer c.Close()
 
 	if _, err := c.Do(c.Context(), "get", "a", "b", "c").Result(); err == nil {
 		t.Errorf("invalid err %v", err)
