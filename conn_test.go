@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/go-redis/redis/v8"
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/ledis"
@@ -47,11 +48,17 @@ func getTestConn() *redis.Client {
 		conf.Restore = restore
 		go uhaha.Main(conf)
 
-		// wait server starts
-		time.Sleep(5 * time.Second)
 		testRedisClient = redis.NewClient(&redis.Options{
 			Addr: "127.0.0.1:11001",
 		})
+
+		// wait server starts
+		backoff.Retry(func() error {
+			 _, err := testRedisClient.Set(context.Background(), "init", "1", 0).Result()
+			return err
+		}, backoff.NewConstantBackOff(1*time.Second))
+
+		// clean all data
 		testRedisClient.FlushAll(context.Background())
 	}
 	testConnOnce.Do(f)

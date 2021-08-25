@@ -232,7 +232,6 @@ func TestListMPush(t *testing.T) {
 
 func TestPop(t *testing.T) {
 	c := getTestConn()
-	defer c.Close()
 
 	key := []byte("c")
 	if n, err := c.Do(c.Context(), "rpush", key, 1, 2, 3, 4, 5, 6).Int64(); err != nil {
@@ -295,7 +294,6 @@ func TestPop(t *testing.T) {
 
 func TestRPopLPush(t *testing.T) {
 	c := getTestConn()
-	defer c.Close()
 
 	src := []byte("sr")
 	des := []byte("de")
@@ -364,7 +362,6 @@ func TestRPopLPush(t *testing.T) {
 
 func TestRPopLPushSingleElement(t *testing.T) {
 	c := getTestConn()
-	defer c.Close()
 
 	src := []byte("sr")
 
