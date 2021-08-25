@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 	"testing"
 
 	"github.com/spf13/cast"
@@ -76,15 +75,10 @@ func testHashArray(ay []interface{}, checkValues ...int) error {
 		if ay[i] == nil && checkValues[i] != 0 {
 			return fmt.Errorf("must nil")
 		} else if ay[i] != nil {
-			v, ok := ay[i].([]byte)
-			if !ok {
-				return fmt.Errorf("invalid return data %d %v :%T", i, ay[i], ay[i])
-			}
-
-			d, _ := strconv.Atoi(string(v))
+			d := cast.ToInt(ay[i])
 
 			if d != checkValues[i] {
-				return fmt.Errorf("invalid data %d %s != %d", i, v, checkValues[i])
+				return fmt.Errorf("invalid data %d %v != %d", i, d, checkValues[i])
 			}
 		}
 	}
@@ -96,13 +90,13 @@ func TestHashM(t *testing.T) {
 	defer c.Close()
 
 	key := []byte("b")
-	if ok, err := c.Do(c.Context(), "hmset", key, 1, 1, 2, 2, 3, 3).Result(); err != nil {
+	if ok, err := c.Do(c.Context(), "hmset", key, 1, 1, 2, 2, 3, 3).Text(); err != nil {
 		t.Fatal(err)
-	} else if cast.ToString(ok) != "OK" {
+	} else if ok != "OK" {
 		t.Fatal(ok)
 	}
 
-	if n, err := c.Do(c.Context(), "hlen", key).Result(); err != nil {
+	if n, err := c.Do(c.Context(), "hlen", key).Int64(); err != nil {
 		t.Fatal(err)
 	} else if n != 3 {
 		t.Fatal(n)
@@ -116,13 +110,13 @@ func TestHashM(t *testing.T) {
 		}
 	}
 
-	if n, err := c.Do(c.Context(), "hdel", key, 1, 2, 3, 4).Result(); err != nil {
+	if n, err := c.Do(c.Context(), "hdel", key, 1, 2, 3, 4).Int64(); err != nil {
 		t.Fatal(err)
 	} else if n != 3 {
 		t.Fatal(n)
 	}
 
-	if n, err := c.Do(c.Context(), "hlen", key).Result(); err != nil {
+	if n, err := c.Do(c.Context(), "hlen", key).Int64(); err != nil {
 		t.Fatal(err)
 	} else if n != 0 {
 		t.Fatal(n)
@@ -136,7 +130,7 @@ func TestHashM(t *testing.T) {
 		}
 	}
 
-	if n, err := c.Do(c.Context(), "hlen", key).Result(); err != nil {
+	if n, err := c.Do(c.Context(), "hlen", key).Int64(); err != nil {
 		t.Fatal(err)
 	} else if n != 0 {
 		t.Fatal(n)
@@ -148,31 +142,31 @@ func TestHashIncr(t *testing.T) {
 	defer c.Close()
 
 	key := []byte("c")
-	if n, err := c.Do(c.Context(), "hincrby", key, 1, 1).Result(); err != nil {
+	if n, err := c.Do(c.Context(), "hincrby", key, 1, 1).Int64(); err != nil {
 		t.Fatal(err)
 	} else if n != 1 {
 		t.Fatal(err)
 	}
 
-	if n, err := c.Do(c.Context(), "hlen", key).Result(); err != nil {
+	if n, err := c.Do(c.Context(), "hlen", key).Int64(); err != nil {
 		t.Fatal(err)
 	} else if n != 1 {
 		t.Fatal(n)
 	}
 
-	if n, err := c.Do(c.Context(), "hincrby", key, 1, 10).Result(); err != nil {
+	if n, err := c.Do(c.Context(), "hincrby", key, 1, 10).Int64(); err != nil {
 		t.Fatal(err)
 	} else if n != 11 {
 		t.Fatal(err)
 	}
 
-	if n, err := c.Do(c.Context(), "hlen", key).Result(); err != nil {
+	if n, err := c.Do(c.Context(), "hlen", key).Int64(); err != nil {
 		t.Fatal(err)
 	} else if n != 1 {
 		t.Fatal(n)
 	}
 
-	if n, err := c.Do(c.Context(), "hincrby", key, 1, -11).Result(); err != nil {
+	if n, err := c.Do(c.Context(), "hincrby", key, 1, -11).Int64(); err != nil {
 		t.Fatal(err)
 	} else if n != 0 {
 		t.Fatal(err)
@@ -216,13 +210,13 @@ func TestHashGetAll(t *testing.T) {
 		}
 	}
 
-	if n, err := c.Do(c.Context(), "hclear", key).Result(); err != nil {
+	if n, err := c.Do(c.Context(), "hclear", key).Int64(); err != nil {
 		t.Fatal(err)
 	} else if n != 3 {
 		t.Fatal(n)
 	}
 
-	if n, err := c.Do(c.Context(), "hlen", key).Result(); err != nil {
+	if n, err := c.Do(c.Context(), "hlen", key).Int64(); err != nil {
 		t.Fatal(err)
 	} else if n != 0 {
 		t.Fatal(n)
