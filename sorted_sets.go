@@ -157,26 +157,30 @@ func cmdZRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	min, err := strconv.Atoi(string(args[2]))
-
+	min, max, err := zparseRange(args[2], args[3])
 	if err != nil {
 		return nil, err
 	}
 
-	max, err := strconv.Atoi(string(args[3]))
-
+	ScorePair, err := ldb.ZRange([]byte(args[1]), int(min), int(max))
 	if err != nil {
 		return nil, err
 	}
 
-	ScorePair, err := ldb.ZRange([]byte(args[1]), min, max)
-
-	if err != nil {
-		return nil, err
+	var withScores bool 
+	args = args[4:]
+	if len(args) > 0 {
+		if len(args) != 1 {
+			return nil,  rafthub.ErrWrongNumArgs
+		}
+		if strings.ToLower(args[0]) == "withscores" {
+			withScores = true
+		} else {
+			return nil, uhaha.ErrSyntax
+		}
 	}
 
-	//WITHSCORES
-	if strings.ToUpper(args[len(args)-1]) == "WITHSCORES" {
+	if withScores {
 		ret := make([][]byte, len(ScorePair)*2)
 
 		for index, item := range ScorePair {
