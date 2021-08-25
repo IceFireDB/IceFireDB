@@ -17,7 +17,7 @@ import (
 var testConnOnce sync.Once
 var testRedisClient *redis.Client
 
-func getConnTest() *redis.Client {
+func getTestConn() *redis.Client {
 	f := func() {
 		conf.DataDir = "/tmp/icefiredb"
 		os.RemoveAll(conf.DataDir)

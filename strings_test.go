@@ -7,7 +7,7 @@ import (
 )
 
 func TestKV(t *testing.T) {
-	c := getConnTest()
+	c := getTestConn()
 	defer c.Close()
 
 	if ok, err := c.Set(c.Context(), "a", "1234", 0).Result(); err != nil {
@@ -142,6 +142,152 @@ func TestKV(t *testing.T) {
 	if v, err := c.Get(c.Context(), "bit_dest_key").Result(); err != nil {
 		t.Fatal(err)
 	} else if v != "`bc`ab" {
-		t.Fatal(v)
+		t.Error(v)
 	}
+}
+
+func TestKVM(t *testing.T) {
+	c := getTestConn()
+	defer c.Close()
+
+	if ok, err := c.MSet(c.Context(), "a", "1", "b", "2").Result(); err != nil {
+		t.Error(err)
+	} else if ok != "OK" {
+		t.Error(ok)
+	}
+
+	if v, err := c.MGet(c.Context(), "a", "b", "c").Result(); err != nil {
+		t.Error(err)
+	} else if len(v) != 3 {
+		t.Error(len(v))
+	} else {
+		if vv, ok := v[0].(string); !ok || vv != "1" {
+			t.Error("not 1")
+		}
+
+		if vv, ok := v[1].(string); !ok || vv != "2" {
+			t.Error("not 2")
+		}
+
+		if v[2] != "" {
+			t.Error("must nil")
+		}
+	}
+}
+
+func TestKVIncrDecr(t *testing.T) {
+	c := getTestConn()
+	defer c.Close()
+
+	if n, err := c.Incr(c.Context(), "n").Result(); err != nil {
+		t.Error(err)
+	} else if n != 1 {
+		t.Error(n)
+	}
+
+	if n, err := c.Incr(c.Context(), "n").Result(); err != nil {
+		t.Error(err)
+	} else if n != 2 {
+		t.Error(n)
+	}
+
+	if n, err := c.Decr(c.Context(), "n").Result(); err != nil {
+		t.Error(err)
+	} else if n != 1 {
+		t.Error(n)
+	}
+
+	if n, err := c.IncrBy(c.Context(), "n", 10).Result(); err != nil {
+		t.Error(err)
+	} else if n != 11 {
+		t.Error(n)
+	}
+
+	if n, err := c.DecrBy(c.Context(), "n", 10).Result(); err != nil {
+		t.Error(err)
+	} else if n != 1 {
+		t.Error(n)
+	}
+}
+
+func TestKVErrorParams(t *testing.T) {
+	c := getTestConn()
+	defer c.Close()
+
+	if _, err := c.Do(c.Context(), "get", "a", "b", "c").Result(); err == nil {
+		t.Errorf("invalid err %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "set", "a", "b", "c").Result(); err == nil {
+		t.Errorf("invalid err %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "getset", "a", "b", "c").Result(); err == nil {
+		t.Errorf("invalid err %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "setnx", "a", "b", "c").Result(); err == nil {
+		t.Errorf("invalid err %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "exists", "a", "b").Result(); err == nil {
+		t.Errorf("invalid err %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "incr", "a", "b").Result(); err == nil {
+		t.Errorf("invalid err %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "incrby", "a").Result(); err == nil {
+		t.Errorf("invalid err %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "decrby", "a").Result(); err == nil {
+		t.Errorf("invalid err %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "del").Result(); err == nil {
+		t.Errorf("invalid err of %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "mset").Result(); err == nil {
+		t.Errorf("invalid err of %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "mset", "a", "b", "c").Result(); err == nil {
+		t.Errorf("invalid err of %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "mget").Result(); err == nil {
+		t.Errorf("invalid err of %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "expire").Result(); err == nil {
+		t.Errorf("invalid err of %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "expire", "a", "b").Result(); err == nil {
+		t.Errorf("invalid err of %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "expireat").Result(); err == nil {
+		t.Errorf("invalid err of %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "expireat", "a", "b").Result(); err == nil {
+		t.Errorf("invalid err of %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "ttl").Result(); err == nil {
+		t.Errorf("invalid err of %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "persist").Result(); err == nil {
+		t.Errorf("invalid err of %v", err)
+	}
+
+	if _, err := c.Do(c.Context(), "setex", "a", "blah", "hello world").Result(); err == nil {
+		t.Errorf("invalid err %v", err)
+	}
+
 }
