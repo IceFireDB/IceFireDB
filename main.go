@@ -10,9 +10,13 @@ package main
 
 import (
 	"io"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 
+	"github.com/gitsrc/IceFireDB/hybriddb"
+
+	_ "github.com/gitsrc/IceFireDB/hybriddb"
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -27,10 +31,11 @@ func main() {
 	conf.DataDirReady = func(dir string) {
 		os.RemoveAll(filepath.Join(dir, "main.db"))
 
-		//配置ledis相关路径
 		cfg := lediscfg.NewConfigDefault()
 		cfg.DataDir = filepath.Join(dir, "main.db")
-
+		cfg.Databases = 1
+		// use hybriddb
+		cfg.DBName = hybriddb.DBName
 		var err error
 		le, err = ledis.Open(cfg)
 
@@ -44,7 +49,7 @@ func main() {
 			panic(err)
 		}
 
-		//Obtain the leveldb object and handle it carefully
+		// Obtain the leveldb object and handle it carefully
 		driver := ldb.GetSDB().GetDriver().GetStorageEngine()
 		db = driver.(*leveldb.DB)
 	}
