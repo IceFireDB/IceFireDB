@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/armon/go-metrics v0.3.6 // indirect
+	github.com/dgraph-io/ristretto v0.1.0
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
@@ -29,3 +30,5 @@ require (
 )
 
 replace github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6 => github.com/gitsrc/ledisdb v0.0.0-20210311085546-2e33308de99f
+
+replace github.com/tidwall/uhaha v0.8.1 => github.com/gitsrc/uhaha v0.6.2-0.20210825093330-16e008760735
