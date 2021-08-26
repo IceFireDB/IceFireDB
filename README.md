@@ -13,7 +13,9 @@
 </p>
 
 # IceFireDB  
-[![](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main) [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB?ref=badge_shield)
+![test](https://github.com/gitsrc/IceFireDB/actions/workflows/test.yml/badge.svg)
+![build](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)
+![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB.svg?type=shield)
 
 
 Distributed disk storage system based on Raft and RESP protocol.
@@ -106,6 +108,14 @@ Distributed disk storage system based on Raft and RESP protocol.
 * ZCLEAR
 * ZRANK
 * ZRANGE
+* ZREVRANGE
+* ZSCORE
+* ZINCRBY
+* ZREVRANK
+* ZRANGEBYSCORE
+* ZREVRANGEBYSCORE
+* ZREMRANGEBYSCORE
+* ZREMRANGEBYRANK
 
 # Performance
 ### 
