@@ -22,6 +22,7 @@ import (
 	"github.com/gitsrc/IceFireDB/hybriddb"
 
 	_ "github.com/gitsrc/IceFireDB/hybriddb"
+	argshandler "github.com/gitsrc/IceFireDB/argsHandler"
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -67,6 +68,7 @@ func main() {
 	}()
 	conf.Snapshot = snapshot
 	conf.Restore = restore
+	conf.CmdRewrite = argshandler.RedisCmdRewrite
 	rafthub.Main(conf)
 }
 
