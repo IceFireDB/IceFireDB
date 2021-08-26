@@ -12,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
@@ -61,6 +62,9 @@ func main() {
 		driver := ldb.GetSDB().GetDriver().GetStorageEngine()
 		db = driver.(*leveldb.DB)
 	}
+	go func() {
+		http.ListenAndServe(":26063", nil)
+	}()
 	conf.Snapshot = snapshot
 	conf.Restore = restore
 	rafthub.Main(conf)
@@ -148,7 +152,7 @@ Networking options:
 
 Store options: 
   --hot-cache-size int : memory cache capacity，unit:MB (default 1024)
-  --db-name string     : select a db to use, it will overwrite the config's db name (default 1024)
+  --db-name string     : select a db to use, it will overwrite the config's db name
 
 Advanced options:
   --nosync         : turn off syncing data to disk after every write. This leads
