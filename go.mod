@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/armon/go-metrics v0.3.6 // indirect
+	github.com/dgraph-io/ristretto v0.1.0
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/edsrzf/mmap-go v1.0.0 // indirect

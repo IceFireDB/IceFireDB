@@ -32,7 +32,6 @@ func TestKV(t *testing.T) {
 	} else if ok != "OK" {
 		t.Fatalf("setex err")
 	}
-
 	if v, err := c.Get(c.Context(), "a").Result(); err != nil {
 		t.Fatal(err)
 	} else if v != "1234" {
@@ -285,5 +284,4 @@ func TestKVErrorParams(t *testing.T) {
 	if _, err := c.Do(c.Context(), "setex", "a", "blah", "hello world").Result(); err == nil {
 		t.Errorf("invalid err %v", err)
 	}
-
 }
