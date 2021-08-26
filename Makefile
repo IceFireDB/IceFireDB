@@ -59,7 +59,10 @@ clean:
 	rm -rf $(CONF_INSTALL_PREFIX)
 
 run:
-	go run ./main.go 
+	go run .
 
 run_dev:
-	go run ./main.go
+	go run .
+
+test:
+	go test -v --v ./...
