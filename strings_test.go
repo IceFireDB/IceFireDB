@@ -27,7 +27,7 @@ func TestKV(t *testing.T) {
 		t.Fatalf("setnx err")
 	}
 
-	if ok, err := c.SetEX(c.Context(), "mykey", "hello", 10000000000).Result(); err != nil {
+	if ok, err := c.SetEX(c.Context(), "mykey", "hello", 10).Result(); err != nil {
 		t.Fatal(err)
 	} else if ok != "OK" {
 		t.Fatalf("setex err")
