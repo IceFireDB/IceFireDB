@@ -42,6 +42,8 @@ github.com/fsnotify/fsnotify v1.4.9 h1:hsms1Qyu0jgnwNXIxa+/V/PDsU6CfLf6CNO8H7IWo
 github.com/fsnotify/fsnotify v1.4.9/go.mod h1:znqG4EE+3YCdAaPaxE2ZRY/06pZUdp0tY4IgpuI1SZQ=
 github.com/gitsrc/ledisdb v0.0.0-20210311085546-2e33308de99f h1:gjl6DyMIYTI+SuMj3eS71CSZxQUcO+xzI8jtxV0GDUw=
 github.com/gitsrc/ledisdb v0.0.0-20210311085546-2e33308de99f/go.mod h1:n931TsDuKuq+uX4v1fulaMbA/7ZLLhjc85h7chZGBCQ=
+github.com/gitsrc/uhaha v0.6.2-0.20210825093330-16e008760735 h1:J50NvKZUxXpxkp77mkXETOWwx+Egtw6uCXlhKGyJRGU=
+github.com/gitsrc/uhaha v0.6.2-0.20210825093330-16e008760735/go.mod h1:jld6/O1K26UUwT+tMLOvVB3Dc67aUO9/AGFyd0VhqOY=
 github.com/glendc/gopher-json v0.0.0-20170414221815-dc4743023d0c/go.mod h1:Gja1A+xZ9BoviGJNA2E9vFkPjjsl+CoJxSXiQM1UXtw=
 github.com/go-kit/kit v0.8.0/go.mod h1:xBxKIO96dXMWWy0MnWVtmwkA9/13aqxPnvrjFYMA2as=
 github.com/go-kit/kit v0.9.0/go.mod h1:xBxKIO96dXMWWy0MnWVtmwkA9/13aqxPnvrjFYMA2as=
@@ -203,8 +205,6 @@ github.com/tidwall/rtime v0.2.0/go.mod h1:y/sMgr+q6fS3V+rU9JxJcrBwCXLUU8519MJNK3
 github.com/tidwall/sds v0.1.0 h1:JGk30J9xTHS6i7KzCWRoVg+tWJH+bMaRTfFvhkM/1/4=
 github.com/tidwall/sds v0.1.0/go.mod h1:686nVK8DGe2Ek2ai8sMiMQTH/TRsupw9LUCar0Dt/e0=
 github.com/tidwall/tinybtree v1.0.1/go.mod h1:0aFQG6KLQz3j57CeVgXlmKO3RSQ3myhJn2H+r84IgSY=
-github.com/tidwall/uhaha v0.8.1 h1:Xzwloi9c8wM2u3DrCv0OZzq8MT5zOPzG5QZGZdychNs=
-github.com/tidwall/uhaha v0.8.1/go.mod h1:jld6/O1K26UUwT+tMLOvVB3Dc67aUO9/AGFyd0VhqOY=
 github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqriFuLhtthL60Sar/7RFoluCcXsuvEwTV5KM=
 github.com/ugorji/go v0.0.0-20171122102828-84cb69a8af83/go.mod h1:hnLbHMwcvSihnDhEfx2/BzKp2xb0Y+ErdfYcrs9tkJQ=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
