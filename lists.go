@@ -313,6 +313,12 @@ func cmdLINDEX(m uhaha.Machine, args []string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// return `(nil)` when out of range
+	if len(v) == 0 {
+		return nil, nil
+	}
+
 	return v, nil
 }
 

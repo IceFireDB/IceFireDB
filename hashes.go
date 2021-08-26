@@ -49,10 +49,10 @@ func cmdHSET(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n := 0
+	var n int64
 	for i := 2; i < len(args); i += 2 {
-		if _, err := ldb.HSet([]byte(args[1]), []byte(args[i]), []byte(args[i+1])); err == nil {
-			n++
+		if r, err := ldb.HSet([]byte(args[1]), []byte(args[i]), []byte(args[i+1])); err == nil {
+			n = n + r
 		}
 	}
 
