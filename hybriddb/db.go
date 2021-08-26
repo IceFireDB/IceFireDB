@@ -13,7 +13,24 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-const defaultFilterBits int = 10
+const (
+	defaultFilterBits          int   = 10
+	MB                         int64 = 1024 * 1024
+	defaultHotCacheSize        int64 = 1024 // unit:MB 1G
+	defaultHotCacheNumCounters int64 = 1e7  // unit:byte 10m
+)
+
+type Config struct {
+	HotCacheSize int64
+}
+
+var DefaultConfig = Config{
+	HotCacheSize: defaultHotCacheSize,
+}
+
+func init() {
+	driver.Register(Store{})
+}
 
 type Store struct{}
 
@@ -38,15 +55,19 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	if err != nil {
 		return nil, err
 	}
+	if DefaultConfig.HotCacheSize <= 0 {
+		DefaultConfig.HotCacheSize = defaultHotCacheSize
+	}
 	// here we use default value, later add config support
 	db.cache, err = ristretto.NewCache(&ristretto.Config{
-		NumCounters: 102400,
-		MaxCost:     1024 * 1024 * 1024, // 1G
+		MaxCost:     DefaultConfig.HotCacheSize * MB,
+		NumCounters: defaultHotCacheNumCounters,
 		BufferItems: 64,
 		Cost: func(value interface{}) int64 {
 			return int64(len(value.([]byte)))
 		},
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +149,6 @@ func (db *DB) Close() error {
 }
 
 func (db *DB) Put(key, value []byte) error {
-	// log.Println("put", string(key), string(value))
 	err := db.db.Put(key, value, nil)
 	if err == nil {
 		db.cache.Del(key)
@@ -137,7 +157,6 @@ func (db *DB) Put(key, value []byte) error {
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
-	// log.Println("get", string(key))
 	if v, ok := db.cache.Get(key); ok {
 		return v.([]byte), nil
 	}
@@ -150,7 +169,6 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 }
 
 func (db *DB) Delete(key []byte) error {
-	// log.Println("del", string(key))
 	err := db.db.Delete(key, nil)
 	if err == nil {
 		db.cache.Del(key)
@@ -159,7 +177,6 @@ func (db *DB) Delete(key []byte) error {
 }
 
 func (db *DB) SyncPut(key []byte, value []byte) error {
-	// log.Println("SyncPut", string(key), string(value))
 	err := db.db.Put(key, value, db.syncOpts)
 	if err == nil {
 		db.cache.Del(key)
@@ -168,7 +185,6 @@ func (db *DB) SyncPut(key []byte, value []byte) error {
 }
 
 func (db *DB) SyncDelete(key []byte) error {
-	// log.Println("del", string(key))
 	err := db.db.Delete(key, db.syncOpts)
 	if err == nil {
 		db.cache.Del(key)
@@ -211,8 +227,4 @@ func (db *DB) Compact() error {
 		Start: nil,
 		Limit: nil,
 	})
-}
-
-func init() {
-	driver.Register(Store{})
 }

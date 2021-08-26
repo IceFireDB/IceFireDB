@@ -10,13 +10,11 @@ type WriteBatch struct {
 }
 
 func (w *WriteBatch) Put(key, value []byte) {
-	// log.Println("Put", string(key), string(value))
 	w.wbatch.Put(key, value)
 	w.db.cache.Del(key)
 }
 
 func (w *WriteBatch) Delete(key []byte) {
-	// log.Println("del", string(key))
 	w.wbatch.Delete(key)
 	w.db.cache.Del(key)
 }
