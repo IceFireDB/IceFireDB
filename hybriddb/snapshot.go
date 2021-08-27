@@ -5,22 +5,22 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-type Snapshot struct {
-	db  *DB
+type snapshot struct {
+	db  *store
 	snp *leveldb.Snapshot
 }
 
-func (s *Snapshot) Get(key []byte) ([]byte, error) {
+func (s *snapshot) Get(key []byte) ([]byte, error) {
 	return s.snp.Get(key, s.db.iteratorOpts)
 }
 
-func (s *Snapshot) NewIterator() driver.IIterator {
+func (s *snapshot) NewIterator() driver.IIterator {
 	it := &Iterator{
 		s.snp.NewIterator(nil, s.db.iteratorOpts),
 	}
 	return it
 }
 
-func (s *Snapshot) Close() {
+func (s *snapshot) Close() {
 	s.snp.Release()
 }
