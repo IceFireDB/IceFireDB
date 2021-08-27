@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gitsrc/IceFireDB/utils"
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -68,6 +69,7 @@ func main() {
 	}
 	conf.Snapshot = snapshot
 	conf.Restore = restore
+	conf.CmdRewriteFunc = utils.RedisCmdRewrite
 	rafthub.Main(conf)
 }
 
