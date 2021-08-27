@@ -19,8 +19,8 @@ import (
 	"strconv"
 	"strings"
 
-	argshandler "github.com/gitsrc/IceFireDB/argsHandler"
 	"github.com/gitsrc/IceFireDB/hybriddb"
+	"github.com/gitsrc/IceFireDB/utils"
 
 	_ "github.com/gitsrc/IceFireDB/hybriddb"
 	lediscfg "github.com/ledisdb/ledisdb/config"
@@ -68,7 +68,7 @@ func main() {
 	}()
 	conf.Snapshot = snapshot
 	conf.Restore = restore
-	conf.CmdRewriteFunc = argshandler.RedisCmdRewrite
+	conf.CmdRewriteFunc = utils.RedisCmdRewrite
 	rafthub.Main(conf)
 }
 
