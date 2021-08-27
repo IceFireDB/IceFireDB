@@ -1,4 +1,4 @@
-package argshandler
+package utils
 
 import (
 	"strconv"
