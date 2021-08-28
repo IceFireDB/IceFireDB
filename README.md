@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-28 17:17:39
+ * @LastEditTime: 2021-08-28 17:22:10
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -137,6 +137,3 @@ GET: 2130875.50 requests per second
 * https://github.com/syndtr/goleveldb
 * https://github.com/dgraph-io/ristretto
 * https://github.com/ledisdb/ledisdb
-
-# State
-The project is at an early stage and is not recommended for use in a production environment
