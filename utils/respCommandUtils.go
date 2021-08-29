@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-//rewrite some redis instructions
+//Mainly contains redis command processing functions
 
 func RedisCmdRewrite(args [][]string) {
 	nowUnixTime := time.Now().Unix()
