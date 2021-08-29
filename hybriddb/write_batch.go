@@ -4,38 +4,38 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-type WriteBatch struct {
-	db     *DB
+type writeBatch struct {
+	db     *store
 	wbatch *leveldb.Batch
 }
 
-func (w *WriteBatch) Put(key, value []byte) {
+func (w *writeBatch) Put(key, value []byte) {
 	w.wbatch.Put(key, value)
 	w.db.cache.Del(key)
 }
 
-func (w *WriteBatch) Delete(key []byte) {
+func (w *writeBatch) Delete(key []byte) {
 	w.wbatch.Delete(key)
 	w.db.cache.Del(key)
 }
 
-func (w *WriteBatch) Commit() error {
+func (w *writeBatch) Commit() error {
 	return w.db.db.Write(w.wbatch, nil)
 }
 
-func (w *WriteBatch) SyncCommit() error {
+func (w *writeBatch) SyncCommit() error {
 	return w.db.db.Write(w.wbatch, w.db.syncOpts)
 }
 
-func (w *WriteBatch) Rollback() error {
+func (w *writeBatch) Rollback() error {
 	w.wbatch.Reset()
 	return nil
 }
 
-func (w *WriteBatch) Close() {
+func (w *writeBatch) Close() {
 	w.wbatch.Reset()
 }
 
-func (w *WriteBatch) Data() []byte {
+func (w *writeBatch) Data() []byte {
 	return w.wbatch.Dump()
 }

@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-23 18:26:31
+ * @LastEditTime: 2021-08-28 17:22:10
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -23,8 +23,8 @@ Distributed disk storage system based on Raft and RESP protocol.
 1. High performance
 2. Distributed consistency
 3. Reliable LSM disk storage
-4. Cold and hot mixed data storage structure（Upgrading soon）
-5. Multiple groups of raft clusters, horizontal expansion and contraction of data groups
+4. Cold and hot mixed data storage structure
+5. Multiple groups of raft clusters, horizontal expansion and contraction of data groups（Upgrading soon）
 6. More advanced cache implementation, faster LSM persistent storage
 
 # Imagine Architecture
@@ -137,6 +137,3 @@ GET: 2130875.50 requests per second
 * https://github.com/syndtr/goleveldb
 * https://github.com/dgraph-io/ristretto
 * https://github.com/ledisdb/ledisdb
-
-# State
-The project is at an early stage and is not recommended for use in a production environment
