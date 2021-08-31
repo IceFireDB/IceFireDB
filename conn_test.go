@@ -33,7 +33,7 @@ func getTestConn() *redis.Client {
 			ldsCfg = lediscfg.NewConfigDefault()
 			ldsCfg.DataDir = filepath.Join(dir, "main.db")
 			ldsCfg.Databases = 1
-			ldsCfg.DBName = hybriddb.DBName
+			ldsCfg.DBName = hybriddb.StorageName
 			var err error
 			le, err = ledis.Open(ldsCfg)
 			if err != nil {
