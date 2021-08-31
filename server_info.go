@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"runtime/debug"
+	deb "runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -159,10 +159,10 @@ func (i *info) dumpGC(buf *bytes.Buffer) {
 
 	count := 5
 
-	var st debug.GCStats
+	var st deb.GCStats
 	st.Pause = make([]time.Duration, count)
 	// st.PauseQuantiles = make([]time.Duration, count)
-	debug.ReadGCStats(&st)
+	deb.ReadGCStats(&st)
 
 	h := make([]string, 0, count)
 

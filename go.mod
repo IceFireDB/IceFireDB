@@ -4,9 +4,9 @@ go 1.16
 
 require (
 	github.com/armon/go-metrics v0.3.6 // indirect
-	github.com/dgraph-io/ristretto v0.1.0
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/davecgh/go-spew v1.1.1
+	github.com/dgraph-io/ristretto v0.1.0
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/fatih/color v1.10.0 // indirect
 	github.com/go-redis/redis/v8 v8.11.3
@@ -29,6 +29,7 @@ require (
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
 )
 
-replace github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6 => github.com/gitsrc/ledisdb v0.0.0-20210311085546-2e33308de99f
-
-replace github.com/tidwall/uhaha v0.8.1 => github.com/gitsrc/uhaha v0.6.2-0.20210825093330-16e008760735
+replace (
+	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6 => github.com/gitsrc/ledisdb v0.0.0-20210311085546-2e33308de99f
+	github.com/tidwall/uhaha v0.8.1 => github.com/gitsrc/uhaha v0.6.2-0.20210827055200-e2d63f4d4aee
+)

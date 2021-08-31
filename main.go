@@ -9,19 +9,16 @@
 package main
 
 import (
-	"flag"
-	"fmt"
 	"io"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"sync/atomic"
 
 	"github.com/gitsrc/IceFireDB/hybriddb"
 
+	"github.com/gitsrc/IceFireDB/utils"
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -29,8 +26,14 @@ import (
 	rafthub "github.com/tidwall/uhaha"
 )
 
-// select storage Engine
-var DBName string
+var (
+	// storageBackend select storage Engine
+	storageBackend string
+	// pprof listen
+	pprofAddr string
+	// debug
+	debug bool
+)
 
 func main() {
 	conf.Name = "IceFireDB"
@@ -44,17 +47,15 @@ func main() {
 		ldsCfg = lediscfg.NewConfigDefault()
 		ldsCfg.DataDir = filepath.Join(dir, "main.db")
 		ldsCfg.Databases = 1
-		ldsCfg.DBName = DBName
+		ldsCfg.DBName = storageBackend
 
 		var err error
 		le, err = ledis.Open(ldsCfg)
-
 		if err != nil {
 			panic(err)
 		}
 
 		ldb, err = le.Select(0)
-
 		if err != nil {
 			panic(err)
 		}
@@ -65,17 +66,21 @@ func main() {
 		if db, ok = driver.(*leveldb.DB); !ok {
 			panic("unsupported storage is caused")
 		}
-		if DBName == hybriddb.DBName {
+		if storageBackend == hybriddb.StorageName {
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*hybriddb.DB).Metrics)
 		}
 	}
-	go func() {
-		http.ListenAndServe(":26063", nil)
-	}()
+	if debug {
+		// pprof for profiling
+		go func() {
+			http.ListenAndServe(pprofAddr, nil)
+		}()
+	}
 	conf.Snapshot = snapshot
 	conf.Restore = restore
 	conf.ConnOpened = connOpened
 	conf.ConnClosed = connClosed
+	conf.CmdRewriteFunc = utils.RedisCmdRewrite
 	rafthub.Main(conf)
 }
 
@@ -137,145 +142,6 @@ func restore(rd io.Reader) (interface{}, error) {
 		return nil, err
 	}
 	return nil, nil
-}
-
-const usage = `{{NAME}} version: {{VERSION}} ({{GITSHA}})
-
-Usage: {{NAME}} [-n id] [-a addr] [options]
-
-Basic options:
-  -h               : display help, this screen
-  -a addr          : bind to address  (default: 127.0.0.1:11001)
-  -n id            : node ID  (default: 1)
-  -d dir           : data directory  (default: data)
-  -j addr          : leader address of a cluster to join
-  -l level         : log level  (default: info) [debug,verb,info,warn,silent]
-
-Security options:
-  --tls-cert path  : path to TLS certificate
-  --tls-key path   : path to TLS private key
-  --auth auth      : cluster authorization, shared by all servers and clients
-
-Networking options: 
-  --advertise addr : advertise address  (default: network bound address)
-
-Store options: 
-  --hot-cache-size int : memory cache capacity，unit:MB (default 1024)
-  --db-name string     : select a db to use, it will overwrite the config's db name
-
-Advanced options:
-  --nosync         : turn off syncing data to disk after every write. This leads
-                     to faster write operations but opens up the chance for data
-                     loss due to catastrophic events such as power failure.
-  --openreads      : allow followers to process read commands, but with the 
-                     possibility of returning stale data.
-  --localtime      : have the raft machine time synchronized with the local
-                     server rather than the public internet. This will run the 
-                     risk of time shifts when the local server time is
-                     drastically changed during live operation. 
-  --restore path   : restore a raft machine from a snapshot file. This will
-                     start a brand new single-node cluster using the snapshot as
-                     initial data. The other nodes must be re-joined. This
-                     operation is ignored when a data directory already exists.
-                     Cannot be used with -j flag.
-  --init-run-quit  : initialize a bootstrap operation and then quit.
-`
-
-func confInit(conf *rafthub.Config) {
-	flag.Usage = func() {
-		w := os.Stderr
-		for _, arg := range os.Args {
-			if arg == "-h" || arg == "--help" {
-				w = os.Stdout
-				break
-			}
-		}
-		s := usage
-		s = strings.ReplaceAll(s, "{{VERSION}}", conf.Version)
-		if conf.GitSHA == "" {
-			s = strings.ReplaceAll(s, " ({{GITSHA}})", "")
-			s = strings.ReplaceAll(s, "{{GITSHA}}", "")
-		} else {
-			s = strings.ReplaceAll(s, "{{GITSHA}}", conf.GitSHA)
-		}
-		s = strings.ReplaceAll(s, "{{NAME}}", conf.Name)
-		if conf.Flag.Usage != nil {
-			s = conf.Flag.Usage(s)
-		}
-		s = strings.ReplaceAll(s, "{{USAGE}}", "")
-		w.Write([]byte(s))
-		if w == os.Stdout {
-			os.Exit(0)
-		}
-	}
-	var backend string
-	var testNode string
-	flag.StringVar(&conf.Addr, "a", conf.Addr, "")
-	flag.StringVar(&conf.NodeID, "n", conf.NodeID, "")
-	flag.StringVar(&conf.DataDir, "d", conf.DataDir, "")
-	flag.StringVar(&conf.JoinAddr, "j", conf.JoinAddr, "")
-	flag.StringVar(&conf.LogLevel, "l", conf.LogLevel, "")
-	flag.StringVar(&backend, "backend", "leveldb", "")
-	flag.StringVar(&conf.TLSCertPath, "tls-cert", conf.TLSCertPath, "")
-	flag.StringVar(&conf.TLSKeyPath, "tls-key", conf.TLSKeyPath, "")
-	flag.BoolVar(&conf.NoSync, "nosync", conf.NoSync, "")
-	flag.BoolVar(&conf.OpenReads, "openreads", conf.OpenReads, "")
-	flag.StringVar(&conf.BackupPath, "restore", conf.BackupPath, "")
-	flag.BoolVar(&conf.LocalTime, "localtime", conf.LocalTime, "")
-	flag.StringVar(&conf.Auth, "auth", conf.Auth, "")
-	flag.StringVar(&conf.Advertise, "advertise", conf.Advertise, "")
-	flag.StringVar(&testNode, "t", "", "")
-	flag.BoolVar(&conf.TryErrors, "try-errors", conf.TryErrors, "")
-	flag.BoolVar(&conf.InitRunQuit, "init-run-quit", conf.InitRunQuit, "")
-	flag.Int64Var(&hybriddb.DefaultConfig.HotCacheSize, "hot-cache-size", hybriddb.DefaultConfig.HotCacheSize, "")
-	flag.StringVar(&DBName, "db-name", hybriddb.DBName, "")
-	flag.Parse()
-
-	switch backend {
-	case "leveldb":
-		conf.Backend = rafthub.LevelDB
-	case "bolt":
-		conf.Backend = rafthub.Bolt
-	default:
-		_, _ = fmt.Fprintf(os.Stderr, "invalid --backend: '%s'\n", backend)
-	}
-	switch testNode {
-	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
-		if conf.Addr == "" {
-			conf.Addr = ":1100" + testNode
-		} else {
-			conf.Addr = conf.Addr[:len(conf.Addr)-1] + testNode
-		}
-		conf.NodeID = testNode
-		if testNode != "1" {
-			conf.JoinAddr = conf.Addr[:len(conf.Addr)-1] + "1"
-		}
-	case "":
-	default:
-		_, _ = fmt.Fprintf(os.Stderr, "invalid usage of test flag -t\n")
-		os.Exit(1)
-	}
-	if conf.TLSCertPath != "" && conf.TLSKeyPath == "" {
-		_, _ = fmt.Fprintf(os.Stderr,
-			"flag --tls-key cannot be empty when --tls-cert is provided\n")
-		os.Exit(1)
-	} else if conf.TLSCertPath == "" && conf.TLSKeyPath != "" {
-		_, _ = fmt.Fprintf(os.Stderr,
-			"flag --tls-cert cannot be empty when --tls-key is provided\n")
-		os.Exit(1)
-	}
-	if conf.Advertise != "" {
-		colon := strings.IndexByte(conf.Advertise, ':')
-		if colon == -1 {
-			_, _ = fmt.Fprintf(os.Stderr, "flag --advertise is missing port number\n")
-			os.Exit(1)
-		}
-		_, err := strconv.ParseUint(conf.Advertise[colon+1:], 10, 16)
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "flat --advertise port number invalid\n")
-			os.Exit(1)
-		}
-	}
 }
 
 func connOpened(addr string) (context interface{}, accept bool) {

@@ -15,10 +15,11 @@ import (
 )
 
 const (
-	defaultFilterBits          int   = 10
+	StorageName                      = "hybriddb"
 	MB                         int64 = 1024 * 1024
 	defaultHotCacheSize        int64 = 1024 // unit:MB 1G
 	defaultHotCacheNumCounters int64 = 1e7  // unit:byte 10m
+	defaultFilterBits          int   = 10
 )
 
 type Config struct {
@@ -36,7 +37,7 @@ func init() {
 type Store struct{}
 
 func (s Store) String() string {
-	return DBName
+	return StorageName
 }
 
 func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
