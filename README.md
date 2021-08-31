@@ -117,6 +117,37 @@ Distributed disk storage system based on Raft and RESP protocol.
 * ZREMRANGEBYSCORE
 * ZREMRANGEBYRANK
 
+## 5. Sets
+* SADD
+* SCARD
+* SDIFF
+* SDIFFSTORE
+* SINTER
+* SINTERSTORE
+* SISMEMBER
+* SMEMBERS
+* SREM
+* SUNION
+* SUNIONSTORE
+* SCLEAR
+* SMCLEAR
+* SEXPIRE
+* SEXPIREAT
+* STTL
+* SPERSIST
+* SKEYEXISTS
+
+## 6. System cmd
+* INFO
+* FLUSHALL
+* HSCAN
+* SSCAN
+* ZSCAN
+* XSCAN
+* XHSCAN
+* XSSCAN
+* XZSCAN
+
 # Performance
 ### 
 ```shell

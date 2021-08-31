@@ -39,16 +39,16 @@ func init() {
 	conf.AddWriteCommand("MSET", cmdMSET)
 	conf.AddWriteCommand("SET", cmdSET)
 	conf.AddWriteCommand("SETNX", cmdSETNX)
-	//TODO SETEX => SETEXAT : 当raft节点宕机、日志回放时 还是回放了setex指令，所以需要在网络层拦截进行指令修改
+	// TODO SETEX => SETEXAT : 当raft节点宕机、日志回放时 还是回放了setex指令，所以需要在网络层拦截进行指令修改
 	// 由于raft 日志回滚问题，所以推荐大家使用SETEXAT 指令,建议客户端写入时转换为SETEXAT指令
 	conf.AddWriteCommand("SETEX", cmdSETEX)
 	conf.AddWriteCommand("SETEXAT", cmdSETEXAT)
 	conf.AddWriteCommand("SETRANGE", cmdSETRANGE)
 	conf.AddReadCommand("STRLEN", cmdSTRLEN)
-	//conf.AddWriteCommand("EXPIRE", cmdEXPIRE)     //EXPIRE => EXPIREAT
-	conf.AddWriteCommand("EXPIREAT", cmdEXPIREAT) //Timeout command
+	// conf.AddWriteCommand("EXPIRE", cmdEXPIRE)     //EXPIRE => EXPIREAT
+	conf.AddWriteCommand("EXPIREAT", cmdEXPIREAT) // Timeout command
 	conf.AddReadCommand("TTL", cmdTTL)
-	//conf.AddWriteCommand("PERSIST", cmdPERSIST) //Prohibition: time persistence
+	// conf.AddWriteCommand("PERSIST", cmdPERSIST) //Prohibition: time persistence
 }
 
 // func cmdPERSIST(m uhaha.Machine, args []string) (interface{}, error) {
@@ -73,7 +73,7 @@ func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	//如果时间戳小于当前时间，则进行删除操作
+	// 如果时间戳小于当前时间，则进行删除操作
 	if when < time.Now().Unix() {
 		keys := make([][]byte, 1)
 		keys[0] = []byte(args[1])
@@ -246,7 +246,7 @@ func cmdGETBIT(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-//此处和redis标准有区别，当前只支持一个key的判断过程
+// 此处和redis标准有区别，当前只支持一个key的判断过程
 func cmdEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -318,7 +318,7 @@ func cmdBITOP(m uhaha.Machine, args []string) (interface{}, error) {
 
 	op := args[1]
 	destKey := args[2]
-	//srcKeys := args[3:]
+	// srcKeys := args[3:]
 
 	srcKeys := make([][]byte, len(args)-3)
 	for i := 3; i < len(args); i++ {
@@ -362,7 +362,7 @@ func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-//此处和redis标准有区别,需要丰富算法，支撑更多原子指令
+// 此处和redis标准有区别,需要丰富算法，支撑更多原子指令
 func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -388,7 +388,7 @@ func cmdSETEX(m uhaha.Machine, args []string) (interface{}, error) {
 
 	timestamp := time.Now().Unix() + sec
 
-	//如果时间戳小于当前时间，则进行删除操作
+	// 如果时间戳小于当前时间，则进行删除操作
 	if timestamp < time.Now().Unix() {
 		keys := make([][]byte, 1)
 		keys[0] = []byte(args[1])
@@ -415,7 +415,7 @@ func cmdSETEXAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	//如果时间戳小于当前时间，则进行删除操作
+	// 如果时间戳小于当前时间，则进行删除操作
 	if timestamp < time.Now().Unix() {
 		keys := make([][]byte, 1)
 		keys[0] = []byte(args[1])
@@ -439,7 +439,6 @@ func cmdSETNX(m uhaha.Machine, args []string) (interface{}, error) {
 	}
 
 	n, err := ldb.SetNX([]byte(args[1]), []byte(args[2]))
-
 	if err != nil {
 		return nil, err
 	}
@@ -451,12 +450,11 @@ func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
-	count, err := ldb.Exists([]byte(args[1]))
+	/*count, err := ldb.Exists([]byte(args[1]))
 	if err != nil || count == 0 {
 		return nil, nil
-	}
+	}*/
 	val, err := ldb.Get([]byte(args[1]))
-
 	if err != nil {
 		return nil, err
 	}
@@ -464,7 +462,7 @@ func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
 	return val, nil
 }
 
-//此处和redis标准有区别，为了事务一致性考虑，没有进行key存在判断
+// 此处和redis标准有区别，为了事务一致性考虑，没有进行key存在判断
 func cmdDEL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
 		return nil, rafthub.ErrWrongNumArgs

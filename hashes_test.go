@@ -168,7 +168,6 @@ func TestHashIncr(t *testing.T) {
 	} else if n != 0 {
 		t.Fatal(err)
 	}
-
 }
 
 func TestHashGetAll(t *testing.T) {

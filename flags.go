@@ -33,7 +33,6 @@ Networking options:
 
 Store options: 
   --hot-cache-size int : memory cache capacity，unit:MB (default 1024)
-  --db-name string     : select a db to use, it will overwrite the config's db name
 
 Advanced options:
   --nosync         : turn off syncing data to disk after every write. This leads
@@ -102,7 +101,7 @@ func confInit(conf *rafthub.Config) {
 	flag.BoolVar(&conf.TryErrors, "try-errors", conf.TryErrors, "")
 	flag.BoolVar(&conf.InitRunQuit, "init-run-quit", conf.InitRunQuit, "")
 	flag.Int64Var(&hybriddb.DefaultConfig.HotCacheSize, "hot-cache-size", hybriddb.DefaultConfig.HotCacheSize, "")
-	flag.StringVar(&storageBackend, "storage-backend", hybriddb.StorageName, "")
+	flag.StringVar(&storageBackend, "storage-backend", "goleveldb", "")
 	flag.StringVar(&pprofAddr, "pprof-addr", ":26063", "")
 	flag.BoolVar(&debug, "debug", false, "")
 	flag.Parse()
