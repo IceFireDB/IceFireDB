@@ -18,10 +18,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/gitsrc/IceFireDB/hybriddb"
 
-	_ "github.com/gitsrc/IceFireDB/hybriddb"
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -41,12 +41,13 @@ func main() {
 	conf.DataDirReady = func(dir string) {
 		os.RemoveAll(filepath.Join(dir, "main.db"))
 
-		cfg := lediscfg.NewConfigDefault()
-		cfg.DataDir = filepath.Join(dir, "main.db")
-		cfg.Databases = 1
-		cfg.DBName = DBName
+		ldsCfg = lediscfg.NewConfigDefault()
+		ldsCfg.DataDir = filepath.Join(dir, "main.db")
+		ldsCfg.Databases = 1
+		ldsCfg.DBName = DBName
+
 		var err error
-		le, err = ledis.Open(cfg)
+		le, err = ledis.Open(ldsCfg)
 
 		if err != nil {
 			panic(err)
@@ -60,13 +61,21 @@ func main() {
 
 		// Obtain the leveldb object and handle it carefully
 		driver := ldb.GetSDB().GetDriver().GetStorageEngine()
-		db = driver.(*leveldb.DB)
+		var ok bool
+		if db, ok = driver.(*leveldb.DB); !ok {
+			panic("unsupported storage is caused")
+		}
+		if DBName == hybriddb.DBName {
+			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*hybriddb.DB).Metrics)
+		}
 	}
 	go func() {
 		http.ListenAndServe(":26063", nil)
 	}()
 	conf.Snapshot = snapshot
 	conf.Restore = restore
+	conf.ConnOpened = connOpened
+	conf.ConnClosed = connClosed
 	rafthub.Main(conf)
 }
 
@@ -267,4 +276,14 @@ func confInit(conf *rafthub.Config) {
 			os.Exit(1)
 		}
 	}
+}
+
+func connOpened(addr string) (context interface{}, accept bool) {
+	atomic.AddInt64(&respClientNum, 1)
+	return nil, true
+}
+
+func connClosed(context interface{}, addr string) {
+	atomic.AddInt64(&respClientNum, -1)
+	return
 }

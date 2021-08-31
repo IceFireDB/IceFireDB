@@ -1,6 +1,7 @@
 package hybriddb
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 
@@ -63,6 +64,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 		MaxCost:     DefaultConfig.HotCacheSize * MB,
 		NumCounters: defaultHotCacheNumCounters,
 		BufferItems: 64,
+		Metrics:     true,
 		Cost: func(value interface{}) int64 {
 			return int64(len(value.([]byte)))
 		},
@@ -227,4 +229,31 @@ func (db *DB) Compact() error {
 		Start: nil,
 		Limit: nil,
 	})
+}
+
+func (db *DB) Metrics() (tit string, metrics []map[string]interface{}) {
+	tit = "hybriddb cache"
+	costAdd := db.cache.Metrics.CostAdded()
+	costEvicted := db.cache.Metrics.CostEvicted()
+	metrics = []map[string]interface{}{
+		{"used_cost": costAdd - costEvicted},                     // Current memory usage (bytes)
+		{"cost_added": costAdd},                                  // Total memory sum of data added in history, incrementing (bytes)
+		{"cost_evicted": costEvicted},                            // Free total memory, incrementing (bytes)
+		{"hits": db.cache.Metrics.Hits()},                        // hits
+		{"misses": db.cache.Metrics.Misses()},                    // misses
+		{"ratio": fmt.Sprintf("%.2f", db.cache.Metrics.Ratio())}, // hits / (hists + misses)
+		{"keys_added": db.cache.Metrics.KeysAdded()},             // number of keys added
+		{"keys_evicted": db.cache.Metrics.KeysEvicted()},         // delete key times
+		{"keys_updated": db.cache.Metrics.KeysUpdated()},         // update key times
+		{"gets_kept": db.cache.Metrics.GetsKept()},               // get total number of times the command is executed
+		// GetsDropped is the number of Get counter increments that are dropped
+		// internally.
+		{"gets_dropped": db.cache.Metrics.GetsDropped()},
+		// SetsDropped is the number of Set calls that don't make it into internal
+		// buffers (due to contention or some other reason).
+		{"sets_dropped": db.cache.Metrics.SetsDropped()},
+		// SetsRejected is the number of Set calls rejected by the policy (TinyLFU).
+		{"sets_rejected": db.cache.Metrics.SetsRejected()},
+	}
+	return
 }
