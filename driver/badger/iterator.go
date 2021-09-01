@@ -10,15 +10,18 @@ type Iterator struct {
 }
 
 func (it *Iterator) Key() []byte {
+	printf("it key")
 	return it.it.Item().KeyCopy(nil)
 }
 
 func (it *Iterator) Value() []byte {
+	printf("it value")
 	v, _ := it.it.Item().ValueCopy(nil)
 	return v
 }
 
 func (it *Iterator) Close() error {
+	printf("it close")
 	if it.it != nil {
 		it.it.Close()
 		it.it = nil
@@ -27,14 +30,17 @@ func (it *Iterator) Close() error {
 }
 
 func (it *Iterator) Valid() bool {
+	printf("it valid")
 	return it.it.Valid()
 }
 
 func (it *Iterator) Next() {
+	printf("it next")
 	it.it.Next()
 }
 
 func (it *Iterator) Prev() {
+	printf("it prev")
 	tnx := it.db.NewTransaction(false)
 	defer tnx.Discard()
 
@@ -42,7 +48,8 @@ func (it *Iterator) Prev() {
 	opts.Reverse = true
 	opts.PrefetchValues = false
 	revit := tnx.NewIterator(opts)
-	
+	defer revit.Close()
+
 	if it.Valid() {
 		key := it.Key()
 		revit.Seek(key)
@@ -55,10 +62,12 @@ func (it *Iterator) Prev() {
 }
 
 func (it *Iterator) First() {
+	printf("it first")
 	it.it.Rewind()
 }
 
 func (it *Iterator) Last() {
+	printf("it last")
 	tnx := it.db.NewTransaction(false)
 	defer tnx.Discard()
 
@@ -66,6 +75,7 @@ func (it *Iterator) Last() {
 	opts.Reverse = true
 	opts.PrefetchValues = false
 	revit := tnx.NewIterator(opts)
+	defer revit.Close()
 
 	revit.Rewind()
 	key := revit.Item().Key()
@@ -74,5 +84,6 @@ func (it *Iterator) Last() {
 }
 
 func (it *Iterator) Seek(key []byte) {
+	printf("it seek")
 	it.it.Seek(key)
 }
