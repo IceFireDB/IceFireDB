@@ -9,6 +9,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	_ "net/http/pprof"
@@ -16,7 +17,9 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
+	"github.com/dgraph-io/badger/v3"
 	"github.com/gitsrc/IceFireDB/hybriddb"
+	_ "github.com/gitsrc/IceFireDB/driver/badger"
 
 	"github.com/gitsrc/IceFireDB/utils"
 	lediscfg "github.com/ledisdb/ledisdb/config"
@@ -62,9 +65,11 @@ func main() {
 
 		// Obtain the leveldb object and handle it carefully
 		driver := ldb.GetSDB().GetDriver().GetStorageEngine()
-		var ok bool
-		if db, ok = driver.(*leveldb.DB); !ok {
-			panic("unsupported storage is caused")
+		switch v := driver.(type) {
+		case *leveldb.DB:
+		case *badger.DB:
+		default:
+			panic(fmt.Errorf("unsupported storage is caused: %T", v))
 		}
 		if storageBackend == hybriddb.StorageName {
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*hybriddb.DB).Metrics)
@@ -81,6 +86,8 @@ func main() {
 	conf.ConnOpened = connOpened
 	conf.ConnClosed = connClosed
 	conf.CmdRewriteFunc = utils.RedisCmdRewrite
+
+	fmt.Printf("start with Storage Engine: %s\n", storageBackend)
 	rafthub.Main(conf)
 }
 

@@ -7,10 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gitsrc/IceFireDB/hybriddb"
+	"github.com/gitsrc/IceFireDB/driver/badger"
 
 	"github.com/ledisdb/ledisdb/ledis"
-	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/go-redis/redis/v8"
@@ -33,7 +32,7 @@ func getTestConn() *redis.Client {
 			ldsCfg = lediscfg.NewConfigDefault()
 			ldsCfg.DataDir = filepath.Join(dir, "main.db")
 			ldsCfg.Databases = 1
-			ldsCfg.DBName = hybriddb.StorageName
+			ldsCfg.DBName = badger.StorageName
 			var err error
 			le, err = ledis.Open(ldsCfg)
 			if err != nil {
@@ -44,10 +43,6 @@ func getTestConn() *redis.Client {
 			if err != nil {
 				panic(err)
 			}
-
-			// Obtain the leveldb object and handle it carefully
-			driver := ldb.GetSDB().GetDriver().GetStorageEngine()
-			db = driver.(*leveldb.DB)
 		}
 
 		conf.Snapshot = snapshot
