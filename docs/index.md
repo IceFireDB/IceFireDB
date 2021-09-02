@@ -103,6 +103,37 @@ Distributed disk storage system based on Raft and RESP protocol.
 * ZREMRANGEBYSCORE
 * ZREMRANGEBYRANK
 
+## 5. Sets
+* SADD
+* SCARD
+* SDIFF
+* SDIFFSTORE
+* SINTER
+* SINTERSTORE
+* SISMEMBER
+* SMEMBERS
+* SREM
+* SUNION
+* SUNIONSTORE
+* SCLEAR
+* SMCLEAR
+* SEXPIRE
+* SEXPIREAT
+* STTL
+* SPERSIST
+* SKEYEXISTS
+
+## 6. System cmd
+* INFO
+* FLUSHALL
+* HSCAN
+* SSCAN
+* ZSCAN
+* XSCAN
+* XHSCAN
+* XSSCAN
+* XZSCAN
+
 # Performance
 ```shell
 corerman@ubuntu:~/DATA/ICODE/GoLang/IceFireDB$ redis-benchmark  -h 127.0.0.1 -p 11001 -n 10000000 -t set,get -c 512 -P 512 -q
@@ -121,3 +152,4 @@ I stood on the shoulders of giants and did only simple things. Thank you for you
 * https://github.com/syndtr/goleveldb
 * https://github.com/dgraph-io/ristretto
 * https://github.com/ledisdb/ledisdb
+* https://github.com/dgraph-io/badger
