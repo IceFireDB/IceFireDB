@@ -1,5 +1,6 @@
 PROG=bin/IceFireDB
 
+DRIVER?=badger
 
 SRCS=.
 
@@ -65,4 +66,8 @@ run_dev:
 	go run .
 
 test:
-	go test -v --v ./...
+	DRIVER=$(DRIVER) go test -v --v ./...
+
+bench-run:
+	rm -rf ./data
+	./bin/IceFireDB --nosync
