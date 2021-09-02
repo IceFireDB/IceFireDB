@@ -5,43 +5,46 @@ import (
 )
 
 type Iterator struct {
-	db      *badger.DB
-	it      *badger.Iterator
+	db  *badger.DB
+	txn *badger.Txn
+	it  *badger.Iterator
 }
 
 func (it *Iterator) Key() []byte {
-	printf("it key")
-	return it.it.Item().KeyCopy(nil)
+	key := it.it.Item().KeyCopy(nil)
+	return key
 }
 
 func (it *Iterator) Value() []byte {
-	printf("it value")
-	v, _ := it.it.Item().ValueCopy(nil)
+	v := []byte{}
+	var err error
+	v, err = it.it.Item().ValueCopy(v)
+	if err != nil {
+		return nil
+	}
 	return v
 }
 
 func (it *Iterator) Close() error {
-	printf("it close")
 	if it.it != nil {
 		it.it.Close()
 		it.it = nil
+		it.txn.Discard()
 	}
 	return nil
 }
 
 func (it *Iterator) Valid() bool {
-	printf("it valid")
-	return it.it.Valid()
+	ok := it.it.Valid()
+	return ok
 }
 
 func (it *Iterator) Next() {
-	printf("it next")
 	it.it.Next()
 }
 
 func (it *Iterator) Prev() {
-	printf("it prev")
-	tnx := it.db.NewTransaction(false)
+	tnx := it.db.NewTransactionAt(timeTs(), false)
 	defer tnx.Discard()
 
 	opts := badger.DefaultIteratorOptions
@@ -50,25 +53,23 @@ func (it *Iterator) Prev() {
 	revit := tnx.NewIterator(opts)
 	defer revit.Close()
 
-	if it.Valid() {
-		key := it.Key()
+	if it.it.Valid() {
+		key := it.it.Item().KeyCopy(nil)
 		revit.Seek(key)
 		revit.Next()
 		if revit.Valid() {
-			newKey := revit.Item().Key()
+			newKey := revit.Item().KeyCopy(nil)
 			it.it.Seek(newKey)
 		}
 	}
 }
 
 func (it *Iterator) First() {
-	printf("it first")
 	it.it.Rewind()
 }
 
 func (it *Iterator) Last() {
-	printf("it last")
-	tnx := it.db.NewTransaction(false)
+	tnx := it.db.NewTransactionAt(timeTs(), false)
 	defer tnx.Discard()
 
 	opts := badger.DefaultIteratorOptions
@@ -78,12 +79,11 @@ func (it *Iterator) Last() {
 	defer revit.Close()
 
 	revit.Rewind()
-	key := revit.Item().Key()
+	key := revit.Item().KeyCopy(nil)
 
 	it.it.Seek(key)
 }
 
 func (it *Iterator) Seek(key []byte) {
-	printf("it seek")
 	it.it.Seek(key)
 }

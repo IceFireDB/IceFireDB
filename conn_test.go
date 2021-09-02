@@ -2,12 +2,11 @@ package main
 
 import (
 	"context"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
-
-	"github.com/gitsrc/IceFireDB/driver/badger"
 
 	"github.com/ledisdb/ledisdb/ledis"
 
@@ -23,6 +22,7 @@ var (
 )
 
 func getTestConn() *redis.Client {
+	log.SetOutput(os.Stderr)
 	f := func() {
 		conf.DataDir = "/tmp/icefiredb"
 		os.RemoveAll(conf.DataDir)
@@ -32,7 +32,7 @@ func getTestConn() *redis.Client {
 			ldsCfg = lediscfg.NewConfigDefault()
 			ldsCfg.DataDir = filepath.Join(dir, "main.db")
 			ldsCfg.Databases = 1
-			ldsCfg.DBName = badger.StorageName
+			ldsCfg.DBName = os.Getenv("DRIVER")
 			var err error
 			le, err = ledis.Open(ldsCfg)
 			if err != nil {
@@ -53,6 +53,7 @@ func getTestConn() *redis.Client {
 			Addr: "127.0.0.1:11001",
 		})
 
+		log.Println("waiting for DB bootstrap")
 		// wait server starts
 		backoff.Retry(func() error {
 			_, err := testRedisClient.Set(context.Background(), "init", "1", 0).Result()

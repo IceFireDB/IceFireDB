@@ -2,6 +2,7 @@ package badger
 
 import (
 	"github.com/dgraph-io/badger/v3"
+	"github.com/dgraph-io/badger/v3/options"
 	"github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/store/driver"
 )
@@ -27,9 +28,20 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	db := new(DB)
 	db.cfg = cfg
 	db.opts = badger.DefaultOptions(path)
+	db.opts.MemTableSize = 1000 << 20
+	db.opts.NumGoroutines = 100
+	db.opts.MetricsEnabled = false
+	db.opts.Compression = options.ZSTD
+	db.opts.ZSTDCompressionLevel = 3
+	db.opts.IndexCacheSize = 1000 << 20
+	db.opts.DetectConflicts = false
+	db.opts.NumCompactors = 100
+	db.opts.NumMemtables = 100
+	db.opts.BlockCacheSize = 1000 << 20
+
 	db.iteratorOpts = badger.DefaultIteratorOptions
 	var err error
-	db.db, err = badger.Open(db.opts)
+	db.db, err = badger.OpenManaged(db.opts)
 	if err != nil {
 		return nil, err
 	}

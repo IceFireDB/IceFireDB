@@ -3,7 +3,9 @@ package badger
 import (
 	"fmt"
 	"log"
+	"math"
 	"strings"
+	"time"
 )
 
 func printf(tpl string, args ...interface{}) {
@@ -21,4 +23,12 @@ func printf(tpl string, args ...interface{}) {
 		newArgs = append(newArgs, newArg)
 	}
 	log.Println(fmt.Sprintf(tpl, newArgs...))
+}
+
+func timeTs() uint64 {
+	return uint64(time.Now().UnixNano())
+}
+
+func maxTs() uint64 {
+	return math.MaxUint64
 }
