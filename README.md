@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-31 14:42:17
+ * @LastEditTime: 2021-09-02 22:50:12
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -168,6 +168,7 @@ GET: 2130875.50 requests per second
 * https://github.com/syndtr/goleveldb
 * https://github.com/dgraph-io/ristretto
 * https://github.com/ledisdb/ledisdb
+* https://github.com/dgraph-io/badger
 
 # Disclaimers
 When you use this software, you have agreed and stated that the author, maintainer and contributor of this software are not responsible for any risks, costs or problems you encounter. If you find a software defect or BUG, ​​please submit a patch to help improve it!
