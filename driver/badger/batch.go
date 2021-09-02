@@ -45,7 +45,7 @@ func (w *WriteBatch) Commit() error {
 }
 
 func (w *WriteBatch) SyncCommit() error {
-	return w.wb.Flush()
+	return w.Commit()
 }
 
 func (w *WriteBatch) Rollback() error {
@@ -60,6 +60,9 @@ func (w *WriteBatch) Rollback() error {
 }
 
 func (w *WriteBatch) Close() {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
 	w.wb = nil
 }
 
