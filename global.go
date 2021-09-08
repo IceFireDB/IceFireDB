@@ -28,7 +28,7 @@ var (
 var (
 	db            *leveldb.DB
 	le            *ledis.Ledis
-	ldb           *ledis.DB
+	ldb           *ledisDBs
 	ldsCfg        *lediscfg.Config
 	serverInfo    *info
 	respClientNum int64

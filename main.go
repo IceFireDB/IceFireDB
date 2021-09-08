@@ -9,12 +9,16 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"time"
+
+	"github.com/gitsrc/IceFireDB/pkg/models"
 
 	"github.com/gitsrc/IceFireDB/hybriddb"
 
@@ -26,6 +30,8 @@ import (
 	rafthub "github.com/tidwall/uhaha"
 )
 
+const defaultSlotNum = 128
+
 var (
 	// storageBackend select storage Engine
 	storageBackend string
@@ -33,6 +39,16 @@ var (
 	pprofAddr string
 	// debug
 	debug bool
+	// db (slot) number
+	slotNum int
+	// coordinator type
+	coordinatorType string
+	// coordinator address
+	coordinatorAddr string
+	// self ip register to coordinator
+	announceIP string
+	// self port register to coordinator
+	announcePort int
 )
 
 func main() {
@@ -48,6 +64,7 @@ func main() {
 		ldsCfg.DataDir = filepath.Join(dir, "main.db")
 		ldsCfg.Databases = 1
 		ldsCfg.DBName = storageBackend
+		ldsCfg.Databases = slotNum
 
 		var err error
 		le, err = ledis.Open(ldsCfg)
@@ -55,19 +72,20 @@ func main() {
 			panic(err)
 		}
 
-		ldb, err = le.Select(0)
+		ldb, err = NewLedisDBs(le, slotNum)
 		if err != nil {
 			panic(err)
 		}
 
+		db0, err := ldb.GetDB(0)
 		// Obtain the leveldb object and handle it carefully
-		driver := ldb.GetSDB().GetDriver().GetStorageEngine()
+		driver := db0.GetSDB().GetDriver().GetStorageEngine()
 		var ok bool
 		if db, ok = driver.(*leveldb.DB); !ok {
 			panic("unsupported storage is caused")
 		}
 		if storageBackend == hybriddb.StorageName {
-			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*hybriddb.DB).Metrics)
+			// serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*hybriddb.DB).Metrics)
 		}
 	}
 	if debug {
@@ -81,7 +99,54 @@ func main() {
 	conf.ConnOpened = connOpened
 	conf.ConnClosed = connClosed
 	conf.CmdRewriteFunc = utils.RedisCmdRewrite
+	notifyCh := make(chan bool, 3)
+	notifyCh <- false // set init state
+	conf.NotifyCh = notifyCh
+	go handleLeaderState(conf.Name, notifyCh)
 	rafthub.Main(conf)
+}
+
+func handleLeaderState(name string, c <-chan bool) {
+	if coordinatorAddr == "" || coordinatorType == "" || announceIP == "" || announcePort == 0 {
+		return
+	}
+	clinet, err := models.NewClient(coordinatorType, coordinatorAddr, "", time.Second*5)
+	if err != nil {
+		panic(err)
+	}
+	store := models.NewStore(clinet, name)
+	server := &models.Server{
+		ID:      -1,
+		GroupId: -1,
+		Addr:    fmt.Sprintf("%s:%d", announceIP, announcePort),
+	}
+	for {
+		leader, ok := <-c
+		if !ok {
+			return
+		}
+		for {
+			select {
+			case l, ok := <-c:
+				if !ok {
+					break
+				}
+				leader = l
+			default:
+			}
+			break
+		}
+		// register state to coordinator
+		if leader {
+			server.Type = models.ServerTypeLeader
+		} else {
+			server.Type = models.ServerTypeFollower
+		}
+		err = store.UpdateServer(server)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 type snap struct {

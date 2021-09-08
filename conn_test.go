@@ -34,19 +34,20 @@ func getTestConn() *redis.Client {
 			ldsCfg.DataDir = filepath.Join(dir, "main.db")
 			ldsCfg.Databases = 1
 			ldsCfg.DBName = hybriddb.StorageName
+			ldsCfg.Databases = slotNum
 			var err error
 			le, err = ledis.Open(ldsCfg)
 			if err != nil {
 				panic(err)
 			}
 
-			ldb, err = le.Select(0)
+			ldb, err = NewLedisDBs(le, slotNum)
 			if err != nil {
 				panic(err)
 			}
-
+			db0, err := ldb.GetDB(0)
 			// Obtain the leveldb object and handle it carefully
-			driver := ldb.GetSDB().GetDriver().GetStorageEngine()
+			driver := db0.GetSDB().GetDriver().GetStorageEngine()
 			db = driver.(*leveldb.DB)
 		}
 

@@ -35,8 +35,8 @@ func init() {
 	conf.AddWriteCommand("GETSET", cmdGETSET)
 	conf.AddWriteCommand("INCR", cmdINCR)
 	conf.AddWriteCommand("INCRBY", cmdINCRBY)
-	conf.AddReadCommand("MGET", cmdMGET)
-	conf.AddWriteCommand("MSET", cmdMSET)
+	// conf.AddReadCommand("MGET", cmdMGET)
+	// conf.AddWriteCommand("MSET", cmdMSET)
 	conf.AddWriteCommand("SET", cmdSET)
 	conf.AddWriteCommand("SETNX", cmdSETNX)
 	// TODO SETEX => SETEXAT : 当raft节点宕机、日志回放时 还是回放了setex指令，所以需要在网络层拦截进行指令修改
@@ -56,7 +56,7 @@ func init() {
 // 		return nil, rafthub.ErrWrongNumArgs
 // 	}
 
-// 	n, err := ldb.Persist([]byte(args[1]))
+// 	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).Persist([]byte(args[1]))
 // 	if err != nil {
 // 		return nil, err
 // 	}
@@ -77,14 +77,14 @@ func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if when < time.Now().Unix() {
 		keys := make([][]byte, 1)
 		keys[0] = []byte(args[1])
-		_, err := ldb.Del(keys...)
+		_, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).Del(keys...)
 		if err != nil {
 			return nil, err
 		}
 		return redcon.SimpleInt(1), nil
 	}
 
-	v, err := ldb.ExpireAt([]byte(args[1]), when)
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ExpireAt([]byte(args[1]), when)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 // 		return nil, err
 // 	}
 
-// 	v, err := ldb.Expire([]byte(args[1]), duration)
+// 	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).Expire([]byte(args[1]), duration)
 // 	if err != nil {
 // 		return nil, err
 // 	}
@@ -114,7 +114,7 @@ func cmdSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.StrLen([]byte(args[1]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).StrLen([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func cmdSETRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 
 	value := args[3]
 
-	n, err := ldb.SetRange(key, offset, []byte(value))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SetRange(key, offset, []byte(value))
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func cmdINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	n, err := ldb.IncrBy([]byte(args[1]), delta)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).IncrBy([]byte(args[1]), delta)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func cmdINCR(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.Incr([]byte(args[1]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).Incr([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func cmdGETSET(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	v, err := ldb.GetSet([]byte(args[1]), []byte(args[2]))
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).GetSet([]byte(args[1]), []byte(args[2]))
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func cmdGETRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	v, err := ldb.GetRange(key, start, end)
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).GetRange(key, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +221,7 @@ func cmdSETBIT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	n, err := ldb.SetBit([]byte(key), offset, value)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SetBit([]byte(key), offset, value)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func cmdGETBIT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	n, err := ldb.GetBit(key, offset)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).GetBit(key, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +252,7 @@ func cmdEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.Exists([]byte(args[1]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).Exists([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func cmdDECRBY(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	n, err := ldb.DecrBy([]byte(args[1]), delta)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).DecrBy([]byte(args[1]), delta)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +281,7 @@ func cmdDECR(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.Decr([]byte(args[1]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).Decr([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +303,7 @@ func cmdBITPOS(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	n, err := ldb.BitPos(key, bit, start, end)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).BitPos(key, bit, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +325,7 @@ func cmdBITOP(m uhaha.Machine, args []string) (interface{}, error) {
 		srcKeys[i-3] = []byte(args[i])
 	}
 
-	n, err := ldb.BitOP(op, []byte(destKey), srcKeys...)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).BitOP(op, []byte(destKey), srcKeys...)
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +337,7 @@ func cmdAPPEND(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.Append([]byte(args[1]), []byte(args[2]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).Append([]byte(args[1]), []byte(args[2]))
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +355,7 @@ func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	n, err := ldb.BitCount(key, start, end)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).BitCount(key, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +368,7 @@ func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	if err := ldb.Set([]byte(args[1]), []byte(args[2])); err != nil {
+	if err := ldb.GetDBForKeyUnsafe([]byte(args[1])).Set([]byte(args[1]), []byte(args[2])); err != nil {
 		return nil, err
 	}
 
@@ -392,14 +392,14 @@ func cmdSETEX(m uhaha.Machine, args []string) (interface{}, error) {
 	if timestamp < time.Now().Unix() {
 		keys := make([][]byte, 1)
 		keys[0] = []byte(args[1])
-		_, err := ldb.Del(keys...)
+		_, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).Del(keys...)
 		if err != nil {
 			return nil, err
 		}
 		return redcon.SimpleString("OK"), nil
 	}
 
-	if err := ldb.SetEXAT([]byte(args[1]), timestamp, []byte(args[3])); err != nil {
+	if err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SetEXAT([]byte(args[1]), timestamp, []byte(args[3])); err != nil {
 		return nil, err
 	}
 
@@ -419,14 +419,14 @@ func cmdSETEXAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if timestamp < time.Now().Unix() {
 		keys := make([][]byte, 1)
 		keys[0] = []byte(args[1])
-		_, err := ldb.Del(keys...)
+		_, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).Del(keys...)
 		if err != nil {
 			return nil, err
 		}
 		return redcon.SimpleString("OK"), nil
 	}
 
-	if err := ldb.SetEXAT([]byte(args[1]), timestamp, []byte(args[3])); err != nil {
+	if err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SetEXAT([]byte(args[1]), timestamp, []byte(args[3])); err != nil {
 		return nil, err
 	}
 
@@ -438,7 +438,7 @@ func cmdSETNX(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.SetNX([]byte(args[1]), []byte(args[2]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SetNX([]byte(args[1]), []byte(args[2]))
 	if err != nil {
 		return nil, err
 	}
@@ -450,11 +450,11 @@ func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
-	/*count, err := ldb.Exists([]byte(args[1]))
+	/*count, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).Exists([]byte(args[1]))
 	if err != nil || count == 0 {
 		return nil, nil
 	}*/
-	val, err := ldb.Get([]byte(args[1]))
+	val, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).Get([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -469,16 +469,17 @@ func cmdDEL(m uhaha.Machine, args []string) (interface{}, error) {
 	}
 
 	keys := make([][]byte, len(args)-1)
-
+	var count int64 = 0
 	for i := 1; i < len(args); i++ {
 		keys[i-1] = []byte(args[i])
+		n, err := ldb.GetDBForKeyUnsafe([]byte(args[i])).Del([]byte(args[i]))
+		if err != nil {
+			return nil, err
+		}
+		count += n
 	}
 
-	n, err := ldb.Del(keys...)
-	if err != nil {
-		return nil, err
-	}
-	return redcon.SimpleInt(n), nil
+	return redcon.SimpleInt(count), nil
 }
 
 func cmdMSET(m uhaha.Machine, args []string) (interface{}, error) {
@@ -495,7 +496,7 @@ func cmdMSET(m uhaha.Machine, args []string) (interface{}, error) {
 		loopI++
 	}
 
-	if err := ldb.MSet(batch...); err != nil {
+	if err := ldb.GetDBForKeyUnsafe([]byte(args[1])).MSet(batch...); err != nil {
 		return nil, err
 	}
 
@@ -513,7 +514,7 @@ func cmdMGET(m uhaha.Machine, args []string) (interface{}, error) {
 		keys[i-1] = []byte(args[i])
 	}
 
-	v, err := ldb.MGet(keys...)
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).MGet(keys...)
 	if err != nil {
 		return nil, err
 	}
@@ -526,7 +527,7 @@ func cmdTTL(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	v, err := ldb.TTL([]byte(args[1]))
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).TTL([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}

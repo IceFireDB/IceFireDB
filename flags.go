@@ -104,6 +104,11 @@ func confInit(conf *rafthub.Config) {
 	flag.StringVar(&storageBackend, "storage-backend", "goleveldb", "")
 	flag.StringVar(&pprofAddr, "pprof-addr", ":26063", "")
 	flag.BoolVar(&debug, "debug", false, "")
+	flag.IntVar(&slotNum, "slot-num", defaultSlotNum, "define the slot num")
+	flag.StringVar(&coordinatorType, "coordinator-type", "", "")
+	flag.StringVar(&coordinatorAddr, "coordinator-addr", "", "")
+	flag.StringVar(&announceIP, "announce-ip", "", "")
+	flag.IntVar(&announcePort, "announce-port", 0, "")
 	flag.Parse()
 
 	switch raftBackend {
@@ -150,5 +155,9 @@ func confInit(conf *rafthub.Config) {
 			_, _ = fmt.Fprintf(os.Stderr, "flat --advertise port number invalid\n")
 			os.Exit(1)
 		}
+	}
+	if coordinatorAddr == "" {
+		fmt.Fprintf(os.Stderr, "flag --coordinatorAddr is required\n")
+		os.Exit(1)
 	}
 }

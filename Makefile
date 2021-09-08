@@ -51,6 +51,14 @@ install:
 
 	cp -R config/* $(CONF_INSTALL_PREFIX)
 
+DLVFLAGS = -ldflags "-X \"main.BuildVersion=${COMMIT_HASH}\" -X \"main.BuildDate=$(BUILD_DATE)\""
+DLVGCFLAGS = -gcflags "all=-N -l"
+dlv:
+	if [ ! -d "./bin/" ]; then \
+	mkdir bin; \
+	fi
+	go build $(DLVFLAGS) $(DLVGCFLAGS) -o $(PROG) $(SRCS)
+
 clean:
 	rm -rf ./bin
 
