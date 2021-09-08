@@ -153,3 +153,6 @@ I stood on the shoulders of giants and did only simple things. Thank you for you
 * https://github.com/dgraph-io/ristretto
 * https://github.com/ledisdb/ledisdb
 * https://github.com/dgraph-io/badger
+
+# Disclaimers
+When you use this software, you have agreed and stated that the author, maintainer and contributor of this software are not responsible for any risks, costs or problems you encounter. If you find a software defect or BUG, ​​please submit a patch to help improve it!
