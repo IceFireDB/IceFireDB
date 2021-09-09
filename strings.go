@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 18:20:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-23 18:27:04
+ * @LastEditTime: 2021-09-09 08:59:32
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -40,7 +40,7 @@ func init() {
 	conf.AddWriteCommand("SET", cmdSET)
 	conf.AddWriteCommand("SETNX", cmdSETNX)
 	// TODO SETEX => SETEXAT : 当raft节点宕机、日志回放时 还是回放了setex指令，所以需要在网络层拦截进行指令修改
-	// 由于raft 日志回滚问题，所以推荐大家使用SETEXAT 指令,建议客户端写入时转换为SETEXAT指令
+	// 由于raft 日志回滚问题，所以推荐大家使用SETEXAT 指令,建议客户端写入时转换为SETEXAT指令: 最新版本已经解决此问题，可以使用SETEX指令
 	conf.AddWriteCommand("SETEX", cmdSETEX)
 	conf.AddWriteCommand("SETEXAT", cmdSETEXAT)
 	conf.AddWriteCommand("SETRANGE", cmdSETRANGE)
