@@ -13,8 +13,8 @@
 </p>
 
 # IceFireDB  
-![test](https://github.com/gitsrc/IceFireDB/actions/workflows/test.yml/badge.svg)
-![build](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)
+![test](https://github.com/IceFireDB/IceFireDB/actions/workflows/test.yml/badge.svg)
+![build](https://travis-ci.com/IceFireDB/IceFireDB.svg?branch=main)
 ![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB.svg?type=shield)
 
 
