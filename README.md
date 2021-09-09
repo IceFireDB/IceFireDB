@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-28 17:18:54
+ * @LastEditTime: 2021-09-09 11:21:16
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -13,7 +13,9 @@
 </p>
 
 # IceFireDB  
-[![](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main)](https://travis-ci.com/gitsrc/IceFireDB.svg?branch=main) [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB?ref=badge_shield)
+![test](https://github.com/IceFireDB/IceFireDB/actions/workflows/test.yml/badge.svg)
+![build](https://github.com/IceFireDB/IceFireDB/actions/workflows/build.yml/badge.svg)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB?ref=badge_shield)
 
 
 Distributed disk storage system based on Raft and RESP protocol.
@@ -32,7 +34,6 @@ Distributed disk storage system based on Raft and RESP protocol.
     src="IceFireDB_Architecture.png" 
      alt="IceFireDB_Architecture">
 </p>
-
 
 # Command support
 ## 1. String operating
@@ -107,6 +108,45 @@ Distributed disk storage system based on Raft and RESP protocol.
 * ZCLEAR
 * ZRANK
 * ZRANGE
+* ZREVRANGE
+* ZSCORE
+* ZINCRBY
+* ZREVRANK
+* ZRANGEBYSCORE
+* ZREVRANGEBYSCORE
+* ZREMRANGEBYSCORE
+* ZREMRANGEBYRANK
+
+## 5. Sets
+* SADD
+* SCARD
+* SDIFF
+* SDIFFSTORE
+* SINTER
+* SINTERSTORE
+* SISMEMBER
+* SMEMBERS
+* SREM
+* SUNION
+* SUNIONSTORE
+* SCLEAR
+* SMCLEAR
+* SEXPIRE
+* SEXPIREAT
+* STTL
+* SPERSIST
+* SKEYEXISTS
+
+## 6. System cmd
+* INFO
+* FLUSHALL
+* HSCAN
+* SSCAN
+* ZSCAN
+* XSCAN
+* XHSCAN
+* XSSCAN
+* XZSCAN
 
 # Performance
 ### 
@@ -118,7 +158,8 @@ GET: 2130875.50 requests per second
 ```
 
 ## License
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgitsrc%2FIceFireDB?ref=badge_large)
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB?ref=badge_large)
 
 # Thanks 
 
@@ -128,3 +169,8 @@ GET: 2130875.50 requests per second
 * https://github.com/syndtr/goleveldb
 * https://github.com/dgraph-io/ristretto
 * https://github.com/ledisdb/ledisdb
+* https://github.com/dgraph-io/badger
+
+# Disclaimers
+When you use this software, you have agreed and stated that the author, maintainer and contributor of this software are not responsible for any risks, costs or problems you encounter. If you find a software defect or BUG, ​​please submit a patch to help improve it!
+
