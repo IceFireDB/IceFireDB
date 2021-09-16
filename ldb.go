@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/gitsrc/IceFireDB/router"
+	"github.com/IceFireDB/kit/pkg/router"
 	"github.com/ledisdb/ledisdb/ledis"
 )
 

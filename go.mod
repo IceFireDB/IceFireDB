@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/CodisLabs/codis v0.0.0-20181104082235-de1ad026e329
+	github.com/IceFireDB/kit v0.0.0-20210915103202-283d718f5b02 // indirect
 	github.com/armon/go-metrics v0.3.6 // indirect
 	github.com/c4pt0r/cfg v0.0.0-20150302064018-429e6985f0b0
 	github.com/cenkalti/backoff/v4 v4.1.1
@@ -42,7 +43,7 @@ require (
 	github.com/tidwall/uhaha v0.8.1
 	go.etcd.io/etcd/client/v2 v2.305.0
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
-	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
+	golang.org/x/net v0.0.0-20210913180222-943fd674d43e
 	golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40 // indirect
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
 )

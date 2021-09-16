@@ -18,7 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gitsrc/IceFireDB/pkg/models"
+	"github.com/IceFireDB/kit/pkg/models"
 
 	"github.com/gitsrc/IceFireDB/hybriddb"
 
