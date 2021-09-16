@@ -40,7 +40,7 @@ var (
 	// debug
 	debug bool
 	// db (slot) number
-	slotNum int
+	slotNum int = 128
 	// coordinator type
 	coordinatorType string
 	// coordinator address
