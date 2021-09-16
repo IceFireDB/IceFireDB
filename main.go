@@ -20,6 +20,7 @@ import (
 
 	"github.com/IceFireDB/kit/pkg/models"
 
+	"github.com/gitsrc/IceFireDB/driver/badger"
 	"github.com/gitsrc/IceFireDB/hybriddb"
 
 	"github.com/gitsrc/IceFireDB/utils"
@@ -80,9 +81,11 @@ func main() {
 		db0, err := ldb.GetDB(0)
 		// Obtain the leveldb object and handle it carefully
 		driver := db0.GetSDB().GetDriver().GetStorageEngine()
-		var ok bool
-		if db, ok = driver.(*leveldb.DB); !ok {
-			panic("unsupported storage is caused")
+		switch v := driver.(type) {
+		case *leveldb.DB:
+		case *badger.DB:
+		default:
+			panic(fmt.Errorf("unsupported storage is caused: %T", v))
 		}
 		if storageBackend == hybriddb.StorageName {
 			// serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*hybriddb.DB).Metrics)
@@ -103,6 +106,8 @@ func main() {
 	notifyCh <- false // set init state
 	conf.NotifyCh = notifyCh
 	go handleLeaderState(conf.Name, notifyCh)
+
+	fmt.Printf("start with Storage Engine: %s\n", storageBackend)
 	rafthub.Main(conf)
 }
 
