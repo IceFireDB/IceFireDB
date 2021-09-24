@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2021-03-08 18:20:04
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-09-09 09:02:30
+ * @LastEditTime: 2021-09-24 13:40:56
  * @FilePath: /IceFireDB/strings.go
  */
 
@@ -39,8 +39,7 @@ func init() {
 	// conf.AddWriteCommand("MSET", cmdMSET)
 	conf.AddWriteCommand("SET", cmdSET)
 	conf.AddWriteCommand("SETNX", cmdSETNX)
-	// TODO SETEX => SETEXAT : 当raft节点宕机、日志回放时 还是回放了setex指令，所以需要在网络层拦截进行指令修改
-	// 由于raft 日志回滚问题，所以推荐大家使用SETEXAT 指令,建议客户端写入时转换为SETEXAT指令: 最新版本已经解决此问题，可以使用SETEX指令.
+	//SETEX => SETEXAT : When the raft node is down and the log is played back, the setex command is still played back, so it needs to be intercepted at the network layer to modify the command
 	conf.AddWriteCommand("SETEX", cmdSETEX)
 	conf.AddWriteCommand("SETEXAT", cmdSETEXAT)
 	conf.AddWriteCommand("SETRANGE", cmdSETRANGE)
