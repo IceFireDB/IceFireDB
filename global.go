@@ -14,7 +14,6 @@ import (
 	lediscfg "github.com/ledisdb/ledisdb/config"
 
 	"github.com/ledisdb/ledisdb/ledis"
-	"github.com/syndtr/goleveldb/leveldb"
 	rafthub "github.com/tidwall/uhaha"
 )
 
@@ -26,7 +25,7 @@ var (
 )
 
 var (
-	db            *leveldb.DB
+	//db            *leveldb.DB
 	le            *ledis.Ledis
 	ldb           *ledisDBs
 	ldsCfg        *lediscfg.Config

@@ -9,6 +9,8 @@
 package main
 
 import (
+	"bufio"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,8 +28,9 @@ import (
 	"github.com/gitsrc/IceFireDB/utils"
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/ledis"
+	"github.com/ledisdb/ledisdb/store"
+	"github.com/siddontang/go/snappy"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/tidwall/sds"
 	rafthub "github.com/tidwall/uhaha"
 )
 
@@ -50,9 +53,12 @@ var (
 	announceIP string
 	// self port register to coordinator
 	announcePort int
+
+	app *App
 )
 
 func main() {
+	var err error
 	conf.Name = "IceFireDB"
 	conf.Version = "1.0.0"
 	conf.GitSHA = BuildVersion
@@ -107,6 +113,11 @@ func main() {
 	conf.NotifyCh = notifyCh
 	go handleLeaderState(conf.Name, notifyCh)
 
+	app, err = NewApp()
+	if err != nil {
+		panic(err)
+	}
+
 	fmt.Printf("start with Storage Engine: %s\n", storageBackend)
 	rafthub.Main(conf)
 }
@@ -149,69 +160,83 @@ func handleLeaderState(name string, c <-chan bool) {
 		}
 		err = store.UpdateServer(server)
 		if err != nil {
-			panic(err)
+			// todo log
+			fmt.Println("report leader state", err)
 		}
 	}
 }
 
 type snap struct {
-	s *leveldb.Snapshot
+	s        *store.Snapshot
+	commitID uint64
 }
 
-func (s *snap) Done(path string) {}
-func (s *snap) Persist(wr io.Writer) error {
-	sw := sds.NewWriter(wr)
-	iter := s.s.NewIterator(nil, nil)
-	for ok := iter.First(); ok; ok = iter.Next() {
-		if err := sw.WriteBytes(iter.Key()); err != nil {
-			return err
-		}
-		if err := sw.WriteBytes(iter.Value()); err != nil {
-			return err
-		}
+func (s *snap) Done(path string) {
+	if s.s == nil {
+		return
 	}
-	iter.Release()
-	if err := iter.Error(); err != nil {
+	s.s.Close()
+}
+func (s *snap) Persist(w io.Writer) (err error) {
+	var snap = s.s
+	wb := bufio.NewWriterSize(w, 4096)
+
+	h := &ledis.DumpHead{s.commitID}
+
+	if err = h.Write(wb); err != nil {
 		return err
 	}
-	return sw.Flush()
+
+	it := snap.NewIterator()
+	defer it.Close()
+	it.SeekToFirst()
+
+	compressBuf := make([]byte, 4096)
+
+	var key []byte
+	var value []byte
+	for ; it.Valid(); it.Next() {
+		key = it.RawKey()
+		value = it.RawValue()
+
+		if key, err = snappy.Encode(compressBuf, key); err != nil {
+			return err
+		}
+
+		if err = binary.Write(wb, binary.BigEndian, uint16(len(key))); err != nil {
+			return err
+		}
+
+		if _, err = wb.Write(key); err != nil {
+			return err
+		}
+
+		if value, err = snappy.Encode(compressBuf, value); err != nil {
+			return err
+		}
+
+		if err = binary.Write(wb, binary.BigEndian, uint32(len(value))); err != nil {
+			return err
+		}
+
+		if _, err = wb.Write(value); err != nil {
+			return err
+		}
+	}
+
+	return wb.Flush()
 }
 
 func snapshot(data interface{}) (rafthub.Snapshot, error) {
-	s, err := db.GetSnapshot()
+	s, commitID, err := ldb.le.GetSnapshot()
 	if err != nil {
 		return nil, err
 	}
-	return &snap{s: s}, nil
+	return &snap{s: s, commitID: commitID}, nil
 }
 
 func restore(rd io.Reader) (interface{}, error) {
-	sr := sds.NewReader(rd)
-	var batch leveldb.Batch
-	for {
-		key, err := sr.ReadBytes()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-		value, err := sr.ReadBytes()
-		if err != nil {
-			return nil, err
-		}
-		batch.Put(key, value)
-		if batch.Len() == 1000 {
-			if err := db.Write(&batch, nil); err != nil {
-				return nil, err
-			}
-			batch.Reset()
-		}
-	}
-	if err := db.Write(&batch, nil); err != nil {
-		return nil, err
-	}
-	return nil, nil
+	return ldb.le.LoadDump(rd)
 }
 
 func connOpened(addr string) (context interface{}, accept bool) {

@@ -22,11 +22,11 @@ require (
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6
 	github.com/pelletier/go-toml v1.8.1 // indirect
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726
+	github.com/siddontang/goredis v0.0.0-20180423163523-0b4019cbd7b7
 	github.com/spf13/cast v1.4.1
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tidwall/raft-leveldb v0.2.0 // indirect
 	github.com/tidwall/redcon v1.4.1
-	github.com/tidwall/sds v0.1.0
 	github.com/tidwall/uhaha v0.8.1
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
 	golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40 // indirect
@@ -34,6 +34,6 @@ require (
 )
 
 replace (
-	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6 => github.com/gitsrc/ledisdb v0.0.0-20210311085546-2e33308de99f
+	github.com/ledisdb/ledisdb => github.com/gitsrc/ledisdb v0.0.0-20210924091748-05ada23e89c0
 	github.com/tidwall/uhaha v0.8.1 => github.com/gitsrc/uhaha v0.6.2-0.20210907032229-eef8220ec1f7
 )
