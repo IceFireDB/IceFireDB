@@ -3,7 +3,7 @@ module github.com/gitsrc/IceFireDB
 go 1.16
 
 require (
-	github.com/IceFireDB/kit v0.0.0-20210927085457-b9f5901edaac
+	github.com/IceFireDB/kit v0.0.0-20210927091721-f0b91a5b05fb
 	github.com/armon/go-metrics v0.3.6 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/davecgh/go-spew v1.1.1

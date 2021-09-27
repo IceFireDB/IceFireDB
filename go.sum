@@ -5,8 +5,8 @@ github.com/CodisLabs/codis v0.0.0-20181104082235-de1ad026e329 h1:KyRmPlfd2xewxb5
 github.com/CodisLabs/codis v0.0.0-20181104082235-de1ad026e329/go.mod h1:7p/InQNYNEI8sdFDMqA1rZqszJBZMZekIcWYf6N6s2M=
 github.com/DataDog/datadog-go v2.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
-github.com/IceFireDB/kit v0.0.0-20210927085457-b9f5901edaac h1:XKSQftXqhsrpfxiImpjmjV3NywjXDwtiLnIgwck97eg=
-github.com/IceFireDB/kit v0.0.0-20210927085457-b9f5901edaac/go.mod h1:iLMbnid2irQ+AD6UH7gA2cFN0CRmCcjOwnuOquaJ6Kk=
+github.com/IceFireDB/kit v0.0.0-20210927091721-f0b91a5b05fb h1:fOqTBJuyaJBjixiDFdcpV2gq9IJY5oIf7oBGQ5+hN+A=
+github.com/IceFireDB/kit v0.0.0-20210927091721-f0b91a5b05fb/go.mod h1:iLMbnid2irQ+AD6UH7gA2cFN0CRmCcjOwnuOquaJ6Kk=
 github.com/OneOfOne/xxhash v1.2.2 h1:KMrpdQIwFcEqXDklaen+P1axHaj9BSKzvpUUfnHldSE=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
