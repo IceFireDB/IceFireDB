@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/IceFireDB/kit/pkg/logger"
 	"github.com/ledisdb/ledisdb/ledis"
-	"github.com/siddontang/go/log"
 	"github.com/siddontang/goredis"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/tidwall/redcon"
@@ -67,7 +67,7 @@ func cmdMigrate(m uhaha.Machine, args []string) (interface{}, error) {
 		if err != errKeyInMigrating {
 			break
 		} else {
-			log.Infof("%s key %s is in migrating, wait 500ms and retry", tp, key)
+			logger.Infof("%s key %s is in migrating, wait 500ms and retry", tp, key)
 			time.Sleep(500 * time.Millisecond)
 		}
 	}

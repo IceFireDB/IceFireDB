@@ -20,12 +20,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/IceFireDB/kit/pkg/logger"
 	"github.com/IceFireDB/kit/pkg/models"
-
 	"github.com/gitsrc/IceFireDB/driver/badger"
 	"github.com/gitsrc/IceFireDB/hybriddb"
-
 	"github.com/gitsrc/IceFireDB/utils"
+	
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/ledisdb/ledisdb/store"
@@ -64,6 +64,8 @@ func main() {
 	conf.GitSHA = BuildVersion
 	conf.Flag.Custom = true
 	confInit(&conf)
+	// init logger
+	logger.Init("icefire")
 	conf.DataDirReady = func(dir string) {
 		os.RemoveAll(filepath.Join(dir, "main.db"))
 
