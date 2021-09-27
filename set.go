@@ -9,15 +9,15 @@ import (
 func init() {
 	conf.AddWriteCommand("SADD", cmdSADD)
 	conf.AddReadCommand("SCARD", cmdSCARD)
-	conf.AddReadCommand("SDIFF", cmdSDIFF)
-	conf.AddWriteCommand("SDIFFSTORE", cmdSDIFFSTORE)
-	conf.AddReadCommand("SINTER", cmdSINTER)
-	conf.AddWriteCommand("SINTERSTORE", cmdSINTERSTORE)
+	// conf.AddReadCommand("SDIFF", cmdSDIFF)
+	// conf.AddWriteCommand("SDIFFSTORE", cmdSDIFFSTORE)
+	// conf.AddReadCommand("SINTER", cmdSINTER)
+	// conf.AddWriteCommand("SINTERSTORE", cmdSINTERSTORE)
 	conf.AddReadCommand("SISMEMBER", cmdSISMEMBER)
 	conf.AddReadCommand("SMEMBERS", cmdSMEMBERS)
 	conf.AddWriteCommand("SREM", cmdSREM)
-	conf.AddReadCommand("SUNION", cmdSUNION)
-	conf.AddWriteCommand("SUNIONSTORE", cmdSUNIONSTORE)
+	// conf.AddReadCommand("SUNION", cmdSUNION)
+	// conf.AddWriteCommand("SUNIONSTORE", cmdSUNIONSTORE)
 	conf.AddWriteCommand("SCLEAR", cmdSCLEAR)
 	conf.AddWriteCommand("SMCLEAR", cmdSMCLEAR)
 	conf.AddWriteCommand("SEXPIRE", cmdSEXPIRE)
@@ -31,7 +31,7 @@ func cmdSADD(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
-	n, err := ldb.SAdd([]byte(args[1]), stringSliceToBytes(args[2:])...)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SAdd([]byte(args[1]), stringSliceToBytes(args[2:])...)
 	return redcon.SimpleInt(n), err
 }
 
@@ -44,11 +44,11 @@ func soptGeneric(args [][]byte, optType byte) ([][]byte, error) {
 	var err error
 	switch optType {
 	case ledis.UnionType:
-		v, err = ldb.SUnion(args[1:]...)
+		v, err = ldb.GetDBForKeyUnsafe([]byte(args[1])).SUnion(args[1:]...)
 	case ledis.DiffType:
-		v, err = ldb.SDiff(args[1:]...)
+		v, err = ldb.GetDBForKeyUnsafe([]byte(args[1])).SDiff(args[1:]...)
 	case ledis.InterType:
-		v, err = ldb.SInter(args[1:]...)
+		v, err = ldb.GetDBForKeyUnsafe([]byte(args[1])).SInter(args[1:]...)
 	}
 	if err != nil {
 		return nil, err
@@ -66,11 +66,11 @@ func soptStoreGeneric(args [][]byte, optType byte) (interface{}, error) {
 
 	switch optType {
 	case ledis.UnionType:
-		n, err = ldb.SUnionStore(args[1], args[2:]...)
+		n, err = ldb.GetDBForKeyUnsafe([]byte(args[1])).SUnionStore(args[1], args[2:]...)
 	case ledis.DiffType:
-		n, err = ldb.SDiffStore(args[1], args[2:]...)
+		n, err = ldb.GetDBForKeyUnsafe([]byte(args[1])).SDiffStore(args[1], args[2:]...)
 	case ledis.InterType:
-		n, err = ldb.SInterStore(args[1], args[2:]...)
+		n, err = ldb.GetDBForKeyUnsafe([]byte(args[1])).SInterStore(args[1], args[2:]...)
 	}
 	return redcon.SimpleInt(n), err
 }
@@ -79,7 +79,7 @@ func cmdSCARD(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
-	n, err := ldb.SCard([]byte(args[1]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SCard([]byte(args[1]))
 	return redcon.SimpleInt(n), err
 }
 
@@ -103,7 +103,7 @@ func cmdSISMEMBER(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
-	n, err := ldb.SIsMember([]byte(args[1]), []byte(args[2]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SIsMember([]byte(args[1]), []byte(args[2]))
 
 	return redcon.SimpleInt(n), err
 }
@@ -112,7 +112,7 @@ func cmdSMEMBERS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
-	return ldb.SMembers([]byte(args[1]))
+	return ldb.GetDBForKeyUnsafe([]byte(args[1])).SMembers([]byte(args[1]))
 }
 
 func cmdSREM(m uhaha.Machine, args []string) (interface{}, error) {
@@ -120,7 +120,7 @@ func cmdSREM(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	n, err := ldb.SRem([]byte(args[1]), stringSliceToBytes(args[2:])...)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SRem([]byte(args[1]), stringSliceToBytes(args[2:])...)
 	return redcon.SimpleInt(n), err
 }
 
@@ -137,7 +137,7 @@ func cmdSCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	n, err := ldb.SClear([]byte(args[1]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SClear([]byte(args[1]))
 
 	return redcon.SimpleInt(n), err
 }
@@ -147,7 +147,7 @@ func cmdSMCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	n, err := ldb.SMclear(stringSliceToBytes(args[1:])...)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SMclear(stringSliceToBytes(args[1:])...)
 
 	return redcon.SimpleInt(n), err
 }
@@ -162,7 +162,7 @@ func cmdSEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, uhaha.ErrInvalid
 	}
 
-	v, err := ldb.SExpire([]byte(args[1]), duration)
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SExpire([]byte(args[1]), duration)
 
 	return redcon.SimpleInt(v), err
 }
@@ -177,7 +177,7 @@ func cmdSEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, uhaha.ErrInvalid
 	}
 
-	v, err := ldb.SExpireAt([]byte(args[1]), when)
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SExpireAt([]byte(args[1]), when)
 	return redcon.SimpleInt(v), err
 }
 
@@ -186,7 +186,7 @@ func cmdSTTL(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	v, err := ldb.STTL([]byte(args[1]))
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).STTL([]byte(args[1]))
 	return redcon.SimpleInt(v), err
 }
 
@@ -195,7 +195,7 @@ func cmdSPERSIST(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	n, err := ldb.SPersist([]byte(args[1]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SPersist([]byte(args[1]))
 	return redcon.SimpleInt(n), err
 }
 
@@ -203,7 +203,7 @@ func cmdSKEYEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
-	n, err := ldb.SKeyExists([]byte(args[1]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).SKeyExists([]byte(args[1]))
 	return redcon.SimpleInt(n), err
 }
 

@@ -7,16 +7,16 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-func TestScan(t *testing.T) {
-	c := getTestConn()
-	c.FlushAll(c.Context())
-	testKVScan(t, c)
-	testHashKeyScan(t, c)
-	testListKeyScan(t, c)
-	testZSetKeyScan(t, c)
-	testSetKeyScan(t, c)
-	c.FlushAll(c.Context())
-}
+//func TestScan(t *testing.T) {
+//	c := getTestConn()
+//	c.FlushAll(c.Context())
+//	testKVScan(t, c)
+//	testHashKeyScan(t, c)
+//	testListKeyScan(t, c)
+//	testZSetKeyScan(t, c)
+//	testSetKeyScan(t, c)
+//	c.FlushAll(c.Context())
+//}
 
 func checkScanValues(t *testing.T, ay interface{}, values ...interface{}) {
 	a, ok := ay.([]interface{})

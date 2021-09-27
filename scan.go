@@ -112,9 +112,9 @@ func (scg scanCommandGroup) cmdXSCAN(_ uhaha.Machine, args []string) (interface{
 
 	var ay [][]byte
 	if !desc {
-		ay, err = ldb.Scan(dataType, cursor, count, false, match)
+		ay, err = ldb.GetDBForKeyUnsafe([]byte(args[1])).Scan(dataType, cursor, count, false, match)
 	} else {
-		ay, err = ldb.RevScan(dataType, cursor, count, false, match)
+		ay, err = ldb.GetDBForKeyUnsafe([]byte(args[1])).RevScan(dataType, cursor, count, false, match)
 	}
 	if err != nil {
 		return nil, err
@@ -143,9 +143,9 @@ func (scg scanCommandGroup) cmdXHSCAN(_ uhaha.Machine, args []string) (interface
 
 	var ay []ledis.FVPair
 	if !desc {
-		ay, err = ldb.HScan(key, cursor, count, false, match)
+		ay, err = ldb.GetDBForKeyUnsafe(key).HScan(key, cursor, count, false, match)
 	} else {
-		ay, err = ldb.HRevScan(key, cursor, count, false, match)
+		ay, err = ldb.GetDBForKeyUnsafe(key).HRevScan(key, cursor, count, false, match)
 	}
 
 	if err != nil {
@@ -182,9 +182,9 @@ func (scg scanCommandGroup) cmdXSSCAN(_ uhaha.Machine, args []string) (interface
 
 	var ay [][]byte
 	if !desc {
-		ay, err = ldb.SScan(key, cursor, count, false, match)
+		ay, err = ldb.GetDBForKeyUnsafe(key).SScan(key, cursor, count, false, match)
 	} else {
-		ay, err = ldb.SRevScan(key, cursor, count, false, match)
+		ay, err = ldb.GetDBForKeyUnsafe(key).SRevScan(key, cursor, count, false, match)
 	}
 
 	if err != nil {
@@ -216,9 +216,9 @@ func (scg scanCommandGroup) cmdXZSCAN(_ uhaha.Machine, args []string) (interface
 	}
 	var ay []ledis.ScorePair
 	if !desc {
-		ay, err = ldb.ZScan(key, cursor, count, false, match)
+		ay, err = ldb.GetDBForKeyUnsafe(key).ZScan(key, cursor, count, false, match)
 	} else {
-		ay, err = ldb.ZRevScan(key, cursor, count, false, match)
+		ay, err = ldb.GetDBForKeyUnsafe(key).ZRevScan(key, cursor, count, false, match)
 	}
 	if err != nil {
 		return nil, err

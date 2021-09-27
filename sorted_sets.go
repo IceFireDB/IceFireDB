@@ -85,7 +85,7 @@ func zparseScoreRange(minBuf []byte, maxBuf []byte) (min int64, max int64, err e
 	if strings.ToLower(hack.String(maxBuf)) == "+inf" {
 		max = math.MaxInt64
 	} else {
-		var ropen = false
+		ropen := false
 
 		if len(maxBuf) == 0 {
 			err = uhaha.ErrWrongNumArgs
@@ -130,8 +130,7 @@ func cmdZCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	count, err := ldb.ZCount([]byte(args[1]), int64(min), int64(max))
-
+	count, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZCount([]byte(args[1]), int64(min), int64(max))
 	if err != nil {
 		return nil, err
 	}
@@ -144,8 +143,7 @@ func cmdZCARD(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.ZCard([]byte(args[1]))
-
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZCard([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -162,16 +160,16 @@ func cmdZRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	ScorePair, err := ldb.ZRange([]byte(args[1]), int(min), int(max))
+	ScorePair, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZRange([]byte(args[1]), int(min), int(max))
 	if err != nil {
 		return nil, err
 	}
 
-	var withScores bool 
+	var withScores bool
 	args = args[4:]
 	if len(args) > 0 {
 		if len(args) != 1 {
-			return nil,  rafthub.ErrWrongNumArgs
+			return nil, rafthub.ErrWrongNumArgs
 		}
 		if strings.ToLower(args[0]) == "withscores" {
 			withScores = true
@@ -209,16 +207,16 @@ func cmdZREVRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	ScorePair, err := ldb.ZRevRange([]byte(args[1]), int(min), int(max))
+	ScorePair, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZRevRange([]byte(args[1]), int(min), int(max))
 	if err != nil {
 		return nil, err
 	}
 
-	var withScores bool 
+	var withScores bool
 	args = args[4:]
 	if len(args) > 0 {
 		if len(args) != 1 {
-			return nil,  rafthub.ErrWrongNumArgs
+			return nil, rafthub.ErrWrongNumArgs
 		}
 		if strings.ToLower(args[0]) == "withscores" {
 			withScores = true
@@ -251,8 +249,7 @@ func cmdZRANK(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.ZRank([]byte(args[1]), []byte(args[2]))
-
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZRank([]byte(args[1]), []byte(args[2]))
 	if err != nil {
 		return nil, err
 	}
@@ -267,8 +264,7 @@ func cmdZCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.ZClear([]byte(args[1]))
-
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZClear([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -286,8 +282,7 @@ func cmdZREM(m uhaha.Machine, args []string) (interface{}, error) {
 		members[i-2] = []byte(args[i])
 	}
 
-	n, err := ldb.ZRem([]byte(args[1]), members...)
-
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZRem([]byte(args[1]), members...)
 	if err != nil {
 		return nil, err
 	}
@@ -310,8 +305,7 @@ func cmdZADD(m uhaha.Machine, args []string) (interface{}, error) {
 		}
 	}
 
-	n, err := ldb.ZAdd([]byte(args[1]), ScorePair...)
-
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZAdd([]byte(args[1]), ScorePair...)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +317,7 @@ func cmdZSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.ZScore([]byte(args[1]), []byte(args[2]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZScore([]byte(args[1]), []byte(args[2]))
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +334,7 @@ func cmdZINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	n, err := ldb.ZIncrBy([]byte(args[1]), int64(delta), []byte(args[3]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZIncrBy([]byte(args[1]), int64(delta), []byte(args[3]))
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +346,7 @@ func cmdZREVRANK(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.ZRevRank([]byte(args[1]), []byte(args[2]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZRevRank([]byte(args[1]), []byte(args[2]))
 	if err != nil {
 		return nil, err
 	}
@@ -406,12 +400,12 @@ func cmdZRANGEBYSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 	}
 
 	if offset < 0 {
-		//for ledis, if offset < 0, a empty will return
-		//so here we directly return a empty array
+		// for ledis, if offset < 0, a empty will return
+		// so here we directly return a empty array
 		return [][]byte{}, nil
 	}
 
-	scorePair, err := ldb.ZRangeByScore([]byte(key), min, max, offset, count)
+	scorePair, err := ldb.GetDBForKeyUnsafe([]byte(key)).ZRangeByScore([]byte(key), min, max, offset, count)
 	if err != nil {
 		return nil, err
 	}
@@ -475,12 +469,12 @@ func cmdZREVRANGEBYSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 	}
 
 	if offset < 0 {
-		//for ledis, if offset < 0, a empty will return
-		//so here we directly return a empty array
+		// for ledis, if offset < 0, a empty will return
+		// so here we directly return a empty array
 		return [][]byte{}, nil
 	}
 
-	scorePair, err := ldb.ZRangeByScoreGeneric([]byte(key), min, max, offset, count, true)
+	scorePair, err := ldb.GetDBForKeyUnsafe([]byte(key)).ZRangeByScoreGeneric([]byte(key), min, max, offset, count, true)
 	if err != nil {
 		return nil, err
 	}
@@ -512,7 +506,7 @@ func cmdZREMRANGEBYSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	n, err := ldb.ZRemRangeByScore([]byte(args[1]), min, max)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZRemRangeByScore([]byte(args[1]), min, max)
 	if err != nil {
 		return nil, err
 	}
@@ -539,7 +533,7 @@ func cmdZREMRANGEBYRANK(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	n, err := ldb.ZRemRangeByRank([]byte(args[1]), start, stop)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).ZRemRangeByRank([]byte(args[1]), start, stop)
 	if err != nil {
 		return nil, err
 	}

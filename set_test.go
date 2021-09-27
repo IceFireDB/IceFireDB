@@ -93,12 +93,12 @@ func TestDBSet(t *testing.T) {
 	}
 }
 
-func TestSetOperation(t *testing.T) {
-	db := getTestConn()
-	testUnion(db, t)
-	testInter(db, t)
-	testDiff(db, t)
-}
+//func TestSetOperation(t *testing.T) {
+//	db := getTestConn()
+//	testUnion(db, t)
+//	testInter(db, t)
+//	testDiff(db, t)
+//}
 
 func testUnion(db *redis.Client, t *testing.T) {
 	key := "testdb_set_union_1"

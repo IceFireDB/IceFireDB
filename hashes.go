@@ -33,15 +33,14 @@ func init() {
 	conf.AddReadCommand("HSTRLEN", cmdHSTRLEN)
 	conf.AddReadCommand("HVALS", cmdHVALS)
 
-	//IceFireDB special command
+	// IceFireDB special command
 	conf.AddWriteCommand("HCLEAR", cmdHCLEAR)
 	conf.AddWriteCommand("HMCLEAR", cmdHMCLEAR)
-	//conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)     //Timeout command HEXPIRE => HEXPIREAT
-	conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT) //Timeout command
+	// conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)     //Timeout command HEXPIRE => HEXPIREAT
+	conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT) // Timeout command
 	conf.AddReadCommand("HTTL", cmdHTTL)
 	// conf.AddWriteCommand("HPERSIST", cmdHPERSIST)
 	conf.AddReadCommand("HKEYEXISTS", cmdHKEYEXISTS)
-
 }
 
 func cmdHSET(m uhaha.Machine, args []string) (interface{}, error) {
@@ -51,7 +50,7 @@ func cmdHSET(m uhaha.Machine, args []string) (interface{}, error) {
 
 	var n int64
 	for i := 2; i < len(args); i += 2 {
-		if r, err := ldb.HSet([]byte(args[1]), []byte(args[i]), []byte(args[i+1])); err == nil {
+		if r, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HSet([]byte(args[1]), []byte(args[i]), []byte(args[i+1])); err == nil {
 			n = n + r
 		}
 	}
@@ -63,8 +62,7 @@ func cmdHGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
-	val, err := ldb.HGet([]byte(args[1]), []byte(args[2]))
-
+	val, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HGet([]byte(args[1]), []byte(args[2]))
 	if err != nil {
 		if err == leveldb.ErrNotFound {
 			return nil, nil
@@ -79,7 +77,7 @@ func cmdHGET(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleString(val), nil
 }
 
-//HDEL key field [field ...]
+// HDEL key field [field ...]
 func cmdHDEL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -91,21 +89,21 @@ func cmdHDEL(m uhaha.Machine, args []string) (interface{}, error) {
 		argsData[i-2] = []byte(args[i])
 	}
 
-	if count, err := ldb.HDel([]byte(args[1]), argsData...); err == nil {
+	if count, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HDel([]byte(args[1]), argsData...); err == nil {
 		n = count
 	}
 
 	return redcon.SimpleInt(n), nil
 }
 
-//HEXISTS key field
+// HEXISTS key field
 func cmdHEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
 	var n int64 = 1
-	v, err := ldb.HGet([]byte(args[1]), []byte(args[2]))
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HGet([]byte(args[1]), []byte(args[2]))
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +119,7 @@ func cmdHGETALL(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	v, err := ldb.HGetAll([]byte(args[1]))
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HGetAll([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +142,7 @@ func cmdHINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	n, err := ldb.HIncrBy([]byte(args[1]), []byte(args[2]), delta)
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HIncrBy([]byte(args[1]), []byte(args[2]), delta)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +155,7 @@ func cmdHKEYS(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	v, err := ldb.HKeys([]byte(args[1]))
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HKeys([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -165,13 +163,13 @@ func cmdHKEYS(m uhaha.Machine, args []string) (interface{}, error) {
 	return v, nil
 }
 
-//conf.AddReadCommand("HLEN", cmdHLEN)
+// conf.AddReadCommand("HLEN", cmdHLEN)
 func cmdHLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.HLen([]byte(args[1]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HLen([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +189,7 @@ func cmdHMGET(m uhaha.Machine, args []string) (interface{}, error) {
 		keys[i-2] = []byte(args[i])
 	}
 
-	v, err := ldb.HMget([]byte(args[1]), keys...)
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HMget([]byte(args[1]), keys...)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +197,7 @@ func cmdHMGET(m uhaha.Machine, args []string) (interface{}, error) {
 	return v, nil
 }
 
-//conf.AddWriteCommand("HMSET", cmdHMSET)
+// conf.AddWriteCommand("HMSET", cmdHMSET)
 func cmdHMSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -219,7 +217,7 @@ func cmdHMSET(m uhaha.Machine, args []string) (interface{}, error) {
 		kvs[i].Value = []byte(args[2*i+1])
 	}
 
-	if err := ldb.HMset([]byte(key), kvs...); err != nil {
+	if err := ldb.GetDBForKeyUnsafe([]byte(key)).HMset([]byte(key), kvs...); err != nil {
 		return nil, err
 	}
 
@@ -233,16 +231,16 @@ func cmdHSETNX(m uhaha.Machine, args []string) (interface{}, error) {
 	}
 
 	var n int64 = 1
-	v, err := ldb.HGet([]byte(args[1]), []byte(args[2]))
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HGet([]byte(args[1]), []byte(args[2]))
 	if err != nil {
 		return nil, err
 	}
-	if v != nil { //Data exists, return zero
+	if v != nil { // Data exists, return zero
 		n = 0
 		return redcon.SimpleInt(n), nil
 	}
 
-	n, err = ldb.HSet([]byte(args[1]), []byte(args[2]), []byte(args[3]))
+	n, err = ldb.GetDBForKeyUnsafe([]byte(args[1])).HSet([]byte(args[1]), []byte(args[2]), []byte(args[3]))
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +254,7 @@ func cmdHSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	val, err := ldb.HGet([]byte(args[1]), []byte(args[2]))
+	val, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HGet([]byte(args[1]), []byte(args[2]))
 	if err != nil {
 		return nil, err
 	}
@@ -264,47 +262,49 @@ func cmdHSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(len(val)), nil
 }
 
-//conf.AddReadCommand("HVALS", cmdHVALS)
+// conf.AddReadCommand("HVALS", cmdHVALS)
 func cmdHVALS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	v, err := ldb.HValues([]byte(args[1]))
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HValues([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
 	return v, nil
 }
 
-//conf.AddWriteCommand("HCLEAR", cmdHCLEAR)
+// conf.AddWriteCommand("HCLEAR", cmdHCLEAR)
 func cmdHCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.HClear([]byte(args[1]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HClear([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
 	return redcon.SimpleInt(n), nil
 }
 
-//conf.AddWriteCommand("HMCLEAR", cmdHMCLEAR)
+// conf.AddWriteCommand("HMCLEAR", cmdHMCLEAR)
 func cmdHMCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
 	keys := make([][]byte, len(args)-1)
+	var count int64 = 0
 	for i := 1; i < len(args); i++ {
 		keys[i-1] = []byte(args[i])
+		n, err := ldb.GetDBForKeyUnsafe([]byte(args[i])).HClear([]byte(args[i]))
+		if err != nil {
+			return nil, err
+		}
+		count += n
 	}
-	n, err := ldb.HMclear(keys...)
-	if err != nil {
-		return nil, err
-	}
-	return redcon.SimpleInt(n), nil
+	return redcon.SimpleInt(count), nil
 }
 
 // conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)
@@ -318,14 +318,14 @@ func cmdHEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	v, err := ldb.HExpire([]byte(args[1]), duration)
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HExpire([]byte(args[1]), duration)
 	if err != nil {
 		return nil, err
 	}
 	return redcon.SimpleInt(v), nil
 }
 
-//conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT)
+// conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT)
 func cmdHEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -336,16 +336,16 @@ func cmdHEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	//If the timestamp is less than the current time, delete operation
+	// If the timestamp is less than the current time, delete operation
 	if when < time.Now().Unix() {
-		_, err := ldb.HClear([]byte(args[1]))
+		_, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HClear([]byte(args[1]))
 		if err != nil {
 			return nil, err
 		}
 		return redcon.SimpleInt(0), nil
 	}
 
-	v, err := ldb.HExpireAt([]byte(args[1]), when)
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HExpireAt([]byte(args[1]), when)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +358,7 @@ func cmdHTTL(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	v, err := ldb.HTTL([]byte(args[1]))
+	v, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HTTL([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -371,20 +371,20 @@ func cmdHPERSIST(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.HPersist([]byte(args[1]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HPersist([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
 	return redcon.SimpleInt(n), nil
 }
 
-//conf.AddReadCommand("HKEYEXISTS", cmdHKEYEXISTS)
+// conf.AddReadCommand("HKEYEXISTS", cmdHKEYEXISTS)
 func cmdHKEYEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.HKeyExists([]byte(args[1]))
+	n, err := ldb.GetDBForKeyUnsafe([]byte(args[1])).HKeyExists([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}

@@ -8,11 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ledisdb/ledisdb/ledis"
-
 	"github.com/cenkalti/backoff/v4"
 	"github.com/go-redis/redis/v8"
 	lediscfg "github.com/ledisdb/ledisdb/config"
+	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/tidwall/uhaha"
 )
 
@@ -33,16 +32,21 @@ func getTestConn() *redis.Client {
 			ldsCfg.DataDir = filepath.Join(dir, "main.db")
 			ldsCfg.Databases = 1
 			ldsCfg.DBName = os.Getenv("DRIVER")
+			ldsCfg.Databases = slotNum
 			var err error
 			le, err = ledis.Open(ldsCfg)
 			if err != nil {
 				panic(err)
 			}
 
-			ldb, err = le.Select(0)
+			ldb, err = NewLedisDBs(le, slotNum)
 			if err != nil {
 				panic(err)
 			}
+			//db0, err := ldb.GetDB(0)
+			// Obtain the leveldb object and handle it carefully
+			//driver := db0.GetSDB().GetDriver().GetStorageEngine()
+			//db := driver.(*leveldb.DB)
 		}
 
 		conf.Snapshot = snapshot
@@ -62,6 +66,11 @@ func getTestConn() *redis.Client {
 
 		// clean all data
 		testRedisClient.FlushAll(context.Background())
+	}
+	var err error
+	app, err = NewApp()
+	if err != nil {
+		panic(err)
 	}
 	testConnOnce.Do(f)
 	return testRedisClient
