@@ -1,6 +1,7 @@
 package utils
 
-//Mainly contains redis command processing functions
+//Here you can perform batch processing of instructions. For example: add prefix to all keys; add regular expression.
+//This is the network layer, where instructions are rewritten at the top layer to reduce performance loss.
 
 func RedisCmdRewrite(args [][]string) {
 	// nowUnixTime := time.Now().Unix()
