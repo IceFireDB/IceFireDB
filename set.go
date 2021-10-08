@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/tidwall/redcon"
 	"github.com/tidwall/uhaha"
@@ -162,8 +164,16 @@ func cmdSEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, uhaha.ErrInvalid
 	}
 
-	v, err := ldb.SExpire([]byte(args[1]), duration)
+	timestamp := m.Now().Unix() + duration
+	if timestamp < time.Now().Unix() {
+		_, err := ldb.SClear([]byte(args[1]))
+		if err != nil {
+			return nil, err
+		}
+		return redcon.SimpleInt(0), nil
+	}
 
+	v, err := ldb.SExpireAt([]byte(args[1]), timestamp)
 	return redcon.SimpleInt(v), err
 }
 
@@ -172,12 +182,19 @@ func cmdSEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	when, err := ledis.StrInt64([]byte(args[2]), nil)
+	timestamp, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
 		return nil, uhaha.ErrInvalid
 	}
+	if timestamp < time.Now().Unix() {
+		_, err := ldb.SClear([]byte(args[1]))
+		if err != nil {
+			return nil, err
+		}
+		return redcon.SimpleInt(0), nil
+	}
 
-	v, err := ldb.SExpireAt([]byte(args[1]), when)
+	v, err := ldb.SExpireAt([]byte(args[1]), timestamp)
 	return redcon.SimpleInt(v), err
 }
 
