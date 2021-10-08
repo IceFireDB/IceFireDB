@@ -45,7 +45,7 @@ func init() {
 	conf.AddWriteCommand("SETEXAT", cmdSETEXAT)
 	conf.AddWriteCommand("SETRANGE", cmdSETRANGE)
 	conf.AddReadCommand("STRLEN", cmdSTRLEN)
-	// conf.AddWriteCommand("EXPIRE", cmdEXPIRE)     //EXPIRE => EXPIREAT
+	conf.AddWriteCommand("EXPIRE", cmdEXPIRE)     //EXPIRE => EXPIREAT
 	conf.AddWriteCommand("EXPIREAT", cmdEXPIREAT) // Timeout command
 	conf.AddReadCommand("TTL", cmdTTL)
 	// conf.AddWriteCommand("PERSIST", cmdPERSIST) //Prohibition: time persistence
@@ -68,13 +68,13 @@ func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	when, err := ledis.StrInt64([]byte(args[2]), nil)
+	timestamp, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	// 如果时间戳小于当前时间，则进行删除操作
-	if when < time.Now().Unix() {
+	if timestamp < time.Now().Unix() {
 		keys := make([][]byte, 1)
 		keys[0] = []byte(args[1])
 		_, err := ldb.Del(keys...)
@@ -84,7 +84,7 @@ func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return redcon.SimpleInt(1), nil
 	}
 
-	v, err := ldb.ExpireAt([]byte(args[1]), when)
+	v, err := ldb.ExpireAt([]byte(args[1]), timestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -92,22 +92,31 @@ func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(v), nil
 }
 
-// func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
-// 	if len(args) != 3 {
-// 		return nil, rafthub.ErrWrongNumArgs
-// 	}
+func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
+	if len(args) != 3 {
+		return nil, rafthub.ErrWrongNumArgs
+	}
 
-// 	duration, err := ledis.StrInt64([]byte(args[2]), nil)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	v, err := ldb.Expire([]byte(args[1]), duration)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return redcon.SimpleInt(v), nil
-// }
+	duration, err := ledis.StrInt64([]byte(args[2]), nil)
+	if err != nil {
+		return nil, err
+	}
+	timestamp := m.Now().Unix() + duration
+	if timestamp < time.Now().Unix() {
+		keys := make([][]byte, 1)
+		keys[0] = []byte(args[1])
+		_, err := ldb.Del(keys...)
+		if err != nil {
+			return nil, err
+		}
+		return redcon.SimpleInt(1), nil
+	}
+	v, err := ldb.ExpireAt([]byte(args[1]), timestamp)
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(v), nil
+}
 
 func cmdSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
@@ -381,14 +390,13 @@ func cmdSETEX(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	sec, err := ledis.StrInt64([]byte(args[2]), nil)
+	duration, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
 		return nil, err
 	}
+	timestamp := m.Now().Unix() + duration
 
-	timestamp := time.Now().Unix() + sec
-
-	// 如果时间戳小于当前时间，则进行删除操作
+	//If the timestamp is less than the current time, delete operation
 	if timestamp < time.Now().Unix() {
 		keys := make([][]byte, 1)
 		keys[0] = []byte(args[1])
@@ -415,7 +423,7 @@ func cmdSETEXAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	// 如果时间戳小于当前时间，则进行删除操作
+	//If the timestamp is less than the current time, delete operation
 	if timestamp < time.Now().Unix() {
 		keys := make([][]byte, 1)
 		keys[0] = []byte(args[1])

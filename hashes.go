@@ -36,7 +36,7 @@ func init() {
 	//IceFireDB special command
 	conf.AddWriteCommand("HCLEAR", cmdHCLEAR)
 	conf.AddWriteCommand("HMCLEAR", cmdHMCLEAR)
-	//conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)     //Timeout command HEXPIRE => HEXPIREAT
+	conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)     //Timeout command HEXPIRE => HEXPIREAT
 	conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT) //Timeout command
 	conf.AddReadCommand("HTTL", cmdHTTL)
 	// conf.AddWriteCommand("HPERSIST", cmdHPERSIST)
@@ -318,7 +318,17 @@ func cmdHEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	v, err := ldb.HExpire([]byte(args[1]), duration)
+	timestamp := m.Now().Unix() + duration
+	//If the timestamp is less than the current time, delete operation
+	if timestamp < time.Now().Unix() {
+		_, err := ldb.HClear([]byte(args[1]))
+		if err != nil {
+			return nil, err
+		}
+		return redcon.SimpleInt(0), nil
+	}
+
+	v, err := ldb.HExpireAt([]byte(args[1]), timestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -331,13 +341,13 @@ func cmdHEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	when, err := ledis.StrInt64([]byte(args[2]), nil)
+	timestamp, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	//If the timestamp is less than the current time, delete operation
-	if when < time.Now().Unix() {
+	if timestamp < time.Now().Unix() {
 		_, err := ldb.HClear([]byte(args[1]))
 		if err != nil {
 			return nil, err
@@ -345,7 +355,7 @@ func cmdHEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return redcon.SimpleInt(0), nil
 	}
 
-	v, err := ldb.HExpireAt([]byte(args[1]), when)
+	v, err := ldb.HExpireAt([]byte(args[1]), timestamp)
 	if err != nil {
 		return nil, err
 	}
