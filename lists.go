@@ -38,7 +38,7 @@ func init() {
 	conf.AddWriteCommand("LCLEAR", cmdLCLEAR)
 	conf.AddWriteCommand("LMCLEAR", cmdLMCLEAR)
 	//Timeout instruction: be cautious, the raft log is rolled back, causing dirty data: timeout LEXPIRE => LEXPIREAT
-	//conf.AddWriteCommand("LEXPIRE", cmdLEXPIRE) //超时时间指令：谨慎，raft日志回滚，造成脏数据:超时时间  LEXPIRE => LEXPIREAT
+	conf.AddWriteCommand("LEXPIRE", cmdLEXPIRE) //超时时间指令：谨慎，raft日志回滚，造成脏数据:超时时间  LEXPIRE => LEXPIREAT
 	conf.AddWriteCommand("LEXPIREAT", cmdLEXPIREAT)
 	conf.AddReadCommand("LTTL", cmdLTTL)
 	// conf.AddWriteCommand("LPERSIST", cmdLPERSIST)
@@ -112,14 +112,14 @@ func cmdLEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	when, err := ledis.StrInt64([]byte(args[2]), nil)
+	timestamp, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	//如果时间戳小于当前时间，则进行删除操作 :此处有边界条件：因为是队列，raft 日志回滚是顺序的
 	//If the timestamp is less than the current time, delete operation: There are boundary conditions here: because it is a queue, the rollback of the raft log is sequential
-	if when < time.Now().Unix() {
+	if timestamp < time.Now().Unix() {
 		_, err := ldb.LClear([]byte(args[1]))
 		if err != nil {
 			return nil, err
@@ -127,7 +127,7 @@ func cmdLEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return redcon.SimpleInt(0), nil
 	}
 
-	v, err := ldb.LExpireAt([]byte(args[1]), when)
+	v, err := ldb.LExpireAt([]byte(args[1]), timestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,17 @@ func cmdLEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	v, err := ldb.LExpire([]byte(args[1]), duration)
+	timestamp := m.Now().Unix() + duration
+	//If the timestamp is less than the current time, delete operation
+	if timestamp < time.Now().Unix() {
+		_, err := ldb.LClear([]byte(args[1]))
+		if err != nil {
+			return nil, err
+		}
+		return redcon.SimpleInt(0), nil
+	}
+
+	v, err := ldb.LExpireAt([]byte(args[1]), timestamp)
 	if err != nil {
 		return nil, err
 	}
