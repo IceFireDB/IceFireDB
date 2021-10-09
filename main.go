@@ -13,13 +13,12 @@ import (
 	"io"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 	"path/filepath"
 	"sync/atomic"
 
 	"github.com/dgraph-io/badger/v3"
-	"github.com/gitsrc/IceFireDB/hybriddb"
 	_ "github.com/gitsrc/IceFireDB/driver/badger"
+	"github.com/gitsrc/IceFireDB/hybriddb"
 
 	"github.com/gitsrc/IceFireDB/utils"
 	lediscfg "github.com/ledisdb/ledisdb/config"
@@ -45,7 +44,7 @@ func main() {
 	conf.Flag.Custom = true
 	confInit(&conf)
 	conf.DataDirReady = func(dir string) {
-		os.RemoveAll(filepath.Join(dir, "main.db"))
+		//os.RemoveAll(filepath.Join(dir, "main.db"))
 
 		ldsCfg = lediscfg.NewConfigDefault()
 		ldsCfg.DataDir = filepath.Join(dir, "main.db")
@@ -67,6 +66,7 @@ func main() {
 		driver := ldb.GetSDB().GetDriver().GetStorageEngine()
 		switch v := driver.(type) {
 		case *leveldb.DB:
+			db = v
 		case *badger.DB:
 		default:
 			panic(fmt.Errorf("unsupported storage is caused: %T", v))
