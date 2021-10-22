@@ -6,7 +6,7 @@ require (
 	github.com/armon/go-metrics v0.3.6 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/davecgh/go-spew v1.1.1
-	github.com/dgraph-io/badger/v3 v3.2103.1
+	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/dgraph-io/ristretto v0.1.0
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/fatih/color v1.10.0 // indirect
