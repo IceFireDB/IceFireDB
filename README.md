@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2021-09-09 11:18:27
+ * @LastEditTime: 2021-12-10 14:12:26
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -12,19 +12,19 @@
     width="201" height="300" border="0" alt="IceFireDB">
 </p>
 
-# IceFireDB  
+# IceFireDB  - [ WEB2 + WEB3  ]
 ![test](https://github.com/IceFireDB/IceFireDB/actions/workflows/test.yml/badge.svg)
 ![build](https://github.com/IceFireDB/IceFireDB/actions/workflows/build.yml/badge.svg)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB?ref=badge_shield)
 
 
-Distributed disk storage system based on Raft and RESP protocol.
+Distributed disk storage system based on Raft and RESP protocol,web3 decentralized system access point.
 
 1. High performance
 2. Distributed consistency
 3. Reliable LSM disk storage
 4. Cold and hot mixed data storage structure
-5. Multiple groups of raft clusters, horizontal expansion and contraction of data groups（Upgrading soon）
+5. Based on IPFS decentralized storage, build a persistent data distributed storage layer.（Upgrading soon）
 6. More advanced cache implementation, faster LSM persistent storage
 
 # Imagine Architecture
