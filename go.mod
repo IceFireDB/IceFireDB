@@ -23,7 +23,7 @@ require (
 	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tidwall/raft-leveldb v0.2.0 // indirect
-	github.com/tidwall/redcon v1.4.2
+	github.com/tidwall/redcon v1.4.3
 	github.com/tidwall/sds v0.1.0
 	github.com/tidwall/uhaha v0.8.1
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
