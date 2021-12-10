@@ -18,7 +18,7 @@
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB?ref=badge_shield)
 
 
-Decentralized distributed nosql database, Web3 world system access point, supports RESP, RAFT and blockchain protocols.
+Decentralized distributed nosql database, Web3 world access point, supports RESP, RAFT and blockchain protocols.
 
 1. High performance
 2. Distributed consistency
