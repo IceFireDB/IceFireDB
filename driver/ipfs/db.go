@@ -1,8 +1,6 @@
 package ipfs
 
 import (
-	"bytes"
-	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"io/ioutil"
@@ -26,14 +24,16 @@ const (
 	defaultFilterBits          int   = 10
 )
 
-var EndPointConnection = "localhost:5001"
+//var  EndPointConnection="localhost:5001"
 
 type Config struct {
-	HotCacheSize int64
+	HotCacheSize       int64
+	EndPointConnection string
 }
 
-var DefaultConfig = Config{
-	HotCacheSize: defaultHotCacheSize,
+var IpfsDefaultConfig = Config{
+	HotCacheSize:       defaultHotCacheSize,
+	EndPointConnection: "",
 }
 
 func init() {
@@ -47,8 +47,7 @@ func (s Store) String() string {
 }
 
 func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
-	fmt.Print("ipfs.Store.Open \n")
-
+	//fmt.Print("ipfs.Store.Open \n")
 	if err := os.MkdirAll(path, fs.ModePerm); err != nil {
 		return nil, err
 	}
@@ -58,7 +57,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	db.cfg = &cfg.LevelDB
 
 	db.initOpts()
-	db.encryptKey, _ = hex.DecodeString("44667768254d593b7ea48c3327c18a651f6031554ca4f5e3e641f6ff1ea72e98")
+	// db.encryptKey, _ = hex.DecodeString("44667768254d593b7ea48c3327c18a651f6031554ca4f5e3e641f6ff1ea72e98")
 
 	var err error
 	db.db, err = leveldb.OpenFile(db.path, db.opts)
@@ -66,12 +65,12 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if DefaultConfig.HotCacheSize <= 0 {
-		DefaultConfig.HotCacheSize = defaultHotCacheSize
+	if IpfsDefaultConfig.HotCacheSize <= 0 {
+		IpfsDefaultConfig.HotCacheSize = defaultHotCacheSize
 	}
 	// here we use default value, later add config support
 	db.cache, err = ristretto.NewCache(&ristretto.Config{
-		MaxCost:     DefaultConfig.HotCacheSize * MB,
+		MaxCost:     IpfsDefaultConfig.HotCacheSize * MB,
 		NumCounters: defaultHotCacheNumCounters,
 		BufferItems: 64,
 		Metrics:     true,
@@ -80,17 +79,18 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 		},
 	})
 
-	sh := shell.NewShell(EndPointConnection)
-	db.remoteShell = sh
-
 	if err != nil {
 		return nil, err
 	}
+
+	sh := shell.NewShell(IpfsDefaultConfig.EndPointConnection)
+	db.remoteShell = sh
+
 	return db, nil
 }
 
 func (s Store) Repair(path string, cfg *config.Config) error {
-	fmt.Print("ipfs.Store.Repair \n")
+	//fmt.Print("ipfs.Store.Repair \n")
 	db, err := leveldb.RecoverFile(path, newOptions(&cfg.LevelDB))
 	if err != nil {
 		return err
@@ -117,11 +117,10 @@ type DB struct {
 
 	filter      filter.Filter
 	remoteShell *shell.Shell
-	encryptKey  []byte
 }
 
 func (s *DB) GetStorageEngine() interface{} {
-	fmt.Print("ipfs.db.GetStorageEngine \n")
+	//fmt.Print("ipfs.db.GetStorageEngine \n")
 	return s.db
 }
 
@@ -163,13 +162,13 @@ func newOptions(cfg *config.LevelDBConfig) *opt.Options {
 }
 
 func (db *DB) Close() error {
-	fmt.Print("ipfs.db.Close \n")
+	//fmt.Print("ipfs.db.Close \n")
 	db.cache.Close()
 	return db.db.Close()
 }
 
-func (db *DB) Put1(key, value []byte) error {
-	fmt.Print("ipfs.db.put \n")
+func (db *DB) Put(key, value []byte) error {
+	//fmt.Print("ipfs.db.put \n")
 	err := db.db.Put(key, value, nil)
 	if err == nil {
 		db.cache.Del(key)
@@ -177,27 +176,8 @@ func (db *DB) Put1(key, value []byte) error {
 	return err
 }
 
-func (db *DB) Put(key, value []byte) error {
-	fmt.Print("ipfs.db.put \n")
-	//	data := encrypt(value, w.db.encryptKey)
-
-	buf := bytes.NewBuffer(value)
-	//fmt.Printf("%s\n", buf)
-	cid, err := db.remoteShell.Add(buf)
-	if err != nil {
-		fmt.Print("ipfs.add err\n")
-	}
-	fmt.Println("cid=", cid)
-
-	err = db.db.Put(key, []byte(cid), nil)
-	if err == nil {
-		db.cache.Del(key)
-	}
-	return err
-}
-
 func (db *DB) Geti1(key []byte) ([]byte, error) {
-	fmt.Print("ipfs.db.Get \n")
+	//fmt.Printf("ipfs.db.Get  %s\n", string(key))
 	if v, ok := db.cache.Get(key); ok {
 		return v.([]byte), nil
 	}
@@ -206,11 +186,13 @@ func (db *DB) Geti1(key []byte) ([]byte, error) {
 		return nil, nil
 	}
 	db.cache.Set(key, v, 0)
+	//fmt.Println("data=", string(v))
 	return v, nil
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
-	fmt.Print("ipfs.db.Get \n")
+
+	//fmt.Printf("ipfs.db.Get  %s\n", string(key))
 	if v, ok := db.cache.Get(key); ok {
 		return v.([]byte), nil
 	}
@@ -229,16 +211,13 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	dData := decrypt(data, db.encryptKey)
+	//fmt.Println("data=", string(data))
 
-	fmt.Println("data=", string(dData))
-
-	db.cache.Set(key, dData, 0)
-	return dData, nil
+	db.cache.Set(key, data, 0)
+	return data, nil
 }
-
 func (db *DB) Delete(key []byte) error {
-	fmt.Print("ipfs.db.Delete \n")
+	//fmt.Print("ipfs.db.Delete \n")
 	err := db.db.Delete(key, nil)
 	if err == nil {
 		db.cache.Del(key)
@@ -247,7 +226,7 @@ func (db *DB) Delete(key []byte) error {
 }
 
 func (db *DB) SyncPut(key []byte, value []byte) error {
-	fmt.Print("ipfs.db.SyncPut \n")
+	//fmt.Print("ipfs.db.SyncPut \n")
 	err := db.db.Put(key, value, db.syncOpts)
 	if err == nil {
 		db.cache.Del(key)
@@ -256,7 +235,7 @@ func (db *DB) SyncPut(key []byte, value []byte) error {
 }
 
 func (db *DB) SyncDelete(key []byte) error {
-	fmt.Print("ipfs.db.SyncDelete \n")
+	//fmt.Print("ipfs.db.SyncDelete \n")
 	err := db.db.Delete(key, db.syncOpts)
 	if err == nil {
 		db.cache.Del(key)
@@ -265,7 +244,7 @@ func (db *DB) SyncDelete(key []byte) error {
 }
 
 func (db *DB) NewWriteBatch() driver.IWriteBatch {
-	fmt.Print("ipfs.db.NewWriteBatch \n")
+	//	fmt.Print("ipfs.db.NewWriteBatch \n")
 	wb := &WriteBatch{
 		db:     db,
 		wbatch: new(leveldb.Batch),
@@ -274,7 +253,7 @@ func (db *DB) NewWriteBatch() driver.IWriteBatch {
 }
 
 func (db *DB) NewIterator() driver.IIterator {
-	fmt.Print("ipfs.db.NewIterator \n")
+	//fmt.Print("ipfs.db.NewIterator \n")
 	it := &Iterator{
 		it:     db.db.NewIterator(nil, db.iteratorOpts),
 		rShell: db.remoteShell,
@@ -284,7 +263,7 @@ func (db *DB) NewIterator() driver.IIterator {
 }
 
 func (db *DB) NewSnapshot() (driver.ISnapshot, error) {
-	fmt.Print("ipfs.db.NewSnapshot \n")
+	//fmt.Print("ipfs.db.NewSnapshot \n")
 	snapshot, err := db.db.GetSnapshot()
 	if err != nil {
 		return nil, err

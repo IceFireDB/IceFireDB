@@ -1,7 +1,6 @@
 package ipfs
 
 import (
-	"fmt"
 	"io/ioutil"
 
 	shell "github.com/ipfs/go-ipfs-api"
@@ -20,7 +19,6 @@ func (it *Iterator) Key() []byte {
 func (it *Iterator) Value1() []byte {
 	return it.it.Value()
 }
-
 func (it *Iterator) Value() []byte {
 
 	v := it.it.Value()
@@ -36,7 +34,7 @@ func (it *Iterator) Value() []byte {
 
 	//dData := decrypt(data, db.encryptKey)
 
-	fmt.Println("ipfs.get. data=", string(data))
+	//fmt.Println("ipfs.get. data=", string(data))
 
 	return data
 }
