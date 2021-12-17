@@ -18,6 +18,7 @@ import (
 
 	"github.com/dgraph-io/badger/v3"
 	_ "github.com/gitsrc/IceFireDB/driver/badger"
+	"github.com/gitsrc/IceFireDB/driver/ipfs"
 	"github.com/gitsrc/IceFireDB/hybriddb"
 
 	"github.com/gitsrc/IceFireDB/utils"
@@ -74,6 +75,10 @@ func main() {
 		if storageBackend == hybriddb.StorageName {
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*hybriddb.DB).Metrics)
 		}
+		if storageBackend == ipfs.StorageName {
+			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*ipfs.DB).Metrics)
+		}
+
 	}
 	if debug {
 		// pprof for profiling
