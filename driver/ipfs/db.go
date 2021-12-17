@@ -24,8 +24,6 @@ const (
 	defaultFilterBits          int   = 10
 )
 
-//var  EndPointConnection="localhost:5001"
-
 type Config struct {
 	HotCacheSize       int64
 	EndPointConnection string
@@ -56,7 +54,6 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	db.cfg = &cfg.LevelDB
 
 	db.initOpts()
-	// db.encryptKey, _ = hex.DecodeString("44667768254d593b7ea48c3327c18a651f6031554ca4f5e3e641f6ff1ea72e98")
 
 	var err error
 	db.db, err = leveldb.OpenFile(db.path, db.opts)
@@ -67,6 +64,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	if IpfsDefaultConfig.HotCacheSize <= 0 {
 		IpfsDefaultConfig.HotCacheSize = defaultHotCacheSize
 	}
+
 	// here we use default value, later add config support
 	db.cache, err = ristretto.NewCache(&ristretto.Config{
 		MaxCost:     IpfsDefaultConfig.HotCacheSize * MB,
@@ -113,7 +111,8 @@ type DB struct {
 
 	cache *ristretto.Cache
 
-	filter      filter.Filter
+	filter filter.Filter
+
 	remoteShell *shell.Shell
 }
 
@@ -171,18 +170,6 @@ func (db *DB) Put(key, value []byte) error {
 	return err
 }
 
-func (db *DB) Geti1(key []byte) ([]byte, error) {
-	if v, ok := db.cache.Get(key); ok {
-		return v.([]byte), nil
-	}
-	v, err := db.db.Get(key, nil)
-	if err == leveldb.ErrNotFound {
-		return nil, nil
-	}
-	db.cache.Set(key, v, 0)
-	return v, nil
-}
-
 func (db *DB) Get(key []byte) ([]byte, error) {
 	if v, ok := db.cache.Get(key); ok {
 		return v.([]byte), nil
@@ -205,6 +192,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	db.cache.Set(key, data, 0)
 	return data, nil
 }
+
 func (db *DB) Delete(key []byte) error {
 	err := db.db.Delete(key, nil)
 	if err == nil {

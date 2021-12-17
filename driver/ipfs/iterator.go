@@ -1,3 +1,10 @@
+/*
+ * @Author: gitsrc
+ * @Date: 2021-12-17 17:52:52
+ * @LastEditors: gitsrc
+ * @LastEditTime: 2021-12-17 17:55:43
+ * @FilePath: /IceFireDB/driver/ipfs/iterator.go
+ */
 package ipfs
 
 import (
@@ -19,6 +26,7 @@ func (it *Iterator) Key() []byte {
 func (it *Iterator) Value1() []byte {
 	return it.it.Value()
 }
+
 func (it *Iterator) Value() []byte {
 
 	v := it.it.Value()
@@ -31,8 +39,6 @@ func (it *Iterator) Value() []byte {
 	if err != nil {
 		return nil
 	}
-
-	//dData := decrypt(data, db.encryptKey)
 
 	return data
 }
