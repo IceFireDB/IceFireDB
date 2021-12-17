@@ -34,8 +34,6 @@ func (it *Iterator) Value() []byte {
 
 	//dData := decrypt(data, db.encryptKey)
 
-	//fmt.Println("ipfs.get. data=", string(data))
-
 	return data
 }
 

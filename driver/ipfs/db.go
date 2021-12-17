@@ -47,7 +47,6 @@ func (s Store) String() string {
 }
 
 func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
-	//fmt.Print("ipfs.Store.Open \n")
 	if err := os.MkdirAll(path, fs.ModePerm); err != nil {
 		return nil, err
 	}
@@ -90,7 +89,6 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 }
 
 func (s Store) Repair(path string, cfg *config.Config) error {
-	//fmt.Print("ipfs.Store.Repair \n")
 	db, err := leveldb.RecoverFile(path, newOptions(&cfg.LevelDB))
 	if err != nil {
 		return err
@@ -120,7 +118,6 @@ type DB struct {
 }
 
 func (s *DB) GetStorageEngine() interface{} {
-	//fmt.Print("ipfs.db.GetStorageEngine \n")
 	return s.db
 }
 
@@ -162,13 +159,11 @@ func newOptions(cfg *config.LevelDBConfig) *opt.Options {
 }
 
 func (db *DB) Close() error {
-	//fmt.Print("ipfs.db.Close \n")
 	db.cache.Close()
 	return db.db.Close()
 }
 
 func (db *DB) Put(key, value []byte) error {
-	//fmt.Print("ipfs.db.put \n")
 	err := db.db.Put(key, value, nil)
 	if err == nil {
 		db.cache.Del(key)
@@ -177,7 +172,6 @@ func (db *DB) Put(key, value []byte) error {
 }
 
 func (db *DB) Geti1(key []byte) ([]byte, error) {
-	//fmt.Printf("ipfs.db.Get  %s\n", string(key))
 	if v, ok := db.cache.Get(key); ok {
 		return v.([]byte), nil
 	}
@@ -186,13 +180,10 @@ func (db *DB) Geti1(key []byte) ([]byte, error) {
 		return nil, nil
 	}
 	db.cache.Set(key, v, 0)
-	//fmt.Println("data=", string(v))
 	return v, nil
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
-
-	//fmt.Printf("ipfs.db.Get  %s\n", string(key))
 	if v, ok := db.cache.Get(key); ok {
 		return v.([]byte), nil
 	}
@@ -211,13 +202,10 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	//fmt.Println("data=", string(data))
-
 	db.cache.Set(key, data, 0)
 	return data, nil
 }
 func (db *DB) Delete(key []byte) error {
-	//fmt.Print("ipfs.db.Delete \n")
 	err := db.db.Delete(key, nil)
 	if err == nil {
 		db.cache.Del(key)
@@ -226,7 +214,6 @@ func (db *DB) Delete(key []byte) error {
 }
 
 func (db *DB) SyncPut(key []byte, value []byte) error {
-	//fmt.Print("ipfs.db.SyncPut \n")
 	err := db.db.Put(key, value, db.syncOpts)
 	if err == nil {
 		db.cache.Del(key)
@@ -235,7 +222,6 @@ func (db *DB) SyncPut(key []byte, value []byte) error {
 }
 
 func (db *DB) SyncDelete(key []byte) error {
-	//fmt.Print("ipfs.db.SyncDelete \n")
 	err := db.db.Delete(key, db.syncOpts)
 	if err == nil {
 		db.cache.Del(key)
@@ -244,7 +230,6 @@ func (db *DB) SyncDelete(key []byte) error {
 }
 
 func (db *DB) NewWriteBatch() driver.IWriteBatch {
-	//	fmt.Print("ipfs.db.NewWriteBatch \n")
 	wb := &WriteBatch{
 		db:     db,
 		wbatch: new(leveldb.Batch),
@@ -253,7 +238,6 @@ func (db *DB) NewWriteBatch() driver.IWriteBatch {
 }
 
 func (db *DB) NewIterator() driver.IIterator {
-	//fmt.Print("ipfs.db.NewIterator \n")
 	it := &Iterator{
 		it:     db.db.NewIterator(nil, db.iteratorOpts),
 		rShell: db.remoteShell,
@@ -263,7 +247,6 @@ func (db *DB) NewIterator() driver.IIterator {
 }
 
 func (db *DB) NewSnapshot() (driver.ISnapshot, error) {
-	//fmt.Print("ipfs.db.NewSnapshot \n")
 	snapshot, err := db.db.GetSnapshot()
 	if err != nil {
 		return nil, err
