@@ -23,7 +23,7 @@ require (
 	github.com/spf13/cast v1.4.1
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tidwall/raft-leveldb v0.2.0 // indirect
-	github.com/tidwall/redcon v1.4.3
+	github.com/tidwall/redcon v1.4.4
 	github.com/tidwall/sds v0.1.0
 	github.com/tidwall/uhaha v0.8.1
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
