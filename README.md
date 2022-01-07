@@ -27,7 +27,7 @@ Decentralized distributed nosql database, Web3 world access point, supports RESP
 5. Based on IPFS decentralized storage, build a persistent data distributed storage layer.（Upgrading soon）
 6. More advanced cache implementation, faster LSM persistent storage
 
-# Imagine Architecture
+# Architecture
 
 <p align="center">
 <img 
