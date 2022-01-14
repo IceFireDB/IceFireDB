@@ -3,22 +3,25 @@ module github.com/gitsrc/IceFireDB
 go 1.16
 
 require (
+	berty.tech/go-ipfs-log v1.5.0
+	berty.tech/go-orbit-db v1.13.2
 	github.com/armon/go-metrics v0.3.6 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/dgraph-io/ristretto v0.1.0
-	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/fatih/color v1.10.0 // indirect
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/hashicorp/go-hclog v0.16.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.0 // indirect
 	github.com/hashicorp/go-msgpack v1.1.5 // indirect
-	github.com/hashicorp/golang-lru v0.5.4 // indirect
+	github.com/ipfs/go-ipfs v0.11.0
 	github.com/ipfs/go-ipfs-api v0.3.0
+	github.com/ipfs/interface-go-ipfs-core v0.5.2
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6
 	github.com/pelletier/go-toml v1.8.1 // indirect
+	github.com/pkg/errors v0.9.1
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726
 	github.com/spf13/cast v1.4.1
 	github.com/syndtr/goleveldb v1.0.0
@@ -26,11 +29,12 @@ require (
 	github.com/tidwall/redcon v1.4.4
 	github.com/tidwall/sds v0.1.0
 	github.com/tidwall/uhaha v0.8.1
-	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
 )
 
 replace (
+	berty.tech/go-ipfs-log v1.5.0 => github.com/Jchicode/go-ipfs-log v0.0.0-20211229072901-39985a956db3
+	berty.tech/go-orbit-db v1.13.2 => github.com/Jchicode/go-orbit-db v0.0.0-20211229073052-e4486e53a1da
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6 => github.com/gitsrc/ledisdb v0.0.0-20210311085546-2e33308de99f
 	github.com/tidwall/uhaha v0.8.1 => github.com/gitsrc/uhaha v0.6.2-0.20210827055200-e2d63f4d4aee
 )
