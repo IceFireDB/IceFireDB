@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2022-01-13 15:18:48
+ * @LastEditTime: 2022-02-11 10:39:33
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -25,7 +25,7 @@ Cloud native decentralized distributed nosql database, Web3 world access point, 
 3. Reliable LSM disk storage
 4. Cold and hot mixed data storage structure
 5. Based on IPFS decentralized storage, build a persistent data distributed storage layer.（beta version）
-6. Support OSS storage engine
+6. Support OSS storage engine（Upgrading soon）
 7. More advanced cache implementation, faster LSM persistent storage
 
 # Architecture
