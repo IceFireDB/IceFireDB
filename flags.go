@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gitsrc/IceFireDB/driver/ipfs"
+	"github.com/gitsrc/IceFireDB/driver/orbitdb"
 	"github.com/gitsrc/IceFireDB/hybriddb"
 	rafthub "github.com/tidwall/uhaha"
 )
@@ -54,6 +55,7 @@ Advanced options:
   --raft-backend   : Raft storage backend. 
   --storage-backend : Storage backend.
   --ipfs-endpoint:  ipfs endpoint connect . 
+  --pubsub-id: orbitdb pub sub .
 `
 
 func confInit(conf *rafthub.Config) {
@@ -101,6 +103,7 @@ func confInit(conf *rafthub.Config) {
 	flag.StringVar(&conf.Advertise, "advertise", conf.Advertise, "")
 	flag.StringVar(&testNode, "t", "", "")
 	flag.StringVar(&ipfs.IpfsDefaultConfig.EndPointConnection, "ipfs-endpoint", "", "")
+	flag.StringVar(&orbitdb.OrbitdbDefaultConfig.Pubsubid, "pubsub-id", "", "")
 	flag.BoolVar(&conf.TryErrors, "try-errors", conf.TryErrors, "")
 	flag.BoolVar(&conf.InitRunQuit, "init-run-quit", conf.InitRunQuit, "")
 	flag.Int64Var(&hybriddb.DefaultConfig.HotCacheSize, "hot-cache-size", hybriddb.DefaultConfig.HotCacheSize, "")

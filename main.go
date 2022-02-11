@@ -19,6 +19,7 @@ import (
 	"github.com/dgraph-io/badger/v3"
 	_ "github.com/gitsrc/IceFireDB/driver/badger"
 	"github.com/gitsrc/IceFireDB/driver/ipfs"
+	"github.com/gitsrc/IceFireDB/driver/orbitdb"
 	"github.com/gitsrc/IceFireDB/hybriddb"
 
 	"github.com/gitsrc/IceFireDB/utils"
@@ -78,7 +79,9 @@ func main() {
 		if storageBackend == ipfs.StorageName {
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*ipfs.DB).Metrics)
 		}
-
+		if storageBackend == orbitdb.StorageName {
+			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*orbitdb.DB).Metrics)
+		}
 	}
 	if debug {
 		// pprof for profiling
