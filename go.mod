@@ -16,7 +16,7 @@ require (
 	github.com/hashicorp/go-hclog v0.16.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.0 // indirect
 	github.com/hashicorp/go-msgpack v1.1.5 // indirect
-	github.com/ipfs/go-ipfs v0.11.0
+	github.com/ipfs/go-ipfs v0.12.0
 	github.com/ipfs/go-ipfs-api v0.3.0
 	github.com/ipfs/interface-go-ipfs-core v0.5.2
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6
