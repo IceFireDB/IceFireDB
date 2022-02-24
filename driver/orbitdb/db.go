@@ -7,8 +7,6 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/ipfs/go-ipfs/repo/fsrepo"
-
 	"github.com/ipfs/go-ipfs/plugin/loader"
 	"github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/store/driver"
@@ -59,15 +57,13 @@ func (s Store) String() string {
 }
 
 
-func createCoreAPI( core *ipfsCore.IpfsNode) iface.CoreAPI{
+func CreateCoreAPI( core *ipfsCore.IpfsNode) iface.CoreAPI{
         api, _ := coreapi.NewCoreAPI(core)
         return api
 }
-/*
-func createMockNet(ctx context.Context) mocknet.Mocknet {
-        return mocknet.New(ctx)
-}
-*/
+
+
+
 
 
 func loadPlugins(repoPath string) (*loader.PluginLoader, error) {
@@ -90,16 +86,17 @@ func loadPlugins(repoPath string) (*loader.PluginLoader, error) {
 
 
 
-func createIPFSNode(ctx context.Context) (*ipfsCore.IpfsNode) {
-
+func CreateIPFSNode(ctx context.Context) (*ipfsCore.IpfsNode) {
+/*
 	r, err1 := fsrepo.Open("/root/.ipfs")
 	if err1 != nil { 
 		return nil
 	}
+	*/
 
         core, _ := ipfsCore.NewNode(ctx, &ipfsCore.BuildCfg{
                 Online: true,
-                Repo: r,
+               // Repo: r,
                 Host:   libp2p.DefaultHostOption, //mock.MockHostOption(m),
                 ExtraOpts: map[string]bool{
                         "pubsub": true,
@@ -170,9 +167,9 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	
 
 	loadPlugins("/root/.ipfs")
-	node := createIPFSNode(ctx)
+	node := CreateIPFSNode(ctx)
 
-	db1IPFS := createCoreAPI( node)
+	db1IPFS := CreateCoreAPI( node)
 	odb, _ := orbitdb2.NewOrbitDB(ctx, db1IPFS, &orbitdb2.NewOrbitDBOptions{Directory: &path,})
 
 	var db1  oiface.KeyValueStore
