@@ -20,6 +20,7 @@ import (
 	_ "github.com/gitsrc/IceFireDB/driver/badger"
 	"github.com/gitsrc/IceFireDB/driver/ipfs"
 	"github.com/gitsrc/IceFireDB/driver/orbitdb"
+	"github.com/gitsrc/IceFireDB/driver/oss"
 	"github.com/gitsrc/IceFireDB/hybriddb"
 
 	"github.com/gitsrc/IceFireDB/utils"
@@ -82,6 +83,11 @@ func main() {
 		if storageBackend == orbitdb.StorageName {
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*orbitdb.DB).Metrics)
 		}
+
+		if storageBackend == oss.StorageName {
+			//serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*orbitdb.DB).Metrics)
+		}
+
 	}
 	if debug {
 		// pprof for profiling
