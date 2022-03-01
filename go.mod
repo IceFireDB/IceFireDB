@@ -6,6 +6,7 @@ require (
 	berty.tech/go-ipfs-log v1.5.0
 	berty.tech/go-orbit-db v1.13.2
 	github.com/armon/go-metrics v0.3.6 // indirect
+	github.com/aws/aws-sdk-go v1.27.0
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger/v3 v3.2103.2
@@ -21,6 +22,9 @@ require (
 	github.com/ipfs/interface-go-ipfs-core v0.5.2
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6
 	github.com/pelletier/go-toml v1.8.1 // indirect
+	github.com/philippgille/gokv/encoding v0.6.0
+	github.com/philippgille/gokv/test v0.6.0
+	github.com/philippgille/gokv/util v0.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726
 	github.com/spf13/cast v1.4.1
