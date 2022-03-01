@@ -1,3 +1,5 @@
+// +build osstest
+
 package main
 
 import (
@@ -11,16 +13,16 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 
-	"github.com/philippgille/gokv/encoding"
 	oss "github.com/gitsrc/IceFireDB/driver/oss"
-	
+	"github.com/philippgille/gokv/encoding"
+
 	"github.com/philippgille/gokv/test"
 )
 
 // For Minio Docker container.
 // See https://docs.minio.io/docs/minio-docker-quickstart-guide.html.
 const (
-	customEndpoint  string = "http://192.168.4.7:7480"
+	customEndpoint  string = "http://localhost:9000"
 	accesskey string  =      "AKIAIOSFODNN7EXAMPLE"
 	secretkey string  =      "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 	bucketname string  = "gokv"

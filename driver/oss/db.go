@@ -36,7 +36,7 @@ type Config struct {
 
 var OssDefaultConfig = Config{
 	HotCacheSize:       defaultHotCacheSize,
-	EndPointConnection: "http://192.168.4.7:7480",
+	EndPointConnection: "http://localhost:9000",
 	AccessKey :   "AKIAIOSFODNN7EXAMPLE",
 	Secretkey :   "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 	

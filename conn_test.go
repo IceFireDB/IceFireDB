@@ -1,3 +1,5 @@
+// +build alltest
+
 package main
 
 import (
