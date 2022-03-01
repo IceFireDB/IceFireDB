@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -49,6 +50,7 @@ func getTestConn() *redis.Client {
 
 		conf.Snapshot = snapshot
 		conf.Restore = restore
+		fmt.Printf("start with Storage Engine: %s\n", os.Getenv("DRIVER"))
 		go uhaha.Main(conf)
 
 		testRedisClient = redis.NewClient(&redis.Options{
