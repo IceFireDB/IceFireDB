@@ -31,7 +31,7 @@ type Config struct {
 
 var IpfsDefaultConfig = Config{
 	HotCacheSize:       defaultHotCacheSize,
-	EndPointConnection: "",
+	EndPointConnection: "http://localhost:5001",
 }
 
 func init() {
