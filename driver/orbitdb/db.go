@@ -1,13 +1,11 @@
 package orbitdb
-
+ 
 import (
 	"context"
 	"fmt"
 	"github.com/ipfs/go-ipfs/core/node/libp2p"
 	"io/fs"
 	"os"
-
-	"github.com/ipfs/go-ipfs/repo/fsrepo"
 
 	"github.com/ipfs/go-ipfs/plugin/loader"
 	"github.com/ledisdb/ledisdb/config"
@@ -91,15 +89,15 @@ func loadPlugins(repoPath string) (*loader.PluginLoader, error) {
 
 
 func createIPFSNode(ctx context.Context) (*ipfsCore.IpfsNode) {
-
+/*
 	r, err1 := fsrepo.Open("/root/.ipfs")
 	if err1 != nil { 
 		return nil
 	}
-
+*/
         core, _ := ipfsCore.NewNode(ctx, &ipfsCore.BuildCfg{
                 Online: true,
-                Repo: r,
+              //  Repo: r,
                 Host:   libp2p.DefaultHostOption, //mock.MockHostOption(m),
                 ExtraOpts: map[string]bool{
                         "pubsub": true,
@@ -236,18 +234,30 @@ func (db *DB) Put(key, value []byte) error {
 	kk:=string(key)
 
 	_, err := db.kv_db.Put(db.ctx, kk, value)
-
+	err = db.db.Put(key, value, nil)
+	if err == nil {
+		db.cache.Del(key)
+	}
 	return err
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
-	kk:=string(key)
-	value, err := db.kv_db.Get(db.ctx, kk)
+	v, err := db.db.Get(key, nil)
+	if err == leveldb.ErrNotFound {
+		kk:=string(key)
+		value, err := db.kv_db.Get(db.ctx, kk)
+		if err == nil{
+			return nil, nil
+		}
+		v = value
+	}
+	db.cache.Set(key, v, 0)
 
-	return value, err
+	return v, nil
 }
 
 func (db *DB) Delete(key []byte) error {
+	db.db.Delete(key, nil)
 	kk:=string(key)
 	var err error
 	_, err = db.kv_db.Delete(db.ctx, kk)
@@ -274,27 +284,14 @@ func (db *DB) SyncDelete(key []byte) error {
 func (db *DB) NewWriteBatch() driver.IWriteBatch {   
 	wb := &WriteBatch{
 		db:     db,
-		//wbatch: new(leveldb.Batch),
+		wbatch: new(leveldb.Batch),
 	}
 	return wb
 }
 
 func (db *DB) NewIterator() driver.IIterator {
-
-	allkv := db.kv_db.All()
-	maplen := len(allkv)
-
-	var allkey  []string
-
-	for k, _ := range allkv {
-		allkey = append(allkey, k)
-	}
-
 	it := &Iterator{
-		allkey: allkey,
-		cap: maplen,
-		index: 0,
-		allkv: allkv,
+		db.db.NewIterator(nil, db.iteratorOpts),
 	}
 
 	return it
