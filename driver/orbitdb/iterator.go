@@ -1,76 +1,49 @@
 package orbitdb
 
 import (
-	"strings"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
 
-
-
 type Iterator struct {
-	allkey  []string
-	cap int
-	index  int
-
-	allkv  map[string][]byte
+	it iterator.Iterator
 }
 
 func (it *Iterator) Key() []byte {
-	s := it.allkey[it.index]
-	return []byte(s)
+	return it.it.Key()
 }
 
 func (it *Iterator) Value() []byte {
-	s := it.allkey[it.index]
-	return []byte(it.allkv[s])
+	return it.it.Value()
 }
 
 func (it *Iterator) Close() error {
-	//if it.it != nil {
-	//	it.it.Release()
-	//	it.it = nil
-	//}
+	if it.it != nil {
+		it.it.Release()
+		it.it = nil
+	}
 	return nil
 }
 
 func (it *Iterator) Valid() bool {
-	if it.index >= it.cap  ||  it.index < 0{
-		return false
-	}
-
-	return true
-
-	//return it.it.Valid()
+	return it.it.Valid()
 }
 
 func (it *Iterator) Next() {
-	it.index++
+	it.it.Next()
 }
 
 func (it *Iterator) Prev() {
-	it.index--
+	it.it.Prev()
 }
 
 func (it *Iterator) First() {
-	it.index  = 0
+	it.it.First()
 }
 
 func (it *Iterator) Last() {
-	it.index = it.cap
+	it.it.Last()
 }
 
 func (it *Iterator) Seek(key []byte) {
-	var ret int
-	s := string(key)
-
-	for i, key2 := range it.allkey {
-		ret = strings.Compare(s, key2)
-		if ret == 0{
-			it.index = i
-		}
-
-	}
-
-
-	//it.it.Seek(key)
+	it.it.Seek(key)
 }
-
