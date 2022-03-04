@@ -23,9 +23,9 @@ Cloud native decentralized distributed nosql database, Web3 world access point, 
 1. High performance
 2. Distributed consistency
 3. Reliable LSM disk storage
-4. Cold and hot mixed data storage structure
+4. Support OSS storage engine
 5. Based on IPFS decentralized storage, build a persistent data distributed storage layer.（beta version）
-6. Support OSS storage engine（Upgrading soon）
+6. Support kv metadata layer and mixed storage structure of hot and cold（upgrading soon）
 7. More advanced cache implementation, faster LSM persistent storage
 
 # Architecture
