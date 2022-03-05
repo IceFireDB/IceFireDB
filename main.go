@@ -16,19 +16,19 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"github.com/dgraph-io/badger/v3"
-	_ "github.com/gitsrc/IceFireDB/driver/badger"
-	"github.com/gitsrc/IceFireDB/driver/ipfs"
-	"github.com/gitsrc/IceFireDB/driver/orbitdb"
-	"github.com/gitsrc/IceFireDB/driver/oss"
-	"github.com/gitsrc/IceFireDB/hybriddb"
-
-	"github.com/gitsrc/IceFireDB/utils"
+	badger "github.com/dgraph-io/badger/v3"
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/tidwall/sds"
 	rafthub "github.com/tidwall/uhaha"
+
+	_ "github.com/gitsrc/IceFireDB/driver/badger"
+	"github.com/gitsrc/IceFireDB/driver/hybriddb"
+	"github.com/gitsrc/IceFireDB/driver/ipfs"
+	"github.com/gitsrc/IceFireDB/driver/orbitdb"
+	"github.com/gitsrc/IceFireDB/driver/oss"
+	"github.com/gitsrc/IceFireDB/utils"
 )
 
 var (
@@ -110,6 +110,7 @@ type snap struct {
 }
 
 func (s *snap) Done(path string) {}
+
 func (s *snap) Persist(wr io.Writer) error {
 	sw := sds.NewWriter(wr)
 	iter := s.s.NewIterator(nil, nil)
