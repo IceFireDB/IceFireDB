@@ -261,3 +261,5 @@ func createClient(t *testing.T, codec encoding.Codec) oss.Client {
 	}
 	return client
 }
+
+//Thanks, from https://github.com/philippgille/gokv
