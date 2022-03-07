@@ -1,6 +1,6 @@
 // +build osstest
 
-package main
+package oss
 
 import (
 	"log"
