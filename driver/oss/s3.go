@@ -279,3 +279,5 @@ func createBucket(origS3 bool, svc *awss3.S3, createBucketInput awss3.CreateBuck
 
 	return nil
 }
+
+//Thanks, from https://github.com/philippgille/gokv
