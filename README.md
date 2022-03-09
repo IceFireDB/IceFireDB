@@ -26,7 +26,7 @@ Cloud native decentralized distributed nosql database, Web3 world access point, 
 4. Support OSS storage engine
 5. Based on IPFS decentralized storage, build a persistent data distributed storage layer.（beta version）
 6. Support kv metadata layer and mixed storage structure of hot and cold（upgrading soon）
-7. More advanced cache implementation, faster LSM persistent storage（Source of ideas: https://db.cs.cmu.edu/papers/2021/zhou-sigmod2021.pdf）
+7. More advanced cache implementation, faster LSM persistent storage（Source of ideas: https://dl.acm.org/doi/10.1145/3448016.3452819）
 
 # Architecture
 
