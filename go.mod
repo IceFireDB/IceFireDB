@@ -6,7 +6,7 @@ require (
 	berty.tech/go-ipfs-log v1.5.0
 	berty.tech/go-orbit-db v1.13.2
 	github.com/armon/go-metrics v0.3.6 // indirect
-	github.com/aws/aws-sdk-go v1.43.18
+	github.com/aws/aws-sdk-go v1.43.19
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger/v3 v3.2103.2
