@@ -20,7 +20,7 @@ jobs:
       - name: start minlo
         run: docker run -p 9000:9000 -p 9001:9001 -e "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE" -e "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" -d quay.io/minio/minio server /data --console-address ":9001"
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
@@ -38,7 +38,7 @@ jobs:
 #      DRIVER: hybriddb
 #    steps:
 #      - name: Install Go
-#        uses: actions/setup-go@v2
+#        uses: actions/setup-go@v3
 #        with:
 #          go-version: ${{ matrix.go-version }}
 #      - name: Checkout code
@@ -64,7 +64,7 @@ jobs:
           docker run -d --name ipfs_host -v $ipfs_staging:/export -v $ipfs_data:/data/ipfs -p 4001:4001 -p 8080:8080 -p 5001:5001 ipfs/go-ipfs:latest
           
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
@@ -82,7 +82,7 @@ jobs:
       DRIVER: orbitdb
     steps:
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
@@ -101,7 +101,7 @@ jobs:
       DRIVER: goleveldb
     steps:
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
