@@ -31,7 +31,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tidwall/raft-leveldb v0.2.0 // indirect
 	github.com/tidwall/redcon v1.4.4
-	github.com/tidwall/sds v0.1.0
+	github.com/tidwall/sds v0.1.1
 	github.com/tidwall/uhaha v0.8.1
 )
 
