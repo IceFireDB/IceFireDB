@@ -1,0 +1,378 @@
+// Global variables.
+@slide-height: 681px;
+@abs-offsets: {
+	@default: {
+		left: 80px;
+		top: 20px;
+		header-top: 44px;
+		content-top: 136px;
+	}
+	@compact: {
+		left: 40px;
+		top: 20px;
+		header-top: 42px;
+		content-top: 136px;
+	}
+	@roomy: {
+		left: 80px;
+		top: 20px;
+		header-top: 52px;
+		content-top: 168px;
+	}
+}
+@type-scale: {
+	@default: {
+		h1: 3rem;
+		h2: 2.75rem;
+		h3: 2.5rem;
+		default: 2rem;
+		code: 1.5rem;
+	}
+	@compact: {
+		h1: 2.75rem;
+		h2: 2.5rem;
+		h3: 2.25rem;
+		default: 1.75rem;
+		code: 1.25rem;
+	}
+	@roomy: {
+		h1: 4rem;
+		h2: 3rem;
+		h3: 2.75rem;
+		default: 2.25rem;
+		code: 1.75rem;
+	}
+	@title: {
+		h1: 4rem;
+		h2: 3rem;
+		h3: 2.25rem;
+	}
+}
+
+// Counters the user's possible changes to default font sizes.
+html {
+  font-size: 16px;
+}
+
+// Globals, resets, and fixes. Remark sets display:table and display:table-cell,
+// apparently to make things like vertical-align:middle work. But those
+// mess with a bunch of other things, and make them hard/impossible. An example
+// is using column-count, which won't work except inside a display:block
+// element. So I reset these things to undo what I consider Remark's hacks.
+.remark-slide {
+	display: block;
+	box-sizing: border-box;
+	margin: 0px;
+	padding: 0px;
+}
+
+// This fixes a RemarkJS print-to-pdf bug
+@media print {
+	.remark-slide-scaler {
+		width: 100% !important;
+		height: 100% !important;
+		transform: scale(1) !important;
+		top: 0 !important;
+		left: 0 !important;
+	}
+}
+
+.remark-slide-content {
+	display: block;
+	box-sizing: border-box;
+	height: 100%;
+	* {
+		box-sizing: border-box;
+	}
+
+	// Debug and debug grid, for help figuring out layouts and bugs.
+	&.debug * {
+		outline: 1px solid gold;
+	}
+	&.debug-white * {
+		outline: 1px solid white;
+	}
+	&.debug-black * {
+		outline: 1px solid black;
+	}
+	&.debug-grid {
+		background: transparent url( data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFElEQVR4AWPAC97/9x0eCsAEPgwAVLshdpENIxcAAAAASUVORK5CYII= ) repeat top left;
+	}
+	&.debug-grid-16 {
+		background: transparent url( data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMklEQVR4AWOgCLz/b0epAa6UGuBOqQHOQHLUgFEDnAbcBZ4UGwDOkiCnkIhdgNgNxAYAiYlD+8sEuo8AAAAASUVORK5CYII= ) repeat top left;
+	}
+	&.debug-grid-8-solid {
+		background: white url( data:image/gif;base64,R0lGODdhCAAIAPEAAADw/wDx/////wAAACwAAAAACAAIAAACDZQvgaeb/lxbAIKA8y0AOw== ) repeat top left;
+	}
+	&.debug-grid-16-solid {
+		background: white url( data:image/gif;base64,R0lGODdhEAAQAPEAAADw/wDx/xXy/////ywAAAAAEAAQAAACIZyPKckYDQFsb6ZqD85jZ2+BkwiRFKehhqQCQgDHcgwEBQA7 ) repeat top left;
+	}
+
+	// Type scale (font-size, line-height, etc) and slide sizing.
+	line-height: 1.25;
+	padding: @abs-offsets[@default][top] @abs-offsets[@default][left] 0 @abs-offsets[@default][left];
+	font-size: @type-scale[@default][default];
+	h1 { font-size: @type-scale[@default][h1]; }
+	h2 { font-size: @type-scale[@default][h2]; }
+	h3 { font-size: @type-scale[@default][h3]; }
+	pre, code, kbd, tt, samp {
+		font-size: @type-scale[@default][code];
+		line-height: 1.5;
+	}
+
+	&.compact {
+		padding: @abs-offsets[@compact][top] @abs-offsets[@compact][left] 0 @abs-offsets[@compact][left];
+		font-size: @type-scale[@compact][default];
+		h1 { font-size: @type-scale[@compact][h1]; }
+		h2 { font-size: @type-scale[@compact][h2]; }
+		h3 { font-size: @type-scale[@compact][h3]; }
+		pre, code, kbd, tt, samp {
+			font-size: @type-scale[@compact][code];
+		}
+	}
+
+	&.roomy {
+		padding: @abs-offsets[@roomy][top] @abs-offsets[@roomy][left] 0 @abs-offsets[@roomy][left];
+		font-size: @type-scale[@roomy][default];
+		h1 { font-size: @type-scale[@roomy][h1]; }
+		h2 { font-size: @type-scale[@roomy][h2]; }
+		h3 { font-size: @type-scale[@roomy][h3]; }
+		pre, code, kbd, tt, samp {
+			font-size: @type-scale[@roomy][code];
+		}
+	}
+
+	&.title {
+		h1 { font-size: @type-scale[@title][h1]; }
+		h2 { font-size: @type-scale[@title][h2]; }
+		h3 { font-size: @type-scale[@title][h3]; }
+	}
+
+	// Element styling
+	img {
+		max-width: 100%; // Images should never be bigger than their container.
+	}
+
+	h1, h2, h3 {
+		margin-top: 0.5em;
+		margin-bottom: 0.5em;
+	}
+
+	table, .katex {
+		font-size: 85%;
+	}
+
+	// Layout Classes
+
+	// Layout: fullbleed. Simply removes Remark's built-in padding and margins.
+	&.fullbleed, &.fullbleed>p {
+		margin: 0;
+		padding: 0;
+	}
+
+	// Layout: title, plus top/bottom variations, and shelf sizing.
+	// Designed for H1, plus optional H2 or H3 (but not both).
+	&.title {
+		text-align: center;
+		background-size: cover;
+		h1, h2, h3 {
+			position: absolute;
+			width: 100%;
+			left: 0;
+			margin: 0;
+			padding: 1em 0;
+			font-weight: normal;
+		}
+		h1 { top: calc(50% - 2.5em); }
+		h2 { top: calc(50% - 1.0em); }
+		h3 { top: calc(50% - 0.5em); }
+		&.top {
+			h1 { top: calc(@slide-height * 0.3 - 2.5em); }
+			h2 { top: calc(@slide-height * 0.3 - 1.0em); }
+			h3 { top: calc(@slide-height * 0.3 - 0.5em); }
+		}
+		&.bottom {
+			h1 { top: calc(@slide-height * 3/4 - 2.5em); }
+			h2 { top: calc(@slide-height * 3/4 - 1.0em); }
+			h3 { top: calc(@slide-height * 3/4 - 0.5em); }
+		}
+		&.shelf>h1 {
+			// The "shelf" class makes the H1 extend down far enough to form the background for
+			// the H2 or H3, with a negative bottom margin to extend beneath the H2/H3. This is
+			// better than giving each element a background color and placing them next to each
+			// other; that will let a thin slice of the slide background show through.
+			padding-bottom: 2.25em;
+			margin-bottom: -1.75em;
+		}
+	}
+
+	// Layout: img-caption. Content must begin with an image.
+	&.img-caption {
+		text-align: center;
+		padding-top: @slide-height * 0.8;
+		&>p:first-of-type {
+			padding: 0px;
+			margin: 0px;
+			&>img {
+				position: absolute;
+				top: 0px;
+				left: 0px;
+				width: 100%;
+				height: 80%;
+				object-fit: cover;
+			}
+		}
+	}
+
+	// Layout: img-right. The first image begins "columns."
+	&.img-right>p:first-of-type {
+		height: 100%;
+		float: right;
+		width: calc(50% - 1rem);
+		margin-left: 2rem;
+		margin-top: 0px;
+		padding: 0px;
+	}
+
+	// Layout: img-left. The first image begins "columns."
+	&.img-left {
+		&>p:first-of-type {
+			height: 100%;
+			float: left;
+			width: calc(50% - 1rem);
+			margin-right: 2rem;
+			margin-top: 0px;
+			padding: 0px;
+		}
+		&>ul, &>ol, &>blockquote {
+			// Ensures bullets are indented.
+			overflow: auto;
+		}
+	}
+
+	// Layout: img-right-full. The first p>img fills the side of the slide.
+	// If you have "layout" content, ensure it has no <p> elements.
+	&.img-right-full {
+		padding-right: calc(40% + 2rem);
+		&>p:first-of-type {
+			margin: 0px;
+			padding: 0px;
+			&>img {
+				position: absolute;
+				top: 0px;
+				right: 0px;
+				height: 100%;
+				width: 40%;
+				object-fit: cover;
+				object-position: left;
+			}
+		}
+	}
+
+	// Layout: img-left-full. The first p>img fills the side of the slide.
+	// If you have "layout" content, ensure it has no <p> elements.
+	&.img-left-full {
+		padding-left: calc(40% + 2rem);
+		&>p:first-of-type {
+			margin: 0px;
+			padding: 0px;
+			&>img {
+				position: absolute;
+				top: 0px;
+				left: 0px;
+				height: 100%;
+				width: 40%;
+				object-fit: cover;
+				object-position: right;
+			}
+		}
+	}
+
+	// Layout: col-2 and col-3. Designed for use with an H1 heading.
+	.col() {
+		// If Firefox supported column-span: all I'd use that for the heading H1.
+		// I use a workaround instead: push the content down and put the H1 above it.
+		padding-top: @abs-offsets[@default][content-top];
+		&>h1:first-of-type {
+			position: absolute;
+			margin-top: 0px;
+			top: @abs-offsets[@default][header-top];
+			left: @abs-offsets[@default][left];
+		}
+		&.compact {
+			padding-top: @abs-offsets[@compact][content-top];
+		}
+		&.compact>h1:first-of-type {
+			top: @abs-offsets[@compact][header-top];
+			left: @abs-offsets[@compact][left];
+		}
+		&.roomy {
+			padding-top: @abs-offsets[@roomy][content-top];
+		}
+		&.roomy>h1:first-of-type {
+			top: @abs-offsets[@roomy][header-top];
+			left: @abs-offsets[@roomy][left];
+		}
+		// If the first columnized content has margin-top, vertical alignment is messy.
+		*:nth-child(2) {
+			margin-top: 0px;
+		}
+		&>ul, &>ol {
+			break-inside: avoid;
+			page-break-inside: avoid;
+		}
+		column-gap: 1.5em; // Deliberately a relative measure
+	}
+	&.col-2 {
+		columns: 2;
+		.col();
+	}
+	&.col-3 {
+		columns: 3;
+		.col();
+	}
+
+	// Footer layout and positioning. TODO make the UL full width so it can have border.
+	// TODO make the UL possible to place at the top of the slide.
+	.remark-slide-number, .footer li {
+		font-size: 1.25rem;
+		display: block;
+		list-style: none;
+		position: absolute;
+		bottom: 12px;
+		height: 30px;
+		margin: 0px;
+		padding: 2px 5px;
+		border-radius: 3px;
+		border: 1px solid rgba(0, 0, 0, 0);
+	}
+	.footer {
+		&, & ul {
+			position: absolute;
+			bottom: 0px;
+			right: 0px;
+			left: 0px;
+			height: 50px;
+			margin: 0px;
+			padding: 0px;
+		}
+		li:nth-child(1) {
+			left: 20px;
+		}
+		li:nth-child(2) {
+			left: 50%;
+			margin-left: -50px; // assume the logo/content is about 100px
+		}
+		li img {
+			display: block;
+			max-height: 100%;
+			margin-left: auto;
+			margin-right: auto;
+		}
+	}
+	&.no-footer {
+		.remark-slide-number, .footer {
+			display: none;
+		}
+	}
+}
