@@ -30,7 +30,7 @@ require (
 	github.com/spf13/cast v1.4.1
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tidwall/raft-leveldb v0.2.0 // indirect
-	github.com/tidwall/redcon v1.4.4
+	github.com/tidwall/redcon v1.4.5
 	github.com/tidwall/sds v0.1.1
 	github.com/tidwall/uhaha v0.8.1
 )
