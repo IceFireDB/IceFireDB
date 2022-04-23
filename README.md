@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2022-04-23 22:42:03
+ * @LastEditTime: 2022-04-23 22:54:38
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -18,7 +18,7 @@
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB?ref=badge_shield)
 
 
-IceFireDB is a database built for web3 and web2. The storage layer supports disk,OSS,IPFS and other storage methods, the protocol layer currently supports RESP, and will support SQL and GraphQL in the future. A blockchain fusion layer based on Ethereum and EOS is being built, which can be used in fusion with higher-level decentralized computing platforms and applications as well as identity, financial assets, intellectual property, and sidechain protocols. IceFireDB strives to fill the gap of the decentralized stack, making web3 application data storage more convenient, and making web2 application easier to connect to the blockchain.
+IceFireDB is a database built for web3 and web2. The core mission of the project is to help applications quickly decentralize. At present, the storage layer supports various storage methods such as disk, OSS, and IPFS. The protocol layer currently supports RESP, and will support SQL and GraphQL in the future. A blockchain fusion layer based on Ethereum and EOS is under construction to integrate with higher-level decentralized computing platforms and applications as well as identity, financial assets, intellectual property and sidechain protocols. IceFireDB strives to fill the gap of the decentralized stack, making web3 application data storage more convenient and web2 application easier to achieve decentralization.
 <p align="center">
 <img 
     src="./imgs/project_purpose.png" 
