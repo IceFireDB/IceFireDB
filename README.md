@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2022-04-09 11:15:51
+ * @LastEditTime: 2022-04-23 22:42:03
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -33,6 +33,7 @@ IceFireDB is a database built for web3 and web2. The storage layer supports disk
 6. Build a blockchain mechanism based on Ethereum and quorum.（Working hard）
 7. Support kv metadata layer and mixed storage structure of hot and cold.
 8. More advanced cache implementation, faster LSM persistent storage（Source of ideas: https://dl.acm.org/doi/10.1145/3448016.3452819 ）
+9. DataMesh big data application architecture metadata support.
 
 # Architecture
 
