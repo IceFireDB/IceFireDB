@@ -33,8 +33,8 @@ IceFireDB is a database built for web3 and web2,The core mission of the project 
 6. Build a blockchain mechanism based on Ethereum and quorum.（Working hard）
 7. Support kv metadata layer and mixed storage structure of hot and cold.
 8. More advanced cache implementation, faster LSM persistent storage（Source of ideas: https://dl.acm.org/doi/10.1145/3448016.3452819 ）
-9. DataMesh big data application architecture metadata support.
-10. The web2 environment supports a highly tamper-proof logging system in non-blockchain mode,For data manipulation, accuracy and integrity protection is provided.
+9. The web2 environment supports a highly tamper-proof logging system in non-blockchain mode,For data manipulation, accuracy and integrity protection is provided.
+<!-- 10.  DataMesh big data application architecture metadata support. -->
 
 # Architecture
 
