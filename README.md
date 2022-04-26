@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2022-04-23 22:59:05
+ * @LastEditTime: 2022-04-26 22:17:47
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -34,6 +34,7 @@ IceFireDB is a database built for web3 and web2,The core mission of the project 
 7. Support kv metadata layer and mixed storage structure of hot and cold.
 8. More advanced cache implementation, faster LSM persistent storage（Source of ideas: https://dl.acm.org/doi/10.1145/3448016.3452819 ）
 9. DataMesh big data application architecture metadata support.
+10. The web2 environment supports a highly tamper-proof logging system in non-blockchain mode,For data manipulation, accuracy and integrity protection is provided.
 
 # Architecture
 
