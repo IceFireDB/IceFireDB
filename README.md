@@ -2,7 +2,7 @@
  * @Author: gitsrc
  * @Date: 2020-12-23 13:30:07
  * @LastEditors: gitsrc
- * @LastEditTime: 2022-05-06 17:36:57
+ * @LastEditTime: 2022-05-07 09:10:45
  * @FilePath: /IceFireDB/README.md
 -->
 
@@ -31,6 +31,7 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
 3. Reliable LSM disk storage
 4. Support OSS storage engine
 5. Based on IPFS decentralized storage, build a persistent data distributed storage layer.（beta version）
+<<<<<<< HEAD
 6. Build an immutable transparent log witness layer between web2 and web3, build a data hot and cold hybrid structure and an immutable data bridge layer. (inspired by google trillian-witness)(in progress)
 7. Build a blockchain mechanism based on Ethereum and quorum.（In progress）
 8. Support kv metadata layer and mixed storage structure of hot and cold. （web2 area support）
@@ -39,6 +40,13 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
 # Project direction
 
 IceFireDB originated from the distributed NoSQL database in the web2 scenario. We will continue to support the web2 distributed NoSQL database, while investing more energy in the direction of web3 and web2 decentralized databases. We are very grateful to our community partners for their continued interest, the community has been our driving force.
+=======
+6. Build a blockchain mechanism based on Ethereum and quorum.（Working hard）
+7. Support kv metadata layer and mixed storage structure of hot and cold.
+8. More advanced cache implementation, faster LSM persistent storage（Source of ideas: https://dl.acm.org/doi/10.1145/3448016.3452819 ）
+9. The web2 environment supports a highly tamper-proof logging system in non-blockchain mode,For data manipulation, accuracy and integrity protection is provided.
+<!-- 10.  DataMesh big data application architecture metadata support. -->
+>>>>>>> a40c128e33a1ac6a7d7befea9aee2f9526745ad2
 
 # Architecture
 
