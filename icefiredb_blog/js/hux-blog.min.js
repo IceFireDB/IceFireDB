@@ -1,0 +1,6 @@
+/*!
+ * Clean Blog v1.0.0 (http://startbootstrap.com)
+ * Copyright 2015 Start Bootstrap
+ * Licensed under Apache 2.0 (https://github.com/IronSummitMedia/startbootstrap/blob/gh-pages/LICENSE)
+ */
+$(function(){$("[data-toggle='tooltip']").tooltip()}),$(document).ready(function(){$("table").wrap("<div class='table-responsive'></div>"),$("table").addClass("table")}),$(document).ready(function(){$('iframe[src*="youtube.com"]').wrap('<div class="embed-responsive embed-responsive-16by9"></div>'),$('iframe[src*="youtube.com"]').addClass("embed-responsive-item"),$('iframe[src*="vimeo.com"]').wrap('<div class="embed-responsive embed-responsive-16by9"></div>'),$('iframe[src*="vimeo.com"]').addClass("embed-responsive-item")}),jQuery(document).ready(function(s){if(s(window).width()>1170){var e=s(".navbar-custom").height(),i=s(".intro-header .container").height();s(window).on("scroll",{previousTop:0},function(){var a=s(window).scrollTop(),o=s(".side-catalog");a<this.previousTop?a>0&&s(".navbar-custom").hasClass("is-fixed")?s(".navbar-custom").addClass("is-visible"):s(".navbar-custom").removeClass("is-visible is-fixed"):(s(".navbar-custom").removeClass("is-visible"),a>e&&!s(".navbar-custom").hasClass("is-fixed")&&s(".navbar-custom").addClass("is-fixed")),this.previousTop=a,o.show(),a>i+41?o.addClass("fixed"):o.removeClass("fixed")})}});
