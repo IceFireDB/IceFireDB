@@ -27,7 +27,7 @@ require (
 	github.com/philippgille/gokv/util v0.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726
-	github.com/spf13/cast v1.4.1
+	github.com/spf13/cast v1.5.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tidwall/raft-leveldb v0.2.0 // indirect
 	github.com/tidwall/redcon v1.4.5
