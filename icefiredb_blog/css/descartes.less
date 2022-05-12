@@ -1,0 +1,355 @@
+@sides: {
+	t: -top;
+	r: -right;
+	b: -bottom;
+	l: -left;
+}
+
+@border-lengths: {
+	-0: 0;
+	-1: .125rem;
+	-2: .25rem;
+	-3: .5rem;
+	-4: 1rem;
+	-5: 2rem;
+	-100pct: 100%;
+}
+
+@box-lengths: {
+	-0: 0;
+	-1: 1rem;
+	-2: 2rem;
+	-3: 4rem;
+	-4: 8rem;
+	-5: 16rem;
+	-6: 32rem;
+	-7: 48rem;
+	-8: 64rem;
+	-9: 96rem;
+	-10pct: 10%;
+	-20pct: 20%;
+	-30pct: 30%;
+	-33pct: 33%;
+	-34pct: 34%;
+	-40pct: 40%;
+	-50pct: 50%;
+	-60pct: 60%;
+	-70pct: 70%;
+	-75pct: 75%;
+	-80pct: 80%;
+	-90pct: 90%;
+	-100pct: 100%;
+	-1-12th: 100%/12;
+	-2-12th: 200%/12;
+	-3-12th: 300%/12;
+	-4-12th: 400%/12;
+	-5-12th: 500%/12;
+	-6-12th: 600%/12;
+	-7-12th: 700%/12;
+	-8-12th: 800%/12;
+	-9-12th: 900%/12;
+	-10-12th: 1000%/12;
+	-11-12th: 1100%/12;
+	-third: 100%/3;
+	-two-thirds: 200%/3;
+}
+
+@spacing-lengths: {
+	-0: 0;
+	-1: .25rem;
+	-2: .5rem;
+	-3: 1rem;
+	-4: 2rem;
+	-5: 4rem;
+	-6: 8rem;
+	-7: 16rem;
+	-8: 32rem;
+	-9: 64rem;
+}
+
+// https://drafts.csswg.org/css-color/#named-colors
+@named-colors: {
+	aliceblue: #F0F8FF;
+	antiquewhite: #FAEBD7;
+	aqua: #00FFFF;
+	aquamarine: #7FFFD4;
+	azure: #F0FFFF;
+	beige: #F5F5DC;
+	bisque: #FFE4C4;
+	black: #000000;
+	blanchedalmond: #FFEBCD;
+	blue: #0000FF;
+	blueviolet: #8A2BE2;
+	brown: #A52A2A;
+	burlywood: #DEB887;
+	cadetblue: #5F9EA0;
+	chartreuse: #7FFF00;
+	chocolate: #D2691E;
+	coral: #FF7F50;
+	cornflowerblue: #6495ED;
+	cornsilk: #FFF8DC;
+	crimson: #DC143C;
+	cyan: #00FFFF;
+	darkblue: #00008B;
+	darkcyan: #008B8B;
+	darkgoldenrod: #B8860B;
+	darkgray: #A9A9A9;
+	darkgreen: #006400;
+	darkgrey: #A9A9A9;
+	darkkhaki: #BDB76B;
+	darkmagenta: #8B008B;
+	darkolivegreen: #556B2F;
+	darkorange: #FF8C00;
+	darkorchid: #9932CC;
+	darkred: #8B0000;
+	darksalmon: #E9967A;
+	darkseagreen: #8FBC8F;
+	darkslateblue: #483D8B;
+	darkslategray: #2F4F4F;
+	darkslategrey: #2F4F4F;
+	darkturquoise: #00CED1;
+	darkviolet: #9400D3;
+	deeppink: #FF1493;
+	deepskyblue: #00BFFF;
+	dimgray: #696969;
+	dimgrey: #696969;
+	dodgerblue: #1E90FF;
+	firebrick: #B22222;
+	floralwhite: #FFFAF0;
+	forestgreen: #228B22;
+	fuchsia: #FF00FF;
+	gainsboro: #DCDCDC;
+	ghostwhite: #F8F8FF;
+	gold: #FFD700;
+	goldenrod: #DAA520;
+	gray: #808080;
+	green: #008000;
+	greenyellow: #ADFF2F;
+	grey: #808080;
+	honeydew: #F0FFF0;
+	hotpink: #FF69B4;
+	indianred: #CD5C5C;
+	indigo: #4B0082;
+	ivory: #FFFFF0;
+	khaki: #F0E68C;
+	lavender: #E6E6FA;
+	lavenderblush: #FFF0F5;
+	lawngreen: #7CFC00;
+	lemonchiffon: #FFFACD;
+	lightblue: #ADD8E6;
+	lightcoral: #F08080;
+	lightcyan: #E0FFFF;
+	lightgoldenrodyellow: #FAFAD2;
+	lightgray: #D3D3D3;
+	lightgreen: #90EE90;
+	lightgrey: #D3D3D3;
+	lightpink: #FFB6C1;
+	lightsalmon: #FFA07A;
+	lightseagreen: #20B2AA;
+	lightskyblue: #87CEFA;
+	lightslategray: #778899;
+	lightslategrey: #778899;
+	lightsteelblue: #B0C4DE;
+	lightyellow: #FFFFE0;
+	lime: #00FF00;
+	limegreen: #32CD32;
+	linen: #FAF0E6;
+	magenta: #FF00FF;
+	maroon: #800000;
+	mediumaquamarine: #66CDAA;
+	mediumblue: #0000CD;
+	mediumorchid: #BA55D3;
+	mediumpurple: #9370DB;
+	mediumseagreen: #3CB371;
+	mediumslateblue: #7B68EE;
+	mediumspringgreen: #00FA9A;
+	mediumturquoise: #48D1CC;
+	mediumvioletred: #C71585;
+	midnightblue: #191970;
+	mintcream: #F5FFFA;
+	mistyrose: #FFE4E1;
+	moccasin: #FFE4B5;
+	navajowhite: #FFDEAD;
+	navy: #000080;
+	oldlace: #FDF5E6;
+	olive: #808000;
+	olivedrab: #6B8E23;
+	orange: #FFA500;
+	orangered: #FF4500;
+	orchid: #DA70D6;
+	palegoldenrod: #EEE8AA;
+	palegreen: #98FB98;
+	paleturquoise: #AFEEEE;
+	palevioletred: #DB7093;
+	papayawhip: #FFEFD5;
+	peachpuff: #FFDAB9;
+	peru: #CD853F;
+	pink: #FFC0CB;
+	plum: #DDA0DD;
+	powderblue: #B0E0E6;
+	purple: #800080;
+	rebeccapurple: #663399;
+	red: #FF0000;
+	rosybrown: #BC8F8F;
+	royalblue: #4169E1;
+	saddlebrown: #8B4513;
+	salmon: #FA8072;
+	sandybrown: #F4A460;
+	seagreen: #2E8B57;
+	seashell: #FFF5EE;
+	sienna: #A0522D;
+	silver: #C0C0C0;
+	skyblue: #87CEEB;
+	slateblue: #6A5ACD;
+	slategray: #708090;
+	slategrey: #708090;
+	snow: #FFFAFA;
+	springgreen: #00FF7F;
+	steelblue: #4682B4;
+	tan: #D2B48C;
+	teal: #008080;
+	thistle: #D8BFD8;
+	tomato: #FF6347;
+	turquoise: #40E0D0;
+	violet: #EE82EE;
+	wheat: #F5DEB3;
+	white: #FFFFFF;
+	whitesmoke: #F5F5F5;
+	yellow: #FFFF00;
+	yellowgreen: #9ACD32;
+}
+
+@fifths: {
+	-20pct: 80%;
+	-40pct: 60%;
+	-60pct: 40%;
+	-80pct: 20%;
+}
+
+// Text color, border color, background color, opacity
+.color-transparent, img[src~=color-transparent] { color: transparent; }
+.bg-transparent, img[src~=bg-transparent] { background-color: transparent; }
+.bc-transparent, img[src~=bc-transparent] { border-color: transparent; }
+.color(@name, @color) {
+	.color-@{name}, img[src~="color-@{name}"] { color: @value; }
+	each(@fifths, {
+		.color-@{name}@{key}, img[src~="color-@{name}"] { color: fadeout(@color, @value); }
+	});
+}
+.background-color(@name, @color) {
+	.bg-@{name}, img[src~="bg-@{name}"] { background-color: @value; }
+	each(@fifths, {
+		.bg-@{name}@{key}, img[src~="bg-@{name}"] { background-color: fadeout(@color, @value); }
+	});
+}
+.border-color(@name, @color) {
+	.bc-@{name}, img[src~="bc-@{name}"] { border-color: @value; }
+	each(@fifths, {
+		.bc-@{name}@{key}, img[src~="bc-@{name}"] { border-color: fadeout(@color, @value); }
+	});
+}
+each(@named-colors, {
+	.color(@key, @value);
+	.background-color(@key, @value);
+	.border-color(@key, @value);
+});
+each(@fifths, {
+	.opacity@{key}, img[src~="opacity-@{key}"] { opacity: 100%-@value; }
+});
+
+// Border styles, widths, and radiuses
+.ba, img[src~=ba] { border: 1px solid; }
+.bn, img[src~=bn] { border: 0px none; }
+each(@sides, {
+	.b@{key}, img[src~="b@{key}"] { border@{value}: 1px solid; }
+});
+each(@border-lengths, {
+	.br@{key}, img[src~="br@{key}"] { border-radius: @value; }
+	.bw@{key}, img[src~="bw@{key}"] { border-width: @value; }
+});
+
+// Padding and margins
+each(@spacing-lengths, {
+	.pa@{key}, img[src~="pa@{key}"] { padding: @value; }
+	.pv@{key}, img[src~="pv@{key}"] { padding-top: @value; padding-bottom: @value; }
+	.ph@{key}, img[src~="ph@{key}"] { padding-left: @value; padding-right: @value; }
+	.ma@{key}, img[src~="ma@{key}"] { margin: @value; }
+	.mv@{key}, img[src~="mv@{key}"] { margin-top: @value; margin-bottom: @value; }
+	.mh@{key}, img[src~="mh@{key}"] { margin-left: @value; margin-right: @value; }
+});
+.spacing(@name, @side) {
+	each(@spacing-lengths, {
+		.p@{name}@{key}, img[src~="p@{name}@{key}"] { padding@{side}: @value; }
+		.m@{name}@{key}, img[src~="m@{name}@{key}"] { margin@{side}: @value; }
+	});
+}
+each(@sides, {
+	.spacing(@key, @value);
+});
+
+// Element widths, heights, and coordinates
+// Idle thought: combine with the inverse golden ratio, 2/(1+sqrt(5))
+each(@box-lengths, {
+	.w@{key}, img[src~="w@{key}"]       { width: @value; }
+	.maxw@{key}, img[src~="maxw@{key}"] { max-width: @value; }
+	.minw@{key}, img[src~="minw@{key}"] { min-width: @value; }
+	.h@{key}, img[src~="h@{key}"]       { height: @value; }
+	.maxh@{key}, img[src~="maxh@{key}"] { max-height: @value; }
+	.minh@{key}, img[src~="minh@{key}"] { min-height: @value; }
+	.t@{key}, img[src~="t@{key}"]       { top: @value; }
+	.r@{key}, img[src~="r@{key}"]       { right: @value; }
+	.b@{key}, img[src~="b@{key}"]       { bottom: @value; }
+	.l@{key}, img[src~="l@{key}"]       { left: @value; }
+	// https://www.sitepoint.com/css-center-position-absolute-div/
+	.w@{key}.center, img[src~="w@{key}"][src~=center] {
+		left: 50%;
+		margin-left: @value/-2;
+	}
+});
+
+// Element display styles, positioning, floating, etc
+.dn, img[src~=dn] { display: none; }
+.di, img[src~=di] { display: inline; }
+.db, img[src~=db] { display: block; }
+.dib, img[src~=dib] { display: inline-block; }
+
+.fl, img[src~=fl] { float: left; }
+.fr, img[src~=fr] { float: right; }
+.fn, img[src~=fn] { float: none; }
+
+img[src~=cf]:before,
+img[src~=cf]:after { content: " "; display: table; }
+img[src~=cf]:after { clear: both; }
+.cf, img[src~=cf] { *zoom: 1; }
+
+.static, img[src~=static] { position: static; }
+.relative, img[src~=relative] { position: relative; }
+.absolute, img[src~=absolute] { position: absolute; }
+.fixed, img[src~=fixed] { position: fixed; }
+
+.center, img[src~=center] { display: block; margin-left: auto; margin-right: auto; }
+
+// Object-fitting and covering
+.ofc, img[src~=ofc] { object-fit: contain; }
+.ofv, img[src~=ofv] { object-fit: cover; }
+.opl, img[src~=opl] { object-position: left !important; }
+.opc, img[src~=opc] { object-position: center !important; }
+.opr, img[src~=opr] { object-position: right !important; }
+.opt, img[src~=opt] { object-position: top !important; }
+.opb, img[src~=opb] { object-position: bottom !important; }
+.oplt, img[src~=oplt] { object-position: left top !important; }
+.oplc, img[src~=oplc] { object-position: left center !important; }
+.oplb, img[src~=oplb] { object-position: left bottom !important; }
+.opct, img[src~=opct] { object-position: center top !important; }
+.opcc, img[src~=opcc] { object-position: center center !important; }
+.opcb, img[src~=opcb] { object-position: center bottom !important; }
+.oprt, img[src~=oprt] { object-position: right top !important; }
+.oprc, img[src~=oprc] { object-position: right center !important; }
+.oprb, img[src~=oprb] { object-position: right bottom !important; }
+
+// Box shadows
+.shadow-1, img[src~=shadow-1] { box-shadow: 0 0 4px 2px rgba( 0, 0, 0, .2 ); }
+.shadow-2, img[src~=shadow-2] { box-shadow: 0 0 8px 2px rgba( 0, 0, 0, .2 ); }
+.shadow-3, img[src~=shadow-3] { box-shadow: 2px 2px 4px 2px rgba( 0, 0, 0, .2 ); }
+.shadow-4, img[src~=shadow-4] { box-shadow: 2px 2px 8px 0 rgba( 0, 0, 0, .2 ); }
+.shadow-5, img[src~=shadow-5] { box-shadow: 4px 4px 8px 0 rgba( 0, 0, 0, .2 ); }
