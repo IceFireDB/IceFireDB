@@ -13,13 +13,12 @@ require (
 	github.com/dgraph-io/ristretto v0.1.0
 	github.com/fatih/color v1.10.0 // indirect
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/golang/snappy v0.0.4 // indirect
 	github.com/hashicorp/go-hclog v0.16.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.0 // indirect
 	github.com/hashicorp/go-msgpack v1.1.5 // indirect
-	github.com/ipfs/go-ipfs v0.12.2
+	github.com/ipfs/go-ipfs v0.13.0
 	github.com/ipfs/go-ipfs-api v0.3.0
-	github.com/ipfs/interface-go-ipfs-core v0.5.2
+	github.com/ipfs/interface-go-ipfs-core v0.7.0
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6
 	github.com/pelletier/go-toml v1.8.1 // indirect
 	github.com/philippgille/gokv/encoding v0.6.0
