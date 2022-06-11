@@ -1,0 +1,28 @@
+server:
+  addr: ":33306" # The port on which the proxy listens, mysql-server, supports direct connection of mysql-client
+
+debug:  # Control to enable debug mode
+  enable: true
+  port: 17878
+
+# mysql
+mysql:
+  addr: "127.0.0.1:3306"
+  user: "root"
+  password: "root"
+  dbname: "test"
+  minAlive: 1 # Specifies the minimum number of open connections the pool will attempt to maintain
+  maxAlive: 64 # Specifies the maximum number of open connections the pool will attempt to maintain
+  maxIdle: 4 # Maximum number of idle connections
+
+# Tenant list
+userlist:
+  - user: host1
+    password: host1
+
+# p2p config
+p2p:
+  enable: true
+  service_discovery_id: "p2p_sqlproxy_service_test"
+  service_command_topic: "p2p_sqlproxy_service_topic_test"
+  service_discover_mode: "advertise" # advertise or announce
