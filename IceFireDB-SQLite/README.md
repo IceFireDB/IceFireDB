@@ -2,6 +2,9 @@
 
 IceFireDB SQLite database is a decentralized SQLite database. Provide a convenient mechanism to build a global distributed database system. Support users to write data to IceFireDB using MySQL protocol. IceFireDB stores the data in the SQLite database and synchronizes the data among the nodes in the P2P automatic networking.
 
+## current state
+For the content of the Wanxiang Hackathon, you can browse: [https://github.com/wanxiang-blockchain/2022-Wanxiang-Blockchain-Spring-Hackathon-IceFireDB](https://github.com/wanxiang-blockchain/2022-Wanxiang-Blockchain-Spring-Hackathon-IceFireDB)
+
 ## How does it work?
 ![framework](./docs/icefiredb-sqlite.png)
 
