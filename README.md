@@ -68,7 +68,7 @@ IceFireDB-SQLProxy is a decentralized SQL database networking system that helps 
 
 Decentralized networking through IceFireDB-SQLProxy provides web2 program read and write support for SQL, enabling decentralized data synchronization for MySQL database read and write scenarios commonly used in web2 applications.
 
-## [IceFireDB-NoSQL](https://github.com/IceFireDB)
+## [IceFireDB-NoSQL]https://github.com/IceFireDB/IceFireDB)
 It supports distributed raft disk Redis database mode in web2 mode, and also supports decentralized IPFS storage mode.
 
 ## RESP Command support(NoSQL Mode)
