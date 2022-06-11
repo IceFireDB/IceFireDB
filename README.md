@@ -59,10 +59,10 @@ IceFireDB originated from the distributed NoSQL database in the web2 scenario. W
 
 # Project composition
 
-## (IceFireDB-SQLite)[https://github.com/IceFireDB/IceFireDB/tree/main/IceFireDB-SQLite]
+## [IceFireDB-SQLite](https://github.com/IceFireDB/IceFireDB/tree/main/IceFireDB-SQLite)
 IceFireDB-SQLite database is a decentralized SQLite database. Provide a convenient mechanism to build a global distributed database system. Support users to write data to IceFireDB-SQLite using MySQL protocol. IceFireDB-SQLite stores the data in the SQLite database and synchronizes the data among the nodes in the P2P automatic network.
 
-## (IceFireDB-SQLProxy)[https://github.com/IceFireDB/IceFireDB/tree/main/IceFireDB-SQLProxy]
+## [IceFireDB-SQLProxy](https://github.com/IceFireDB/IceFireDB/tree/main/IceFireDB-SQLProxy)
 
 IceFireDB-SQLProxy is a decentralized SQL database networking system that helps web2 traditional SQL database data decentralization. Provide a convenient mechanism to build a globally distributed storage system with automatic networking. Commands are automatically synchronized between IceFireDB-SQLProxy in the network, and each IceFireDB-SQLProxy writes data to MySQL storage.
 
