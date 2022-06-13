@@ -4,10 +4,6 @@ IceFireDB-SQLProxy helps decentralize traditional SQL database data. Provide a c
 
 Through the decentralized middleware network proxy, decentralized data synchronization can be enabled for MySQL databases commonly used in web2 applications.
 
-
-## current state
-For the content of the Wanxiang Hackathon, you can browse: [https://github.com/wanxiang-blockchain/2022-Wanxiang-Blockchain-Spring-Hackathon-IceFireDB](https://github.com/wanxiang-blockchain/2022-Wanxiang-Blockchain-Spring-Hackathon-IceFireDB)
-
 ## How does it work?
 
 ![framework](./docs/icefiredb-sqlproxy.png)
