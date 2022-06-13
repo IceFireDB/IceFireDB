@@ -1,0 +1,349 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head prefix="og: http://ogp.me/ns#">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+  <meta property="og:title" content=" ZeroAccess WhitePaper &middot;  IceFireDB Blog" />
+  
+    <meta name="theme-color" content="#hexcolor" />
+  
+  <meta property="og:site_name" content="IceFireDB Blog" />
+  <meta property="og:url" content="https://www.IceFireDB.xyz/IceFireDB_blog/zeroaccess-whitepaper/" />
+  
+  
+    <meta property="og:type" content="article" />
+    
+    <meta property="og:article:published_time" content="2022-04-19T22:55:18&#43;08:00" />
+    
+      <meta property="og:article:tag" content="ZeroAccess" />
+    
+      <meta property="og:article:tag" content="ZTALAB" />
+    
+      <meta property="og:article:tag" content="NetWork" />
+    
+  
+
+  <title>
+     ZeroAccess WhitePaper &middot;  IceFireDB Blog
+  </title>
+
+  <link rel="alternative stylesheet" href="https://www.IceFireDB.xyz/IceFireDB_blog/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://www.IceFireDB.xyz/IceFireDB_blog/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="https://www.IceFireDB.xyz/IceFireDB_blog/css/main.css" />
+  <link rel="stylesheet" href="https://www.IceFireDB.xyz/IceFireDB_blog/css/github.css" />
+  <link rel="stylesheet" href="https://www.IceFireDB.xyz/IceFireDB_blog/css/color-theme.css" />
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Sans+Pro:200,300,400" type="text/css">
+  <link rel="shortcut icon" href="https://www.IceFireDB.xyz/IceFireDB_blog/img/favicon.ico" />
+  <link rel="apple-touch-icon" href="https://www.IceFireDB.xyz/IceFireDB_blog/images/apple-touch-icon.png" />
+
+  
+
+  
+</head>
+<body>
+  
+  <header class="global-header"  style="background-image:url(https://picsum.photos/1920/1080?blur=3)">
+  
+    <section class="header-text">
+      <h1><a href="https://www.IceFireDB.xyz/IceFireDB_blog/">IceFireDB Blog</a></h1>
+      
+        <h3 class="tag-line">
+          Record the bits and pieces of IceFireDB.
+        </h3>
+      
+      
+        <a class="btn btn-default btn-home" href="https://www.IceFireDB.xyz/IceFireDB_blog/">
+          <i class="fa fa-angle-left" aria-hidden="true"></i>
+          &nbsp;Home
+        </a>
+      
+      
+      <div class="navbar-container">
+        
+          <a class="btn btn-default navbar-item" href="https://www.IceFireDB.xyz/IceFireDB_blog/categories">
+            Categories
+          </a>
+        
+          <a class="btn btn-default navbar-item" href="https://www.IceFireDB.xyz/IceFireDB_blog/tags">
+            Tags
+          </a>
+        
+          <a class="btn btn-default navbar-item" href="https://www.IceFireDB.xyz">
+            IceFireDB
+          </a>
+        
+      </div>
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+    </section>
+  </header>
+  <main class="container">
+
+
+
+<article>
+  <header class="article-title">
+    <h1 class="text-primary">ZeroAccess WhitePaper</h1>
+  </header>
+  <div class="delimiter"></div>
+  <section>
+    <h2 id="thank-you-for-your-interest-in-zeroaccess">Thank you for your interest in ZeroAccess</h2>
+<p>ZeroAccess helps organizations improve information security by providing a better and simpler way to protect access to private network resources and applications.</p>
+<p>The information contained in this document is intended to provide customers and potential customers with transparency and confidence about the security situation, practices and processes of ZeroAccess. Although this document represents the security of ZeroAccess when it was last updated, ensuring information security is a process of continuous improvement, and we will not stop the evaluation and support.</p>
+<p>This document is divided into two main parts. The first part describes the security architecture of ZeroAccess from the perspective of products, and the second part describes the general information security practices of ZeroAccess.</p>
+<h2 id="product-safety">Product safety</h2>
+<h3 id="11-product-architecture-and-design">1.1 Product Architecture and Design</h3>
+<h4 id="overview-of-methods">Overview of Methods</h4>
+<p>ZeroAccess was originally designed to provide a safe solution for modern &ldquo;working anywhere&rdquo; employees. Modern labor force is increasingly dispersed:</p>
+<ul>
+<li>More and more users work at home and in remote locations such as public places;</li>
+<li>User devices are scattered among desktop and mobile devices, devices for job posting and personal devices;</li>
+<li>The application is being migrated from inside to the cloud or provided by a third-party SaaS provider;</li>
+<li>Networks are increasingly cloud-based or managed by third parties.</li>
+</ul>
+<p>Therefore, the traditional fixed boundary method based on IP address can&rsquo;t meet today&rsquo;s security or availability requirements. ZeroAccess&rsquo;s answer is a method based on the concept of zero trust access, which we call identity first network.</p>
+<h4 id="identity-first-network">Identity first network</h4>
+<p>The premise behind ZeroAccess&rsquo;s identity first network model is to rethink the basic assumptions of the network to meet the needs of modern labor force. The dispersion and abstraction of users, devices, applications and networks (for example, through infrastructure such as Terraform, that is, code framework) means that different methods are needed.</p>
+<p>Our identity-first approach starts with asking a simple question: Should network requests be allowed to leave the device? And if so, whose identity should it be attached to? Because there is no clearly authorized identity, the network connection is never allowed to enter your network, so there is no longer the question of who the network connection belongs to and why it is authorized.</p>
+<p>This connection between network request initiation and identity makes it very easy to understand the activities inside the network. Gone are the days of whitelisting IP addresses,</p>
+<p>Maintain complex subnet assignments and VLAN segments, or manually piece together network events across physical networks. With ZeroAccess, you can provide users with the flexibility they need to work anywhere, while maintaining confidence that every network connection is authorized and audited according to the user&rsquo;s identity.</p>
+<h4 id="zero-trust-access-zta">Zero Trust Access (ZTA)</h4>
+<p>ZeroAccess&rsquo;s architecture is designed according to ZTA&rsquo;s main philosophy:</p>
+<ul>
+<li>Every request for private resources should be authenticated and authorized based on real-time context information, such as user identity, device status and other attributes such as time and location.</li>
+<li>Users should only have access to the minimum necessary resources (principle of least privilege).</li>
+<li>Events should be recorded in detail to support monitoring, detection, investigation and other analysis.</li>
+</ul>
+<p>Generally speaking, these principles are embodied in our products in the following ways:</p>
+<ul>
+<li>No ZeroAccess component can independently decide to allow traffic to flow to secure resources on remote networks. And user data flow authorization is always confirmed by running multiple checks by multiple components. In addition, the user data flow and the user authentication flow are handled by separate components and require separate authentication checks.</li>
+<li>We entrust user authentication to a third-party authentication provider, which creates a separation of concerns and provides an additional layer of security.</li>
+<li>We support extensive logging, provide enhanced visibility, and help administrators monitor, troubleshoot, and investigate the activities of the entire network and terminals, including unauthorized activities, as well as those of individuals who are authorized to access resources but may exceed their business authority.</li>
+<li>User data streams from the client to the server are encrypted end-to-end. Even though they can pass through relays (components residing in the infrastructure controlled by ZeroAccess), ZeroAccess cannot decrypt such data. (Encrypted transmission will never have intermediate termination/recovery on the relay. )</li>
+<li>Our client-relay-server, all components communicate with each other by upgrading to websocket protocol, which better supports the transfer of custom parameters and facilitates the verification of data security and legality.</li>
+<li>Our relay is mounted under the CDN network, which can effectively prevent DDOS attacks, and better optimize network lines to improve access speed. The network CDN supports Websocket protocol and seamlessly integrates with ZeroAccess network.</li>
+<li>Our client application is designed to always run in the background.</li>
+</ul>
+<p>From the customer&rsquo;s point of view, our product architecture provides additional security advantages in the following aspects:</p>
+<ul>
+<li>Hide the network -ZeroAccess will not publicly expose the access point to your network to promote secure remote access to resources inside the network. This means that, if necessary, the customer network can remain invisible to the public Internet, and it will not be explored by potential attackers.</li>
+<li>Support granular access control at port level -Compared with VPN that provides access to the whole network, this helps to reduce the explosion radius of intrusion.</li>
+<li>Centralized access management for all private resources  -This helps IT team to audit and maintain access list to cope with personnel changes.</li>
+<li>Record all network activities centrally -Identity index log and analysis can provide insight into who is doing what in the whole enterprise network.</li>
+<li>Better availability for administrators -Solutions that are easier to configure and maintain are less prone to errors and more effective.</li>
+<li>Provide better usability for end users -This is an easy-to-deploy, always-on solution, which does not hinder users, promotes the adoption of VPN clients, and avoids common problems of VPN clients, where users shut down their internet connections because they interrupt or slow down.</li>
+<li>Provide a safe and fast network line -As a public basic service, the relay is mounted under the CDN network to optimize the network access line and effectively prevent DDOS attacks.</li>
+</ul>
+<h4 id="architecture--component-overview">Architecture &amp; Component Overview</h4>
+<p>This section provides a high-level overview of the main components that make up the ZeroAccess architecture and how they interact. The architecture of ZeroAccess is in our document, and we strongly recommend that you read this article in order to have a more comprehensive understanding of the security foundation of ZeroAccess.</p>
+<p><img src="https://res.cloudinary.com/malloc/image/upload/v1650031834/github/ztalab/en-1_lbpbjq.png" alt="en-1"></p>
+<p>ZeroAccess protects access to customers&rsquo; remote network resources. ZeroAccess consists of four main components, which together ensure that only authenticated users can access the resources they have access to. After ZeroAccess is fully configured, the end result is that authorized users can connect to any resource without knowing the underlying network configuration or even which remote network the resource resides on. The four main components are:</p>
+<ul>
+<li>Controller-central coordination component of -ZeroAccess. The controller is a multi-tenant component operated by ZeroAccess. It performs a number of duties, including storing the client configuration information management console managed based on web to register and verify the server, issuing the signature authorization to the client that successfully sends the connection request, entrusting the user authentication to the identity provider, and distributing the signed access control list to the client and the server.</li>
+<li>Client-A software application installed on the end user&rsquo;s device. For users&rsquo; requests for protected resources, the client acts as a combined authentication and authorization agent through ZeroAccess. Routing and authorization decisions take place at the edge of the client.</li>
+<li>Server-A software component designed to be deployed on a device behind a remote network firewall. The server only starts the outbound connection with the controller and relay, and establishes communication with the client through these connections.</li>
+<li>Relay-geographically distributed components operated by ZeroAccess. The relay serves as the registration point of the server and the connection point of the client wishing to establish a connection to the server. The relay is mounted under the CDN network to resist DDOS attacks.</li>
+</ul>
+<p>Client and server components are located on the equipment and infrastructure controlled by customers, while controller and relay components are located in the infrastructure controlled by ZeroAccess.</p>
+<p>The following diagram illustrates how various components exchange information in a secure way, so as to connect from the client to a specific resource on a remote network:</p>
+<!-- raw HTML omitted -->
+<p>1.The server registers itself with the geographically nearest relay.</p>
+<p>The relay does not receive any information about the server except the randomly generated ID and its signature signed by the controller. Only when the signature of the server is signed by the same controller, the relay allows the server to register.</p>
+<p>2.The client and the server respectively receive the traffic forwarding permission list.</p>
+<p>Allow lists to be specific to each component. The client&rsquo;s allow list corresponds to the content that users are allowed to access, and the server&rsquo;s list covers the resources that administrators have configured. Two allow lists must be signed by the same controller.</p>
+<p>3.The client is authenticated by a third-party identity provider, providing additional in-depth protection.
+<!-- raw HTML omitted --></p>
+<p>4.The client initiates a TLS connection with a single end-to-end certificate lock to the requested server.</p>
+<p>The relay only promotes this connection, but can&rsquo;t &ldquo;see&rdquo; any such data flow.</p>
+<p>5.The server verifies whether the client request is signed by the same controller.</p>
+<p>6.The client verifies whether the server signature matches the signature provided by the controller.</p>
+<p>7.The server verifies whether the target address is in its allowed list.</p>
+<p>8.Once established, the traffic flows to the destination through the encrypted TLS tunnel. DNS lookup and routing are forwarded from the client and executed by the server on the target network.</p>
+<p>9.The relay can be mounted under the CDN network
+The relay is mounted on the CDN network, and the CDN supports websocket protocol, which better supports the transmission of Header parameters. In terms of security, the CDN can naturally resist DDOS attacks, and effectively optimize network lines and increase traffic communication speed.</p>
+<h3 id="12-customer-data">1.2 Customer data</h3>
+<h4 id="what-customer-data-do-we-process">What customer data do we process?</h4>
+<p>The main types of customer data processed by ZeroAccess are:</p>
+<ul>
+<li>User details (such as email addresses, names and group members, but not passwords, as ZeroAccess entrusts authentication to a third-party identity provider);</li>
+<li>Infrastructure information (such as network details, resource details and access control list);</li>
+<li>Logs (such as crash and error reports for diagnosis and troubleshooting). The ZeroAccess component also records events that allow customers to monitor user activities (for example, user login and token requests).</li>
+</ul>
+<p>User network traffic destined for resources protected by ZeroAccess can be transmitted through ZeroAccess relay in encrypted form. This traffic carrying data is relayed on an instantaneous basis. The relay does not store traffic or any network identifiable information.</p>
+<p>ZeroAccess can also process customer data submitted by customers related to customer support requests. This may include configuration data, error logs, and other information that customers decide to provide to ZeroAccess for reporting and diagnosing technical problems.</p>
+<h4 id="data-separation">data separation</h4>
+<p>Customer data is logically isolated in ZeroAccess&rsquo;s system according to customer tenant ID.</p>
+<h4 id="data-confidentiality">Data confidentiality</h4>
+<p>According to our contract with customers, ZeroAccess regards customer data as confidential information of customers, and the ownership of customer data is reserved by customers.</p>
+<h3 id="13-product-performance-and-scalability">1.3 Product performance and scalability</h3>
+<p>Service reliability is the core aspect of information security. This section describes service reliability related to performance and scalability. For information on service reliability in terms of availability, please see the following infrastructure &amp; physical security.</p>
+<p>We have designed our infrastructure and software to ensure that ZeroAccess performs well, even when the usage of individual customers or our entire customer base increases. The main ways for us to achieve this goal include:</p>
+<ul>
+<li>Eliminate the backhaul/trombone problem-the traffic routed through ZeroAccess takes a more direct route, instead of routing all traffic through a central gateway geographically far from the start and end points, thus reducing the delay of users and the bandwidth usage of organizations. ZeroAccess clients automatically and intelligently connect to ZeroAccess controllers and relays, which provide the best performance according to the physical location of users at that time and the resources they need to connect to.</li>
+<li>Support split tunnel-Any user traffic that the organization chooses not to route through ZeroAccess will completely bypass ZeroAccess and be handled by user equipment independently. This reduces unnecessary traffic sent through additional hops.</li>
+<li>Load balancing-ZeroAccess handles multiple levels of load balancing. The controllers and relays of ZeroAccess are distributed in different places and geographical areas. As part of infrastructure planning, our goal is to allocate them strategically to reduce delays and provide load balancing in areas where expected traffic loads are high. For example, in high-traffic areas, we can add additional controllers and relays, and balance the load among them. By using the same IaaS provider hosting controller and relay used by customers (for example, in Alibaba Cloud, Huawei Cloud and GCP), the delay is further reduced. On the client side, customers can install multiple servers in the same remote network, and ZeroAccess will automatically handle the load balance between the servers to meet the access request of a specific network.</li>
+<li>Handling extensions for customers-The traditional network access security model requires organizations to deploy and maintain their own security infrastructure, such as VPN gateways. Expanding the scale will increase the management cost disproportionately and occupy the resources that can be used for other plans. ZeroAccess alleviates IT departments&rsquo; concerns about expansion.</li>
+<li>Distributed authorization processing-the authorization processing workload is distributed, such as at the ZeroAccess client level, which helps to improve the overall performance, instead of being concentrated in one place.</li>
+</ul>
+<h2 id="information-security-plan">Information security plan</h2>
+<h3 id="21-overview">2.1 Overview</h3>
+<p>This section contains a summary of ZeroAccess&rsquo;s information security plan. ZeroAccess keeps a set of written information security plans, policies and procedures. These plans, policies and procedures are reviewed at least once a year and supplemented by regular risk reviews, which will be incorporated into the continuous development of our information security plan.</p>
+<h3 id="22-management-and-organizational-security">2.2 Management and organizational security</h3>
+<h4 id="governance--responsibility">Governance &amp; Responsibility</h4>
+<p>The chief technology officer of ZeroAccess is mainly responsible for ZeroAccess&rsquo;s information security plan. ZeroAccess also has an interdisciplinary security team, which is responsible for implementing, reviewing and maintaining its information security plan. Its members include senior managers.</p>
+<p>However, as a safety project, ZeroAccess believes that safety is a universal problem, so it is the common responsibility of our whole organization. For example, all our engineers are required to regard safety as a basic part of their work, and they will not simply delegate all responsibilities to other colleagues who are more concerned about safety.</p>
+<h3 id="23-application-security">2.3 Application Security</h3>
+<h4 id="data-protection--access-control">Data Protection &amp; Access Control</h4>
+<h5 id="access-control">Access control</h5>
+<p>We provide users with access to the system according to the user role and the principle of least privilege.</p>
+<p>Use ZeroAccess to protect access to private network resources in production and other environments. Authentication is performed by our identity provider&rsquo;s single sign-on system, and multi-factor authentication is enabled. With ZeroAccess, we can also finely control user access rights at the resource level (instead of the network level) according to the principle of minimum rights, and apply different security policies according to the authentication of users, devices and the context requesting access.</p>
+<p>Enterprise applications use SSO and MFA for authentication as much as possible, and enforce minimum password complexity requirements.</p>
+<p>We also automate the deployment process of the production environment, which means that users have no right to make changes to the production environment manually or directly. Developers cannot directly access the database containing customer data. Developers usually don&rsquo;t have or need to access the production environment server through SSH.</p>
+<h5 id="access-monitoring">Access monitoring</h5>
+<p>We use ZeroAccess and other log systems to monitor access to various systems and all aspects of ZeroAccess infrastructure.</p>
+<h5 id="cdn-network">CDN network</h5>
+<p>CDN network can effectively resist DDOS attacks and optimize network access lines.</p>
+<p>The network CDN supports Websocket protocol and seamlessly integrates with ZeroAccess network.</p>
+<h5 id="data-encryption">Data encryption</h5>
+<p>Encrypt customer data in transit and at rest using industry standard encryption protocol.</p>
+<p>During transmission, client application communication is protected by TLS/SSL (HTTPS) connection.</p>
+<p>In static state, customer data is stored in the database managed by the platform, which is encrypted by AES-256 or better standard and uses symmetric key. The data key itself is encrypted using the master key stored in the secure keystore, and is changed regularly.</p>
+<p>We do not use any custom or proprietary encryption framework or implementation. Please note that ZeroAccess does not store any customer passwords.</p>
+<h4 id="software-development-methodology--testing">Software Development Methodology &amp; Testing</h4>
+<h5 id="software-development">Software development</h5>
+<p>All written software codes have to be reviewed by the second person&rsquo;s code. In addition, ZeroAccess also performs internal and third-party security tests, as described below.</p>
+<p>Developers often have no access to production systems or data. Customer data is not used for testing.</p>
+<p>We usually inform customers of major updates of downloadable software components. Minor updates, such as adjustments to the user interface, will be released regularly without explicit notice. When the latest stable version of ZeroAccess software is available, we recommend that customers upgrade to this version.</p>
+<h5 id="internal-security-test">Internal security test</h5>
+<p>ZeroAccess uses various tools to statically analyze the code and report problems-both our proprietary code and vulnerabilities in third-party libraries. According to our vulnerability management policy, patch the detected vulnerabilities in time.</p>
+<h5 id="third-party-security-testing">Third-party security testing</h5>
+<p>ZeroAccess will cooperate with third-party organizations to regularly conduct security tests on its applications. Testing activities extend from penetration testing to application security assurance and product analysis, including:</p>
+<ul>
+<li>Analyze ZeroAccess component by component in a &ldquo;white box&rdquo; environment</li>
+<li>Reverse engineering, runtime and static analysis of each component to ensure that the engineering design conforms to the best practice safety guidelines;</li>
+<li>Perform automated stress testing, manual vulnerability discovery, and runtime and source code review</li>
+<li>Conduct threat modeling.</li>
+</ul>
+<h5 id="penetration-test-request">Penetration test request</h5>
+<p>We allow our customers to conduct penetration tests on our system in some cases. Customers must obtain prior approval from our security team and inform us of the time and scope of penetration testing in advance, and may need to sign an agreement covering such testing activities.</p>
+<h3 id="24-infrastructure-and-physical-security">2.4 Infrastructure and Physical Security</h3>
+<h4 id="equipment-security">Equipment security</h4>
+<p>All end users&rsquo; laptops and desktops need to install anti-virus/anti-malware software and enable full disk encryption.</p>
+<h4 id="infrastructure-change-management">Infrastructure change management</h4>
+<p>Every change proposed to our production environment (including infrastructure changes) must be approved, and every such change and corresponding approval should be recorded. Our CI/CD pipeline supply infrastructure will be changed automatically after approval.</p>
+<h4 id="confidential-management">Confidential management</h4>
+<p>We use a commercial secret management system provided by a major supplier to store secrets, such as authentication tokens, passwords, API vouchers and certificates. Key rotation at regular intervals.</p>
+<h4 id="server-hardening">Server hardening</h4>
+<p>We mainly interact with the server by deploying Docker containers coordinated with Kubernetes.</p>
+<h4 id="network-segmentation">Network segmentation</h4>
+<p>Our production network is divided into different areas according to the security level. Each environment has its own subnet, and only the network policy based on the predefined allow list allows internal communication.</p>
+<h4 id="availability--elasticity">Availability &amp; Elasticity</h4>
+<p>When our services need to access mission-critical network resources, service availability is crucial. We ensure very high service availability by:</p>
+<ul>
+<li>Use a world-class infrastructure provider to host our core components.</li>
+<li>Using multiple geographically separated data centers-ZeroAccess&rsquo;s infrastructure is hosted in multiple physically separated cloud platform data centers to achieve redundancy. This helps to balance the load and reduces the risk of natural disasters in the environment and other specific locations.</li>
+<li>Implement fault-tolerant, redundant infrastructure-Our services are provided by multiple data centers, which reflect each other&rsquo;s capabilities. If one data center has an availability problem, other data centers will automatically bear the load.</li>
+<li>Provide the ability to resist DDOS attacks-We have implemented certain measures to reduce the risk of DDOS attacks.</li>
+</ul>
+
+  </section>
+  <div class="clearfix">
+    
+      <div class="post-date pull-left">
+        <span class="small">
+          Posted on
+          Apr 19, 2022 at 22:55
+        </span>
+      </div>
+    
+    <div class="pull-right">
+      
+        <span class="post-tag small">
+          <a href="https://www.IceFireDB.xyz/IceFireDB_blog/tags/zeroaccess/">
+            #ZeroAccess
+          </a>
+        </span>
+      
+        <span class="post-tag small">
+          <a href="https://www.IceFireDB.xyz/IceFireDB_blog/tags/ztalab/">
+            #ZTALAB
+          </a>
+        </span>
+      
+        <span class="post-tag small">
+          <a href="https://www.IceFireDB.xyz/IceFireDB_blog/tags/network/">
+            #NetWork
+          </a>
+        </span>
+      
+    </div>
+  </div>
+  <footer>
+    
+	
+   
+    <div class="delimiter"></div>
+    <div class="pager-container">
+      
+        <a class="btn btn-primary btn-older-posts disabled" href="#">
+          <div>
+            <span aria-hidden="true">&larr;</span> Older Posts
+          </div>
+        </a>
+      
+      
+        <a class="btn btn-primary btn-newer-posts disabled" href="#">
+          <div>
+            Newer Posts <span aria-hidden="true">&rarr;</span>
+          </div>
+        </a>
+      
+         
+    </div>
+  </footer>
+</article>
+<div class="delimiter"></div>
+
+  </main>
+  <footer class="container global-footer">
+    <div class="copyright-note pull-left">
+      &copy 2022 IceFireDB 
+    </div>
+    <div class="sns-links hidden-print">
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+</div>
+
+  </footer>
+
+  
+  
+  
+
+  
+  
+
+  
+</body>
+</html>
+
