@@ -1,3 +1,4 @@
+//go:build osstest
 // +build osstest
 
 package oss
@@ -13,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 
-	oss "github.com/gitsrc/IceFireDB/driver/oss"
+	oss "github.com/IceFireDB/IceFireDB/driver/oss"
 	"github.com/philippgille/gokv/encoding"
 
 	"github.com/philippgille/gokv/test"
@@ -22,11 +23,11 @@ import (
 // For Minio Docker container.
 // See https://docs.minio.io/docs/minio-docker-quickstart-guide.html.
 const (
-	customEndpoint  string = "http://localhost:9000"
-	accesskey string  =      "AKIAIOSFODNN7EXAMPLE"
-	secretkey string  =      "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-	bucketname string  = "gokv"
-)	
+	customEndpoint string = "http://localhost:9000"
+	accesskey      string = "AKIAIOSFODNN7EXAMPLE"
+	secretkey      string = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+	bucketname     string = "gokv"
+)
 
 // TestClient tests if reading from, writing to and deleting from the store works properly.
 // A struct is used as value. See TestTypes() for a test that is simpler but tests all types.
@@ -120,7 +121,7 @@ func TestErrors(t *testing.T) {
 	}
 	options = oss.Options{
 		BucketName:     bucketname,
-		AWSaccessKeyID:     accesskey,
+		AWSaccessKeyID: accesskey,
 	}
 	client, err = oss.NewClient(options)
 	if err.Error() != "When passing credentials via options, you need to set BOTH AWSaccessKeyID AND AWSsecretAccessKey" {
@@ -244,16 +245,16 @@ func checkConnection() bool {
 }
 
 func createClient(t *testing.T, codec encoding.Codec) oss.Client {
-//	os.Setenv("AWS_ACCESS_KEY_ID", "AKIAIOSFODNN7EXAMPLE")
-///	os.Setenv("AWS_SECRET_ACCESS_KEY", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
+	//	os.Setenv("AWS_ACCESS_KEY_ID", "AKIAIOSFODNN7EXAMPLE")
+	///	os.Setenv("AWS_SECRET_ACCESS_KEY", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
 	options := oss.Options{
 		BucketName:             bucketname,
-		Region:                 endpoints.UsEast1RegionID,// endpoints.EuCentral1RegionID,
+		Region:                 endpoints.UsEast1RegionID, // endpoints.EuCentral1RegionID,
 		CustomEndpoint:         customEndpoint,
 		UsePathStyleAddressing: true,
 		Codec:                  codec,
-		AWSaccessKeyID:     accesskey,
-		AWSsecretAccessKey: secretkey,
+		AWSaccessKeyID:         accesskey,
+		AWSsecretAccessKey:     secretkey,
 	}
 	client, err := oss.NewClient(options)
 	if err != nil {

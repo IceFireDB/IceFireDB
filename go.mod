@@ -1,4 +1,4 @@
-module github.com/gitsrc/IceFireDB
+module github.com/IceFireDB/IceFireDB
 
 go 1.16
 

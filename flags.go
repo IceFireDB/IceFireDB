@@ -9,10 +9,10 @@ import (
 
 	rafthub "github.com/tidwall/uhaha"
 
-	"github.com/gitsrc/IceFireDB/driver/hybriddb"
-	"github.com/gitsrc/IceFireDB/driver/ipfs"
-	"github.com/gitsrc/IceFireDB/driver/orbitdb"
-	"github.com/gitsrc/IceFireDB/driver/oss"
+	"github.com/IceFireDB/IceFireDB/driver/hybriddb"
+	"github.com/IceFireDB/IceFireDB/driver/ipfs"
+	"github.com/IceFireDB/IceFireDB/driver/orbitdb"
+	"github.com/IceFireDB/IceFireDB/driver/oss"
 )
 
 const usage = `{{NAME}} version: {{VERSION}} ({{GITSHA}})
