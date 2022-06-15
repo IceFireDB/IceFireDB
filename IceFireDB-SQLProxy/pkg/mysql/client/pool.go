@@ -89,7 +89,7 @@ func NewPool(
 	password string,
 	dbName string,
 	options ...func(conn *Conn),
-) *Pool {
+) (*Pool, error) {
 	if minAlive > maxAlive {
 		minAlive = maxAlive
 	}
@@ -122,12 +122,14 @@ func NewPool(
 
 	if pool.minAlive > 0 {
 		pool.logFunc(`Pool: Setup %d new connections (minimal pool size)...`, pool.minAlive)
-		pool.startNewConnections(pool.minAlive)
+		if err := pool.startNewConnections(pool.minAlive); err != nil {
+			return nil, err
+		}
 	}
 
 	go pool.closeOldIdleConnections()
 
-	return pool
+	return pool, nil
 }
 
 func (pool *Pool) GetStats(stats *ConnectionStats) {
@@ -446,10 +448,13 @@ func (pool *Pool) closeConn(conn *Conn) {
 	_ = conn.Close() // Closing is not an instant action, so do it outside the lock
 }
 
-func (pool *Pool) startNewConnections(count int) {
+func (pool *Pool) startNewConnections(count int) error {
 	connections := make([]Connection, 0, count)
 	for i := 0; i < count; i++ {
-		if conn, err := pool.createNewConnection(); err == nil {
+		conn, err := pool.createNewConnection()
+		if err != nil {
+			return err
+		} else {
 			pool.synchro.Lock()
 			pool.synchro.stats.TotalCount++
 			pool.synchro.Unlock()
@@ -462,6 +467,7 @@ func (pool *Pool) startNewConnections(count int) {
 		pool.putConnectionUnsafe(connection)
 	}
 	pool.synchro.Unlock()
+	return nil
 }
 
 func (pool *Pool) ping(conn *Conn) error {

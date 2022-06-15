@@ -56,7 +56,7 @@ func newMysqlProxy() *mysqlProxy {
 	p.server = server.NewDefaultServer()
 	p.credential = server.NewInMemoryProvider()
 	for _, info := range config.Get().UserList {
-		p.credential.(*server.InMemoryProvider).AddUser(info.User, info.Password)
+		p.credential.AddUser(info.User, info.Password)
 	}
 	return p
 }
