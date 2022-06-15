@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 func main() {
@@ -46,43 +45,32 @@ func main() {
 		config.InitConfig(confPath)
 		return nil
 	}
-
 	app.Action = func(c *cli.Context) error {
 		ctx, cancel := context.WithCancel(context.TODO())
-		stop := make(chan struct{})
-
-		go func() {
-			ms := mysql.NewMysqlProxy()
-			ms.Run(ctx)
-			stop <- struct{}{}
-		}()
-
-		return exitSignal(cancel, stop)
+		go exitSignal(cancel)
+		if err := mysql.Run(ctx); err != nil {
+			return err
+		}
+		return nil
 	}
-	err := app.Run(os.Args)
-	if err != nil {
-		panic(err)
+	if err := app.Run(os.Args); err != nil {
+		panic(fmt.Sprintf("app run error: %v", err))
 	}
 }
 
-func exitSignal(cancel context.CancelFunc, stop chan struct{}) error {
+func exitSignal(cancel context.CancelFunc) {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
 	for sig := range sigs {
 		switch sig {
 		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
 			cancel()
-
-			select {
-			case <-stop:
-				fmt.Println("shutdown！！！！")
-			case <-time.After(time.Second * 5):
-				fmt.Println("timeout forced exit！！！！")
-			}
+			fmt.Println("Bye!")
 			os.Exit(0)
 		case syscall.SIGHUP:
 			fmt.Println("+++++++++++++++++++++++++++++")
+		default:
+			fmt.Println(sig)
 		}
 	}
-	return nil
 }

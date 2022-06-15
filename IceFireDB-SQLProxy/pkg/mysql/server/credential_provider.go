@@ -8,10 +8,12 @@ import "sync"
 // if the password in a third-party credential provider could be updated at runtime, we have to invalidate the caching
 // for 'caching_sha2_password' by calling 'func (s *Server)InvalidateCache(string, string)'.
 type CredentialProvider interface {
-	// check if the user exists
+	// CheckUsername check if the user exists
 	CheckUsername(username string) (bool, error)
-	// get user credential
+	// GetCredential get user credential
 	GetCredential(username string) (password string, found bool, err error)
+	// AddUser add user
+	AddUser(username, password string)
 }
 
 func NewInMemoryProvider() *InMemoryProvider {
@@ -20,7 +22,7 @@ func NewInMemoryProvider() *InMemoryProvider {
 	}
 }
 
-// implements a in memory credential provider
+// InMemoryProvider implements a in memory credential provider
 type InMemoryProvider struct {
 	userPool sync.Map // username -> password
 }
