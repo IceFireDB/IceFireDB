@@ -5,21 +5,41 @@ IceFireDB SQLite database is a decentralized SQLite database. Provide a convenie
 ## How does it work?
 ![framework](./docs/icefiredb-sqlite.png)
 
-### Compile and install
+### Built With
+
+* [Golang 1.17](https://go.dev/)
+
+## Getting Started
+
+#### Installation
+
+1. Clone the repo
+
+~~~bash
+git clone https://github.com/IceFireDB/IceFireDB.git
+~~~
+
+2. Build
 
 ```shell
 cd IceFireDB-SQLite
 make
-
 IceFireDB-SQLite -h
 ```
 
-### demo video
 
-https://user-images.githubusercontent.com/21053373/173170247-74b1daeb-7bd5-4dc0-8b93-62b334859ba8.mp4
-
-
-### Application scenarios
+## Application scenarios
 
 1. Build a decentralized SQLite database based on Mysql usage protocol
+
+## Roadmap
+
+- [x] P2P Support
+- [x] Mysql-cli Client Support
+- [x] Golang Gorm Support
+- [ ] SQL Prepared Statements
+
+### Demo video
+
+https://user-images.githubusercontent.com/21053373/173170247-74b1daeb-7bd5-4dc0-8b93-62b334859ba8.mp4
 
