@@ -52,7 +52,7 @@ func (h *Handle) HandleStmtExecute(c *server.Conn, context interface{}, query st
 	if !ok {
 		return nil, errors.New("other error")
 	}
-	res, err := stmt.Execute(args)
+	res, err := stmt.Execute(args...)
 	if err == nil {
 		broadcast(query)
 	}

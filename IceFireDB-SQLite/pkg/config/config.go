@@ -5,36 +5,36 @@ import (
 )
 
 type Config struct {
-	Server   ServerC    `json:"server"`
-	Debug    DebugC     `json:"debug"`
-	SQLite   SQLiteC    `json:"sqlite"`
-	P2P      P2PS       `json:"p2p"`
-	UserList []UserInfo `json:"userlist"`
+	Server   ServerC    `mapstructure:"server" json:"server"`
+	Debug    DebugC     `mapstructure:"debug" json:"debug"`
+	SQLite   SQLiteC    `mapstructure:"sqlite" json:"sqlite"`
+	P2P      P2PS       `mapstructure:"p2p" json:"p2p"`
+	UserList []UserInfo `mapstructure:"userlist" json:"userlist"`
 }
 
 type ServerC struct {
-	Addr string `json:"addr"`
+	Addr string `mapstructure:"addr" json:"addr"`
 }
 
 type SQLiteC struct {
-	Filename string `json:"filename"`
+	Filename string `mapstructure:"filename" json:"filename"`
 }
 
 type UserInfo struct {
-	User     string `json:"user"`
-	Password string `json:"password"`
+	User     string `mapstructure:"user" json:"user"`
+	Password string `mapstructure:"password" json:"password"`
 }
 
 type DebugC struct {
-	Enable bool `json:"enable"`
-	Port   int  `json:"port"`
+	Enable bool `mapstructure:"enable" json:"enable"`
+	Port   int  `mapstructure:"port" json:"port"`
 }
 
 type P2PS struct {
-	Enable              bool   `json:"enable"`
-	ServiceDiscoveryID  string `json:"service_discovery_id"`
-	ServiceCommandTopic string `json:"service_command_topic"`
-	ServiceDiscoverMode string `json:"service_discover_mode"`
+	Enable              bool   `mapstructure:"enable" json:"enable"`
+	ServiceDiscoveryID  string `mapstructure:"service_discovery_id" json:"service_discovery_id"`
+	ServiceCommandTopic string `mapstructure:"service_command_topic" json:"service_command_topic"`
+	ServiceDiscoverMode string `mapstructure:"service_discover_mode" json:"service_discover_mode"`
 }
 
 func init() {
