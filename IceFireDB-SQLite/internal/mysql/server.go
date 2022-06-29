@@ -36,8 +36,8 @@ func (m *mysqlProxy) Run(ctx context.Context) {
 	logrus.Infof("启动IceFireDB-SQLite，监听地址：%s\n", config.Get().Server.Addr)
 
 	// init sqlitedb
-	sqlite.InitSQLite(ctx, config.Get().SQLite.Filename)
-
+	db := sqlite.InitSQLite(ctx, config.Get().SQLite.Filename)
+	m.db = db
 	for {
 		conn, err := ln.Accept()
 		if err != nil {

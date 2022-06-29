@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/server"
 	"net"
@@ -18,6 +19,7 @@ type mysqlProxy struct {
 	credential server.CredentialProvider
 	pLock      sync.RWMutex
 	closed     atomic.Value
+	db         *sql.DB
 }
 
 // 代理连接

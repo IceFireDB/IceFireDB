@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	. "github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
-	"net"
-
 	"github.com/siddontang/go/hack"
+	"net"
 )
 
 type Handler interface {

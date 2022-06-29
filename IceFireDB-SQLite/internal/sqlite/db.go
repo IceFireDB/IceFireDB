@@ -20,7 +20,7 @@ var (
 	p2pPubSub *p2p.PubSub
 )
 
-func InitSQLite(ctx context.Context, filename string) {
+func InitSQLite(ctx context.Context, filename string) *sql.DB {
 	var err error
 	// var driver sqlite3.SQLiteDriver
 	// conn, err := driver.Open(filename)
@@ -45,13 +45,14 @@ func InitSQLite(ctx context.Context, filename string) {
 
 		logrus.Info("Connected to P2P Service Peers")
 		var err error
-		p2pPubSub, err = p2p.JoinPubSub(p2pHost, "redis-client", config.Get().P2P.ServiceCommandTopic)
+		p2pPubSub, err = p2p.JoinPubSub(p2pHost, "mysql-client", config.Get().P2P.ServiceCommandTopic)
 		if err != nil {
 			panic(err)
 		}
 		logrus.Infof("Successfully joined [%s] P2P channel. \n", config.Get().P2P.ServiceCommandTopic)
 		asyncSQL(ctx)
 	}
+	return db
 }
 
 // 这些语句开头的都需要通过节点同步
@@ -231,4 +232,26 @@ func getColumnTypeAndLen(columnType string) (byte, uint32) {
 		return mysql.MYSQL_TYPE_NULL, length
 	}
 	return mysql.MYSQL_TYPE_VAR_STRING, length
+}
+
+func isDML(sql string) bool {
+	prefix := sql
+	if len(sql) > 20 {
+		prefix = sql[:20]
+	}
+	prefix = strings.ToUpper(prefix)
+	for _, v := range DMLSQL {
+		if strings.HasPrefix(prefix, v) {
+			return true
+		}
+	}
+	return false
+}
+
+func Broadcast(sql string) {
+	if !isDML(sql) {
+		return
+	}
+	p2pPubSub.Outbound <- sql
+	logrus.Infof("Outbound sql: %s", sql)
 }

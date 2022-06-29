@@ -7,10 +7,10 @@ debug:  # Control to enable debug mode
 
 # mysql
 mysql:
-  addr: "127.0.0.1:3306"
+  addr: "192.168.2.80:3306"
   user: "root"
   password: "123456"
-  dbname: "root_cap"
+  dbname: "zta"
   minAlive: 1 # Specifies the minimum number of open connections the pool will attempt to maintain
   maxAlive: 64 # Specifies the maximum number of open connections the pool will attempt to maintain
   maxIdle: 4 # Maximum number of idle connections
