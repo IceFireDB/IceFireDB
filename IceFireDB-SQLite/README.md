@@ -34,10 +34,10 @@ IceFireDB-SQLite -h
 
 ## Roadmap
 
-- [x] P2P Support
-- [x] Mysql-cli Client Support
-- [x] Golang Gorm Support
-- [ ] SQL Prepared Statements
+- [✔️] P2P Support
+- [✔️] Mysql-cli Client Support
+- [✔️] Golang Gorm Support
+- [💪] SQL Prepared Statements
 
 ### Demo video
 
