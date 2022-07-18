@@ -1,6 +1,6 @@
-# IceFireDB-Redis-PubSub
+# IceFireDB-PubSub
 
-IceFireDB-Redis-Pubsub is a high performance, high availability and decentralized subscription system.
+IceFireDB-PubSub is a high performance, high availability and decentralized subscription system.
 
 It can seamlessly migrate web2 applications using redis publish and subscribe into a decentralized p2p subscription network.
 
@@ -47,7 +47,7 @@ $ ./bin/Icefiredb-proxy -c ./config/config.yaml
 ```
 
 ### Usage
-IceFireDB-Redis-PubSub is mainly used for two commands: SUBSCRIBE and PUBLISH, which are mainly implemented in[pubsub](./pkg/router/redisNode/ppubsub.go)
+IceFireDB-PubSub is mainly used for two commands: SUBSCRIBE and PUBLISH, which are mainly implemented in[pubsub](./pkg/router/redisNode/ppubsub.go)
 
 Secondary development can be carried out according to requirements, or other instructions can be added.
 
