@@ -1,4 +1,4 @@
-PROG=bin/Icefiredb-Redis-PubSub
+PROG=bin/Icefiredb-PubSub
 
 
 SRCS=./cmd/proxy
