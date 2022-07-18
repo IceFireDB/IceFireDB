@@ -11,10 +11,11 @@ IceFireDB-Redis-proxy database proxy adds decentralization wings to traditional 
 ## How does it work?
 
 ### scene introduction
-<img width="1188" alt="image" src="https://user-images.githubusercontent.com/52234994/173173974-851cad34-f7dc-4f06-9194-b5921d4928a2.png">
+![image](https://user-images.githubusercontent.com/34047788/179436964-00aa6ffd-f6f4-4c60-a46c-fb0165296049.png)
+
 
 ### system structure
-<img width="1159" alt="image" src="https://user-images.githubusercontent.com/52234994/173173986-3ed997ae-4c1e-4c34-b0b5-012ff6d6af69.png">
+![image](https://user-images.githubusercontent.com/34047788/179437011-6cdeb273-0ebd-40bc-bde3-410c5953d256.png)
 
 
 ### Configuration
