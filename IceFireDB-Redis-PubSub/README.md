@@ -7,10 +7,10 @@ It can seamlessly migrate web2 applications using redis publish and subscribe in
 ## How does it work?
 
 ### scene introduction
-<img width="1070" alt="image" src="https://user-images.githubusercontent.com/52234994/173174080-95775add-c287-4f43-943b-686b903e67b7.png">
+![image](https://user-images.githubusercontent.com/34047788/179438925-16fce624-4711-4f5d-9207-1e80397e3b55.png)
 
 ### system structure
-<img width="1061" alt="image" src="https://user-images.githubusercontent.com/52234994/173174090-7c2f084b-4ccc-4c56-983b-210486f13a60.png">
+![image](https://user-images.githubusercontent.com/34047788/179438955-31a05dd8-e33d-42f2-a0e2-867f5e566251.png)
 
 The application works with multiple nodes on the same network or on different networks. Nodes behind a NAT on a private network can communicate with each other. Peer discovery and routing using Kademlia DHT and IPFs network discovery. By supporting the redis pub-sub protocol, a globally distributed Web3 publish-subscribe system is constructed.
 
