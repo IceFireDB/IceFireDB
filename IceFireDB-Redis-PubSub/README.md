@@ -1,4 +1,4 @@
-# [IceFireDB-Redis-PubSub]
+# IceFireDB-Redis-PubSub
 
 IceFireDB-Redis-Pubsub is a high performance, high availability and decentralized subscription system.
 
