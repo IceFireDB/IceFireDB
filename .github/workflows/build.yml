@@ -50,3 +50,33 @@ jobs:
         run: |
           cd IceFireDB-SQLProxy
           make
+
+  build-pubsub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.16
+
+      - name: Build
+        run: |
+          cd IceFireDB-PubSub
+          make
+
+  build-redis-proxy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.16
+
+      - name: Build
+        run: |
+          cd IceFireDB-Redis-Proxy
+          make
