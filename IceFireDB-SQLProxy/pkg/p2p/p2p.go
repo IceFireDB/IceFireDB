@@ -18,24 +18,24 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p"
-	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
-	discovery "github.com/libp2p/go-libp2p-discovery"
-	host "github.com/libp2p/go-libp2p-host"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	tls "github.com/libp2p/go-libp2p-tls"
-	yamux "github.com/libp2p/go-libp2p-yamux"
-	"github.com/libp2p/go-tcp-transport"
+	"github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-pubsub"
+	discoveryRouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
+	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
+	tls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/mr-tron/base58/base58"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multihash"
 	"github.com/sirupsen/logrus"
 )
 
-// A structure that represents a P2P Host
+// P2P A structure that represents a P2P Host
 type P2P struct {
 	// Represents the host context layer
 	Ctx context.Context
@@ -47,7 +47,7 @@ type P2P struct {
 	KadDHT *dht.IpfsDHT
 
 	// Represents the peer discovery service
-	Discovery *discovery.RoutingDiscovery
+	Discovery *discoveryRouting.RoutingDiscovery
 
 	// Represents the PubSub Handler
 	PubSub *pubsub.PubSub
@@ -81,7 +81,7 @@ func NewP2P(serviceName string) *P2P {
 	logrus.Debugln("Bootstrapped the Kademlia DHT and Connected to Bootstrap Peers")
 
 	// Create a peer discovery service using the Kad DHT : 创建一个节点路由发现方式
-	routingdiscovery := discovery.NewRoutingDiscovery(kaddht)
+	routingdiscovery := discoveryRouting.NewRoutingDiscovery(kaddht)
 	// Debug log
 	logrus.Debugln("Created the Peer Discovery Service.")
 
@@ -90,10 +90,6 @@ func NewP2P(serviceName string) *P2P {
 	// Debug log
 	logrus.Debugln("Created the PubSub Handler.")
 
-	//set p2p cid default service name
-	if serviceName == "" {
-		serviceName = "p2p_redis_proxy_service"
-	}
 	// Return the P2P object
 	return &P2P{
 		Ctx:       ctx,
@@ -218,11 +214,15 @@ func setupHost(ctx context.Context) (host.Host, *dht.IpfsDHT) {
 
 	// Trace log
 	logrus.Traceln("Generated P2P Address Listener Configuration.")
-
 	// Set up the stream multiplexer and connection manager options
 	muxer := libp2p.Muxer("/yamux/1.0.0", yamux.DefaultTransport)
-	conn := libp2p.ConnectionManager(connmgr.NewConnManager(100, 400, time.Minute))
-
+	basicConnMgr, err := connmgr.NewConnManager(100, 400, connmgr.WithGracePeriod(time.Minute))
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Fatalln("Failed to NewConnManager!")
+	}
+	conn := libp2p.ConnectionManager(basicConnMgr)
 	// Trace log
 	logrus.Traceln("Generated P2P Stream Multiplexer, Connection Manager Configurations.")
 
@@ -237,7 +237,7 @@ func setupHost(ctx context.Context) (host.Host, *dht.IpfsDHT) {
 	var kaddht *dht.IpfsDHT
 	// Setup a routing configuration with the KadDHT
 	//定义节点路由函数,设置节点发现函数
-	routing := libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
+	routingOpt := libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 		kaddht = setupKadDHT(ctx, h)
 		return kaddht, err
 	})
@@ -245,10 +245,10 @@ func setupHost(ctx context.Context) (host.Host, *dht.IpfsDHT) {
 	// Trace log
 	logrus.Traceln("Generated P2P Routing Configurations.")
 
-	opts := libp2p.ChainOptions(identity, listen, security, transport, muxer, conn, nat, routing, relay)
+	opts := libp2p.ChainOptions(identity, listen, security, transport, muxer, conn, nat, routingOpt, relay)
 
 	// Construct a new libP2P host with the created options
-	libhost, err := libp2p.New(ctx, opts)
+	libhost, err := libp2p.New(opts)
 	// Handle any potential error
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
@@ -287,7 +287,7 @@ func setupKadDHT(ctx context.Context, nodehost host.Host) *dht.IpfsDHT {
 
 // A function that generates a PubSub Handler object and returns it
 // Requires a node host and a routing discovery service.
-func setupPubSub(ctx context.Context, nodehost host.Host, routingdiscovery *discovery.RoutingDiscovery) *pubsub.PubSub {
+func setupPubSub(ctx context.Context, nodehost host.Host, routingdiscovery *discoveryRouting.RoutingDiscovery) *pubsub.PubSub {
 	// Create a new PubSub service which uses a GossipSub router
 	pubsubhandler, err := pubsub.NewGossipSub(ctx, nodehost, pubsub.WithDiscovery(routingdiscovery))
 	// Handle any potential error
