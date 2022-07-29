@@ -6,7 +6,7 @@ require (
 	berty.tech/go-ipfs-log v1.5.0
 	berty.tech/go-orbit-db v1.13.2
 	github.com/armon/go-metrics v0.3.6 // indirect
-	github.com/aws/aws-sdk-go v1.44.59
+	github.com/aws/aws-sdk-go v1.44.65
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger/v3 v3.2103.2
@@ -30,7 +30,7 @@ require (
 	github.com/spf13/cast v1.5.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tidwall/raft-leveldb v0.2.0 // indirect
-	github.com/tidwall/redcon v1.4.5
+	github.com/tidwall/redcon v1.4.6
 	github.com/tidwall/sds v0.1.1
 	github.com/tidwall/uhaha v0.8.1
 )
