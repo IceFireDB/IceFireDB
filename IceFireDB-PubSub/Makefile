@@ -10,9 +10,17 @@ COMMIT_HASH=$(shell git rev-parse --short HEAD || echo "GitNotFound")
 BUILD_DATE=$(shell date '+%Y-%m-%d %H:%M:%S')
 # compile
 CFLAGS = -ldflags "-s -w -X \"main.BuildVersion=${COMMIT_HASH}\""
-# GOOS 方便在Mac系统上快速的进行调试开发
-GOOS = $(shell uname | tr 'A-Z' 'a-z')
-# GOARCH 考虑到目前大部分机器为 64 的指令集，暂不对此进行处理
+# Get GOOS from System
+LOCAL_OS := $(shell uname)
+ifeq ($(LOCAL_OS),Linux)
+   TARGET_OS_LOCAL = linux
+else ifeq ($(LOCAL_OS),Darwin)
+   TARGET_OS_LOCAL = darwin
+else
+   TARGET_OS_LOCAL = windows
+   PROTOC_GEN_GO_NAME := "icefiredb.exe"
+endif
+export GOOS ?= $(TARGET_OS_LOCAL)
 
 all:
 	if [ ! -d "./bin/" ]; then \
