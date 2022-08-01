@@ -56,6 +56,10 @@ type chatlog struct {
 	logmsg    string
 }
 
+func (c chatlog) String() string {
+	return fmt.Sprintf("%s: %s", c.logprefix, c.logmsg)
+}
+
 // A constructor function that generates and returns a new
 // PubSub for a given P2PHost, username and roomname
 func JoinPubSub(p2phost *P2P, clientName string, topicName string) (*PubSub, error) {

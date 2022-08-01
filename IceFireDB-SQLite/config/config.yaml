@@ -2,7 +2,7 @@ server:
   addr: ":23306" # Network listening address, support MySQL protocol
 
 sqlite:
-  filename: "sqlite.db"
+  filename: "db/sqlite.db"
 
 debug:  # Control to open pprof
   enable: true
@@ -11,13 +11,11 @@ debug:  # Control to open pprof
 # p2p config
 p2p:
   enable: true
-  service_discovery_id: "p2p_sqlite_service_test"
-  service_command_topic: "p2p_sqlite_service_topic_test"
+  service_discovery_id: "p2p_sqlite_service"
+  service_command_topic: "p2p_sqlite_service_topic"
   service_discover_mode: "advertise" # advertise or announce
 
 # Tenant list
 userlist:
-  - user: host1
-    password: host1
-  - user: test
-    password: test
+  - user: root
+    password: 123456
