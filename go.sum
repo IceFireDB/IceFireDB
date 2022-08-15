@@ -1502,8 +1502,8 @@ github.com/tidwall/rhh v1.1.1/go.mod h1:DmqiIRtSnlVEi5CSKqNaX6m3YTa3YNSYrGB4Flfd
 github.com/tidwall/rtime v0.2.0 h1:GutGhaGKa3IkD4nmx0qyRfLFlbi+s77DtyOvBUfueKk=
 github.com/tidwall/rtime v0.2.0/go.mod h1:y/sMgr+q6fS3V+rU9JxJcrBwCXLUU8519MJNK31N2Sc=
 github.com/tidwall/sds v0.1.0/go.mod h1:686nVK8DGe2Ek2ai8sMiMQTH/TRsupw9LUCar0Dt/e0=
-github.com/tidwall/sds v0.1.1 h1:/EMi6BaVCYBMm7cU5Zv2VnQIT2EUAGSrtCuHpeJd70Y=
-github.com/tidwall/sds v0.1.1/go.mod h1:686nVK8DGe2Ek2ai8sMiMQTH/TRsupw9LUCar0Dt/e0=
+github.com/tidwall/sds v0.2.0 h1:Ap+C0a+1/WNy9b392rrXgfBp61vsyKaT6dc/wL8jE2w=
+github.com/tidwall/sds v0.2.0/go.mod h1:9HSHCNyi2P9vs8PH5sRq6sbkscGb+hIYpai9FZAukwg=
 github.com/tidwall/tinybtree v1.0.1/go.mod h1:0aFQG6KLQz3j57CeVgXlmKO3RSQ3myhJn2H+r84IgSY=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqriFuLhtthL60Sar/7RFoluCcXsuvEwTV5KM=
