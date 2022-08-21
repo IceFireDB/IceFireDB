@@ -24,11 +24,14 @@ import (
 	rafthub "github.com/tidwall/uhaha"
 
 	_ "github.com/IceFireDB/IceFireDB/driver/badger"
+	"github.com/IceFireDB/IceFireDB/driver/crdt"
 	"github.com/IceFireDB/IceFireDB/driver/hybriddb"
 	"github.com/IceFireDB/IceFireDB/driver/ipfs"
-	"github.com/IceFireDB/IceFireDB/driver/orbitdb"
+
+	// "github.com/IceFireDB/IceFireDB/driver/orbitdb"
 	"github.com/IceFireDB/IceFireDB/driver/oss"
 	"github.com/IceFireDB/IceFireDB/utils"
+	"github.com/IceFireDB/icefiredb-crdt-kv/kv"
 )
 
 var (
@@ -71,6 +74,8 @@ func main() {
 		case *leveldb.DB:
 			db = v
 		case *badger.DB:
+		case *kv.CRDTKeyValueDB:
+			db = ldb.GetSDB().GetDriver().(*crdt.DB).GetLevelDB()
 		default:
 			panic(fmt.Errorf("unsupported storage is caused: %T", v))
 		}
@@ -80,9 +85,9 @@ func main() {
 		if storageBackend == ipfs.StorageName {
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*ipfs.DB).Metrics)
 		}
-		if storageBackend == orbitdb.StorageName {
-			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*orbitdb.DB).Metrics)
-		}
+		// if storageBackend == orbitdb.StorageName {
+		// 	serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*orbitdb.DB).Metrics)
+		// }
 
 		if storageBackend == oss.StorageName {
 			//serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*orbitdb.DB).Metrics)

@@ -7,11 +7,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/IceFireDB/IceFireDB/driver/crdt"
+
 	rafthub "github.com/tidwall/uhaha"
 
 	"github.com/IceFireDB/IceFireDB/driver/hybriddb"
 	"github.com/IceFireDB/IceFireDB/driver/ipfs"
-	"github.com/IceFireDB/IceFireDB/driver/orbitdb"
+
+	//"github.com/IceFireDB/IceFireDB/driver/orbitdb"
 	"github.com/IceFireDB/IceFireDB/driver/oss"
 )
 
@@ -61,6 +64,11 @@ Advanced options:
   --oss-endpoint:  aws oss endpoint connect . 
   --oss-ak: aws oss access key.
   --oss-sk: aws oss secret key
+
+P2P options:
+  --servicename    : Service Discovery Identification
+  --nettopic       : Node discovery channel
+  --datatopic      : Pubsub data synchronization channel
 `
 
 func confInit(conf *rafthub.Config) {
@@ -86,9 +94,10 @@ func confInit(conf *rafthub.Config) {
 		}
 		s = strings.ReplaceAll(s, "{{USAGE}}", "")
 		w.Write([]byte(s))
-		if w == os.Stdout {
-			os.Exit(0)
-		}
+		//if w == os.Stdout {
+		//	os.Exit(0)
+		//}
+		//fmt.Println(s)
 	}
 	var raftBackend string
 	var testNode string
@@ -112,7 +121,7 @@ func confInit(conf *rafthub.Config) {
 	flag.StringVar(&oss.OssDefaultConfig.EndPointConnection, "oss-endpoint", "", "")
 	flag.StringVar(&oss.OssDefaultConfig.AccessKey, "oss-ak", "", "")
 	flag.StringVar(&oss.OssDefaultConfig.Secretkey, "oss-sk", "", "")
-	flag.StringVar(&orbitdb.OrbitdbDefaultConfig.Pubsubid, "pubsub-id", "", "")
+	//flag.StringVar(&orbitdb.OrbitdbDefaultConfig.Pubsubid, "pubsub-id", "", "")
 
 	flag.BoolVar(&conf.TryErrors, "try-errors", conf.TryErrors, "")
 	flag.BoolVar(&conf.InitRunQuit, "init-run-quit", conf.InitRunQuit, "")
@@ -120,6 +129,10 @@ func confInit(conf *rafthub.Config) {
 	flag.StringVar(&storageBackend, "storage-backend", "goleveldb", "")
 	flag.StringVar(&pprofAddr, "pprof-addr", ":26063", "")
 	flag.BoolVar(&debug, "debug", false, "")
+	// p2p
+	flag.StringVar(&crdt.DefaultConfig.ServiceName, "servicename", crdt.DefaultConfig.ServiceName, "")
+	flag.StringVar(&crdt.DefaultConfig.DataSyncChannel, "datatopic", crdt.DefaultConfig.DataSyncChannel, "")
+	flag.StringVar(&crdt.DefaultConfig.NetDiscoveryChannel, "nettopic", crdt.DefaultConfig.NetDiscoveryChannel, "")
 	flag.Parse()
 
 	switch raftBackend {
