@@ -5,7 +5,7 @@ go 1.16
 require (
 	berty.tech/go-ipfs-log v1.8.0
 	berty.tech/go-orbit-db v1.17.1
-	github.com/IceFireDB/icefiredb-crdt-kv v0.0.0-20220818065026-2d9515be4958
+	github.com/IceFireDB/icefiredb-crdt-kv v0.0.0-20220821125516-0f23a3a1b870
 	github.com/armon/go-metrics v0.3.6 // indirect
 	github.com/aws/aws-sdk-go v1.44.80
 	github.com/cenkalti/backoff/v4 v4.1.3
