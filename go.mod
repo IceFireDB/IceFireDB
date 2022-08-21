@@ -7,7 +7,7 @@ require (
 	berty.tech/go-orbit-db v1.17.1
 	github.com/IceFireDB/icefiredb-crdt-kv v0.0.0-20220818065026-2d9515be4958
 	github.com/armon/go-metrics v0.3.6 // indirect
-	github.com/aws/aws-sdk-go v1.44.76
+	github.com/aws/aws-sdk-go v1.44.80
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger v1.6.2
