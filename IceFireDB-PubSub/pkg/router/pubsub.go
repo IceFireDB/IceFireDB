@@ -21,6 +21,7 @@ package router
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -34,8 +35,8 @@ import (
 func PubSubMiddleware(router IRoutes, pubSub *p2p.PubSub) HandlerFunc {
 	subscribe(router, pubSub)
 	return func(context *Context) error {
-		// sync write operate cmd
-		if context.Op.IsMasterOnly() {
+		// sync write operate cmd and remove 'publish' command
+		if context.Op.IsMasterOnly() && strings.ToUpper(context.Cmd) != "PUBLISH" {
 			args := make([]string, len(context.Args))
 			for k, v := range context.Args {
 				args[k] = string(v.([]byte))
