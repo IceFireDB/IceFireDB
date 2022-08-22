@@ -21,28 +21,29 @@ package router
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/utils"
+	"github.com/IceFireDB/IceFireDB-PubSub/utils"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/p2p"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/p2p"
 )
 
-// Synchronize notification to peer node middleware
+// PubSubMiddleware Synchronize notification to peer node middleware
 func PubSubMiddleware(router IRoutes, pubSub *p2p.PubSub) HandlerFunc {
 	subscribe(router, pubSub)
 	return func(context *Context) error {
-		// sync write operate cmd
-		if context.Op.IsMasterOnly() {
+		// sync write operate cmd and remove 'publish' command
+		if context.Op.IsMasterOnly() && strings.ToUpper(context.Cmd) != "PUBLISH" {
 			args := make([]string, len(context.Args))
 			for k, v := range context.Args {
 				args[k] = string(v.([]byte))
 			}
 			s, _ := json.Marshal(args)
 			pubSub.Outbound <- string(s)
-			// logrus.Info("outbound: ", string(s))
+			logrus.Info("outbound: ", string(s))
 		}
 		return context.Next()
 	}
@@ -51,7 +52,7 @@ func PubSubMiddleware(router IRoutes, pubSub *p2p.PubSub) HandlerFunc {
 func subscribe(router IRoutes, pubSub *p2p.PubSub) {
 	utils.GoWithRecover(func() {
 		for args := range pubSub.Inbound {
-			// logrus.Info("inbound: ", args.Message)
+			logrus.Info("inbound: ", args.Message)
 			var data []interface{}
 			err := json.Unmarshal([]byte(args.Message), &data)
 			if err != nil {

@@ -24,8 +24,8 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/codis/bufio2"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/codis/errors"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/codis/bufio2"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/codis/errors"
 )
 
 const (

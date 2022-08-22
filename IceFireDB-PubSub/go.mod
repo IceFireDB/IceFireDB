@@ -1,4 +1,4 @@
-module github.com/IceFireDB/IceFireDB-Proxy
+module github.com/IceFireDB/IceFireDB-PubSub
 
 go 1.16
 

@@ -20,7 +20,7 @@
 package redisNode
 
 import (
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/router"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/router"
 	"github.com/gomodule/redigo/redis"
 )
 
@@ -30,7 +30,8 @@ var (
 )
 
 func (r *Router) cmdCOMMAND(s *router.Context) error {
-	return router.WriteObjects(s.Writer, nil)
+	// can not reply nil object, it will cause panic when use redis-cl(7.0.3)
+	return router.WriteSimpleString(s.Writer, okReply)
 }
 
 func (r *Router) cmdPING(s *router.Context) error {

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/test/proto"
+	"github.com/IceFireDB/IceFireDB-PubSub/test/proto"
 )
 
 // assert fails the test if the condition is false.

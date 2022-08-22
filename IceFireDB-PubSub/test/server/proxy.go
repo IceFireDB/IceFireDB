@@ -24,9 +24,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/proxy"
+	"github.com/IceFireDB/IceFireDB-PubSub/proxy"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/config"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/config"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/spf13/viper"
 )

@@ -22,7 +22,7 @@ package router
 import (
 	"math"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/RedSHandle"
 )
 
 const AbortIndex int8 = math.MaxInt8 / 2
