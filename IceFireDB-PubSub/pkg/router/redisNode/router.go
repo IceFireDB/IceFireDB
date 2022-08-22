@@ -22,14 +22,15 @@ package redisNode
 import (
 	"context"
 	"fmt"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/config"
 	"io"
 	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/router"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/RedSHandle"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/router"
 	"github.com/gomodule/redigo/redis"
 )
 
@@ -54,9 +55,13 @@ func (r *Router) InitCMD() {
 	r.AddCommand("COMMAND", r.cmdCOMMAND)
 	r.AddCommand("PING", r.cmdPING)
 	r.AddCommand("QUIT", r.cmdQUIT)
-	r.AddCommand(CMDEXEC, r.cmdCMDEXEC)
-	r.AddCommand("PUBLISH", r.cmdPpub)
-	r.AddCommand("SUBSCRIBE", r.cmdPsub)
+	if r.client != nil {
+		r.AddCommand(CMDEXEC, r.cmdCMDEXEC)
+	}
+	if config.Get().P2P.Enable {
+		r.AddCommand("PUBLISH", r.cmdPpub)
+		r.AddCommand("SUBSCRIBE", r.cmdPsub)
+	}
 }
 
 func (r *Router) Handle(w *RedSHandle.WriterHandle, args []interface{}) error {
@@ -176,6 +181,6 @@ func (r *Router) combineHandlers(handlers router.HandlersChain) router.HandlersC
 	return mergedHandlers
 }
 
-func (engine *Router) allocateContext() *router.Context {
+func (r *Router) allocateContext() *router.Context {
 	return &router.Context{}
 }

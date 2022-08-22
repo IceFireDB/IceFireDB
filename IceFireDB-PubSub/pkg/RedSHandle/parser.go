@@ -24,7 +24,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/utils"
+	"github.com/IceFireDB/IceFireDB-PubSub/utils"
 )
 
 var (

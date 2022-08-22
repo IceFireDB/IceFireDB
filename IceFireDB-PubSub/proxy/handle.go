@@ -23,10 +23,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/bareneter"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/codis/credis"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/router"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/RedSHandle"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/bareneter"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/codis/credis"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/router"
 	"github.com/sirupsen/logrus"
 )
 
@@ -45,7 +45,6 @@ func (p *Proxy) handle(conn bareneter.Conn) {
 			}*/
 			return
 		}
-
 		if resp.Type != credis.TypeArray {
 			_ = router.WriteError(localWriteHandle, fmt.Errorf(router.ErrUnknownCommand, "cmd"))
 			return

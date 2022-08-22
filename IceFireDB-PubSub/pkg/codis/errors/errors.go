@@ -23,7 +23,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/codis/trace"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/codis/trace"
 )
 
 var TraceEnabled = true

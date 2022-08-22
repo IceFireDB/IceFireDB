@@ -25,12 +25,12 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/utils"
+	"github.com/IceFireDB/IceFireDB-PubSub/utils"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/p2p"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/p2p"
 )
 
-// Synchronize notification to peer node middleware
+// PubSubMiddleware Synchronize notification to peer node middleware
 func PubSubMiddleware(router IRoutes, pubSub *p2p.PubSub) HandlerFunc {
 	subscribe(router, pubSub)
 	return func(context *Context) error {
@@ -42,7 +42,7 @@ func PubSubMiddleware(router IRoutes, pubSub *p2p.PubSub) HandlerFunc {
 			}
 			s, _ := json.Marshal(args)
 			pubSub.Outbound <- string(s)
-			// logrus.Info("outbound: ", string(s))
+			logrus.Info("outbound: ", string(s))
 		}
 		return context.Next()
 	}
@@ -51,7 +51,7 @@ func PubSubMiddleware(router IRoutes, pubSub *p2p.PubSub) HandlerFunc {
 func subscribe(router IRoutes, pubSub *p2p.PubSub) {
 	utils.GoWithRecover(func() {
 		for args := range pubSub.Inbound {
-			// logrus.Info("inbound: ", args.Message)
+			logrus.Info("inbound: ", args.Message)
 			var data []interface{}
 			err := json.Unmarshal([]byte(args.Message), &data)
 			if err != nil {

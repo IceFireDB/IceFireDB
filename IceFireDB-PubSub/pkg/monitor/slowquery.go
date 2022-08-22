@@ -25,7 +25,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/utils"
+	"github.com/IceFireDB/IceFireDB-PubSub/utils"
 )
 
 type SlowQueryConfS struct {

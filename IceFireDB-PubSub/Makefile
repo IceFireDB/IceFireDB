@@ -1,7 +1,7 @@
 PROG=bin/Icefiredb-PubSub
 
 
-SRCS=./cmd/proxy
+SRCS=./cmd/pubsub
 
 # git commit hash
 COMMIT_HASH=$(shell git rev-parse --short HEAD || echo "GitNotFound")
@@ -39,4 +39,7 @@ clean:
 	rm -rf ./bin
 
 run:
-	GOPROXY=$(GOPROXY) go run --race cmd/proxy/main.go -c config/config.yaml
+	GOPROXY=$(GOPROXY) go run --race cmd/pubsub/main.go -c config/config.yaml
+
+run_dev:
+	GOPROXY=$(GOPROXY) go run cmd/pubsub/main.go -c config/config_dev.yaml

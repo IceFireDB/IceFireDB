@@ -23,13 +23,13 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/rediscluster"
 	"github.com/spf13/viper"
 )
 
 var (
-	ErrConfigNotInit       = errors.New("Config not init")
-	ErrDuplicateInitConfig = errors.New("Duplicate init config！")
+	ErrConfigNotInit       = errors.New("config not init")
+	ErrDuplicateInitConfig = errors.New("duplicate init config！")
 )
 
 const (
