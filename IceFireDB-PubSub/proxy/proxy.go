@@ -22,21 +22,22 @@ package proxy
 import (
 	"context"
 	"fmt"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/ppubsub"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/ppubsub"
 	"github.com/sirupsen/logrus"
+	"log"
 	"strings"
 	"time"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/cache"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/monitor"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/p2p"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/cache"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/monitor"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/p2p"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/bareneter"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/config"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/router"
-	proxycluster "github.com/IceFireDB/IceFireDB-Proxy/pkg/router/redisCluster"
-	proxynode "github.com/IceFireDB/IceFireDB-Proxy/pkg/router/redisNode"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/bareneter"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/config"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/rediscluster"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/router"
+	proxycluster "github.com/IceFireDB/IceFireDB-PubSub/pkg/router/redisCluster"
+	proxynode "github.com/IceFireDB/IceFireDB-PubSub/pkg/router/redisNode"
 	redisclient "github.com/gomodule/redigo/redis"
 )
 
@@ -94,6 +95,7 @@ func New() (*Proxy, error) {
 
 	// if enable p2p command pubsub mode,then create p2p pubsub handle
 	if config.Get().P2P.Enable {
+		logrus.Println("Starting Pubsub ...")
 		// create p2p element
 		p2phost := p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID) // create p2p
 		p.P2pHost = p2phost
@@ -112,14 +114,12 @@ func New() (*Proxy, error) {
 
 		logrus.Println("Connected to P2P Service Peers")
 
-		//p.P2pSubPub, err = p2p.JoinPubSub(p.P2pHost, "redis-client", config.Get().P2P.ServiceCommandTopic)
-		//
-		//if err != nil {
-		//	log.Println(err)
-		//	return nil, err
-		//}
-		//log.Printf("Successfully joined [%s] P2P channel. \n", config.Get().P2P.ServiceCommandTopic)
-
+		p.P2pSubPub, err = p2p.JoinPubSub(p.P2pHost, "redis-client", config.Get().P2P.ServiceCommandTopic)
+		if err != nil {
+			log.Println(err)
+			return nil, err
+		}
+		log.Printf("Successfully joined [%s] P2P channel. \n", config.Get().P2P.ServiceCommandTopic)
 		// 初始化ppubsub
 		ppubsub.InitPubSub(context.Background(), p.P2pHost)
 	}
@@ -130,7 +130,7 @@ func New() (*Proxy, error) {
 
 	p.router.Use(router.KeyMonitorMiddleware(p.Monitor, config.Get().Monitor.SlowQueryConf.SlowQueryIgnoreCMD))
 	if config.Get().P2P.Enable {
-		//p.router.Use(router.PubSubMiddleware(p.router, p.P2pSubPub))
+		p.router.Use(router.PubSubMiddleware(p.router, p.P2pSubPub))
 	}
 	p.router.InitCMD()
 

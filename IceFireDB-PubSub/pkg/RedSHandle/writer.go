@@ -129,11 +129,11 @@ func (w *WriterHandle) WriteObjects(objs ...interface{}) error {
 				return err
 			}
 		case int64:
-			if err := w.WriteInt(int64(v)); err != nil {
+			if err := w.WriteInt(v); err != nil {
 				return err
 			}
 		default:
-			return fmt.Errorf("Value not suppport %v", v)
+			return fmt.Errorf("value not suppport %v", v)
 		}
 	}
 	return nil
@@ -191,7 +191,7 @@ func (w *WriterHandle) RecursivelyWriteObjects(objs ...interface{}) error {
 				return err
 			}
 		default:
-			return fmt.Errorf("Value not suppport %v", v)
+			return fmt.Errorf("value not suppport %v", v)
 		}
 	}
 	return nil

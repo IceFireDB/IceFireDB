@@ -33,9 +33,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/config"
-	"github.com/IceFireDB/IceFireDB-Proxy/proxy"
-	"github.com/IceFireDB/IceFireDB-Proxy/utils"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/config"
+	"github.com/IceFireDB/IceFireDB-PubSub/proxy"
+	"github.com/IceFireDB/IceFireDB-PubSub/utils"
 	"github.com/spf13/viper"
 	"github.com/urfave/cli"
 )
@@ -60,7 +60,6 @@ func main() {
 		},
 	}
 	//showBanner()
-	logrus.Println("Starting Pubsub ...")
 	app.Before = initConfig
 	app.Action = start
 	err := app.Run(os.Args)

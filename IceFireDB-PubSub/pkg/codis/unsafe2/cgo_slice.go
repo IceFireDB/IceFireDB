@@ -24,7 +24,7 @@ import (
 	"runtime"
 	"unsafe"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/codis/sync2/atomic2"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/codis/sync2/atomic2"
 )
 
 var allocOffheapBytes atomic2.Int64

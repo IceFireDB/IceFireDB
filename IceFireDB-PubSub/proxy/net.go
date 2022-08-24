@@ -22,9 +22,9 @@ package proxy
 import (
 	"net"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/bareneter"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/config"
-	"github.com/IceFireDB/IceFireDB-Proxy/utils"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/bareneter"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/config"
+	"github.com/IceFireDB/IceFireDB-PubSub/utils"
 )
 
 func (p *Proxy) accept(conn bareneter.Conn) bool {
@@ -34,11 +34,14 @@ func (p *Proxy) accept(conn bareneter.Conn) bool {
 			return false
 		}
 	}
-
-	p.Monitor.ConnectionGauge.Inc()
+	if p.Monitor != nil {
+		p.Monitor.ConnectionGauge.Inc()
+	}
 	return true
 }
 
 func (p *Proxy) closed(conn bareneter.Conn, err error) {
-	p.Monitor.ConnectionGauge.Dec()
+	if p.Monitor != nil {
+		p.Monitor.ConnectionGauge.Dec()
+	}
 }

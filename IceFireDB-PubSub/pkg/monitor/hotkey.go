@@ -27,9 +27,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/utils"
+	"github.com/IceFireDB/IceFireDB-PubSub/utils"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/cache"
+	"github.com/IceFireDB/IceFireDB-PubSub/pkg/cache"
 	lru "github.com/hashicorp/golang-lru"
 )
 

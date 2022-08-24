@@ -6,7 +6,8 @@ require (
 	berty.tech/go-ipfs-log v1.8.0
 	berty.tech/go-orbit-db v1.17.1
 	github.com/IceFireDB/icefiredb-crdt-kv v0.0.0-20220821125516-0f23a3a1b870
-	github.com/aws/aws-sdk-go v1.44.80
+	github.com/armon/go-metrics v0.3.6 // indirect
+	github.com/aws/aws-sdk-go v1.44.83
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger v1.6.2
@@ -37,7 +38,6 @@ require (
 	github.com/Stebalien/go-bitfield v0.0.1 // indirect
 	github.com/alecthomas/units v0.0.0-20210927113745-59d0afb8317a // indirect
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
-	github.com/armon/go-metrics v0.3.6 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect

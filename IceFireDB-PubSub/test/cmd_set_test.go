@@ -22,8 +22,8 @@ package test
 import (
 	"testing"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/test/proto"
-	"github.com/IceFireDB/IceFireDB-Proxy/test/server"
+	"github.com/IceFireDB/IceFireDB-PubSub/test/proto"
+	"github.com/IceFireDB/IceFireDB-PubSub/test/server"
 )
 
 // Test SADD / SMEMBERS.
