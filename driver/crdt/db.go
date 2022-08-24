@@ -1,8 +1,10 @@
 package crdt
 
 import (
+	"bytes"
 	"context"
-	"encoding/hex"
+	"encoding/base64"
+	"fmt"
 	"github.com/IceFireDB/icefiredb-crdt-kv/kv"
 	"github.com/dgraph-io/badger"
 	"github.com/ipfs/go-datastore"
@@ -145,8 +147,8 @@ func (db *DB) Close() error {
 }
 
 func (db *DB) Put(key, value []byte) error {
-	key = db.EncodeKey(key)
-	return db.db.Put(db.ctx, key, value)
+	k := db.EncodeKey(key)
+	return db.db.Put(db.ctx, k, value)
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
@@ -198,12 +200,16 @@ func (db *DB) Compact() error {
 }
 
 func (dn *DB) EncodeKey(key []byte) []byte {
-	if !utf8.Valid(key) {
-		key = []byte(hex.EncodeToString(key))
+	// last 3 byte
+	if len(key) > 0 && !utf8.Valid(key) {
+		if len(key) <= 3 {
+			fmt.Println(key)
+			panic("BUG: key error")
+		}
+		index := len(key) - 3
+		buf := bytes.NewBuffer(key[:index])
+		buf.WriteString(base64.StdEncoding.EncodeToString(key[index:]))
+		return buf.Bytes()
 	}
 	return key
-}
-
-func (dn *DB) BytesToHex(key []byte) []byte {
-	return []byte(hex.EncodeToString(key))
 }

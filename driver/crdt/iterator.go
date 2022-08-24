@@ -3,6 +3,7 @@ package crdt
 import (
 	"github.com/ipfs/go-datastore/query"
 	"log"
+	"unicode/utf8"
 )
 
 type Iterator struct {
@@ -47,16 +48,15 @@ func (it *Iterator) Seek(key []byte) {
 	// Due to the CRDT lookup mechanism,
 	// the key starting with 0 4 0 4 bytes is judged
 	// and the last three bytes are removed
-	var k []byte
-	if len(key) > 4 && key[0] == 0x0 && key[1] == 0x4 && key[2] == 0x0 && key[3] == 0x4 {
-		k = it.db.BytesToHex(key[:len(key)-3])
-	} else {
-		k = it.db.EncodeKey(key)
+	if len(key) > 4 && !utf8.Valid(key) {
+		key = key[:len(key)-4]
 	}
-
+	//if len(key) > 4 && key[0] == 0x0 && key[1] == 0x4 && key[2] == 0x0 && key[3] == 0x4 {
+	//
+	//}
 	result, err := it.db.db.Query(it.db.ctx, query.Query{
 		Filters: []query.Filter{
-			query.FilterKeyPrefix{Prefix: "/" + string(k)},
+			query.FilterKeyPrefix{Prefix: "/" + string(key)},
 		},
 	})
 	if err != nil {
