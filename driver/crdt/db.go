@@ -3,11 +3,12 @@ package crdt
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
-	"fmt"
+	"encoding/hex"
 	"github.com/IceFireDB/icefiredb-crdt-kv/kv"
 	"github.com/dgraph-io/badger"
 	"github.com/ipfs/go-datastore"
+	"github.com/ledisdb/ledisdb/config"
+	"github.com/ledisdb/ledisdb/store/driver"
 	"github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
@@ -16,15 +17,14 @@ import (
 	"log"
 	"os"
 	"unicode/utf8"
-
-	"github.com/ledisdb/ledisdb/config"
-	"github.com/ledisdb/ledisdb/store/driver"
 )
 
 const (
 	StorageName      = "crdt"
 	defaultNamespace = "ifdb"
 )
+
+var NilBytes = []byte{0}
 
 type Config struct {
 	ServiceName         string
@@ -148,7 +148,14 @@ func (db *DB) Close() error {
 
 func (db *DB) Put(key, value []byte) error {
 	k := db.EncodeKey(key)
-	return db.db.Put(db.ctx, k, value)
+	if value == nil {
+		value = NilBytes
+	}
+	err := db.db.Put(db.ctx, k, value)
+	if err != nil {
+		log.Println("err", err, key, k, value, string(value))
+	}
+	return err
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
@@ -200,16 +207,18 @@ func (db *DB) Compact() error {
 }
 
 func (dn *DB) EncodeKey(key []byte) []byte {
-	// last 3 byte
 	if len(key) > 0 && !utf8.Valid(key) {
-		if len(key) <= 3 {
-			fmt.Println(key)
-			panic("BUG: key error")
+		buf := bytes.NewBuffer(nil)
+		tem := make([]byte, 2)
+		for k, b := range key {
+			if b > 127 {
+				hex.Encode(tem, key[k:k+1])
+				buf.Write(tem)
+			} else {
+				buf.WriteByte(b)
+			}
 		}
-		index := len(key) - 3
-		buf := bytes.NewBuffer(key[:index])
-		buf.WriteString(base64.StdEncoding.EncodeToString(key[index:]))
-		return buf.Bytes()
+		key = buf.Bytes()
 	}
 	return key
 }
