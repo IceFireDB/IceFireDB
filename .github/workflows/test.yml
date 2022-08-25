@@ -11,7 +11,7 @@ jobs:
   osstest:
     strategy:
       matrix:
-        go-version: [1.16.x]
+        go-version: [1.17.x]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     env:
@@ -31,7 +31,7 @@ jobs:
 #  hybriddbtest:
 #    strategy:
 #      matrix:
-#        go-version: [ 1.16.x ]
+#        go-version: [ 1.17.x ]
 #        os: [ ubuntu-latest, macos-latest, windows-latest ]
 #    runs-on: ${{ matrix.os }}
 #    env:
@@ -49,7 +49,7 @@ jobs:
   ipfstest:
     strategy:
       matrix:
-        go-version: [ 1.16.x ]
+        go-version: [ 1.17.x ]
         os: [ ubuntu-latest]
     runs-on: ${{ matrix.os }}
     env:
@@ -72,14 +72,33 @@ jobs:
       - name: Test
         run: go test -v --v -tags alltest
 
-  orbitdbtest:
+#  orbitdbtest:
+#    strategy:
+#      matrix:
+#        go-version: [ 1.17.x ]
+#        os: [ ubuntu-latest, macos-latest, windows-latest ]
+#    runs-on: ${{ matrix.os }}
+#    env:
+#      DRIVER: orbitdb
+#    steps:
+#      - name: Install Go
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version: ${{ matrix.go-version }}
+#      - name: Checkout code
+#        uses: actions/checkout@v3
+#      - name: Test
+#        run: go test -v --v -tags alltest
+
+
+  goleveldbtest:
     strategy:
       matrix:
-        go-version: [ 1.16.x ]
+        go-version: [ 1.17.x ]
         os: [ ubuntu-latest, macos-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
     env:
-      DRIVER: orbitdb
+      DRIVER: goleveldb
     steps:
       - name: Install Go
         uses: actions/setup-go@v3
@@ -90,15 +109,14 @@ jobs:
       - name: Test
         run: go test -v --v -tags alltest
 
-
-  goleveldbtest:
+  crdtdbtest:
     strategy:
       matrix:
-        go-version: [ 1.16.x ]
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        go-version: [ 1.17.x ]
+        os: [ ubuntu-latest, macos-latest ]
     runs-on: ${{ matrix.os }}
     env:
-      DRIVER: goleveldb
+      DRIVER: crdt
     steps:
       - name: Install Go
         uses: actions/setup-go@v3
