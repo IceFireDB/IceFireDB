@@ -14,7 +14,7 @@ require (
 	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/dgraph-io/ristretto v0.1.0
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/ipfs/go-datastore v0.5.1
+	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ipfs v0.12.2
 	github.com/ipfs/go-ipfs-api v0.3.0
 	github.com/ipfs/interface-go-ipfs-core v0.7.0
