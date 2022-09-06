@@ -18,10 +18,10 @@
   - [IceFireDB-Redis-Proxy](#icefiredb-redis-proxy)
   - [IceFireDB-PubSub](#icefiredb-pubsub)
 - [Some Q\&A](#some-qa)
-  - [1. Would you be able to write IPLD Schemas and specs for the data structures you're using? This would allow others to implement writers/readers for their data.](#1-would-you-be-able-to-write-ipld-schemas-and-specs-for-the-data-structures-youre-using-this-would-allow-others-to-implement-writersreaders-for-their-data)
-  - [2. How does the DB run?](#2-how-does-the-db-run)
-  - [3. How will you address mutability of data?](#3-how-will-you-address-mutability-of-data)
-  - [4. What program languages are you targeting?](#4-what-program-languages-are-you-targeting)
+  - [Would you be able to write IPLD Schemas and specs for the data structures you're using? This would allow others to implement writers/readers for their data.](#1-would-you-be-able-to-write-ipld-schemas-and-specs-for-the-data-structures-youre-using-this-would-allow-others-to-implement-writersreaders-for-their-data)
+  - [How does the DB run?](#2-how-does-the-db-run)
+  - [How will you address mutability of data?](#3-how-will-you-address-mutability-of-data)
+  - [What program languages are you targeting?](#4-what-program-languages-are-you-targeting)
   - [Additional Information](#additional-information)
 - [Thanks supports](#thanks-supports)
 
@@ -123,7 +123,7 @@ Our program implementation is Golang.
 
 We provide standard Redis-RESP and MYSQL communication protocols, so Redis and MYSQL clients of other computer programming languages can communicate with IceFireDB (JS, Rust)
 
-## Additional Information
+# Additional Information
 
 **IceFireDB has a good download volume, we think we have done it right, thank you for the support of the hackathon, and hope that more interested partners will participate in the open source construction.**
 
