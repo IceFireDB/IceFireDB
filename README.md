@@ -17,11 +17,12 @@
   - [IceFireDB-SQLProxy](#icefiredb-sqlproxy)
   - [IceFireDB-Redis-Proxy](#icefiredb-redis-proxy)
   - [IceFireDB-PubSub](#icefiredb-pubsub)
-- [Some Q&A](#some-qa)
-  - [Would you be able to write IPLD Schemas and specs for the data structures you're using? This would allow others to implement writers/readers for their data.](#1-would-you-be-able-to-write-ipld-schemas-and-specs-for-the-data-structures-youre-using-this-would-allow-others-to-implement-writersreaders-for-their-data)
-  - [How does the DB run?](#2-how-does-the-db-run)
-  - [How will you address mutability of data?](#3-how-will-you-address-mutability-of-data)
-  - [What program languages are you targeting?](#4-what-program-languages-are-you-targeting)
+- [Some Q\&A](#some-qa)
+  - [1. Would you be able to write IPLD Schemas and specs for the data structures you're using? This would allow others to implement writers/readers for their data.](#1-would-you-be-able-to-write-ipld-schemas-and-specs-for-the-data-structures-youre-using-this-would-allow-others-to-implement-writersreaders-for-their-data)
+  - [2. How does the DB run?](#2-how-does-the-db-run)
+  - [3. How will you address mutability of data?](#3-how-will-you-address-mutability-of-data)
+  - [4. What program languages are you targeting?](#4-what-program-languages-are-you-targeting)
+  - [Additional Information](#additional-information)
 - [Thanks supports](#thanks-supports)
 
 
