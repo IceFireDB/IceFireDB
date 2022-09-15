@@ -1,4 +1,4 @@
-package orbitdb
+package log
 
 import (
 	"github.com/syndtr/goleveldb/leveldb/iterator"

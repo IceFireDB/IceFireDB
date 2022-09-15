@@ -1,4 +1,4 @@
-package orbitdb
+package log
 
 import (
 	"github.com/ledisdb/ledisdb/store/driver"
@@ -15,13 +15,10 @@ func (s *Snapshot) Get(key []byte) ([]byte, error) {
 }
 
 func (s *Snapshot) NewIterator() driver.IIterator {
-	/*
 	it := &Iterator{
 		s.snp.NewIterator(nil, s.db.iteratorOpts),
 	}
 	return it
-	*/
-	return nil
 }
 
 func (s *Snapshot) Close() {
