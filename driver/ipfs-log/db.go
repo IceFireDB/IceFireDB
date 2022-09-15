@@ -1,4 +1,4 @@
-package log
+package ipfs_log
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	StorageName = "log"
+	StorageName = "ipfs-log"
 )
 
 var Dbname = "ifdb-event-kv"

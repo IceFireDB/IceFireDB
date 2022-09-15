@@ -1,4 +1,4 @@
-package log
+package ipfs_log
 
 import (
 	"github.com/syndtr/goleveldb/leveldb/iterator"

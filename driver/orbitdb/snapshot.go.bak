@@ -1,4 +1,4 @@
-package log
+package orbitdb
 
 import (
 	"github.com/ledisdb/ledisdb/store/driver"

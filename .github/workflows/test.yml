@@ -127,14 +127,14 @@ jobs:
       - name: Test
         run: go test -v --v -tags alltest
 
-  logkvdbtest:
+  ipfslogdbtest:
     strategy:
       matrix:
         go-version: [ 1.18.x ]
         os: [ ubuntu-latest, macos-latest ]
     runs-on: ${{ matrix.os }}
     env:
-      DRIVER: log
+      DRIVER: ipfs-log
     steps:
       - name: Install Go
         uses: actions/setup-go@v3

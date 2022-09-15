@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/IceFireDB/IceFireDB/driver/log"
+	ipfs_log "github.com/IceFireDB/IceFireDB/driver/ipfs-log"
 	"os"
 	"strconv"
 	"strings"
@@ -65,7 +65,7 @@ Advanced options:
   --oss-endpoint	: aws oss endpoint connect . 
   --oss-ak			: aws oss access key.
   --oss-sk			: aws oss secret key
-  --log-dbname		: log driver db name, multi node communication identifier
+  --ipfs-log-dbname	: ipfs-log driver db name, multi node communication identifier
 
 P2P options:
   --servicename    : Service Discovery Identification
@@ -136,7 +136,7 @@ func confInit(conf *rafthub.Config) {
 	flag.StringVar(&crdt.DefaultConfig.DataSyncChannel, "datatopic", crdt.DefaultConfig.DataSyncChannel, "")
 	flag.StringVar(&crdt.DefaultConfig.NetDiscoveryChannel, "nettopic", crdt.DefaultConfig.NetDiscoveryChannel, "")
 	// log driver
-	flag.StringVar(&log.Dbname, "log-dbname", log.Dbname, "")
+	flag.StringVar(&ipfs_log.Dbname, "log-dbname", ipfs_log.Dbname, "")
 	flag.Parse()
 
 	switch raftBackend {

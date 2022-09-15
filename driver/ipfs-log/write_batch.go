@@ -1,4 +1,4 @@
-package log
+package ipfs_log
 
 type WriteBatch struct {
 	db *DB
