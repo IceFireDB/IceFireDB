@@ -64,7 +64,9 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	if err = ev.LoadDisk(ctx); err != nil {
+		return nil, err
+	}
 	if err := ev.AnnounceConnect(ctx, node); err != nil {
 		return nil, err
 	}
