@@ -11,7 +11,7 @@ jobs:
   osstest:
     strategy:
       matrix:
-        go-version: [1.17.x]
+        go-version: [1.18.x]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     env:
@@ -49,7 +49,7 @@ jobs:
   ipfstest:
     strategy:
       matrix:
-        go-version: [ 1.17.x ]
+        go-version: [ 1.18.x ]
         os: [ ubuntu-latest]
     runs-on: ${{ matrix.os }}
     env:
@@ -94,7 +94,7 @@ jobs:
   goleveldbtest:
     strategy:
       matrix:
-        go-version: [ 1.17.x ]
+        go-version: [ 1.18.x ]
         os: [ ubuntu-latest, macos-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
     env:
@@ -112,11 +112,29 @@ jobs:
   crdtdbtest:
     strategy:
       matrix:
-        go-version: [ 1.17.x ]
+        go-version: [ 1.18.x ]
         os: [ ubuntu-latest, macos-latest ]
     runs-on: ${{ matrix.os }}
     env:
       DRIVER: crdt
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Test
+        run: go test -v --v -tags alltest
+
+  logkvdbtest:
+    strategy:
+      matrix:
+        go-version: [ 1.18.x ]
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    env:
+      DRIVER: log
     steps:
       - name: Install Go
         uses: actions/setup-go@v3
