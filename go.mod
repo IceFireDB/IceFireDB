@@ -33,7 +33,7 @@ require (
 
 require (
 	github.com/multiformats/go-multiaddr v0.6.0
-	go.uber.org/zap v1.21.0
+	go.uber.org/zap v1.23.0
 )
 
 require (
