@@ -1,5 +1,5 @@
 package orbitdb
- 
+
 import (
 	"context"
 	"fmt"
@@ -37,13 +37,13 @@ const (
 )
 
 type Config struct {
-	HotCacheSize       int64
-	Pubsubid        string
+	HotCacheSize int64
+	Pubsubid     string
 }
 
 var OrbitdbDefaultConfig = Config{
-	HotCacheSize:       defaultHotCacheSize,
-	Pubsubid:    "",
+	HotCacheSize: defaultHotCacheSize,
+	Pubsubid:     "",
 }
 
 func init() {
@@ -56,17 +56,16 @@ func (s Store) String() string {
 	return StorageName
 }
 
-
-func createCoreAPI( core *ipfsCore.IpfsNode) iface.CoreAPI{
-        api, _ := coreapi.NewCoreAPI(core)
-        return api
+func createCoreAPI(core *ipfsCore.IpfsNode) iface.CoreAPI {
+	api, _ := coreapi.NewCoreAPI(core)
+	return api
 }
+
 /*
 func createMockNet(ctx context.Context) mocknet.Mocknet {
         return mocknet.New(ctx)
 }
 */
-
 
 func loadPlugins(repoPath string) (*loader.PluginLoader, error) {
 	plugins, err := loader.NewPluginLoader(repoPath)
@@ -84,27 +83,23 @@ func loadPlugins(repoPath string) (*loader.PluginLoader, error) {
 	return plugins, nil
 }
 
+func createIPFSNode(ctx context.Context) *ipfsCore.IpfsNode {
+	/*
+		r, err1 := fsrepo.Open("/root/.ipfs")
+		if err1 != nil {
+			return nil
+		}
+	*/
+	core, _ := ipfsCore.NewNode(ctx, &ipfsCore.BuildCfg{
+		Online: true,
+		//  Repo: r,
+		Host: libp2p.DefaultHostOption, //mock.MockHostOption(m),
+		ExtraOpts: map[string]bool{
+			"pubsub": true,
+		},
+	})
 
-
-
-
-func createIPFSNode(ctx context.Context) (*ipfsCore.IpfsNode) {
-/*
-	r, err1 := fsrepo.Open("/root/.ipfs")
-	if err1 != nil { 
-		return nil
-	}
-*/
-        core, _ := ipfsCore.NewNode(ctx, &ipfsCore.BuildCfg{
-                Online: true,
-              //  Repo: r,
-                Host:   libp2p.DefaultHostOption, //mock.MockHostOption(m),
-                ExtraOpts: map[string]bool{
-                        "pubsub": true,
-                },
-        })
-       
-        return core
+	return core
 }
 
 func (db *DB) initOpts() {
@@ -152,36 +147,35 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	db := new(DB)
 	db.path = path
 	db.cfg = &cfg.LevelDB
-	
+
 	db.initOpts()
 
 	var err error
-	
+
 	db.db, err = leveldb.OpenFile(db.path, db.opts)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	db.ctx = ctx
 	db.cancelFunc = cancel
-	
 
 	loadPlugins("/root/.ipfs")
 	node := createIPFSNode(ctx)
 
-	db1IPFS := createCoreAPI( node)
-	odb, _ := orbitdb2.NewOrbitDB(ctx, db1IPFS, &orbitdb2.NewOrbitDBOptions{Directory: &path,})
+	db1IPFS := createCoreAPI(node)
+	odb, _ := orbitdb2.NewOrbitDB(ctx, db1IPFS, &orbitdb2.NewOrbitDBOptions{Directory: &path})
 
-	var db1  oiface.KeyValueStore
+	var db1 oiface.KeyValueStore
 
-	if  len(OrbitdbDefaultConfig.Pubsubid) !=0 {
-		db1, _= odb.KeyValue(ctx, OrbitdbDefaultConfig.Pubsubid, nil)
-	}else {
-		db1, _= odb.KeyValue(ctx, "orbit-db-tests", nil)
-	}	
+	if len(OrbitdbDefaultConfig.Pubsubid) != 0 {
+		db1, _ = odb.KeyValue(ctx, OrbitdbDefaultConfig.Pubsubid, nil)
+	} else {
+		db1, _ = odb.KeyValue(ctx, "orbit-db-tests", nil)
+	}
 
-	fmt.Println("or db address: " , db1.Address().String())
+	fmt.Println("or db address: ", db1.Address().String())
 	db.kv_db = db1
 
 	return db, nil
@@ -193,25 +187,25 @@ func (s Store) Repair(path string, cfg *config.Config) error {
 
 type DB struct {
 	path string
-	
+
 	basestore.BaseStore
-	
+
 	cfg *config.LevelDBConfig
-	
-	db *leveldb.DB
-	opts *opt.Options
+
+	db     *leveldb.DB
+	opts   *opt.Options
 	filter filter.Filter
-	
-	cache *ristretto.Cache
+
+	cache        *ristretto.Cache
 	iteratorOpts *opt.ReadOptions
-	syncOpts *opt.WriteOptions
+	syncOpts     *opt.WriteOptions
 
-	ctx context.Context
-	core * ipfsCore.IpfsNode
-	kv_db   oiface.KeyValueStore	
-	orbitdb  oiface.OrbitDB  
+	ctx     context.Context
+	core    *ipfsCore.IpfsNode
+	kv_db   oiface.KeyValueStore
+	orbitdb oiface.OrbitDB
 
-	cancelFunc  context.CancelFunc
+	cancelFunc context.CancelFunc
 }
 
 func (s *DB) GetStorageEngine() interface{} {
@@ -219,19 +213,16 @@ func (s *DB) GetStorageEngine() interface{} {
 	//return nil
 }
 
-
-
-
 func (db *DB) Close() error {
-	db.core.Close() 
-	db.kv_db.Drop() 
-	db.orbitdb.Close() 
+	db.core.Close()
+	db.kv_db.Drop()
+	db.orbitdb.Close()
 	db.cancelFunc()
-	return  nil
+	return nil
 }
 
 func (db *DB) Put(key, value []byte) error {
-	kk:=string(key)
+	kk := string(key)
 
 	_, err := db.kv_db.Put(db.ctx, kk, value)
 	err = db.db.Put(key, value, nil)
@@ -244,9 +235,9 @@ func (db *DB) Put(key, value []byte) error {
 func (db *DB) Get(key []byte) ([]byte, error) {
 	v, err := db.db.Get(key, nil)
 	if err == leveldb.ErrNotFound {
-		kk:=string(key)
+		kk := string(key)
 		value, err := db.kv_db.Get(db.ctx, kk)
-		if err == nil{
+		if err == nil {
 			return nil, nil
 		}
 		v = value
@@ -258,15 +249,15 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 
 func (db *DB) Delete(key []byte) error {
 	db.db.Delete(key, nil)
-	kk:=string(key)
+	kk := string(key)
 	var err error
 	_, err = db.kv_db.Delete(db.ctx, kk)
 
-	return  err
+	return err
 }
 
 func (db *DB) SyncPut(key []byte, value []byte) error {
-	kk:=string(key)
+	kk := string(key)
 
 	_, err := db.kv_db.Put(db.ctx, kk, value)
 
@@ -274,14 +265,14 @@ func (db *DB) SyncPut(key []byte, value []byte) error {
 }
 
 func (db *DB) SyncDelete(key []byte) error {
-	kk:=string(key)
+	kk := string(key)
 	var err error
 	_, err = db.kv_db.Delete(db.ctx, kk)
-	
-	return err		
+
+	return err
 }
 
-func (db *DB) NewWriteBatch() driver.IWriteBatch {   
+func (db *DB) NewWriteBatch() driver.IWriteBatch {
 	wb := &WriteBatch{
 		db:     db,
 		wbatch: new(leveldb.Batch),

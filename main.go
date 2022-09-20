@@ -10,6 +10,8 @@ package main
 
 import (
 	"fmt"
+	ipfs_log "github.com/IceFireDB/IceFireDB/driver/ipfs-log"
+	"github.com/IceFireDB/icefiredb-ipfs-log/stores/levelkv"
 	"io"
 	"net/http"
 	_ "net/http/pprof"
@@ -76,6 +78,8 @@ func main() {
 		case *badger.DB:
 		case *kv.CRDTKeyValueDB:
 			db = ldb.GetSDB().GetDriver().(*crdt.DB).GetLevelDB()
+		case *levelkv.LevelKV:
+			db = ldb.GetSDB().GetDriver().(*ipfs_log.DB).GetLevelDB()
 		default:
 			panic(fmt.Errorf("unsupported storage is caused: %T", v))
 		}
