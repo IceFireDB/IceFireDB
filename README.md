@@ -34,17 +34,16 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
      alt="project_purpose">
 </p>
 
-1. High performance
-2. Reliable LSM disk storage
-3. Distributed consistency（Support raft and p2p-crdt mode）
-4. Support OSS storage engine
-5. Based on IPFS decentralized storage, build a persistent data distributed storage layer.（beta version）
-6. Support P2P automatic networking, build decentralized NoSQL and SQL data synchronization.
-7. Support decentralized consistent kv storage engine ([icefiredb-crdt-kv](https://github.com/IceFireDB/icefiredb-crdt-kv) is supporting)
-8. Build an immutable transparent log witness layer between web2 and web3, build a data hot and cold hybrid structure and an immutable data bridge layer. (inspired by google trillian-witness and IPLD) (in progress)
-9. Build a blockchain mechanism based on EVM and Substrate. (supporting)
-10. Support kv metadata layer and mixed storage structure of hot and cold. （web2 area support）
-11. More advanced cache implementation, faster LSM persistent storage（Source of ideas: https://dl.acm.org/doi/10.1145/3448016.3452819 ）（Support the performance improvement of blockchain full-node）
+1. High performance.
+2. Support LSM disk, OSS, IPFS underlying storage。
+3. Distributed consistency（support raft\p2p-crdt\ipfs-log mode）
+4. Based on IPFS decentralized storage, build a persistent data distributed storage layer.（beta version）
+5. Support P2P automatic networking, build decentralized NoSQL and SQL data synchronization.
+6. Support decentralized consistent kv storage engine ([icefiredb-crdt-kv](https://github.com/IceFireDB/icefiredb-crdt-kv) and [icefiredb-ipfs-log](https://github.com/IceFireDB/icefiredb-ipfs-log) is supporting)
+7. Build a blockchain mechanism based on EVM and Substrate. (Smart contract layer construction through IceGiant combined with FVM)
+8. Build an immutable transparent log witness layer between web2 and web3, build a data hot and cold hybrid structure and an immutable data bridge layer. (inspired by google trillian-witness and IPLD) 
+9. Support kv metadata layer and mixed storage structure of hot and cold. （web2 area support）
+10. More advanced cache implementation, faster LSM persistent storage（Source of ideas: https://dl.acm.org/doi/10.1145/3448016.3452819 ）（Support the performance improvement of blockchain full-node）
 
 # Architecture
 
