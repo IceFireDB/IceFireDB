@@ -35,7 +35,7 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
 </p>
 
 1. High performance.
-2. Support LSM disk, OSS, IPFS underlying storage。
+2. Support LSM disk, OSS, IPFS underlying storage.
 3. Distributed consistency（support raft\p2p-crdt\ipfs-log mode）
 4. Based on IPFS decentralized storage, build a persistent data distributed storage layer.（beta version）
 5. Support P2P automatic networking, build decentralized NoSQL and SQL data synchronization.
