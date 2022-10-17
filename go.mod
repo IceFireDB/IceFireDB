@@ -11,7 +11,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger v1.6.2
-	github.com/dgraph-io/badger/v3 v3.2103.2
+	github.com/dgraph-io/badger/v3 v3.2103.3
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/ipfs/go-datastore v0.6.0
