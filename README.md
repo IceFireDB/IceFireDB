@@ -4,12 +4,12 @@
     height="200" border="0" alt="IceFireDB">
 </p>
 
-# IceFireDB - IceFireDB - Decentralized Database Infrastructure
+# IceFireDB - Decentralized Database Infrastructure
 ![test](https://github.com/IceFireDB/IceFireDB/actions/workflows/test.yml/badge.svg)
 ![build](https://github.com/IceFireDB/IceFireDB/actions/workflows/build.yml/badge.svg)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB?ref=badge_shield)
 
-- [IceFireDB - IceFireDB - Decentralized Database Infrastructure](#icefiredb---icefiredb---decentralized-database-infrastructure)
+- [IceFireDB - Decentralized Database Infrastructure](#icefiredb---decentralized-database-infrastructure)
 - [Decentralized database engine](#decentralized-database-engine)
 - [Documentation center](#documentation-center)
 - [Project composition](#project-composition)
