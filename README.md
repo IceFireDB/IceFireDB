@@ -1,29 +1,46 @@
-<!--
- * @Author: gitsrc
- * @Date: 2020-12-23 13:30:07
- * @LastEditors: gitsrc
- * @LastEditTime: 2022-05-07 09:10:45
- * @FilePath: /IceFireDB/README.md
--->
-
 <p align="center">
 <img 
     src="logo.png" 
-    width="201" height="300" border="0" alt="IceFireDB">
+    height="200" border="0" alt="IceFireDB">
 </p>
 
-# IceFireDB  - [ WEB2 + WEB3  ]
+# IceFireDB - Building global database infrastructure [ WEB2 + WEB3 ]
+![test](https://github.com/IceFireDB/IceFireDB/actions/workflows/test.yml/badge.svg)
+![build](https://github.com/IceFireDB/IceFireDB/actions/workflows/build.yml/badge.svg)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB?ref=badge_shield)
+
+- [IceFireDB - Building global database infrastructure \[ WEB2 + WEB3 \]](#icefiredb---building-global-database-infrastructure--web2--web3-)
+- [Decentralized database engine](#decentralized-database-engine)
+- [Documentation center](#documentation-center)
+- [Project composition](#project-composition)
+  - [IceFireDB-SQLite](#icefiredb-sqlite)
+  - [IceFireDB-SQLProxy](#icefiredb-sqlproxy)
+  - [IceFireDB-Redis-Proxy](#icefiredb-redis-proxy)
+  - [IceFireDB-PubSub](#icefiredb-pubsub)
+  - [IceFireDB-NoSQL](#icefiredb-nosql)
+  - [NoSQL Command support](#nosql-command-support)
+- [System Design](#system-design)
+- [Quick Start](#quick-start)
+- [Performance](#performance)
+- [Project direction](#project-direction)
+- [Thanks support](#thanks-support)
+
+
+
+Based on cutting-edge computer science, the IceFireDB project integrates new ideas and research in the fields of message passing, event instruction processing, data consistency and replication, decentralized network, reliable data storage, high-performance network framework, etc.The team of researchers and engineers at IceFireDB combines the cutting-edge ideas from distributed systems and concurrent databases. These ideas combine collision-free replication data types (CRDT) and decentralized appendix-only logs, which can be used to simulate the variable sharing state between peers in P2P applications to create a new data infrastructure with high security, high performance and low latency.
+
+The core of IceFireDB architecture is geographically distributed event source and decentralized Log source, with log-level CRDT replication.In order to realize the consistency of replication, IceFireDB provides a stable decentralized networking model, which allows the combination of public networks among different sites. Multiple IceFireDB nodes can be run inside each site, and RAFT network can be formed between nodes, which ensures the data consistency and stable storage within the same site.
+
+![image](https://res.cloudinary.com/malloc/image/upload/v1666341372/icefiredb/docs/197144174-9f2f400f-5c6d-4ee0-9cfe-5e725dcb179e_sorguc.png)
+
+
+# Decentralized database engine
 
 <p align="center">
 <img 
     src="./icefiredb-bridge.png" 
      alt="icefiredb-bridge">
 </p>
-
-![test](https://github.com/IceFireDB/IceFireDB/actions/workflows/test.yml/badge.svg)
-![build](https://github.com/IceFireDB/IceFireDB/actions/workflows/build.yml/badge.svg)
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB?ref=badge_shield)
-
 
 IceFireDB is a database built for web3 and web2. The core mission of the project is to help applications quickly achieve decentralization and data immutability. At present, the storage layer supports various storage methods such as disk, OSS, and IPFS. The protocol layer currently supports SQL and RESP protocols, and will support GraphQL protocols in the future.A blockchain fusion layer based on immutable transparent logs and Ethereum is under construction to support integration with higher-level decentralized computing platforms and applications as well as identity, financial assets, intellectual property and sidechain protocols. IceFireDB strives to fill the gap of the decentralized stack, making the data ecology of web3 applications more complete, and making it easier for web2 applications to achieve decentralization and data immutability.
 
@@ -45,13 +62,15 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
 9. Support kv metadata layer and mixed storage structure of hot and cold. （web2 area support）
 10. More advanced cache implementation, faster LSM persistent storage（Source of ideas: https://dl.acm.org/doi/10.1145/3448016.3452819 ）（Support the performance improvement of blockchain full-node）
 
-# Architecture
+# Documentation center
 
 <p align="center">
 <img 
     src="IceFireDB_Architecture.png" 
      alt="IceFireDB_Architecture">
 </p>
+
+[**Documentation center**](https://www.icefiredb.xyz/icefiredb_docs/) : https://www.icefiredb.xyz/icefiredb_docs
 
 # Project composition
 
@@ -75,121 +94,62 @@ IceFireDB-PubSub is a high performance, high availability and decentralized subs
 ## [IceFireDB-NoSQL](https://github.com/IceFireDB/IceFireDB)
 It supports distributed raft disk Redis database mode in web2 mode, and also supports decentralized IPFS storage mode.
 
-## RESP Command support(NoSQL Mode)
-## 1. Strings
-* APPEND
-* BITCOUNT
-* BITOP
-* BITPOS
-* DECR
-* DECRBY
-* DEL
-* EXISTS
-* GET
-* GETBIT
-* SETBIT
-* GETRANGE
-* GETSET
-* INCR
-* INCRBY
-* MGET
-* MSET
-* SET
-* SETEX
-* SETEXAT
-* SETRANGE
-* EXPIRE
-* EXPIREAT
-* TTL
-## 2. Hashes
-* HSET
-* HGET
-* HDEL
-* HEXISTS
-* HGETALL
-* HINCRBY
-* HKEYS
-* HLEN
-* HMGET
-* HMSET
-* HSETEX
-* HSTRLEN
-* HVALS
-* HCLEAR
-* HMCLEAR
-* HEXPIRE
-* HEXPIREAT
-* HKEYEXIST
-* HTTL
+## NoSQL Command support
 
-## 3. Lists
-* RPUSH
-* LPOP
-* LINDEX
-* LPUSH
-* RPOP
-* LRANGE
-* LSET
-* LLEN
-* RPOPLPUSH
-* LCLEAR
-* LMCLEAR
-* LEXPIRE
-* LEXPIREAT
-* LKEYEXISTS
-* LTRIM
-* LTTL
+| Strings  | Hashes |Lists | Sets |Sorted Sets |
+| ------------- | ------------- | ------------- |------------- |------------- |
+| APPEND  | HSET|RPUSH | SADD| ZADD|
+| BITCOUNT | HGET |LPOP  | SCARD| ZCARD|
+| BITOP | HDEL |LINDEX  | SDIFF| ZCOUNT|
+| BITPOS | HEXISTS |LPUSH  | SDIFFSTORE| ZREM|
+| DECR| HGETALL |RPOP | SINTER| ZCLEAR|
+| DECRBY | HINCRBY |LRANGE  | SINTERSTORE| ZRANK|
+| DEL | HKEYS |LSET  | SISMEMBER| ZRANGE|
+| EXISTS  | HLEN  |LLEN  | SMEMBERS| ZREVRANGE|
+| GET | HMGET|RPOPLPUSH  | SREM| ZSCORE|
+| GETBIT | HMSET |LCLEAR  | SUNION|ZINCRBY |
+| SETBIT | HSETEX  |LCLEAR  | SUNIONSTORE| ZREVRANK|
+| GETRANGE| HSTRLEN  |LMCLEAR  | SCLEAR|ZRANGEBYSCORE |
+| GETSET | HVALS  |LEXPIRE  |SMCLEAR | ZREVRANGEBYSCORE|
+| INCR | HCLEAR  |LEXPIREAT  |SEXPIRE | ZREMRANGEBYSCORE|
+| EXISTS  | HMCLEAR  |LKEYEXISTS  | SEXPIRE| ZREMRANGEBYRANK|
+| GET | HEXPIRE |LTRIM  |SEXPIREAT | |
+| GETBIT | HEXPIREAT |LTTL  |STTL | |
+| SETBIT | HKEYEXIST |  |SPERSIST | |
+| GETRANGE| HTTL  |   |SKEYEXISTS | |
+| GETSET |   |  | | |
+| INCRBY |   |  | | |
+| GET |  |  | | |
+| MGET |  |  | | |
+| MSET |   |  | | |
+| SET|   |  | | |
+| SETEX |   |  | | |
+| SETEXAT |   |  | | |
+| SETRANGE |   |  | | |
+| EXPIRE|   |  | | |
+| EXPIREAT |   |  | | |
+| TTL |   |  | | |
 
-## 4. Sorted Sets
-* ZADD
-* ZCARD
-* ZCOUNT
-* ZREM
-* ZCLEAR
-* ZRANK
-* ZRANGE
-* ZREVRANGE
-* ZSCORE
-* ZINCRBY
-* ZREVRANK
-* ZRANGEBYSCORE
-* ZREVRANGEBYSCORE
-* ZREMRANGEBYSCORE
-* ZREMRANGEBYRANK
+# System Design
+**IceFireDB refines and implements the following important system components.**
 
-## 5. Sets
-* SADD
-* SCARD
-* SDIFF
-* SDIFFSTORE
-* SINTER
-* SINTERSTORE
-* SISMEMBER
-* SMEMBERS
-* SREM
-* SUNION
-* SUNIONSTORE
-* SCLEAR
-* SMCLEAR
-* SEXPIRE
-* SEXPIREAT
-* STTL
-* SPERSIST
-* SKEYEXISTS
+| System components | describe | technology used |
+| ------------- | ------------- | ------------- |
+| **[Network layer](https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/network/)**  |  1. RAFT guarantees data consistency within a single availability zone. <br />2. P2P network construction decentralized database communication. <br />3. NATS is a new network layer being built.  |P2P、RAFT、NATS  |
+| **[Storage layer](https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/storage/)** | Many types of storage are currently supported. Under the codec computing layer, we abstract the KV storage driver layer, which is compatible with different storage engines of web2 and web3.  |goleveldb、badger、IPFS、CRDT、IPFS-LOG、OSS  |
+| **[Protocol layer](https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/protocol/)**| Based on the codec layer, we have built a protocol layer. A good communication protocol allows more applications to easily access the IceFireDB data network. Currently, we support the Redis-RESP NoSQL protocol and the MySQL protocol.  |RESP、SQL |
+| **[Codec layer](https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/codec/)**| The codec layer is the core of our system. For NoSQL scenarios, any data type will be abstracted into a KV storage model. With the flexible coding layer, we can build rich data operation structures and instructions, such as hash, sets, strings, etc.  |KV、Strings、Hashes、Lists、Sorted Sets、Sets、SQL、PubSub  |
 
-## 6. System cmd
-* INFO
-* FLUSHALL
-* HSCAN
-* SSCAN
-* ZSCAN
-* XSCAN
-* XHSCAN
-* XSSCAN
-* XZSCAN
 
-# Performance
-### 
+# Quick Start 
+
+[https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/quick_start/](https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/quick_start/)
+
+
+# Performance 
+
+**leveldb driver**
+
 ```shell
 corerman@ubuntu:~/DATA/ICODE/GoLang/IceFireDB$ redis-benchmark  -h 127.0.0.1 -p 11001 -n 10000000 -t set,get -c 512 -P 512 -q
 
@@ -197,17 +157,13 @@ SET: 253232.12 requests per second
 GET: 2130875.50 requests per second
 ```
 
-## License
-
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB?ref=badge_large)
-
 # Project direction
 
 IceFireDB originated from the distributed NoSQL database in the web2 scenario. We will continue to support the web2 distributed NoSQL database, while investing more energy in the direction of web3 and web2 decentralized databases. We are very grateful to our community partners for their continued interest, the community has been our driving force.
 
-# Thanks 
+# Thanks support
 
-### I stood on the shoulders of giants and did only simple things. Thank you for your attention.
+ **I stood on the shoulders of giants and did only simple things. Thank you for your attention.**
 
 * https://github.com/tidwall/uhaha
 * https://github.com/syndtr/goleveldb
@@ -216,10 +172,6 @@ IceFireDB originated from the distributed NoSQL database in the web2 scenario. W
 * https://github.com/dgraph-io/badger
 * https://github.com/ipfs/ipfs
 
-# Disclaimers
-When you use this software, you have agreed and stated that the author, maintainer and contributor of this software are not responsible for any risks, costs or problems you encounter. If you find a software defect or BUG, please submit a patch to help improve it!
-
-# Thanks supports
 
 <table>
   <tr>
@@ -227,3 +179,13 @@ When you use this software, you have agreed and stated that the author, maintain
     <td align="center"><a href="https://filecoin.io/"><img src="https://user-images.githubusercontent.com/34047788/188373584-e245e0bb-8a3c-4773-a741-17e4023bde65.png" width="100px;" alt=""/><br /><sub><b>Filecoin</b></sub></a></td>
   </tr>
 </table>
+
+
+**License**
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB?ref=badge_large)
+
+
+**Disclaimers**
+
+When you use this software, you have agreed and stated that the author, maintainer and contributor of this software are not responsible for any risks, costs or problems you encounter. If you find a software defect or BUG, please submit a patch to help improve it!
