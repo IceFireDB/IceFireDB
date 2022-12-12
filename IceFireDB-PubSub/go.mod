@@ -7,18 +7,18 @@ require (
 	github.com/gomodule/redigo v1.8.8
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-cid v0.0.7
-	github.com/libp2p/go-libp2p v0.14.4
+	github.com/libp2p/go-libp2p v0.18.0
 	github.com/libp2p/go-libp2p-connmgr v0.2.4
-	github.com/libp2p/go-libp2p-core v0.8.6
+	github.com/libp2p/go-libp2p-core v0.14.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-host v0.1.0
 	github.com/libp2p/go-libp2p-kad-dht v0.15.0
 	github.com/libp2p/go-libp2p-pubsub v0.4.1
-	github.com/libp2p/go-libp2p-tls v0.1.3
-	github.com/libp2p/go-libp2p-yamux v0.5.4
-	github.com/libp2p/go-tcp-transport v0.2.7
+	github.com/libp2p/go-libp2p-tls v0.3.1
+	github.com/libp2p/go-libp2p-yamux v0.8.2
+	github.com/libp2p/go-tcp-transport v0.5.1
 	github.com/mr-tron/base58 v1.2.0
-	github.com/multiformats/go-multiaddr v0.3.3
+	github.com/multiformats/go-multiaddr v0.5.0
 	github.com/multiformats/go-multihash v0.0.15
 	github.com/prometheus/client_golang v1.12.1
 	github.com/sirupsen/logrus v1.7.0
