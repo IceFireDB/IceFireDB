@@ -27,7 +27,7 @@
 
 
 
-Based on cutting-edge computer science, the IceFireDB project integrates new ideas and research in the fields of message passing, event instruction processing, data consistency and replication, decentralized network, reliable data storage, high-performance network framework, etc.The team of researchers and engineers at IceFireDB combines the cutting-edge ideas from distributed systems and concurrent databases. These ideas combine collision-free replication data types (CRDT) and decentralized appendix-only logs, which can be used to simulate the variable sharing state between peers in P2P applications to create a new data infrastructure with high security, high performance and low latency.
+Based on cutting-edge computer science, the IceFireDB project integrates new ideas and research in the fields of message passing, event instruction processing, data consistency and replication, decentralized network, reliable data storage, high-performance network framework, etc. The team of researchers and engineers at IceFireDB combines the cutting-edge ideas from distributed systems and concurrent databases. These ideas combine collision-free replication data types (CRDT) and decentralized appendix-only logs, which can be used to simulate the variable sharing state between peers in P2P applications to create a new data infrastructure with high security, high performance and low latency.
 
 The core of IceFireDB architecture is geographically distributed event source and decentralized Log source, with log-level CRDT replication.In order to realize the consistency of replication, IceFireDB provides a stable decentralized networking model, which allows the combination of public networks among different sites. Multiple IceFireDB nodes can be run inside each site, and RAFT network can be formed between nodes, which ensures the data consistency and stable storage within the same site.
 
@@ -42,7 +42,7 @@ The core of IceFireDB architecture is geographically distributed event source an
      alt="icefiredb-bridge">
 </p>
 
-IceFireDB is a database built for web3 and web2. The core mission of the project is to help applications quickly achieve decentralization and data immutability. At present, the storage layer supports various storage methods such as disk, OSS, and IPFS. The protocol layer currently supports SQL and RESP protocols, and will support GraphQL protocols in the future.A blockchain fusion layer based on immutable transparent logs and Ethereum is under construction to support integration with higher-level decentralized computing platforms and applications as well as identity, financial assets, intellectual property and sidechain protocols. IceFireDB strives to fill the gap of the decentralized stack, making the data ecology of web3 applications more complete, and making it easier for web2 applications to achieve decentralization and data immutability.
+IceFireDB is a database built for web3 and web2. The core mission of the project is to help applications quickly achieve decentralization and data immutability. At present, the storage layer supports various storage methods such as disk, OSS, and IPFS. The protocol layer currently supports SQL and RESP protocols, and will support GraphQL protocols in the future. A blockchain fusion layer based on immutable transparent logs and Ethereum is under construction to support integration with higher-level decentralized computing platforms and applications as well as identity, financial assets, intellectual property and sidechain protocols. IceFireDB strives to fill the gap of the decentralized stack, making the data ecology of web3 applications more complete, and making it easier for web2 applications to achieve decentralization and data immutability.
 
 
 <p align="center">
@@ -70,7 +70,7 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
      alt="IceFireDB_Architecture">
 </p>
 
-[**Documentation center**](https://www.icefiredb.xyz/icefiredb_docs/) : https://www.icefiredb.xyz/icefiredb_docs
+[**Documentation center**](https://www.icefiredb.xyz/icefiredb_docs/): https://www.icefiredb.xyz/icefiredb_docs
 
 # Project composition
 
@@ -89,7 +89,7 @@ IceFireDB-Redis-proxy database proxy adds decentralization wings to traditional 
 
 ## [IceFireDB-PubSub](https://github.com/IceFireDB/IceFireDB/tree/main/IceFireDB-PubSub)
 
-IceFireDB-PubSub is a high performance, high availability and decentralized subscription system.It can seamlessly migrate web2 applications using redis publish and subscribe into a decentralized p2p subscription network.
+IceFireDB-PubSub is a high performance, high availability and decentralized subscription system. It can seamlessly migrate web2 applications using redis publish and subscribe into a decentralized p2p subscription network.
 
 ## [IceFireDB-NoSQL](https://github.com/IceFireDB/IceFireDB)
 It supports distributed raft disk Redis database mode in web2 mode, and also supports decentralized IPFS storage mode.
