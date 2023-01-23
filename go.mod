@@ -26,7 +26,7 @@ require (
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cast v1.5.0
 	github.com/syndtr/goleveldb v1.0.0
-	github.com/tidwall/redcon v1.6.1
+	github.com/tidwall/redcon v1.6.2
 	github.com/tidwall/sds v0.3.0
 	github.com/tidwall/uhaha v0.8.1
 )
