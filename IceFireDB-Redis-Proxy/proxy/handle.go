@@ -74,7 +74,7 @@ func (p *Proxy) handle(conn bareneter.Conn) {
 				return
 			}
 			_ = router.WriteError(localWriteHandle, err)
-			logrus.Errorf("redis命令执行错误:%s , %v", commandArgs, err)
+			logrus.Errorf("resp command exec fail:%s , %v", commandArgs, err)
 			return
 		}
 	}
