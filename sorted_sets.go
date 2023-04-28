@@ -1,11 +1,3 @@
-/*
- * @Author: gitsrc
- * @Date: 2021-08-23 18:12:43
- * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-23 18:26:42
- * @FilePath: /IceFireDB/sorted_sets.go
- */
-
 package main
 
 import (
@@ -167,11 +159,11 @@ func cmdZRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	var withScores bool 
+	var withScores bool
 	args = args[4:]
 	if len(args) > 0 {
 		if len(args) != 1 {
-			return nil,  rafthub.ErrWrongNumArgs
+			return nil, rafthub.ErrWrongNumArgs
 		}
 		if strings.ToLower(args[0]) == "withscores" {
 			withScores = true
@@ -214,11 +206,11 @@ func cmdZREVRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	var withScores bool 
+	var withScores bool
 	args = args[4:]
 	if len(args) > 0 {
 		if len(args) != 1 {
-			return nil,  rafthub.ErrWrongNumArgs
+			return nil, rafthub.ErrWrongNumArgs
 		}
 		if strings.ToLower(args[0]) == "withscores" {
 			withScores = true

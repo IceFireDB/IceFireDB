@@ -1,11 +1,3 @@
-/*
- * @Author: gitsrc
- * @Date: 2021-03-08 17:57:04
- * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-20 10:43:33
- * @FilePath: /IceFireDB/lists.go
- */
-
 package main
 
 import (

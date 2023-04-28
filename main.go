@@ -1,22 +1,15 @@
-/*
- * @Author: gitsrc
- * @Date: 2021-03-08 13:09:44
- * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-20 10:50:01
- * @FilePath: /IceFireDB/main.go
- */
-
 package main
 
 import (
 	"fmt"
-	ipfs_log "github.com/IceFireDB/IceFireDB/driver/ipfs-log"
-	"github.com/IceFireDB/icefiredb-ipfs-log/stores/levelkv"
 	"io"
 	"net/http"
 	_ "net/http/pprof"
 	"path/filepath"
 	"sync/atomic"
+
+	ipfs_log "github.com/IceFireDB/IceFireDB/driver/ipfs-log"
+	"github.com/IceFireDB/icefiredb-ipfs-log/stores/levelkv"
 
 	badger "github.com/dgraph-io/badger/v3"
 	lediscfg "github.com/ledisdb/ledisdb/config"

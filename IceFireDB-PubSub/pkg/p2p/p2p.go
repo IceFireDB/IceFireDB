@@ -1,11 +1,3 @@
-/*
- * @Author: gitsrc
- * @Date: 2022-05-24 14:01:14
- * @LastEditors: gitsrc
- * @LastEditTime: 2022-05-25 13:33:06
- * @FilePath: /peerchat/src/p2p.go
- */
-
 package p2p
 
 import (
