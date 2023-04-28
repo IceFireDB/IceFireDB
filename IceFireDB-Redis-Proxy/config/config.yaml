@@ -48,23 +48,6 @@ cache:
   default_expiration: 5000 # Cache KV default expiration time (milliseconds)
   cleanup_interval: 120 #Cache memory clearing interval (unit: second)
 
-# prometheus metrics
-prometheus_exporter:
-  address: ":19090"
-  hotkey_exporter:
-    record_limit: 32
-    include_metrics: [ "hotkey.record", "hotkey.count" ]
-  bigkey_exporter:
-    record_limit: 32
-    include_metrics: [ "bigkey.count", "bigkey.record", "bigkey.value_size_sum" ]
-  slowquery_exporter:
-    record_limit: 16
-  runtime_exporter:
-    enable: true
-    enable_cpu: true
-    enable_mem: true
-    enable_gc: true
-
 ignore_cmd:
   enable: false
   cmd_list: []

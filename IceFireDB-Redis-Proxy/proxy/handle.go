@@ -41,7 +41,7 @@ func (p *Proxy) handle(conn bareneter.Conn) {
 		resp, err := decoder.Decode()
 		if err != nil {
 			/*if err.Error() != io.EOF.Error() && strings.Index(err.Error(), net.ErrClosed.Error()) == -1 {
-				logrus.Errorf("RESP协议解码失败:%v", err)
+				logrus.Errorf("RESP fail:%v", err)
 			}*/
 			return
 		}
