@@ -1,10 +1,3 @@
-/*
- * @Author: gitsrc
- * @Date: 2021-12-17 17:52:52
- * @LastEditors: gitsrc
- * @LastEditTime: 2021-12-17 17:55:43
- * @FilePath: /IceFireDB/driver/ipfs/iterator.go
- */
 package ipfs
 
 import (

@@ -1,11 +1,3 @@
-/*
- * @Author: gitsrc
- * @Date: 2022-05-24 14:01:14
- * @LastEditors: gitsrc
- * @LastEditTime: 2022-05-25 13:33:06
- * @FilePath: /peerchat/src/p2p.go
- */
-
 package p2p
 
 import (
@@ -22,8 +14,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
-	"github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p-pubsub"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	discoveryRouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"

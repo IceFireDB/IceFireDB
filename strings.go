@@ -1,11 +1,3 @@
-/*
- * @Author: gitsrc
- * @Date: 2021-03-08 18:20:04
- * @LastEditors: gitsrc
- * @LastEditTime: 2021-09-24 13:40:56
- * @FilePath: /IceFireDB/strings.go
- */
-
 package main
 
 import (

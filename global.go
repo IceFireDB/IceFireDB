@@ -1,11 +1,3 @@
-/*
- * @Author: gitsrc
- * @Date: 2021-03-10 11:17:13
- * @LastEditors: gitsrc
- * @LastEditTime: 2021-08-20 10:47:35
- * @FilePath: /IceFireDB/global.go
- */
-
 package main
 
 import (
