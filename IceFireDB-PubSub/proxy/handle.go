@@ -23,10 +23,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/RedSHandle"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/bareneter"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/codis/credis"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/router"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/bareneter"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/codis/credis"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router"
 	"github.com/sirupsen/logrus"
 )
 

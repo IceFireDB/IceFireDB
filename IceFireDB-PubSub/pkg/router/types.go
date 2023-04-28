@@ -19,7 +19,7 @@
 
 package router
 
-import "github.com/IceFireDB/IceFireDB-PubSub/pkg/RedSHandle"
+import "github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
 
 type IRoutes interface {
 	Use(...HandlerFunc) IRoutes

@@ -20,8 +20,8 @@
 package redisCluster
 
 import (
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/rediscluster"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/router"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router"
 )
 
 var (

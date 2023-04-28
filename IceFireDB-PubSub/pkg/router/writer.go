@@ -24,7 +24,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/RedSHandle"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
 )
 
 func WriteSimpleString(local *RedSHandle.WriterHandle, reply string) error {

@@ -49,47 +49,6 @@ cache:
   cleanup_interval: 120 #Cache memory clearing interval (unit: second)
 
 
-# Monitoring configuration
-monitor:
-  hotkey:
-    enable: false #Whether to enable hotkey monitoring
-    monitor_job_interval: 10 # Monitoring task time round policy: Single sleep time (unit: second)
-    monitor_job_lifetime: 20 # Monitoring task Time round policy: Duration of a monitoring task (unit: second)
-    second_hot_threshold: 500 # Hotkey identification threshold. After monitoring, if the key processing capacity per second is higher than the threshold, the key is considered as a hotkey
-    second_increase_threshold: 25000 #Command processing increase rate (unit: second) If the command processing increase rate is higher than the threshold, the middleware immediately enables hotkey monitoring
-    lru_size: 64 #The maximum hotkey storage space is based on the LRU policy
-    enable_cache: false #Whether to enable the middleware cache function
-    max_cache_life_time: 200 #Maximum cache entry lifetime (unit: ms)
-  bigkey:
-    enable: false #Whether to enable bigkey monitoring
-    key_max_bytes: 1024 #Maximum redis key length (byte)
-    value_max_bytes: 10240 #Maximum redis Value length (byte)
-    lru_size: 64 #Bigkey Specifies the maximum storage space. Storage is based on the LRU policy
-    enable_cache: false #Whether to enable the middleware cache function
-    max_cache_life_time: 200 #cache Maximum entry survival time (unit: ms)
-  slowquery:
-    enable: false #Whether to enable slowQuery monitoring
-    slow_query_threshold: 100 # Slow query time limit （unit：ms）
-    max_list_size: 32 #Slowquery Maximum storage space
-    slow_query_ignore_cmd: [] # Slowly check ignored commands
-
-# prometheus metrics
-prometheus_exporter:
-  address: ":19090"
-  hotkey_exporter:
-    record_limit: 32
-    include_metrics: [ "hotkey.record", "hotkey.count" ]
-  bigkey_exporter:
-    record_limit: 32
-    include_metrics: [ "bigkey.count", "bigkey.record", "bigkey.value_size_sum" ]
-  slowquery_exporter:
-    record_limit: 16
-  runtime_exporter:
-    enable: true
-    enable_cpu: true
-    enable_mem: true
-    enable_gc: true
-
 ignore_cmd:
   enable: false
   cmd_list: []

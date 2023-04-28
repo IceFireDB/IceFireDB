@@ -43,7 +43,7 @@ Run the binary file directly, if you need to run in the background, you can add 
 
 ```shell
 $ make
-$ ./bin/Icefiredb-proxy -c ./config/config.yaml
+$ ./bin/IceFireDB-PubSub -c ./config/config.yaml
 ```
 
 ### Usage

@@ -23,9 +23,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/codis/bufio2"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/codis/errors"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/codis/unsafe2"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/codis/bufio2"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/codis/errors"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/codis/unsafe2"
 )
 
 type Conn struct {

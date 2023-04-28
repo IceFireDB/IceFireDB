@@ -22,9 +22,9 @@ package test
 import (
 	"testing"
 
-	"github.com/IceFireDB/IceFireDB-PubSub/test/proto"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/test/proto"
 
-	"github.com/IceFireDB/IceFireDB-PubSub/test/server"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/test/server"
 )
 
 func TestHash(t *testing.T) {

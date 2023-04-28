@@ -27,9 +27,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/RedSHandle"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/rediscluster"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/router"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router"
 )
 
 /**

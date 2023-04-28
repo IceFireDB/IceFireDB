@@ -19,7 +19,7 @@
 
 package unsafe2
 
-import "github.com/IceFireDB/IceFireDB-PubSub/pkg/codis/sync2/atomic2"
+import "github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/codis/sync2/atomic2"
 
 type Slice interface {
 	Type() string

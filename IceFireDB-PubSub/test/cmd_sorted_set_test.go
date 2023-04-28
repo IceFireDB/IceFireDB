@@ -23,8 +23,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/IceFireDB/IceFireDB-PubSub/test/proto"
-	"github.com/IceFireDB/IceFireDB-PubSub/test/server"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/test/proto"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/test/server"
 )
 
 // Test ZADD / ZCARD / ZRANK / ZREVRANK.
