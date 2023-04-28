@@ -22,15 +22,16 @@ package redisNode
 import (
 	"context"
 	"fmt"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/config"
 	"io"
 	"strings"
 	"sync"
 
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/config"
+
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/RedSHandle"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/router"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router"
 	"github.com/gomodule/redigo/redis"
 )
 

@@ -1,8 +1,9 @@
-module github.com/IceFireDB/IceFireDB-PubSub
+module github.com/IceFireDB/IceFireDB/IceFireDB-PubSub
 
 go 1.16
 
 require (
+	github.com/IceFireDB/IceFireDB-Proxy v1.0.0
 	github.com/alicebob/miniredis/v2 v2.17.0
 	github.com/gomodule/redigo v1.8.8
 	github.com/hashicorp/golang-lru v0.5.4

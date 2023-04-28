@@ -22,7 +22,7 @@ package router
 import (
 	"fmt"
 
-	"github.com/IceFireDB/IceFireDB-PubSub/utils"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/utils"
 )
 
 // Start the middleware according to the configuration

@@ -22,28 +22,27 @@ package proxy
 import (
 	"context"
 	"fmt"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/ppubsub"
-	"github.com/sirupsen/logrus"
 	"log"
 	"strings"
 	"time"
 
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/cache"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/monitor"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/p2p"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/ppubsub"
+	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/bareneter"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/config"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/rediscluster"
-	"github.com/IceFireDB/IceFireDB-PubSub/pkg/router"
-	proxycluster "github.com/IceFireDB/IceFireDB-PubSub/pkg/router/redisCluster"
-	proxynode "github.com/IceFireDB/IceFireDB-PubSub/pkg/router/redisNode"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/cache"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/p2p"
+
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/bareneter"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/config"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router"
+	proxycluster "github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router/redisCluster"
+	proxynode "github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router/redisNode"
 	redisclient "github.com/gomodule/redigo/redis"
 )
 
 type Proxy struct {
 	Cache        *cache.Cache
-	Monitor      *monitor.Monitor
 	proxyCluster *rediscluster.Cluster
 	proxyClient  *redisclient.Pool
 	server       *bareneter.Server
@@ -124,11 +123,8 @@ func New() (*Proxy, error) {
 		ppubsub.InitPubSub(context.Background(), p.P2pHost)
 	}
 
-	p.StartMonitor()
-
 	p.router.Use(router.IgnoreCMDMiddleware(config.Get().IgnoreCMD.Enable, config.Get().IgnoreCMD.CMDList))
 
-	p.router.Use(router.KeyMonitorMiddleware(p.Monitor, config.Get().Monitor.SlowQueryConf.SlowQueryIgnoreCMD))
 	if config.Get().P2P.Enable {
 		p.router.Use(router.PubSubMiddleware(p.router, p.P2pSubPub))
 	}

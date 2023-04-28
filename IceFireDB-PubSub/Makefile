@@ -1,4 +1,4 @@
-PROG=bin/Icefiredb-PubSub
+PROG=bin/IceFireDB-PubSub
 
 
 SRCS=./cmd/pubsub

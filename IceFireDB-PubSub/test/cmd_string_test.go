@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IceFireDB/IceFireDB-PubSub/test/proto"
-	"github.com/IceFireDB/IceFireDB-PubSub/test/server"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/test/proto"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/test/server"
 )
 
 // Test simple GET/SET keys
@@ -829,49 +829,50 @@ func TestGetSet(t *testing.T) {
 	}
 }
 
-/*func TestGetdel(t *testing.T) {
-	server.Clear()
-	c, err := proto.Dial(server.Addr())
-	ok(t, err)
-	defer c.Close()
-	s := server.Direct()
+/*
+	func TestGetdel(t *testing.T) {
+		server.Clear()
+		c, err := proto.Dial(server.Addr())
+		ok(t, err)
+		defer c.Close()
+		s := server.Direct()
 
-	// Missing key
-	{
-		mustNil(t, c, "GETDEL", "foo")
-	}
+		// Missing key
+		{
+			mustNil(t, c, "GETDEL", "foo")
+		}
 
-	// Existing key
-	{
-		s.Set("foo", "bar")
-		mustDo(t, c,
-			"GETDEL", "foo",
-			proto.String("bar"),
-		)
-		must0(t, c, "EXISTS", "foo")
-	}
+		// Existing key
+		{
+			s.Set("foo", "bar")
+			mustDo(t, c,
+				"GETDEL", "foo",
+				proto.String("bar"),
+			)
+			must0(t, c, "EXISTS", "foo")
+		}
 
-	// Wrong type of existing key
-	{
-		s.HSet("wrong", "foo", "bar")
-		mustDo(t, c,
-			"GETDEL", "wrong",
-			proto.Error(msgWrongType),
-		)
-	}
+		// Wrong type of existing key
+		{
+			s.HSet("wrong", "foo", "bar")
+			mustDo(t, c,
+				"GETDEL", "wrong",
+				proto.Error(msgWrongType),
+			)
+		}
 
-	// Wrong usage
-	{
-		mustDo(t, c,
-			"GETDEL",
-			proto.Error(errWrongNumber("getdel")),
-		)
-		mustDo(t, c,
-			"GETDEL", "foo", "bar",
-			proto.Error(errWrongNumber("getdel")),
-		)
+		// Wrong usage
+		{
+			mustDo(t, c,
+				"GETDEL",
+				proto.Error(errWrongNumber("getdel")),
+			)
+			mustDo(t, c,
+				"GETDEL", "foo", "bar",
+				proto.Error(errWrongNumber("getdel")),
+			)
+		}
 	}
-}
 */
 func TestStrlen(t *testing.T) {
 	server.Clear()
@@ -1171,117 +1172,118 @@ func TestBitcount(t *testing.T) {
 	}
 }
 
-/*func TestBitop(t *testing.T) {
-	server.Clear()
-	c, err := proto.Dial(server.Addr())
-	ok(t, err)
-	defer c.Close()
-	s := server.Direct()
+/*
+	func TestBitop(t *testing.T) {
+		server.Clear()
+		c, err := proto.Dial(server.Addr())
+		ok(t, err)
+		defer c.Close()
+		s := server.Direct()
 
-	{
-		and := func(a, b byte) byte { return a & b }
-		equals(t, []byte("`"), sliceBinOp(and, []byte("a"), []byte("b")))
-		equals(t, []byte("`\000\000"), sliceBinOp(and, []byte("aaa"), []byte("b")))
-		equals(t, []byte("`\000\000"), sliceBinOp(and, []byte("a"), []byte("bbb")))
-		equals(t, []byte("``\000"), sliceBinOp(and, []byte("aa"), []byte("bbb")))
-	}
+		{
+			and := func(a, b byte) byte { return a & b }
+			equals(t, []byte("`"), sliceBinOp(and, []byte("a"), []byte("b")))
+			equals(t, []byte("`\000\000"), sliceBinOp(and, []byte("aaa"), []byte("b")))
+			equals(t, []byte("`\000\000"), sliceBinOp(and, []byte("a"), []byte("bbb")))
+			equals(t, []byte("``\000"), sliceBinOp(and, []byte("aa"), []byte("bbb")))
+		}
 
-	// Single char AND
-	{
-		s.Set("a", "a") // 'a' is 0x1100001
-		s.Set("b", "b") // 'b' is 0x1100010
-		mustDo(t, c,
-			"BITOP", "AND", "bitand", "a", "b",
-			proto.Int(1), // Length of the longest key
-		)
-		s.CheckGet(t, "bitand", "`")
-	}
-	// Multi char AND
-	{
-		s.Set("a", "aa")   // 'a' is 0x1100001
-		s.Set("b", "bbbb") // 'b' is 0x1100010
-		mustDo(t, c,
-			"BITOP", "AND", "bitand", "a", "b",
-			proto.Int(4), // Length of the longest key
-		)
-		s.CheckGet(t, "bitand", "``\000\000")
-	}
+		// Single char AND
+		{
+			s.Set("a", "a") // 'a' is 0x1100001
+			s.Set("b", "b") // 'b' is 0x1100010
+			mustDo(t, c,
+				"BITOP", "AND", "bitand", "a", "b",
+				proto.Int(1), // Length of the longest key
+			)
+			s.CheckGet(t, "bitand", "`")
+		}
+		// Multi char AND
+		{
+			s.Set("a", "aa")   // 'a' is 0x1100001
+			s.Set("b", "bbbb") // 'b' is 0x1100010
+			mustDo(t, c,
+				"BITOP", "AND", "bitand", "a", "b",
+				proto.Int(4), // Length of the longest key
+			)
+			s.CheckGet(t, "bitand", "``\000\000")
+		}
 
-	// Multi char OR
-	{
-		s.Set("a", "aa")   // 'a' is 0x1100001
-		s.Set("b", "bbbb") // 'b' is 0x1100010
-		mustDo(t, c,
-			"BITOP", "OR", "bitor", "a", "b",
-			proto.Int(4),
-		)
-		s.CheckGet(t, "bitor", "ccbb")
-	}
+		// Multi char OR
+		{
+			s.Set("a", "aa")   // 'a' is 0x1100001
+			s.Set("b", "bbbb") // 'b' is 0x1100010
+			mustDo(t, c,
+				"BITOP", "OR", "bitor", "a", "b",
+				proto.Int(4),
+			)
+			s.CheckGet(t, "bitor", "ccbb")
+		}
 
-	// Multi char XOR
-	{
-		s.Set("a", "aa")   // 'a' is 0x1100001
-		s.Set("b", "bbbb") // 'b' is 0x1100010
-		mustDo(t, c,
-			"BITOP", "XOR", "bitxor", "a", "b",
-			proto.Int(4),
-		)
-		s.CheckGet(t, "bitxor", "\x03\x03bb")
-	}
+		// Multi char XOR
+		{
+			s.Set("a", "aa")   // 'a' is 0x1100001
+			s.Set("b", "bbbb") // 'b' is 0x1100010
+			mustDo(t, c,
+				"BITOP", "XOR", "bitxor", "a", "b",
+				proto.Int(4),
+			)
+			s.CheckGet(t, "bitxor", "\x03\x03bb")
+		}
 
-	// Guess who's NOT like the other ops?
-	{
-		s.Set("a", "aa") // 'a' is 0x1100001
-		mustDo(t, c,
-			"BITOP", "NOT", "not", "a",
-			proto.Int(2),
-		)
-		s.CheckGet(t, "not", "\x9e\x9e")
-	}
+		// Guess who's NOT like the other ops?
+		{
+			s.Set("a", "aa") // 'a' is 0x1100001
+			mustDo(t, c,
+				"BITOP", "NOT", "not", "a",
+				proto.Int(2),
+			)
+			s.CheckGet(t, "not", "\x9e\x9e")
+		}
 
-	// Single argument. Works, just an roundabout copy.
-	{
-		s.Set("a", "a") // 'a' is 0x1100001
-		mustDo(t, c,
-			"BITOP", "AND", "copy", "a",
-			proto.Int(1),
-		)
-		s.CheckGet(t, "copy", "a")
-	}
+		// Single argument. Works, just an roundabout copy.
+		{
+			s.Set("a", "a") // 'a' is 0x1100001
+			mustDo(t, c,
+				"BITOP", "AND", "copy", "a",
+				proto.Int(1),
+			)
+			s.CheckGet(t, "copy", "a")
+		}
 
-	// Wrong type of existing key
-	{
-		s.HSet("wrong", "aap", "noot")
-		mustDo(t, c,
-			"BITOP", "AND", "wrong",
-			proto.Error(errWrongNumber("bitop")),
-		)
-	}
+		// Wrong type of existing key
+		{
+			s.HSet("wrong", "aap", "noot")
+			mustDo(t, c,
+				"BITOP", "AND", "wrong",
+				proto.Error(errWrongNumber("bitop")),
+			)
+		}
 
-	// Wrong usage
-	{
-		mustDo(t, c,
-			"BITOP",
-			proto.Error(errWrongNumber("bitop")),
-		)
-		mustDo(t, c,
-			"BITOP", "AND",
-			proto.Error(errWrongNumber("bitop")),
-		)
-		mustDo(t, c,
-			"BITOP", "WHAT",
-			proto.Error(errWrongNumber("bitop")),
-		)
-		mustDo(t, c,
-			"BITOP", "NOT",
-			proto.Error(errWrongNumber("bitop")),
-		)
-		mustDo(t, c,
-			"BITOP", "NOT", "foo", "bar", "baz",
-			proto.Error("ERR BITOP NOT must be called with a single source key."),
-		)
+		// Wrong usage
+		{
+			mustDo(t, c,
+				"BITOP",
+				proto.Error(errWrongNumber("bitop")),
+			)
+			mustDo(t, c,
+				"BITOP", "AND",
+				proto.Error(errWrongNumber("bitop")),
+			)
+			mustDo(t, c,
+				"BITOP", "WHAT",
+				proto.Error(errWrongNumber("bitop")),
+			)
+			mustDo(t, c,
+				"BITOP", "NOT",
+				proto.Error(errWrongNumber("bitop")),
+			)
+			mustDo(t, c,
+				"BITOP", "NOT", "foo", "bar", "baz",
+				proto.Error("ERR BITOP NOT must be called with a single source key."),
+			)
+		}
 	}
-}
 */
 func TestBitpos(t *testing.T) {
 	server.Clear()
