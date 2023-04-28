@@ -29,7 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/router"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router"
 	"github.com/gomodule/redigo/redis"
 )
 

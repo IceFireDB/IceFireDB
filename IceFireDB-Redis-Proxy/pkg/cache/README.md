@@ -15,14 +15,14 @@ one) to recover from downtime quickly. (See the docs for `NewFrom()` for caveats
 
 ### Installation
 
-`go get github.com/IceFireDB/IceFireDB-Proxy/pkg/cache`
+`go get github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/cache`
 
 ### Usage
 
 ```go
 import (
 	"fmt"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/cache"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/cache"
 	"time"
 )
 
@@ -80,4 +80,4 @@ func main() {
 
 ### Reference
 
-`godoc` or [http://godoc.org/github.com/IceFireDB/IceFireDB-Proxy/pkg/cache](http://godoc.org/github.com/IceFireDB/IceFireDB-Proxy/pkg/cache)
+`godoc` or [http://godoc.org/github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/cache](http://godoc.org/github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/cache)

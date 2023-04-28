@@ -25,7 +25,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/cache"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/cache"
 
 	lru "github.com/hashicorp/golang-lru"
 )

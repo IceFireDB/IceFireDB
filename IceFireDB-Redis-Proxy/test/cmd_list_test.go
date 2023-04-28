@@ -25,9 +25,9 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/test/server"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/test/server"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/test/proto"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/test/proto"
 )
 
 // execute command in a go routine. Used to test blocking commands.

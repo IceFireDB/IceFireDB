@@ -22,7 +22,7 @@ package router
 import (
 	"fmt"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/utils"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/utils"
 )
 
 // Start the middleware according to the configuration

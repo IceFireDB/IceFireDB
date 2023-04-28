@@ -30,7 +30,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/netstat"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/netstat"
 )
 
 var ethInterface string

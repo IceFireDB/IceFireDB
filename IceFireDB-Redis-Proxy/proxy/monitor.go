@@ -22,8 +22,8 @@ package proxy
 import (
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/config"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/monitor"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/config"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/monitor"
 )
 
 func (p *Proxy) StartMonitor() {

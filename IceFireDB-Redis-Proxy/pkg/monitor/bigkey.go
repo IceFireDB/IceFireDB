@@ -25,7 +25,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/cache"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/cache"
 	lru "github.com/hashicorp/golang-lru"
 )
 

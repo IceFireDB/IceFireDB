@@ -25,8 +25,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/monitor"
-	"github.com/IceFireDB/IceFireDB-Proxy/utils"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/monitor"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/utils"
 )
 
 type valueIndexFunc func(mon *monitor.Monitor, arg []interface{}, reply interface{}) bool

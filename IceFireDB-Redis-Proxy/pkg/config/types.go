@@ -19,7 +19,7 @@
 
 package config
 
-import "github.com/IceFireDB/IceFireDB-Proxy/pkg/monitor"
+import "github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/monitor"
 
 type Config struct {
 	Proxy                  ProxyS                `mapstructure:"proxy"`

@@ -26,16 +26,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/cache"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/monitor"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/p2p"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/cache"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/monitor"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/p2p"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/bareneter"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/config"
 	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/router"
-	proxycluster "github.com/IceFireDB/IceFireDB-Proxy/pkg/router/redisCluster"
-	proxynode "github.com/IceFireDB/IceFireDB-Proxy/pkg/router/redisNode"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/bareneter"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/config"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router"
+	proxycluster "github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router/redisCluster"
+	proxynode "github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router/redisNode"
 	redisclient "github.com/gomodule/redigo/redis"
 )
 

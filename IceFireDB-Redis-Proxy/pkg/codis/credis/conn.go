@@ -23,9 +23,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/codis/bufio2"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/codis/errors"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/codis/unsafe2"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/codis/bufio2"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/codis/errors"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/codis/unsafe2"
 )
 
 type Conn struct {

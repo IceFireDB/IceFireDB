@@ -33,9 +33,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/config"
-	"github.com/IceFireDB/IceFireDB-Proxy/proxy"
-	"github.com/IceFireDB/IceFireDB-Proxy/utils"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/config"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/proxy"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/utils"
 	"github.com/spf13/viper"
 	"github.com/urfave/cli"
 )

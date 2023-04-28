@@ -24,9 +24,9 @@ import (
 	"fmt"
 
 	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/bareneter"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/codis/credis"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/router"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/bareneter"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/codis/credis"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router"
 	"github.com/sirupsen/logrus"
 )
 
