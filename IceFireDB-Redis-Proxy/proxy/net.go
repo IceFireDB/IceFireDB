@@ -35,10 +35,9 @@ func (p *Proxy) accept(conn bareneter.Conn) bool {
 		}
 	}
 
-	p.Monitor.ConnectionGauge.Inc()
 	return true
 }
 
 func (p *Proxy) closed(conn bareneter.Conn, err error) {
-	p.Monitor.ConnectionGauge.Dec()
+	return
 }

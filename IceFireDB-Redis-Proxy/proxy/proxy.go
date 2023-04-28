@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/cache"
-	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/monitor"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/p2p"
 
 	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
@@ -41,7 +40,6 @@ import (
 
 type Proxy struct {
 	Cache        *cache.Cache
-	Monitor      *monitor.Monitor
 	proxyCluster *rediscluster.Cluster
 	proxyClient  *redisclient.Pool
 	server       *bareneter.Server
@@ -120,11 +118,8 @@ func New() (*Proxy, error) {
 		log.Printf("Successfully joined [%s] P2P channel. \n", config.Get().P2P.ServiceCommandTopic)
 	}
 
-	p.StartMonitor()
-
 	p.router.Use(router.IgnoreCMDMiddleware(config.Get().IgnoreCMD.Enable, config.Get().IgnoreCMD.CMDList))
 
-	p.router.Use(router.KeyMonitorMiddleware(p.Monitor, config.Get().Monitor.SlowQueryConf.SlowQueryIgnoreCMD))
 	if config.Get().P2P.Enable {
 		p.router.Use(router.PubSubMiddleware(p.router, p.P2pSubPub))
 	}

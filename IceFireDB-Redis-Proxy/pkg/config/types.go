@@ -19,7 +19,7 @@
 
 package config
 
-import "github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/monitor"
+import "github.com/IceFireDB/IceFireDB-Proxy/pkg/monitor"
 
 type Config struct {
 	Proxy                  ProxyS                `mapstructure:"proxy"`
@@ -28,7 +28,6 @@ type Config struct {
 	Log                    LogS                  `mapstructure:"log"`
 	IPWhiteList            IPWhiteListS          `mapstructure:"ip_white_list"`
 	Cache                  CacheS                `mapstructure:"cache"`
-	Monitor                MonitorS              `mapstructure:"monitor"`
 	PrometheusExporterConf *monitor.ExporterConf `mapstructure:"prometheus_exporter"`
 	IgnoreCMD              IgnoreCMDS            `mapstructure:"ignore_cmd"`
 
@@ -119,12 +118,6 @@ type IgnoreCMDS struct {
 	Enable bool `mapstructure:"enable" json:"enable"`
 	// Slowly check omitted keys
 	CMDList []string `mapstructure:"cmd_list" json:"cmd_list"`
-}
-
-type MonitorS struct {
-	HotKeyConf    HotKeyConfS    `mapstructure:"hotkey"`
-	BigKeyConf    BigKeyConfS    `mapstructure:"bigkey"`
-	SlowQueryConf SlowQueryConfS `mapstructure:"slowquery"`
 }
 
 // RedisClusterConf is redis cluster configure options
