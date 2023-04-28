@@ -36,10 +36,6 @@ p2p:
   service_command_topic: "p2p_redis_proxy_service_topic_test"
   # Node Discovery Mode
   service_discover_mode: "advertise" # advertise or announce
-# proxy redis configuration
-redisdb:
-# prometheus metrics configuration
-prometheus_exporter:
 ...
 ```
 
@@ -50,7 +46,7 @@ https://user-images.githubusercontent.com/52234994/173170991-08713e52-291c-4fae-
 Run the binary file directly, if you need to run in the background, you can add it to the systemd system management
 ```shell
 $ make
-$ ./bin/Icefiredb-proxy -c ./config/config.yaml
+$ ./bin/IceFireDB-Redis-Proxy -c ./config/config.yaml
 ```
 
 ### Usage
