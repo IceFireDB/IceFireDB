@@ -23,8 +23,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/test/proto"
-	"github.com/IceFireDB/IceFireDB-Proxy/test/server"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/test/proto"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/test/server"
 )
 
 // Test ZADD / ZCARD / ZRANK / ZREVRANK.

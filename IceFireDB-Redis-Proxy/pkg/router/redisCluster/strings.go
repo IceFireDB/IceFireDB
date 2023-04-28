@@ -21,7 +21,7 @@ package redisCluster
 
 import (
 	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/router"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router"
 )
 
 func (r *Router) cmdMGET(s *router.Context) error {

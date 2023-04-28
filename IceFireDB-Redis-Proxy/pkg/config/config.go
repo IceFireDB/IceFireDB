@@ -56,10 +56,7 @@ func InitConfig() error {
 	if _config.IgnoreCMD.Enable && len(_config.IgnoreCMD.CMDList) > 0 {
 		CmdToUpper(_config.IgnoreCMD.CMDList)
 	}
-
-	if _config.Monitor.SlowQueryConf.Enable && len(_config.Monitor.SlowQueryConf.SlowQueryIgnoreCMD) > 0 {
-		CmdToUpper(_config.Monitor.SlowQueryConf.SlowQueryIgnoreCMD)
-	}
+	
 	return nil
 }
 

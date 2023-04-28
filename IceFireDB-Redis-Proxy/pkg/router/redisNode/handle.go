@@ -20,7 +20,7 @@
 package redisNode
 
 import (
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/router"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router"
 	"github.com/gomodule/redigo/redis"
 )
 

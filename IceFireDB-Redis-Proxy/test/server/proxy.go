@@ -24,9 +24,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/proxy"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/proxy"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/config"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/config"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/spf13/viper"
 )
@@ -46,21 +46,6 @@ redisdb:
   slave_operate_rate: 0 
   cluster_update_heartbeat: 30
 
-prometheus_exporter:
-  address: ":19090"
-  hotkey_exporter:
-    record_limit: 32
-    include_metrics: [ "hotkey.record", "hotkey.count" ]
-  bigkey_exporter:
-    record_limit: 32
-    include_metrics: [ "bigkey.count", "bigkey.record", "bigkey.value_size_sum" ]
-  slowquery_exporter:
-    record_limit: 16
-  runtime_exporter:
-    enable: true
-    enable_cpu: true
-    enable_mem: true
-    enable_gc: true
 `)
 
 type ProxyTest struct {
