@@ -22,9 +22,9 @@ package proxy
 import (
 	"net"
 
-	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/bareneter"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/config"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/utils"
+	"github.com/IceFireDB/components-go/bareneter"
 )
 
 func (p *Proxy) accept(conn bareneter.Conn) bool {
