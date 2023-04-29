@@ -24,8 +24,8 @@ import (
 	"fmt"
 
 	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/codis/credis"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/bareneter"
-	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/codis/credis"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router"
 	"github.com/sirupsen/logrus"
 )

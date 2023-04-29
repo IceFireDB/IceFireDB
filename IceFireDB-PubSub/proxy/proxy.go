@@ -29,7 +29,7 @@ import (
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/ppubsub"
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/cache"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/cache"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/p2p"
 
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/bareneter"
