@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
-	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/p2p"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router"
+	"github.com/IceFireDB/components-go/RESPHandle"
+	"github.com/IceFireDB/components-go/p2p"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/sirupsen/logrus"

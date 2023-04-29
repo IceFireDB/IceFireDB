@@ -19,7 +19,7 @@
 
 package router
 
-import "github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
+import "github.com/IceFireDB/components-go/RESPHandle"
 
 type IRoutes interface {
 	Use(...HandlerFunc) IRoutes

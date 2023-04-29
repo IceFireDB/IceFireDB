@@ -28,7 +28,7 @@ import (
 
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/utils"
 
-	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/p2p"
+	"github.com/IceFireDB/components-go/p2p"
 )
 
 // PubSubMiddleware Synchronize notification to peer node middleware

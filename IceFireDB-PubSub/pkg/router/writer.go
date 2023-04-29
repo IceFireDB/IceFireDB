@@ -24,7 +24,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
+	"github.com/IceFireDB/components-go/RESPHandle"
 )
 
 func WriteSimpleString(local *RESPHandle.WriterHandle, reply string) error {
