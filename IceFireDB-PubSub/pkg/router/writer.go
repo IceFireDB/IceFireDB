@@ -24,10 +24,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
 )
 
-func WriteSimpleString(local *RedSHandle.WriterHandle, reply string) error {
+func WriteSimpleString(local *RESPHandle.WriterHandle, reply string) error {
 	err := local.WriteSimpleString(reply)
 	if err != nil {
 		logrus.Error("client write error:", err)
@@ -41,7 +41,7 @@ func WriteSimpleString(local *RedSHandle.WriterHandle, reply string) error {
 	return nil
 }
 
-func WriteBulk(local *RedSHandle.WriterHandle, reply []byte) error {
+func WriteBulk(local *RESPHandle.WriterHandle, reply []byte) error {
 	err := local.WriteBulk(reply)
 	if err != nil {
 		logrus.Error("client write error:", err)
@@ -55,10 +55,10 @@ func WriteBulk(local *RedSHandle.WriterHandle, reply []byte) error {
 	return nil
 }
 
-func WriteObjects(local *RedSHandle.WriterHandle, reply ...interface{}) (err error) {
+func WriteObjects(local *RESPHandle.WriterHandle, reply ...interface{}) (err error) {
 	if len(reply) > 1 {
 		var memoryWriterBuffer bytes.Buffer
-		memoryWriterHandle := RedSHandle.NewWriterHandle(&memoryWriterBuffer)
+		memoryWriterHandle := RESPHandle.NewWriterHandle(&memoryWriterBuffer)
 		err = memoryWriterHandle.WriteObjects(reply...)
 
 		if err != nil {
@@ -86,10 +86,10 @@ func WriteObjects(local *RedSHandle.WriterHandle, reply ...interface{}) (err err
 	return nil
 }
 
-func RecursivelyWriteObjects(local *RedSHandle.WriterHandle, reply ...interface{}) (err error) {
+func RecursivelyWriteObjects(local *RESPHandle.WriterHandle, reply ...interface{}) (err error) {
 	if len(reply) > 1 {
 		var memoryWriterBuffer bytes.Buffer
-		memoryWriterHandle := RedSHandle.NewWriterHandle(&memoryWriterBuffer)
+		memoryWriterHandle := RESPHandle.NewWriterHandle(&memoryWriterBuffer)
 		err = memoryWriterHandle.RecursivelyWriteObjects(reply...)
 
 		if err != nil {
@@ -118,7 +118,7 @@ func RecursivelyWriteObjects(local *RedSHandle.WriterHandle, reply ...interface{
 	return nil
 }
 
-func WriteBulkStrings(local *RedSHandle.WriterHandle, reply []string) error {
+func WriteBulkStrings(local *RESPHandle.WriterHandle, reply []string) error {
 	err := local.WriteBulkStrings(reply)
 	if err != nil {
 		logrus.Error("Client write error:", err)
@@ -132,7 +132,7 @@ func WriteBulkStrings(local *RedSHandle.WriterHandle, reply []string) error {
 	return nil
 }
 
-func WriteInt(local *RedSHandle.WriterHandle, reply int64) error {
+func WriteInt(local *RESPHandle.WriterHandle, reply int64) error {
 	err := local.WriteInt(reply)
 	if err != nil {
 		logrus.Error("Client write error:", err)
@@ -146,7 +146,7 @@ func WriteInt(local *RedSHandle.WriterHandle, reply int64) error {
 	return nil
 }
 
-func WriteError(local *RedSHandle.WriterHandle, err error) error {
+func WriteError(local *RESPHandle.WriterHandle, err error) error {
 	local.WriteError(err.Error())
 	return local.Flush()
 }

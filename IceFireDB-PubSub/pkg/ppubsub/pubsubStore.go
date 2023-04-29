@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/p2p"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -32,7 +32,7 @@ type pubsubStore struct {
 	ctx          context.Context
 	p2p          *p2p.P2P
 	join         map[string]*PubSub
-	writer       map[string]map[string]*RedSHandle.WriterHandle
+	writer       map[string]map[string]*RESPHandle.WriterHandle
 }
 
 func NewPubsubStore(ctx context.Context, p2p *p2p.P2P) *pubsubStore {
@@ -40,7 +40,7 @@ func NewPubsubStore(ctx context.Context, p2p *p2p.P2P) *pubsubStore {
 		ctx:    ctx,
 		p2p:    p2p,
 		join:   make(map[string]*PubSub),
-		writer: make(map[string]map[string]*RedSHandle.WriterHandle),
+		writer: make(map[string]map[string]*RESPHandle.WriterHandle),
 	}
 	return s
 }
@@ -58,7 +58,7 @@ func Pub(topicName string, message string) error {
 	return nil
 }
 
-func Sub(local *RedSHandle.WriterHandle, topicName string) (*PubSub, error) {
+func Sub(local *RESPHandle.WriterHandle, topicName string) (*PubSub, error) {
 	if _, ok := pss.join[topicName]; !ok {
 		_, err := JoinPubSub(pss.p2p, "redis-client", topicName)
 		if err != nil {
@@ -68,7 +68,7 @@ func Sub(local *RedSHandle.WriterHandle, topicName string) (*PubSub, error) {
 	}
 	lp := fmt.Sprintf("%p", local)
 	if _, ok := pss.writer[topicName]; !ok {
-		pss.writer[topicName] = make(map[string]*RedSHandle.WriterHandle)
+		pss.writer[topicName] = make(map[string]*RESPHandle.WriterHandle)
 	}
 	pss.writer[topicName][lp] = local
 	ps := pss.join[topicName]

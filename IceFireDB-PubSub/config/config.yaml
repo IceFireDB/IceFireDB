@@ -24,9 +24,7 @@ redisdb:
   conn_write_timeout: 1
   conn_alive_timeout: 60
   conn_pool_size: 80 # Connection pool 0 indicates the short connection
-  slave_operate_rate: 0 # Percentage of read traffic carried by slave nodes: 0-> Slave nodes do not carry any read traffic
-  cluster_update_heartbeat: 30 # Heartbeat interval for cluster status update: Takes effect only when READ/write separation is enabled: minimum 5 seconds
-
+  
 pprof_debug:
   enable: true
   port: 16060

@@ -20,8 +20,8 @@
 package redisCluster
 
 import (
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router"
+	rediscluster "github.com/chasex/redis-go-cluster"
 )
 
 var (
@@ -42,11 +42,8 @@ func (r *Router) cmdPING(s *router.Context) error {
 func (r *Router) cmdCMDEXEC(s *router.Context) error {
 	var err error
 
-	if r.redisCluster.IsSlaveOperate() && s.Op.IsReadOnly() {
-		s.Reply, err = r.redisCluster.SlaveDo(s.Cmd, s.Args[1:]...)
-	} else {
-		s.Reply, err = r.redisCluster.Do(s.Cmd, s.Args[1:]...)
-	}
+	s.Reply, err = r.redisCluster.Do(s.Cmd, s.Args[1:]...)
+
 	if err != nil && err != rediscluster.ErrNil {
 		return err
 	}

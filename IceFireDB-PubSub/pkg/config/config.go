@@ -23,7 +23,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
+	rediscluster "github.com/chasex/redis-go-cluster"
 	"github.com/spf13/viper"
 )
 
