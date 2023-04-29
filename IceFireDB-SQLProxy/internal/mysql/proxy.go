@@ -3,19 +3,20 @@ package mysql
 import (
 	"context"
 	"errors"
-	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/client"
-	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
-	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/server"
 	"net"
 	"runtime"
 	"sync"
+
+	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/client"
+	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
+	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/server"
 
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 )
 
 const (
-	GetConnRetry = 3 
+	GetConnRetry = 3
 )
 
 type mysqlProxy struct {
@@ -27,9 +28,7 @@ type mysqlProxy struct {
 	pool       *client.Pool
 }
 
-
 func (m *mysqlProxy) onConn(c net.Conn) {
-	，
 	clientConn, err := m.popMysqlConn()
 	if err != nil {
 		logrus.Errorf("get remote conn err:", err)
@@ -49,10 +48,10 @@ func (m *mysqlProxy) onConn(c net.Conn) {
 		if err != nil {
 			const size = 4096
 			buf := make([]byte, size)
-			buf = buf[:runtime.Stack(buf, false)] goroutinetacktrace
+			buf = buf[:runtime.Stack(buf, false)]
 			logrus.Errorf("panic %s", string(buf))
 		}
-		
+
 		if !conn.Closed() {
 			conn.Close()
 		}
@@ -71,7 +70,6 @@ func (m *mysqlProxy) onConn(c net.Conn) {
 	}
 }
 
-mysql
 func (m *mysqlProxy) popMysqlConn() (*client.Conn, error) {
 	var mysqlConn *client.Conn
 	var err error
@@ -84,21 +82,20 @@ func (m *mysqlProxy) popMysqlConn() (*client.Conn, error) {
 		if err != nil {
 			continue
 		}
-		
+
 		if mysqlConn.IsInTransaction() {
 			if err := mysqlConn.Rollback(); err != nil {
 				mysqlConn.Close()
 				continue
 			}
 		}
-		，
 		if !mysqlConn.IsAutoCommit() {
 			if err := mysqlConn.SetAutoCommit(true); err != nil {
 				mysqlConn.Close()
 				continue
 			}
 		}
-		
+
 		if mysqlConn.GetCharset() != mysql.DEFAULT_CHARSET {
 			if err := mysqlConn.SetCharset(mysql.DEFAULT_CHARSET); err != nil {
 				mysqlConn.Close()
@@ -109,7 +106,6 @@ func (m *mysqlProxy) popMysqlConn() (*client.Conn, error) {
 	}
 	return mysqlConn, nil
 }
-
 
 func (m *mysqlProxy) pushMysqlConn(mysqlConn *client.Conn, err error) {
 	if errors.Is(err, mysql.ErrBadConn) {

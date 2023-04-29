@@ -4,20 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+
 	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/config"
 	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/client"
 	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/server"
 	"github.com/IceFireDB/IceFireDB-SQLProxy/utils"
 	"github.com/sirupsen/logrus"
-	"io"
-	"net"
 )
 
 func Run(ctx context.Context) (err error) {
 	ms := newMysqlProxy()
 	ms.ctx = ctx
 	ms.closed.Store(true)
-	
+
 	if err = ms.initClientPool(); err != nil {
 		return fmt.Errorf("initClientPool error: %v", err)
 	}
@@ -32,7 +33,7 @@ func Run(ctx context.Context) (err error) {
 			ms.closed.Store(true)
 		}
 	}, nil)
-	
+
 	ms.closed.Store(false)
 	logrus.Infof("%s\n", config.Get().Server.Addr)
 	// p2p
@@ -52,7 +53,6 @@ func Run(ctx context.Context) (err error) {
 	return
 }
 
-，
 func newMysqlProxy() *mysqlProxy {
 	p := &mysqlProxy{}
 	p.server = server.NewDefaultServer()

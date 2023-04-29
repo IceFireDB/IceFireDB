@@ -72,7 +72,7 @@ func NewP2P(serviceName string) *P2P {
 	// Debug log
 	logrus.Debugln("Bootstrapped the Kademlia DHT and Connected to Bootstrap Peers")
 
-	// Create a peer discovery service using the Kad DHT : 
+	// Create a peer discovery service using the Kad DHT :
 	routingdiscovery := discoveryRouting.NewRoutingDiscovery(kaddht)
 	// Debug log
 	logrus.Debugln("Created the Peer Discovery Service.")
@@ -228,7 +228,6 @@ func setupHost(ctx context.Context) (host.Host, *dht.IpfsDHT) {
 	// Declare a KadDHT
 	var kaddht *dht.IpfsDHT
 	// Setup a routing configuration with the KadDHT
-	,
 	routingOpt := libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 		kaddht = setupKadDHT(ctx, h)
 		return kaddht, err
