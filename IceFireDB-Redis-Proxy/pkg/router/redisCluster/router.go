@@ -32,9 +32,6 @@ import (
 	rediscluster "github.com/chasex/redis-go-cluster"
 )
 
-/**
- * 注册的命令列表
- */
 func NewRouter(cluster rediscluster.Cluster) *Router {
 	r := &Router{
 		redisCluster: cluster,
