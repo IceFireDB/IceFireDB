@@ -22,13 +22,13 @@ package router
 import (
 	"math"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
 )
 
 const AbortIndex int8 = math.MaxInt8 / 2
 
 type Context struct {
-	Writer *RedSHandle.WriterHandle
+	Writer *RESPHandle.WriterHandle
 	// Args     [][]byte
 	Args     []interface{}
 	Cmd      string
@@ -46,13 +46,6 @@ func (c *Context) Reset() {
 	c.Reply = nil
 }
 
-/************************************/
-/*********** FLOW CONTROL ***********/
-/************************************/
-
-// Next should be used only inside middleware.
-// It executes the pending Handlers in the chain inside the calling handler.
-// See example in GitHub.
 func (c *Context) Next() error {
 	c.Index++
 	for c.Index < int8(len(c.Handlers)) {

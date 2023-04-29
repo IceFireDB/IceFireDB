@@ -87,9 +87,7 @@ type RedisDBS struct {
 	// Cluster node TCP idle survival time Unit: seconds
 	ConnAliveTimeOut int `mapstructure:"conn_alive_timeout"`
 	// The size of the TCP connection pool for each node in the cluster
-	ConnPoolSize           int `mapstructure:"conn_pool_size"`
-	SlaveOperateRate       int `mapstructure:"slave_operate_rate"`
-	ClusterUpdateHeartbeat int `mapstructure:"cluster_update_heartbeat"`
+	ConnPoolSize int `mapstructure:"conn_pool_size"`
 }
 
 type IPWhiteListS struct {

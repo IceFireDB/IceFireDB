@@ -10,13 +10,13 @@ import (
 )
 
 type Resultset struct {
-	Fields     []*Field // 需要填充值
+	Fields     []*Field 
 	FieldNames map[string]int
 	Values     [][]FieldValue
 
 	RawPkg []byte
 
-	RowDatas []RowData // 需要填充值
+	RowDatas []RowData
 }
 
 var resultsetPool = sync.Pool{
@@ -25,7 +25,7 @@ var resultsetPool = sync.Pool{
 	},
 }
 
-// 字段数量，
+
 func NewResultset(fieldsCount int) *Resultset {
 	r := resultsetPool.Get().(*Resultset)
 	r.Reset(fieldsCount)

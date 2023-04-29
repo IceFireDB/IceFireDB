@@ -23,7 +23,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
+	rediscluster "github.com/chasex/redis-go-cluster"
 	"github.com/spf13/viper"
 )
 
@@ -56,7 +56,7 @@ func InitConfig() error {
 	if _config.IgnoreCMD.Enable && len(_config.IgnoreCMD.CMDList) > 0 {
 		CmdToUpper(_config.IgnoreCMD.CMDList)
 	}
-	
+
 	return nil
 }
 

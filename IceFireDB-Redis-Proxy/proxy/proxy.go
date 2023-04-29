@@ -29,18 +29,18 @@ import (
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/cache"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/p2p"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/bareneter"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/config"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router"
 	proxycluster "github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router/redisCluster"
 	proxynode "github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router/redisNode"
+	rediscluster "github.com/chasex/redis-go-cluster"
 	redisclient "github.com/gomodule/redigo/redis"
 )
 
 type Proxy struct {
 	Cache        *cache.Cache
-	proxyCluster *rediscluster.Cluster
+	proxyCluster rediscluster.Cluster
 	proxyClient  *redisclient.Pool
 	server       *bareneter.Server
 	router       router.IRoutes
@@ -74,14 +74,12 @@ func New() (*Proxy, error) {
 	} else {
 		p.proxyCluster, err = rediscluster.NewCluster(
 			&rediscluster.Options{
-				StartNodes:             strings.Split(config.Get().RedisDB.StartNodes, ","),
-				ConnTimeout:            time.Duration(config.Get().RedisDB.ConnTimeOut) * time.Second,
-				ReadTimeout:            time.Duration(config.Get().RedisDB.ConnReadTimeOut) * time.Second,
-				WriteTimeout:           time.Duration(config.Get().RedisDB.ConnWriteTimeOut) * time.Second,
-				KeepAlive:              config.Get().RedisDB.ConnPoolSize,
-				AliveTime:              time.Duration(config.Get().RedisDB.ConnAliveTimeOut) * time.Second,
-				SlaveOperateRate:       config.Get().RedisDB.SlaveOperateRate,
-				ClusterUpdateHeartbeat: config.Get().RedisDB.ClusterUpdateHeartbeat,
+				StartNodes:   strings.Split(config.Get().RedisDB.StartNodes, ","),
+				ConnTimeout:  time.Duration(config.Get().RedisDB.ConnTimeOut) * time.Second,
+				ReadTimeout:  time.Duration(config.Get().RedisDB.ConnReadTimeOut) * time.Second,
+				WriteTimeout: time.Duration(config.Get().RedisDB.ConnWriteTimeOut) * time.Second,
+				KeepAlive:    config.Get().RedisDB.ConnPoolSize,
+				AliveTime:    time.Duration(config.Get().RedisDB.ConnAliveTimeOut) * time.Second,
 			})
 		if err != nil {
 			return nil, err

@@ -19,13 +19,13 @@
 
 package router
 
-import "github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
+import "github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
 
 type IRoutes interface {
 	Use(...HandlerFunc) IRoutes
 	AddCommand(string, ...HandlerFunc) IRoutes
 	InitCMD()
-	Handle(w *RedSHandle.WriterHandle, args []interface{}) error
+	Handle(w *RESPHandle.WriterHandle, args []interface{}) error
 	Sync(args []interface{}) error
 	Close() error
 }

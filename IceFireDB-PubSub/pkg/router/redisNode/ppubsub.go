@@ -15,7 +15,6 @@ func (r *Router) cmdPpub(s *router.Context) error {
 
 	var topicName, message string
 
-	// p2p 过来的数据，这边类型不是 []byte，而是 string，所以要转换一下
 	if args1Byte, ok := args[1].([]byte); ok {
 		topicName = string(args1Byte)
 	} else {

@@ -20,15 +20,15 @@
 package redisCluster
 
 import (
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router"
+	rediscluster "github.com/chasex/redis-go-cluster"
 )
 
 func (r *Router) cmdMGET(s *router.Context) error {
-	batch := r.redisCluster.NewBatch(10)
+	batch := r.redisCluster.NewBatch()
 	argLen := len(s.Args)
 	for i := 1; i < argLen; i++ {
-		err := batch.Put(r.redisCluster.IsSlaveOperate(), "GET", s.Args[i])
+		err := batch.Put("GET", s.Args[i])
 		if err != nil {
 			return err
 		}
@@ -59,9 +59,9 @@ func (r *Router) cmdDEL(s *router.Context) error {
 		return router.WriteInt(s.Writer, reply)
 	}
 
-	batch := r.redisCluster.NewBatch(10)
+	batch := r.redisCluster.NewBatch()
 	for i := 1; i < argLen; i++ {
-		err := batch.Put(false, "DEL", s.Args[i])
+		err := batch.Put("DEL", s.Args[i])
 		if err != nil {
 			return err
 		}
@@ -92,9 +92,9 @@ func (r *Router) cmdEXISTS(s *router.Context) error {
 		return router.WriteInt(s.Writer, reply)
 	}
 
-	batch := r.redisCluster.NewBatch(10)
+	batch := r.redisCluster.NewBatch()
 	for i := 1; i < argLen; i++ {
-		err := batch.Put(false, s.Cmd, s.Args[i])
+		err := batch.Put(s.Cmd, s.Args[i])
 		if err != nil {
 			return err
 		}
