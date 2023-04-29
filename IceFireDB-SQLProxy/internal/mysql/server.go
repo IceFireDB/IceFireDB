@@ -17,13 +17,13 @@ func Run(ctx context.Context) (err error) {
 	ms := newMysqlProxy()
 	ms.ctx = ctx
 	ms.closed.Store(true)
-	// 初始化客户端连接池
+	
 	if err = ms.initClientPool(); err != nil {
 		return fmt.Errorf("initClientPool error: %v", err)
 	}
 	ln, err := net.Listen("tcp4", config.Get().Server.Addr)
 	if err != nil {
-		logrus.Errorf("mysql代理监听端口错误：%v", err)
+		logrus.Errorf("mysql%v", err)
 		return
 	}
 	utils.GoWithRecover(func() {
@@ -32,9 +32,9 @@ func Run(ctx context.Context) (err error) {
 			ms.closed.Store(true)
 		}
 	}, nil)
-	// 标志开启
+	
 	ms.closed.Store(false)
-	logrus.Infof("启动中间件，监听地址：%s\n", config.Get().Server.Addr)
+	logrus.Infof("%s\n", config.Get().Server.Addr)
 	// p2p
 	if config.Get().P2P.Enable {
 		initP2P(ms)
@@ -52,7 +52,7 @@ func Run(ctx context.Context) (err error) {
 	return
 }
 
-// 创建代理，初始化账户密码存储组件
+，
 func newMysqlProxy() *mysqlProxy {
 	p := &mysqlProxy{}
 	p.server = server.NewDefaultServer()

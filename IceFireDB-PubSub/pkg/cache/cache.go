@@ -224,12 +224,10 @@ func (c *cache) get(k string) (interface{}, bool) {
 }
 
 // send map clean to cache janitor
-// 发送map存储清理信号
 func (c *cache) ShoudClean() {
 	if c.janitor.shoudClean == nil {
 		return
 	}
-	// 发送MAP清理信号
 	select {
 	case c.janitor.shoudClean <- true:
 	default:
@@ -1130,21 +1128,20 @@ func (c *cache) Flush() {
 type janitor struct {
 	Interval   time.Duration
 	stop       chan bool
-	shoudClean chan bool // 应该清理信号
+	shoudClean chan bool
 }
 
 func (j *janitor) Run(c *cache) {
 	ticker := time.NewTicker(j.Interval)
 	for {
 		select {
-		case <-ticker.C: // 周期性信号属性
+		case <-ticker.C:
 			c.DeleteExpired()
-		case <-j.shoudClean: // 如果接到shouldClean信号
+		case <-j.shoudClean:
 			c.mu.RLock()
 			lastCleanTime := c.lastCleanTime
 			c.mu.RUnlock()
 
-			// 如果上一次map clean时间超过1s，则执行清理操作
 			if lastCleanTime.Add(time.Second * 1).Before(time.Now()) {
 				c.DeleteExpired()
 			}
@@ -1191,9 +1188,7 @@ func newCacheWithJanitor(de time.Duration, ci time.Duration, maxItemsCount int, 
 	// which c can be collected.
 	C := &Cache{c}
 	if ci > 0 {
-		// 如果ci>0 则代表需要定期清理过期元素。
 		runJanitor(c, ci)
-		// 当C被GC释放之前，会回调stopJanitor函数，runtime.SetFinalizer设置某个对象被GC前的回调函数
 		runtime.SetFinalizer(C, stopJanitor)
 	}
 	return C

@@ -28,7 +28,7 @@ proxy:
   local_port: 16379
   enable_mtls: false
 
-# p2p 配置
+# p2p config
 p2p:
   enable: true
 

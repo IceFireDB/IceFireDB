@@ -40,9 +40,6 @@ func (p *Proxy) handle(conn bareneter.Conn) {
 	for {
 		resp, err := decoder.Decode()
 		if err != nil {
-			/*if err.Error() != io.EOF.Error() && strings.Index(err.Error(), net.ErrClosed.Error()) == -1 {
-				logrus.Errorf("RESP协议解码失败:%v", err)
-			}*/
 			return
 		}
 		if resp.Type != credis.TypeArray {
@@ -73,7 +70,7 @@ func (p *Proxy) handle(conn bareneter.Conn) {
 				return
 			}
 			_ = router.WriteError(localWriteHandle, err)
-			logrus.Errorf("redis命令执行错误:%s , %v", commandArgs, err)
+			logrus.Errorf("redis command exec fail:%s , %v", commandArgs, err)
 			return
 		}
 	}

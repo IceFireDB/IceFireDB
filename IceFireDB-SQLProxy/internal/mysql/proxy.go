@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	GetConnRetry = 3 // 从连接池获取连接最大重试次数
+	GetConnRetry = 3 
 )
 
 type mysqlProxy struct {
@@ -27,9 +27,9 @@ type mysqlProxy struct {
 	pool       *client.Pool
 }
 
-// 代理连接
+
 func (m *mysqlProxy) onConn(c net.Conn) {
-	// 接收客户端数据包，解析包内容获取账号密码数据库
+	，
 	clientConn, err := m.popMysqlConn()
 	if err != nil {
 		logrus.Errorf("get remote conn err:", err)
@@ -49,10 +49,10 @@ func (m *mysqlProxy) onConn(c net.Conn) {
 		if err != nil {
 			const size = 4096
 			buf := make([]byte, size)
-			buf = buf[:runtime.Stack(buf, false)] // 获得当前goroutine的stacktrace
-			logrus.Errorf("panic错误: %s", string(buf))
+			buf = buf[:runtime.Stack(buf, false)] goroutinetacktrace
+			logrus.Errorf("panic %s", string(buf))
 		}
-		// 关闭客户端连接
+		
 		if !conn.Closed() {
 			conn.Close()
 		}
@@ -71,7 +71,7 @@ func (m *mysqlProxy) onConn(c net.Conn) {
 	}
 }
 
-// 从连接池获取远程mysql连接
+mysql
 func (m *mysqlProxy) popMysqlConn() (*client.Conn, error) {
 	var mysqlConn *client.Conn
 	var err error
@@ -84,21 +84,21 @@ func (m *mysqlProxy) popMysqlConn() (*client.Conn, error) {
 		if err != nil {
 			continue
 		}
-		// 如果是事务则回滚上次提交
+		
 		if mysqlConn.IsInTransaction() {
 			if err := mysqlConn.Rollback(); err != nil {
 				mysqlConn.Close()
 				continue
 			}
 		}
-		// 如果不是自动提交，则设置自动提交
+		，
 		if !mysqlConn.IsAutoCommit() {
 			if err := mysqlConn.SetAutoCommit(true); err != nil {
 				mysqlConn.Close()
 				continue
 			}
 		}
-		// 如果编码不是默认编码则设置为默认
+		
 		if mysqlConn.GetCharset() != mysql.DEFAULT_CHARSET {
 			if err := mysqlConn.SetCharset(mysql.DEFAULT_CHARSET); err != nil {
 				mysqlConn.Close()
@@ -110,7 +110,7 @@ func (m *mysqlProxy) popMysqlConn() (*client.Conn, error) {
 	return mysqlConn, nil
 }
 
-// 回收连接
+
 func (m *mysqlProxy) pushMysqlConn(mysqlConn *client.Conn, err error) {
 	if errors.Is(err, mysql.ErrBadConn) {
 		mysqlConn.Close()

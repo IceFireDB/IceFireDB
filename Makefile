@@ -4,19 +4,19 @@ DRIVER?=badger
 
 SRCS=.
 
-# 安装目录
+# install dir
 INSTALL_PREFIX=/usr/local/IceFireDB
 
-# 配置安装的目录
+# install config dir
 CONF_INSTALL_PREFIX=/usr/local/IceFireDB
 
 # git commit hash
 COMMIT_HASH=$(shell git rev-parse --short HEAD || echo "GitNotFound")
 
-# 编译日期
+# build data
 BUILD_DATE=$(shell date '+%Y-%m-%d %H:%M:%S')
 
-# 编译条件
+# build cflags
 CFLAGS = -ldflags "-s -w -X \"main.BuildVersion=${COMMIT_HASH}\" -X \"main.BuildDate=$(BUILD_DATE)\""
 
 all:
@@ -25,14 +25,14 @@ all:
 	fi
 	go build $(CFLAGS) -o $(PROG) $(SRCS)
 
-# 编译race版本
+# build race version
 race:
 	if [ ! -d "./bin/" ]; then \
     	mkdir bin; \
     	fi
 	go build $(CFLAGS) -race -o $(PROG) $(SRCS)
 
-# release 版本
+# release  version
 RELEASE_DATE = $(shell date '+%Y%m%d%H%M%S')
 RELEASE_VERSION = $(shell git rev-parse --short HEAD || echo "GitNotFound")
 RELEASE_DIR=release_bin

@@ -46,13 +46,6 @@ func (c *Context) Reset() {
 	c.Reply = nil
 }
 
-/************************************/
-/*********** FLOW CONTROL ***********/
-/************************************/
-
-// Next should be used only inside middleware.
-// It executes the pending Handlers in the chain inside the calling handler.
-// See example in GitHub.
 func (c *Context) Next() error {
 	c.Index++
 	for c.Index < int8(len(c.Handlers)) {

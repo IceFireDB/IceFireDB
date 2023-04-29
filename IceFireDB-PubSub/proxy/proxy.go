@@ -117,7 +117,7 @@ func New() (*Proxy, error) {
 			return nil, err
 		}
 		log.Printf("Successfully joined [%s] P2P channel. \n", config.Get().P2P.ServiceCommandTopic)
-		// 初始化ppubsub
+		//init ppubsub
 		ppubsub.InitPubSub(context.Background(), p.P2pHost)
 	}
 

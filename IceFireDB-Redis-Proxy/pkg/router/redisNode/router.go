@@ -33,9 +33,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
-/**
- * 注册的命令列表
- */
 func NewRouter(cli *redis.Pool) *Router {
 	r := &Router{
 		client: cli,

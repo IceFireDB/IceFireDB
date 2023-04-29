@@ -259,7 +259,6 @@ func (cr *PubSub) SubLoop() {
 	}
 }
 
-// 广播
 func (cr *PubSub) Writer() {
 	for {
 		msg := <-cr.Inbound

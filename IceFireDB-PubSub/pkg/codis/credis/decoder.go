@@ -132,7 +132,6 @@ func DecodeMultiBulkFromBytes(p []byte) ([]*Resp, error) {
 }
 
 func (d *Decoder) decodeResp() (*Resp, error) {
-	// 读取第一个字节
 	b, err := d.br.ReadByte()
 	if err != nil {
 		return nil, errors.Trace(err)
