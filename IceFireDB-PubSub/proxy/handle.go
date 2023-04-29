@@ -23,10 +23,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/codis/credis"
-	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/bareneter"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router"
+	"github.com/IceFireDB/components-go/RESPHandle"
+	"github.com/IceFireDB/components-go/bareneter"
+	"github.com/IceFireDB/components-go/codis/credis"
 	"github.com/sirupsen/logrus"
 )
 

@@ -27,8 +27,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router"
+	"github.com/IceFireDB/components-go/RESPHandle"
 	rediscluster "github.com/chasex/redis-go-cluster"
 )
 

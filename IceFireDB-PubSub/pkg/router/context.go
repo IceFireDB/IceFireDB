@@ -22,7 +22,7 @@ package router
 import (
 	"math"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
+	"github.com/IceFireDB/components-go/RESPHandle"
 )
 
 const AbortIndex int8 = math.MaxInt8 / 2
