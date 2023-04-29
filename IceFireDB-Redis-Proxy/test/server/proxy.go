@@ -42,10 +42,7 @@ redisdb:
   conn_read_timeout: 1
   conn_write_timeout: 1
   conn_alive_timeout: 60
-  conn_pool_size: 80 
-  slave_operate_rate: 0 
-  cluster_update_heartbeat: 30
-
+  conn_pool_size: 80
 `)
 
 type ProxyTest struct {

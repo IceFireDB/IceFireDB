@@ -27,15 +27,15 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/rediscluster"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router"
+	rediscluster "github.com/chasex/redis-go-cluster"
 )
 
 /**
  * 注册的命令列表
  */
-func NewRouter(cluster *rediscluster.Cluster) *Router {
+func NewRouter(cluster rediscluster.Cluster) *Router {
 	r := &Router{
 		redisCluster: cluster,
 		cmd:          make(map[string]router.HandlersChain),
@@ -59,7 +59,7 @@ func (r *Router) InitCMD() {
 	r.AddCommand("MGET", r.cmdMGET)
 }
 
-func (r *Router) Handle(w *RedSHandle.WriterHandle, args []interface{}) error {
+func (r *Router) Handle(w *RESPHandle.WriterHandle, args []interface{}) error {
 	defer func() {
 		if r := recover(); r != nil {
 			logrus.Error("handle panic", r)
@@ -111,7 +111,7 @@ func (r *Router) Sync(args []interface{}) error {
 	}()
 
 	c.Index = int8(len(handlers) - 1)
-	c.Writer = RedSHandle.NewWriterHandle(io.Discard)
+	c.Writer = RESPHandle.NewWriterHandle(io.Discard)
 	c.Args = args
 	c.Handlers = handlers
 	c.Cmd = cmdType
@@ -123,7 +123,7 @@ func (r *Router) Sync(args []interface{}) error {
 var _ router.IRoutes = (*Router)(nil)
 
 type Router struct {
-	redisCluster *rediscluster.Cluster
+	redisCluster rediscluster.Cluster
 	MiddleWares  router.HandlersChain
 	cmd          map[string]router.HandlersChain
 	pool         sync.Pool
@@ -141,7 +141,7 @@ func (r *Router) AddCommand(operation string, handlers ...router.HandlerFunc) ro
 }
 
 func (r *Router) Close() error {
-	r.redisCluster.Close()
+	//r.redisCluster.Close()
 	return nil
 }
 

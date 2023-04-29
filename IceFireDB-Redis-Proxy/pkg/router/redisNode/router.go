@@ -28,7 +28,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RedSHandle"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/RESPHandle"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/router"
 	"github.com/gomodule/redigo/redis"
 )
@@ -57,7 +57,7 @@ func (r *Router) InitCMD() {
 	r.AddCommand(CMDEXEC, r.cmdCMDEXEC)
 }
 
-func (r *Router) Handle(w *RedSHandle.WriterHandle, args []interface{}) error {
+func (r *Router) Handle(w *RESPHandle.WriterHandle, args []interface{}) error {
 	defer func() {
 		if r := recover(); r != nil {
 			logrus.Error("handle panic", r)
@@ -109,7 +109,7 @@ func (r *Router) Sync(args []interface{}) error {
 	}()
 
 	c.Index = -1
-	c.Writer = RedSHandle.NewWriterHandle(io.Discard)
+	c.Writer = RESPHandle.NewWriterHandle(io.Discard)
 	c.Args = args
 	c.Handlers = handlers
 	c.Cmd = cmdType
