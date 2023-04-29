@@ -32,7 +32,7 @@ import (
 	rediscluster "github.com/chasex/redis-go-cluster"
 )
 
-func NewRouter(cluster rediscluster.Cluster) *Router {
+func NewRouter(cluster *rediscluster.Cluster) *Router {
 	r := &Router{
 		redisCluster: cluster,
 		cmd:          make(map[string]router.HandlersChain),
@@ -120,7 +120,7 @@ func (r *Router) Sync(args []interface{}) error {
 var _ router.IRoutes = (*Router)(nil)
 
 type Router struct {
-	redisCluster rediscluster.Cluster
+	redisCluster *rediscluster.Cluster
 	MiddleWares  router.HandlersChain
 	cmd          map[string]router.HandlersChain
 	pool         sync.Pool
@@ -138,7 +138,7 @@ func (r *Router) AddCommand(operation string, handlers ...router.HandlerFunc) ro
 }
 
 func (r *Router) Close() error {
-	//r.redisCluster.Close()
+	r.redisCluster.Close()
 	return nil
 }
 

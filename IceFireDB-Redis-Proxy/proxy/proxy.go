@@ -40,7 +40,7 @@ import (
 
 type Proxy struct {
 	Cache        *cache.Cache
-	proxyCluster rediscluster.Cluster
+	proxyCluster *rediscluster.Cluster
 	proxyClient  *redisclient.Pool
 	server       *bareneter.Server
 	router       router.IRoutes
