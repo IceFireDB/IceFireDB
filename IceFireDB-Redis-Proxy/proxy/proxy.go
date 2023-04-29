@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/cache"
+	"github.com/IceFireDB/IceFireDB-Proxy/pkg/cache"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/p2p"
 
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/pkg/bareneter"
