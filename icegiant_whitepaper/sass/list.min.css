@@ -1,1 +1,0 @@
-.pitem{display:flex;flex-direction:row;justify-content:space-between;margin:1.6% 0}.pitem-category a{color:#555}.pitem-category a::before{content:'/'}.pitem-tag a{color:#a0a0a0}.pitem-tag a::before{content:'#'}@media screen and (max-width:700px){.pitem{margin:2.3% 0}.pitem-category,.pitem-tag{display:none}}
