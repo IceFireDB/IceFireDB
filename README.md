@@ -57,7 +57,7 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
 4. Based on IPFS decentralized storage, build a persistent data distributed storage layer.（beta version）
 5. Support P2P automatic networking, build decentralized NoSQL and SQL data synchronization.
 6. Support decentralized consistent kv storage engine ([icefiredb-crdt-kv](https://github.com/IceFireDB/icefiredb-crdt-kv) and [icefiredb-ipfs-log](https://github.com/IceFireDB/icefiredb-ipfs-log) is supporting)
-7. Build a blockchain mechanism based on EVM virtual machine. (Smart contract layer construction through IceGiant combined with FVM)
+7. Support KV and SQL immutable storage engine (combined with immudb storage engine)
 8. Build an immutable transparent log witness layer between web2 and web3, build a data hot and cold hybrid structure and an immutable data bridge layer. (inspired by google trillian-witness and IPLD) 
 9. Support kv metadata layer and mixed storage structure of hot and cold. （web2 area support）
 10. More advanced cache implementation, faster LSM persistent storage（Source of ideas: https://dl.acm.org/doi/10.1145/3448016.3452819 ）（Support the performance improvement of blockchain full-node）
