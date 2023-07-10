@@ -203,15 +203,15 @@ func (i *info) dumpStore(buf *bytes.Buffer) {
 	// }
 
 	i.dumpPairs(buf, infoPair{"name", ldsCfg.DBName},
-		infoPair{"get", s.GetNum},
-		infoPair{"get_missing", s.GetMissingNum},
-		infoPair{"put", s.PutNum},
-		infoPair{"delete", s.DeleteNum},
+		infoPair{"get", s.GetNum.Get()},
+		infoPair{"get_missing", s.GetMissingNum.Get()},
+		infoPair{"put", s.PutNum.Get()},
+		infoPair{"delete", s.DeleteNum.Get()},
 		infoPair{"get_total_time", s.GetTotalTime.Get().String()},
-		infoPair{"iter", s.IterNum},
-		infoPair{"iter_seek", s.IterSeekNum},
-		infoPair{"iter_close", s.IterCloseNum},
-		infoPair{"batch_commit", s.BatchCommitNum},
+		infoPair{"iter", s.IterNum.Get()},
+		infoPair{"iter_seek", s.IterSeekNum.Get()},
+		infoPair{"iter_close", s.IterCloseNum.Get()},
+		infoPair{"batch_commit", s.BatchCommitNum.Get()},
 		infoPair{"batch_commit_total_time", s.BatchCommitTotalTime.Get().String()},
 	)
 }
