@@ -117,12 +117,17 @@ func (i *info) dumpAll(buf *bytes.Buffer) {
 func (i *info) dumpServer(buf *bytes.Buffer) {
 	buf.WriteString("# Server\r\n")
 
-	i.dumpPairs(buf, infoPair{"os", i.Server.OS},
+	threadNum, _ := runtime.ThreadCreateProfile(nil)
+	i.dumpPairs(buf,
+		infoPair{"os", i.Server.OS},
+		infoPair{"arch", runtime.GOARCH},
 		infoPair{"process_id", i.Server.ProceessID},
 		infoPair{"addr", conf.Addr},
 		infoPair{"http_addr", ldsCfg.HttpAddr},
 		infoPair{"readonly", ldsCfg.Readonly},
 		infoPair{"goroutine_num", runtime.NumGoroutine()},
+		infoPair{"gomaxprocs", runtime.GOMAXPROCS(0)},
+		infoPair{"thread_num", threadNum},
 		infoPair{"cgo_call_num", runtime.NumCgoCall()},
 		infoPair{"resp_client_num", atomic.LoadInt64(&respClientNum)},
 		infoPair{"ledisdb_version", ledis.Version},
