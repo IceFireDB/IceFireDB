@@ -246,17 +246,25 @@ func cmdGETBIT(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-// 此处和redis标准有区别，当前只支持一个key的判断过程
 func cmdEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) != 2 {
+	if len(args) < 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
-	n, err := ldb.Exists([]byte(args[1]))
-	if err != nil {
-		return nil, err
+	var counter int
+	for _, key := range args[1:] {
+		n, err := ldb.Exists([]byte(key))
+		if err != nil {
+			return nil, err
+		}
+
+		// exists
+		if n > 0 {
+			counter++
+		}
 	}
-	return redcon.SimpleInt(n), nil
+
+	return redcon.SimpleInt(counter), nil
 }
 
 func cmdDECRBY(m uhaha.Machine, args []string) (interface{}, error) {
