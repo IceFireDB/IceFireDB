@@ -1,3 +1,4 @@
+//go:build alltest
 // +build alltest
 
 package main
@@ -6,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/v9"
 )
 
 func TestScan(t *testing.T) {

@@ -1,3 +1,4 @@
+//go:build alltest
 // +build alltest
 
 package main
@@ -6,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/v9"
 	"github.com/spf13/cast"
 )
 
@@ -425,173 +426,171 @@ func TestZSetRange(t *testing.T) {
 
 }
 
-
 func TestZsetErrorParams(t *testing.T) {
 	c := getTestConn()
 
 	//zadd
-	if _, err := c.Do(c.Context(),"zadd", "test_zadd").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zadd", "test_zadd").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zadd", "test_zadd", "a", "b", "c").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zadd", "test_zadd", "a", "b", "c").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zadd", "test_zadd", "-a", "a").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zadd", "test_zadd", "-a", "a").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zadd", "test_zad", "0.1", "a").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zadd", "test_zad", "0.1", "a").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zcard
-	if _, err := c.Do(c.Context(),"zcard").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zcard").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zscore
-	if _, err := c.Do(c.Context(),"zscore", "test_zscore").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zscore", "test_zscore").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zrem
-	if _, err := c.Do(c.Context(),"zrem", "test_zrem").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrem", "test_zrem").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zincrby
-	if _, err := c.Do(c.Context(),"zincrby", "test_zincrby").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zincrby", "test_zincrby").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zincrby", "test_zincrby", 0.1, "a").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zincrby", "test_zincrby", 0.1, "a").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zcount
-	if _, err := c.Do(c.Context(),"zcount", "test_zcount").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zcount", "test_zcount").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zcount", "test_zcount", "-inf", "=inf").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zcount", "test_zcount", "-inf", "=inf").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zcount", "test_zcount", 0.1, 0.1).Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zcount", "test_zcount", 0.1, 0.1).Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zrank
-	if _, err := c.Do(c.Context(),"zrank", "test_zrank").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrank", "test_zrank").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zrevzrank
-	if _, err := c.Do(c.Context(),"zrevrank", "test_zrevrank").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrevrank", "test_zrevrank").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zremrangebyrank
-	if _, err := c.Do(c.Context(),"zremrangebyrank", "test_zremrangebyrank").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zremrangebyrank", "test_zremrangebyrank").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zremrangebyrank", "test_zremrangebyrank", 0.1, 0.1).Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zremrangebyrank", "test_zremrangebyrank", 0.1, 0.1).Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zremrangebyscore
-	if _, err := c.Do(c.Context(),"zremrangebyscore", "test_zremrangebyscore").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zremrangebyscore", "test_zremrangebyscore").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zremrangebyscore", "test_zremrangebyscore", "-inf", "a").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zremrangebyscore", "test_zremrangebyscore", "-inf", "a").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zremrangebyscore", "test_zremrangebyscore", 0, "a").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zremrangebyscore", "test_zremrangebyscore", 0, "a").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zrange
-	if _, err := c.Do(c.Context(),"zrange", "test_zrange").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrange", "test_zrange").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zrange", "test_zrange", 0, 1, "withscore").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrange", "test_zrange", 0, 1, "withscore").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zrange", "test_zrange", 0, 1, "withscores", "a").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrange", "test_zrange", 0, 1, "withscores", "a").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zrevrange, almost same as zrange
-	if _, err := c.Do(c.Context(),"zrevrange", "test_zrevrange").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrevrange", "test_zrevrange").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zrangebyscore
-	if _, err := c.Do(c.Context(),"zrangebyscore", "test_zrangebyscore").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrangebyscore", "test_zrangebyscore").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zrangebyscore", "test_zrangebyscore", 0, 1, "withscore").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrangebyscore", "test_zrangebyscore", 0, 1, "withscore").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zrangebyscore", "test_zrangebyscore", 0, 1, "withscores", "limit").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrangebyscore", "test_zrangebyscore", 0, 1, "withscores", "limit").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zrangebyscore", "test_zrangebyscore", 0, 1, "withscores", "limi", 1, 1).Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrangebyscore", "test_zrangebyscore", 0, 1, "withscores", "limi", 1, 1).Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zrangebyscore", "test_zrangebyscore", 0, 1, "withscores", "limit", "a", 1).Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrangebyscore", "test_zrangebyscore", 0, 1, "withscores", "limit", "a", 1).Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
-	if _, err := c.Do(c.Context(),"zrangebyscore", "test_zrangebyscore", 0, 1, "withscores", "limit", 1, "a").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrangebyscore", "test_zrangebyscore", 0, 1, "withscores", "limit", 1, "a").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zrevrangebyscore, almost same as zrangebyscore
-	if _, err := c.Do(c.Context(),"zrevrangebyscore", "test_zrevrangebyscore").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zrevrangebyscore", "test_zrevrangebyscore").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zclear
-	if _, err := c.Do(c.Context(),"zclear").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zclear").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zmclear
-	if _, err := c.Do(c.Context(),"zmclear").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zmclear").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zexpire
-	if _, err := c.Do(c.Context(),"zexpire", "test_zexpire").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zexpire", "test_zexpire").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zexpireat
-	if _, err := c.Do(c.Context(),"zexpireat", "test_zexpireat").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zexpireat", "test_zexpireat").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zttl
-	if _, err := c.Do(c.Context(),"zttl").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zttl").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 	//zpersist
-	if _, err := c.Do(c.Context(),"zpersist").Result(); err == nil {
+	if _, err := c.Do(c.Context(), "zpersist").Result(); err == nil {
 		t.Fatalf("invalid err of %v", err)
 	}
 
 }
-

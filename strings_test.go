@@ -1,3 +1,4 @@
+//go:build alltest
 // +build alltest
 
 package main
@@ -6,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/v9"
 )
 
 func TestKV(t *testing.T) {
