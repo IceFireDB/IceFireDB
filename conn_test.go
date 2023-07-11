@@ -15,8 +15,8 @@ import (
 	"github.com/ledisdb/ledisdb/ledis"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/go-redis/redis/v9"
 	lediscfg "github.com/ledisdb/ledisdb/config"
+	"github.com/redis/go-redis/v9"
 	"github.com/tidwall/uhaha"
 )
 
