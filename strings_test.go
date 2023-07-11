@@ -1,3 +1,4 @@
+//go:build alltest
 // +build alltest
 
 package main
@@ -56,6 +57,24 @@ func TestKV(t *testing.T) {
 	if n, err := c.Exists(c.Context(), "a").Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 1 {
+		t.Fatal(n)
+	}
+
+	if n, err := c.Exists(c.Context(), "a", "b").Result(); err != nil {
+		t.Fatal(err)
+	} else if n != 2 {
+		t.Fatal(n)
+	}
+
+	if n, err := c.Exists(c.Context(), "a", "b", "c", "d").Result(); err != nil {
+		t.Fatal(err)
+	} else if n != 2 {
+		t.Fatal(n)
+	}
+
+	if n, err := c.Exists(c.Context(), "c", "d").Result(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
 		t.Fatal(n)
 	}
 
@@ -225,10 +244,6 @@ func TestKVErrorParams(t *testing.T) {
 	}
 
 	if _, err := c.Do(c.Context(), "setnx", "a", "b", "c").Result(); err == nil {
-		t.Errorf("invalid err %v", err)
-	}
-
-	if _, err := c.Do(c.Context(), "exists", "a", "b").Result(); err == nil {
 		t.Errorf("invalid err %v", err)
 	}
 
