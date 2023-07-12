@@ -10,7 +10,7 @@ COPY . .
 RUN CGO_ENABLED=1 go build -o sqlite .
 
 
-FROM taosheng205054/mysqladmin:latest AS final
+FROM alpine:latest AS final
 
 WORKDIR /app
 COPY --from=builder /build/sqlite /app/
