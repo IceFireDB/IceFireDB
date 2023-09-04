@@ -31,14 +31,14 @@ Based on cutting-edge computer science, the IceFireDB project integrates new ide
 
 The core of IceFireDB architecture is geographically distributed event source and decentralized Log source, with log-level CRDT replication.In order to realize the consistency of replication, IceFireDB provides a stable decentralized networking model, which allows the combination of public networks among different sites. Multiple IceFireDB nodes can be run inside each site, and RAFT network can be formed between nodes, which ensures the data consistency and stable storage within the same site.
 
-![image](https://res.cloudinary.com/malloc/image/upload/v1666341372/icefiredb/docs/197144174-9f2f400f-5c6d-4ee0-9cfe-5e725dcb179e_sorguc.png)
+![image](./imgs/icefiredb_dc_logs_sync.png)
 
 
 # Decentralized database engine
 
 <p align="center">
 <img 
-    src="./icefiredb-bridge.png" 
+    src="./imgs/IceFireDB_helps_applications_achieve_data_decentralization.png" 
      alt="icefiredb-bridge">
 </p>
 
@@ -47,7 +47,7 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
 
 <p align="center">
 <img 
-    src="./imgs/project_purpose.png" 
+    src="./imgs/Application_architecture_based_on_IceFireDB.png"
      alt="project_purpose">
 </p>
 
@@ -66,7 +66,7 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
 
 <p align="center">
 <img 
-    src="IceFireDB_Architecture.png" 
+    src="./imgs/IceFireDB_Architecture_new.png" 
      alt="IceFireDB_Architecture">
 </p>
 
