@@ -24,7 +24,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Test
         run: go test -v --v -tags="alltest osstest"
 
@@ -42,7 +42,7 @@ jobs:
 #        with:
 #          go-version: ${{ matrix.go-version }}
 #      - name: Checkout code
-#        uses: actions/checkout@v3
+#        uses: actions/checkout@v4
 #      - name: Test
 #        run: go test -v --v -tags alltest
 
@@ -68,7 +68,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Test
         run: go test -v --v -tags alltest
 
@@ -86,7 +86,7 @@ jobs:
 #        with:
 #          go-version: ${{ matrix.go-version }}
 #      - name: Checkout code
-#        uses: actions/checkout@v3
+#        uses: actions/checkout@v4
 #      - name: Test
 #        run: go test -v --v -tags alltest
 
@@ -105,7 +105,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Test
         run: go test -v --v -tags alltest
 
@@ -123,7 +123,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Test
         run: go test -v --v -tags alltest
 
@@ -141,6 +141,6 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Test
         run: go test -v --v -tags alltest
