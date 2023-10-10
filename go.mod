@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	berty.tech/go-ipfs-log v1.8.0 // indirect
-	github.com/IceFireDB/icefiredb-crdt-kv v0.0.0-20220821125516-0f23a3a1b870
-	github.com/IceFireDB/icefiredb-ipfs-log v0.0.0-20220915121808-201a248e55a9
+	github.com/IceFireDB/icefiredb-crdt-kv v0.1.0
+	github.com/IceFireDB/icefiredb-ipfs-log v0.1.0
 	github.com/armon/go-metrics v0.3.6 // indirect
 	github.com/aws/aws-sdk-go v1.45.24
 	github.com/cenkalti/backoff/v4 v4.1.3
@@ -275,5 +275,6 @@ require (
 
 replace (
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6 => github.com/IceFireDB/ledisdb v0.7.1
-	github.com/tidwall/uhaha v0.8.1 => github.com/gitsrc/uhaha v0.6.2-0.20210827055200-e2d63f4d4aee
+	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 => github.com/IceFireDB/golibs v0.1.0
+	github.com/tidwall/uhaha v0.8.1 => github.com/IceFireDB/uhaha v0.7.1
 )
