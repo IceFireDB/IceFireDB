@@ -7,7 +7,7 @@ require (
 	github.com/IceFireDB/icefiredb-crdt-kv v0.1.0
 	github.com/IceFireDB/icefiredb-ipfs-log v0.1.0
 	github.com/armon/go-metrics v0.3.6 // indirect
-	github.com/aws/aws-sdk-go v1.47.0
+	github.com/aws/aws-sdk-go v1.47.1
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger v1.6.2
@@ -256,14 +256,14 @@ require (
 	go.uber.org/fx v1.17.1 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
-	golang.org/x/crypto v0.1.0 // indirect
-	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
-	golang.org/x/net v0.1.0 // indirect
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
-	golang.org/x/sys v0.1.0 // indirect
-	golang.org/x/term v0.1.0 // indirect
-	golang.org/x/text v0.4.0 // indirect
-	golang.org/x/tools v0.1.12 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/mod v0.8.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/sync v0.1.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/term v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/tools v0.6.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
 	google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1 // indirect
 	google.golang.org/grpc v1.47.0 // indirect
