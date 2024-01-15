@@ -54,8 +54,8 @@ github.com/DataDog/datadog-go v2.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/IceFireDB/golibs v0.1.0 h1:YU4gONZfddEDd+PuMokc4jpeUg50bxBU+kkzfepn8v8=
 github.com/IceFireDB/golibs v0.1.0/go.mod h1:1Nf3801XTkX+Ont/I/BZHQ3poEDb5v8d4SDospADyQ4=
-github.com/IceFireDB/icefiredb-crdt-kv v0.1.0 h1:JIgleirS+1u5st87f1nhT2PRgXfErnqdXMdQ62N8rg0=
-github.com/IceFireDB/icefiredb-crdt-kv v0.1.0/go.mod h1:XAsHkuIRp3iSQPkqqbuHD3uOdTC8JpA1pdzT1UW9WTc=
+github.com/IceFireDB/icefiredb-crdt-kv v0.1.1 h1:P9umnPW2oVmszHvhGQgUoKY7nemYVSmbl0t0d1S/m6s=
+github.com/IceFireDB/icefiredb-crdt-kv v0.1.1/go.mod h1:b09g/UvmnRjE2XLYkUFzzY4PmiWGqhPTZgaKtCr+mJw=
 github.com/IceFireDB/icefiredb-ipfs-log v0.1.0 h1:grbevkRNvPXsT4UpTXwF/0WmxwhGYQPAhJe3MZ+XZX8=
 github.com/IceFireDB/icefiredb-ipfs-log v0.1.0/go.mod h1:9A6y/WkTvv2K67Kn51Lgw9ZmmsdoeDErxFS8IP7z9wY=
 github.com/IceFireDB/ledisdb v0.7.1 h1:4/VNwLXGeQD4EQuX8GEWP4Qs6KzTLYL7/DK5hrPHcVw=

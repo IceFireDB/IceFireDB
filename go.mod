@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	berty.tech/go-ipfs-log v1.8.0 // indirect
-	github.com/IceFireDB/icefiredb-crdt-kv v0.1.0
+	github.com/IceFireDB/icefiredb-crdt-kv v0.1.1
 	github.com/IceFireDB/icefiredb-ipfs-log v0.1.0
 	github.com/armon/go-metrics v0.3.6 // indirect
 	github.com/aws/aws-sdk-go v1.49.19
