@@ -18,7 +18,7 @@ require (
 	github.com/ipfs/go-ipfs-api v0.3.0
 	github.com/ipfs/interface-go-ipfs-core v0.7.0 // indirect
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6
-	github.com/philippgille/gokv/encoding v0.6.0
+	github.com/philippgille/gokv/encoding v0.7.0
 	github.com/philippgille/gokv/test v0.7.0
 	github.com/philippgille/gokv/util v0.6.0
 	github.com/pkg/errors v0.9.1 // indirect
