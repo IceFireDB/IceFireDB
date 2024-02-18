@@ -8,6 +8,7 @@ import (
 func init() {
 	conf.AddReadCommand("INFO", cmdINFO)
 	conf.AddWriteCommand("FLUSHALL", cmdFLUSHALL)
+	conf.AddWriteCommand("FLUSHDB", cmdFLUSHDB)
 }
 
 func cmdINFO(_ uhaha.Machine, args []string) (interface{}, error) {
@@ -26,4 +27,8 @@ func cmdFLUSHALL(_ uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 	return redcon.SimpleInt(n), nil
+}
+
+func cmdFLUSHDB(_ uhaha.Machine, args []string) (interface{}, error) {
+	return cmdFLUSHALL(nil, args)
 }
