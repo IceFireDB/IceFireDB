@@ -25,7 +25,6 @@ import (
 
 	// "github.com/IceFireDB/IceFireDB/driver/orbitdb"
 	"github.com/IceFireDB/IceFireDB/driver/oss"
-	"github.com/IceFireDB/IceFireDB/utils"
 	"github.com/IceFireDB/icefiredb-crdt-kv/kv"
 )
 
@@ -101,7 +100,7 @@ func main() {
 	conf.Restore = restore
 	conf.ConnOpened = connOpened
 	conf.ConnClosed = connClosed
-	conf.CmdRewriteFunc = utils.RedisCmdRewrite
+	//conf.CmdRewriteFunc = utils.RedisCmdRewrite
 
 	fmt.Printf("start with Storage Engine: %s\n", storageBackend)
 	rafthub.Main(conf)

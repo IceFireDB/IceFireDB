@@ -28,7 +28,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tidwall/redcon v1.6.2
 	github.com/tidwall/sds v0.3.0
-	github.com/tidwall/uhaha v0.8.1
+	github.com/tidwall/uhaha v0.11.2
 )
 
 require (
@@ -66,7 +66,7 @@ require (
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/facebookgo/atomicfile v0.0.0-20151019160806-2de1f203e7d5 // indirect
-	github.com/fatih/color v1.12.0 // indirect
+	github.com/fatih/color v1.13.0 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
@@ -88,13 +88,14 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
 	github.com/hannahhoward/go-pubsub v0.0.0-20200423002714-8d62886cc36e // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
-	github.com/hashicorp/go-hclog v0.16.2 // indirect
+	github.com/hashicorp/go-hclog v1.4.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.0 // indirect
 	github.com/hashicorp/go-msgpack v1.1.5 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
-	github.com/hashicorp/raft v1.3.1 // indirect
+	github.com/hashicorp/raft v1.3.11 // indirect
 	github.com/hashicorp/raft-boltdb v0.0.0-20210422161416-485fa74b0b01 // indirect
+	github.com/hashicorp/raft-boltdb/v2 v2.2.2 // indirect
 	github.com/hsanjuan/ipfs-lite v1.4.1 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
@@ -189,7 +190,7 @@ require (
 	github.com/marten-seemann/qtls-go1-18 v0.1.2 // indirect
 	github.com/marten-seemann/qtls-go1-19 v0.1.0-beta.1 // indirect
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
-	github.com/mattn/go-colorable v0.1.8 // indirect
+	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
@@ -224,11 +225,11 @@ require (
 	github.com/siddontang/rdb v0.0.0-20150307021120-fc89ed2e418d // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/tidwall/btree v1.1.0 // indirect
+	github.com/tidwall/btree v1.5.2 // indirect
 	github.com/tidwall/gjson v1.14.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
-	github.com/tidwall/raft-leveldb v0.2.0 // indirect
+	github.com/tidwall/raft-leveldb v0.2.1 // indirect
 	github.com/tidwall/redlog/v2 v2.0.4 // indirect
 	github.com/tidwall/rtime v0.2.0 // indirect
 	github.com/wI2L/jsondiff v0.2.0 // indirect
@@ -239,6 +240,7 @@ require (
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7 // indirect
 	github.com/whyrusleeping/tar-utils v0.0.0-20180509141711-8c6c8ba81d5c // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
+	go.etcd.io/bbolt v1.3.5 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.opentelemetry.io/otel v1.7.0 // indirect
 	go.opentelemetry.io/otel/exporters/jaeger v1.7.0 // indirect
@@ -276,5 +278,5 @@ require (
 replace (
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6 => github.com/IceFireDB/ledisdb v0.7.1
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 => github.com/IceFireDB/golibs v0.1.0
-	github.com/tidwall/uhaha v0.8.1 => github.com/IceFireDB/uhaha v0.7.1
+	github.com/tidwall/uhaha v0.8.1 => github.com/IceFireLabs/uhaha v0.11.2
 )
