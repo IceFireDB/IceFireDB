@@ -60,7 +60,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	if DefaultConfig.HotCacheSize <= 0 {
 		DefaultConfig.HotCacheSize = defaultHotCacheSize
 	}
-	// here we use default value, later add config support
+	//TODO: here we use default value, need add config support
 	db.cache, err = ristretto.NewCache(&ristretto.Config{
 		MaxCost:     DefaultConfig.HotCacheSize * MB,
 		NumCounters: defaultHotCacheNumCounters,

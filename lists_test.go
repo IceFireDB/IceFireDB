@@ -104,7 +104,6 @@ func TestList(t *testing.T) {
 	// 127.0.0.1:6379> lrange a 0 1
 	// 1) "1"
 	// 2) "2"
-
 	if err := testListRange(key, 0, 1, 1, 2); err != nil {
 		t.Fatal(err)
 	}

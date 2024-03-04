@@ -53,7 +53,6 @@ func (w *WriteBatch) Rollback() error {
 	defer w.lock.Unlock()
 
 	if w.wb != nil {
-		// w.wb.Cancel()
 		w.wb = nil
 	}
 	return nil

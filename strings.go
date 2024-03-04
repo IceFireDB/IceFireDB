@@ -64,7 +64,7 @@ func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	// 如果时间戳小于当前时间，则进行删除操作
+	// If the timestamp is less than the current time, delete it
 	if timestamp < time.Now().Unix() {
 		keys := make([][]byte, 1)
 		keys[0] = []byte(args[1])
@@ -370,7 +370,7 @@ func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-// 此处和redis标准有区别,需要丰富算法，支撑更多原子指令
+// This is different from the redis standard. It needs to enrich the algorithm to support more atomic instructions.
 func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -469,7 +469,7 @@ func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
 	return val, nil
 }
 
-// 此处和redis标准有区别，为了事务一致性考虑，没有进行key存在判断
+// This is different from the redis standard. For the sake of transaction consistency, there is no key existence judgment.
 func cmdDEL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
 		return nil, rafthub.ErrWrongNumArgs

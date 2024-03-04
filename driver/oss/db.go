@@ -3,10 +3,11 @@ package oss
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/philippgille/gokv/encoding"
 	"io/fs"
 	"os"
+
+	"github.com/aws/aws-sdk-go/aws/endpoints"
+	"github.com/philippgille/gokv/encoding"
 
 	"github.com/dgraph-io/ristretto"
 	"github.com/ledisdb/ledisdb/config"
@@ -23,23 +24,20 @@ const (
 	defaultHotCacheSize        int64 = 1024 // unit:MB 1G
 	defaultHotCacheNumCounters int64 = 1e7  // unit:byte 10m
 	defaultFilterBits          int   = 10
-
-
 )
 
 type Config struct {
-	HotCacheSize int64
-	EndPointConnection  string
-	AccessKey string
-	Secretkey  string 
+	HotCacheSize       int64
+	EndPointConnection string
+	AccessKey          string
+	Secretkey          string
 }
 
 var OssDefaultConfig = Config{
 	HotCacheSize:       defaultHotCacheSize,
 	EndPointConnection: "http://localhost:9000",
-	AccessKey :   "AKIAIOSFODNN7EXAMPLE",
-	Secretkey :   "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-	
+	AccessKey:          "AKIAIOSFODNN7EXAMPLE",
+	Secretkey:          "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 }
 
 func init() {
@@ -86,16 +84,15 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	if err != nil {
 		return nil, err
 	}
-	
-	
+
 	db.options = Options{
-		BucketName:         "gokv",
-		AWSaccessKeyID:     OssDefaultConfig.AccessKey,
-		AWSsecretAccessKey: OssDefaultConfig.Secretkey,
-		Region:             endpoints.UsEast1RegionID, //endpoints.UsWest2RegionID,
+		BucketName:             "gokv",
+		AWSaccessKeyID:         OssDefaultConfig.AccessKey,
+		AWSsecretAccessKey:     OssDefaultConfig.Secretkey,
+		Region:                 endpoints.UsEast1RegionID, //endpoints.UsWest2RegionID,
 		CustomEndpoint:         OssDefaultConfig.EndPointConnection,
 		UsePathStyleAddressing: true,
-		Codec: encoding.Gob,
+		Codec:                  encoding.Gob,
 	}
 	return db, nil
 }
@@ -125,8 +122,8 @@ type DB struct {
 
 	cache *ristretto.Cache
 
-	filter filter.Filter
-	options  Options
+	filter  filter.Filter
+	options Options
 }
 
 func (s *DB) GetStorageEngine() interface{} {
@@ -175,20 +172,17 @@ func (db *DB) Close() error {
 	return db.db.Close()
 }
 
-
 func (db *DB) S3EncodeMetaKey(key []byte) []byte {
 	bas64key := base64.StdEncoding.EncodeToString(key)
 	bkey := []byte(bas64key)
 	return bkey
 }
 
-
-
 func (db *DB) S3Put(key, value []byte) error {
 	client, err := NewClient(db.options)
 	if err != nil {
 		fmt.Println("new client error")
-		return  err
+		return err
 	}
 	bkey := db.S3EncodeMetaKey(key)
 	sskey := string(bkey)
@@ -198,18 +192,18 @@ func (db *DB) S3Put(key, value []byte) error {
 		//fmt.Println("err key = : " ,bkey)
 		//fmt.Println("err value = : " ,value)
 	}
-	
+
 	//fmt.Println(" ok s3 put ", string(key))
 	return err
 }
 func (db *DB) Put(key, value []byte) error {
 	var err error
 
-	err = db.S3Put(key, value )
+	err = db.S3Put(key, value)
 	if err != nil {
 		return err
 	}
-	
+
 	err = db.db.Put(key, value, nil)
 	if err == nil {
 		db.cache.Del(key)
@@ -218,25 +212,24 @@ func (db *DB) Put(key, value []byte) error {
 	return err
 }
 
-
 func (db *DB) S3Get(key []byte) ([]byte, error) {
-	value:= new(string)
+	value := new(string)
 
 	client, err := NewClient(db.options)
 	if err != nil {
 		return nil, err
 	}
 
-	sskey:= db.S3EncodeMetaKey(key)
+	sskey := db.S3EncodeMetaKey(key)
 
 	//found, err := client.Get(string(key), value)
 	found, err := client.Get(string(sskey), value)
 	if err != nil {
 		//fmt.Println(err)
-		return nil , err
+		return nil, err
 	}
 
-	if found != true{
+	if found != true {
 		//fmt.Println(" S3 not found key=" , string(sskey))
 		return nil, nil
 	}
@@ -252,7 +245,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	}
 	v, err := db.db.Get(key, nil)
 	if err == leveldb.ErrNotFound {
-	
+
 		v, err = db.S3Get(key)
 		if err != nil{
 			return nil, nil
@@ -265,10 +258,9 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 }
 */
 
-
 func (db *DB) Get(key []byte) ([]byte, error) {
 	v, err := db.S3Get(key)
-	if err != nil{
+	if err != nil {
 		//fmt.Println("  s3 get ", err)
 		return nil, nil
 	}
@@ -280,10 +272,10 @@ func (db *DB) S3Delete(key []byte) error {
 
 	client, err := NewClient(db.options)
 	if err != nil {
-		return  err
+		return err
 	}
 
-	sskey:= db.S3EncodeMetaKey(key)
+	sskey := db.S3EncodeMetaKey(key)
 	err = client.Delete(string(sskey))
 	if err == nil {
 		//fmt.Printf("Expected an error")
