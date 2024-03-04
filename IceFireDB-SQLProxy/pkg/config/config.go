@@ -1,6 +1,8 @@
 package config
 
 import (
+	"net"
+
 	"github.com/spf13/viper"
 )
 
@@ -41,6 +43,8 @@ type P2PS struct {
 	ServiceDiscoveryID  string `json:"service_discovery_id"`
 	ServiceCommandTopic string `json:"service_command_topic"`
 	ServiceDiscoverMode string `json:"service_discover_mode"`
+	NodeHostIP          string `json:"node_host_ip"`
+	NodeHostPort        int    `json:"node_host_port"`
 }
 
 func init() {
@@ -58,6 +62,14 @@ func InitConfig(path string) {
 	err := viper.Unmarshal(defaultConfig)
 	if err != nil {
 		panic(err)
+	}
+
+	if net.ParseIP(defaultConfig.P2P.NodeHostIP) == nil {
+		defaultConfig.P2P.NodeHostIP = "0.0.0.0"
+	}
+
+	if defaultConfig.P2P.NodeHostPort < 0 || defaultConfig.P2P.NodeHostPort > 65535 {
+		defaultConfig.P2P.NodeHostPort = 0
 	}
 }
 

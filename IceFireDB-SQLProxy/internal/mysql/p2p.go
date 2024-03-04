@@ -1,13 +1,14 @@
 package mysql
 
 import (
+	"strings"
+	"time"
+
 	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/config"
 	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/client"
 	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/p2p"
 	"github.com/IceFireDB/IceFireDB-SQLProxy/utils"
 	"github.com/sirupsen/logrus"
-	"strings"
-	"time"
 )
 
 var (
@@ -17,7 +18,7 @@ var (
 
 func initP2P(m *mysqlProxy) {
 	// create p2p element
-	p2pHost = p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID) // create p2p
+	p2pHost = p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID, config.Get().P2P.NodeHostIP, config.Get().P2P.NodeHostPort) // create p2p
 	logrus.Info("Completed P2P Setup")
 	// Connect to peers with the chosen discovery method
 	switch strings.ToLower(config.Get().P2P.ServiceDiscoverMode) {
