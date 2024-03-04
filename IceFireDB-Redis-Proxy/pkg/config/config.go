@@ -21,6 +21,7 @@ package config
 
 import (
 	"errors"
+	"net"
 	"strings"
 
 	rediscluster "github.com/chasex/redis-go-cluster"
@@ -55,6 +56,14 @@ func InitConfig() error {
 	}
 	if _config.IgnoreCMD.Enable && len(_config.IgnoreCMD.CMDList) > 0 {
 		CmdToUpper(_config.IgnoreCMD.CMDList)
+	}
+
+	if net.ParseIP(_config.P2P.NodeHostIP) == nil {
+		_config.P2P.NodeHostIP = "0.0.0.0"
+	}
+
+	if _config.P2P.NodeHostPort < 0 || _config.P2P.NodeHostPort > 65535 {
+		_config.P2P.NodeHostPort = 0
 	}
 
 	return nil

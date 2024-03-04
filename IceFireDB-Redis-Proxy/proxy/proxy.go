@@ -107,7 +107,7 @@ func New() (*Proxy, error) {
 
 		log.Println("Connected to P2P Service Peers")
 
-		p.P2pSubPub, err = p2p.JoinPubSub(p.P2pHost, "redis-client", config.Get().P2P.ServiceCommandTopic)
+		p.P2pSubPub, err = p2p.JoinPubSub(p.P2pHost, "icefiredb-redis-proxy-client", config.Get().P2P.ServiceCommandTopic)
 
 		if err != nil {
 			log.Println(err)

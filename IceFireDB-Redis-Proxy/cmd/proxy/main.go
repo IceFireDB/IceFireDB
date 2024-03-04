@@ -104,13 +104,13 @@ func start(c *cli.Context) error {
 			}()
 			select {
 			case <-ok:
-				logrus.Info("shutdown proxy ！！！！")
+				logrus.Info("shutdown proxy")
 			case <-time.After(time.Second * 5):
-				logrus.Info("context deadline exceeded ！！！！")
+				logrus.Info("context deadline exceeded")
 			}
 			os.Exit(0)
 		case syscall.SIGHUP:
-			logrus.Info("+++++++++++++++++++++++++++++")
+			logrus.Info("catch syscall.SIGHUP")
 		}
 	}
 	return nil
