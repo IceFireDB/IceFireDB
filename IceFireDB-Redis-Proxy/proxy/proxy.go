@@ -90,7 +90,7 @@ func New() (*Proxy, error) {
 	// if enable p2p command pubsub mode,then create p2p pubsub handle
 	if config.Get().P2P.Enable {
 		// create p2p element
-		p2phost := p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID) // create p2p
+		p2phost := p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID, config.Get().P2P.NodeHostIP, config.Get().P2P.NodeHostPort)
 		p.P2pHost = p2phost
 
 		log.Println("Completed P2P Setup")
@@ -107,7 +107,7 @@ func New() (*Proxy, error) {
 
 		log.Println("Connected to P2P Service Peers")
 
-		p.P2pSubPub, err = p2p.JoinPubSub(p.P2pHost, "redis-client", config.Get().P2P.ServiceCommandTopic)
+		p.P2pSubPub, err = p2p.JoinPubSub(p.P2pHost, "icefiredb-redis-proxy-client", config.Get().P2P.ServiceCommandTopic)
 
 		if err != nil {
 			log.Println(err)
