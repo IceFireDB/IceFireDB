@@ -36,8 +36,8 @@ type Config struct {
 var OssDefaultConfig = Config{
 	HotCacheSize:       defaultHotCacheSize,
 	EndPointConnection: "http://127.0.0.1:9000",
-	AccessKey:          "",
-	Secretkey:          "",
+	AccessKey:          "AKIAIOSFODNN7EXAMPLE",
+	Secretkey:          "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 }
 
 func init() {
