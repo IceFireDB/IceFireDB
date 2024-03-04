@@ -5,7 +5,7 @@ sqlite:
   filename: "db/sqlite.db"
 
 debug:  # Control to open pprof
-  enable: true
+  enable: false
   port: 17878
 
 # p2p config
@@ -14,6 +14,8 @@ p2p:
   service_discovery_id: "p2p_sqlite_service"
   service_command_topic: "p2p_sqlite_service_topic"
   service_discover_mode: "advertise" # advertise or announce
+  node_host_ip: "127.0.0.1" #local ipv4 ip
+  node_host_port: 0 # any port 
 
 # Tenant list
 userlist:

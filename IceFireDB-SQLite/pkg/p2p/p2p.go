@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -57,14 +58,14 @@ A Kademlia DHT is then bootstrapped on this host using the default peers offered
 and a Peer Discovery service is created from this Kademlia DHT. The PubSub handler is then
 created on the host using the peer discovery service created prior.
 */
-func NewP2P(serviceName string) *P2P {
+func NewP2P(serviceName string, nodeHostIP string, nodeHostPort int) *P2P {
 	// Setup a background context
 	ctx := context.Background()
 
 	// Setup a P2P Host Node
-	nodehost, kaddht := setupHost(ctx)
+	nodehost, kaddht := setupHost(ctx, nodeHostIP, nodeHostPort)
 	// Debug log
-	logrus.Debugln("Created the P2P Host and the Kademlia DHT.")
+	logrus.Infoln("Setup the p2p host,listen on", nodehost.Addrs())
 
 	// Bootstrap the Kad DHT
 	bootstrapDHT(ctx, nodehost, kaddht)
@@ -102,7 +103,7 @@ func (p2p *P2P) AdvertiseConnect() {
 	// Advertise the availabilty of the service on this node
 	ttl, err := p2p.Discovery.Advertise(p2p.Ctx, p2p.service)
 	// Debug log
-	logrus.Debugln("Advertised the PeerChat Service.")
+	logrus.Debugln("Advertised the p2p Service.")
 	// Sleep to give time for the advertisment to propogate
 	time.Sleep(time.Second * 5)
 	// Debug log
@@ -117,7 +118,7 @@ func (p2p *P2P) AdvertiseConnect() {
 		}).Fatalln("P2P Peer Discovery Failed!")
 	}
 	// Trace log
-	logrus.Traceln("Discovered PeerChat Service Peers.")
+	logrus.Traceln("Discovered p2p Service Peers.")
 
 	// Connect to peers as they are discovered
 	go handlePeerDiscovery(p2p.Host, peerchan)
@@ -145,14 +146,14 @@ func (p2p *P2P) AnnounceConnect() {
 		}).Fatalln("Failed to Announce Service CID!")
 	}
 	// Debug log
-	logrus.Debugln("Announced the PeerChat Service.")
+	logrus.Debugln("Announced the p2p Service.")
 	// Sleep to give time for the advertisment to propogate
 	time.Sleep(time.Second * 5)
 
 	// Find the other providers for the service CID
 	peerchan := p2p.KadDHT.FindProvidersAsync(p2p.Ctx, cidvalue, 0)
 	// Trace log
-	logrus.Traceln("Discovered PeerChat Service Peers.")
+	logrus.Traceln("Discovered p2p Service Peers.")
 
 	// Connect to peers as they are discovered
 	go handlePeerDiscovery(p2p.Host, peerchan)
@@ -162,7 +163,7 @@ func (p2p *P2P) AnnounceConnect() {
 
 // A function that generates the p2p configuration options and creates a
 // libp2p host object for the given context. The created host is returned
-func setupHost(ctx context.Context) (host.Host, *dht.IpfsDHT) {
+func setupHost(ctx context.Context, nodeHostIP string, nodeHostPort int) (host.Host, *dht.IpfsDHT) {
 	// Set up the host identity options
 	prvkey, pubkey, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, rand.Reader)
 
@@ -194,8 +195,16 @@ func setupHost(ctx context.Context) (host.Host, *dht.IpfsDHT) {
 	// Trace log
 	logrus.Traceln("Generated P2P Security and Transport Configurations.")
 
+	multiaddrStr := "/ip4/%s/tcp/%d"
+
+	//default "/ip4/0.0.0.0/tcp/0"
+	multiaddrStr = fmt.Sprintf(multiaddrStr, nodeHostIP, nodeHostPort)
+
 	// Set up host listener address options
-	muladdr, err := multiaddr.NewMultiaddr("/ip4/0.0.0.0/tcp/0")
+	muladdr, err := multiaddr.NewMultiaddr(multiaddrStr)
+
+	logrus.Infoln("Setup Multiaddr", multiaddrStr)
+
 	listen := libp2p.ListenAddrs(muladdr)
 	// Handle any potential error
 	if err != nil {

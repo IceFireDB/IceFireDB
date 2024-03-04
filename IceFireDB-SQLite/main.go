@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/IceFireDB/IceFireDB-SQLite/internal/mysql"
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/config"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/IceFireDB/IceFireDB-SQLite/internal/mysql"
+	"github.com/IceFireDB/IceFireDB-SQLite/pkg/config"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 )
 
 func main() {
@@ -75,13 +76,13 @@ func exitSignal(cancel context.CancelFunc, stop chan struct{}) error {
 
 			select {
 			case <-stop:
-				fmt.Println("shutdown！！！！")
+				fmt.Println("shutdown")
 			case <-time.After(time.Second * 5):
-				fmt.Println("timeout forced exit！！！！")
+				fmt.Println("timeout forced shutdown")
 			}
 			os.Exit(0)
 		case syscall.SIGHUP:
-			fmt.Println("+++++++++++++++++++++++++++++")
+			fmt.Println("catch syscall.SIGHUP")
 		}
 	}
 	return nil
