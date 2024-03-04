@@ -4,6 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"io/fs"
+	"log"
+	"os"
+	"unicode/utf8"
+
 	"github.com/IceFireDB/icefiredb-crdt-kv/kv"
 	"github.com/dgraph-io/badger"
 	"github.com/ipfs/go-datastore"
@@ -13,10 +18,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-	"io/fs"
-	"log"
-	"os"
-	"unicode/utf8"
 )
 
 const (
@@ -66,12 +67,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 		Namespace:           defaultNamespace,
 		Logger:              logrus.New(),
 	}
-	//kvcfg.PutHook = func(k datastore.Key, v []byte) {
-	//	fmt.Printf("Added: [%s] -> %s\n ", k, string(v))
-	//}
-	//kvcfg.DeleteHook = func(k datastore.Key) {
-	//	fmt.Printf("Removed: [%s]\n", k)
-	//}
+
 	db.db, err = kv.NewCRDTKeyValueDB(context.TODO(), kvcfg)
 	if err != nil {
 		return nil, err
@@ -95,7 +91,7 @@ func newOptions(cfg *config.LevelDBConfig) *opt.Options {
 
 	opts.BlockCacheCapacity = cfg.CacheSize
 
-	// we must use bloomfilter
+	//must use bloomfilter
 	opts.Filter = filter.NewBloomFilter(10)
 
 	if !cfg.Compression {
