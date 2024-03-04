@@ -31,7 +31,10 @@ func InitSQLite(ctx context.Context, filename string) *sql.DB {
 	}
 	if config.Get().P2P.Enable {
 		// create p2p element
-		p2pHost = p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID) // create p2p
+		p2pHost = p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID,
+			config.Get().P2P.NodeHostIP,
+			config.Get().P2P.NodeHostPort)
+
 		logrus.Info("Completed P2P Setup")
 
 		// Connect to peers with the chosen discovery method
@@ -46,7 +49,7 @@ func InitSQLite(ctx context.Context, filename string) *sql.DB {
 
 		logrus.Info("Connected to P2P Service Peers")
 		var err error
-		p2pPubSub, err = p2p.JoinPubSub(p2pHost, "mysql-client", config.Get().P2P.ServiceCommandTopic)
+		p2pPubSub, err = p2p.JoinPubSub(p2pHost, "icefiredb-sqlite-client", config.Get().P2P.ServiceCommandTopic)
 		if err != nil {
 			panic(err)
 		}
