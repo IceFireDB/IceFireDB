@@ -94,7 +94,7 @@ func New() (*Proxy, error) {
 	if config.Get().P2P.Enable {
 		logrus.Println("Starting Pubsub ...")
 		// create p2p element
-		p2phost := p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID) // create p2p
+		p2phost := p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID, config.Get().P2P.NodeHostIP, config.Get().P2P.NodeHostPort) // create p2p
 		p.P2pHost = p2phost
 
 		logrus.Println("Completed P2P Setup")
