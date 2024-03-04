@@ -143,7 +143,6 @@ func cmdHINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-// conf.AddReadCommand("HKEYS", cmdHKEYS)
 func cmdHKEYS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -157,7 +156,6 @@ func cmdHKEYS(m uhaha.Machine, args []string) (interface{}, error) {
 	return v, nil
 }
 
-// conf.AddReadCommand("HLEN", cmdHLEN)
 func cmdHLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -171,7 +169,6 @@ func cmdHLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	return n, nil
 }
 
-// conf.AddReadCommand("HMGET", cmdHMGET)
 func cmdHMGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -191,7 +188,6 @@ func cmdHMGET(m uhaha.Machine, args []string) (interface{}, error) {
 	return v, nil
 }
 
-// conf.AddWriteCommand("HMSET", cmdHMSET)
 func cmdHMSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -218,7 +214,6 @@ func cmdHMSET(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleString("OK"), nil
 }
 
-// conf.AddWriteCommand("HSETNX", cmdHSETNX)
 func cmdHSETNX(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -242,7 +237,6 @@ func cmdHSETNX(m uhaha.Machine, args []string) (interface{}, error) {
 	return n, nil
 }
 
-// conf.AddReadCommand("HSTRLEN", cmdHSTRLEN)
 func cmdHSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -256,7 +250,6 @@ func cmdHSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(len(val)), nil
 }
 
-// conf.AddReadCommand("HVALS", cmdHVALS)
 func cmdHVALS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -269,7 +262,6 @@ func cmdHVALS(m uhaha.Machine, args []string) (interface{}, error) {
 	return v, nil
 }
 
-// conf.AddWriteCommand("HCLEAR", cmdHCLEAR)
 func cmdHCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -282,7 +274,6 @@ func cmdHCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-// conf.AddWriteCommand("HMCLEAR", cmdHMCLEAR)
 func cmdHMCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -299,7 +290,6 @@ func cmdHMCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-// conf.AddWriteCommand("HEXPIRE", cmdHEXPIRE)
 func cmdHEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -327,7 +317,6 @@ func cmdHEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(v), nil
 }
 
-// conf.AddWriteCommand("HEXPIREAT", cmdHEXPIREAT)
 func cmdHEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -354,7 +343,6 @@ func cmdHEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(v), nil
 }
 
-// conf.AddReadCommand("HTTL", cmdHTTL)
 func cmdHTTL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -367,7 +355,6 @@ func cmdHTTL(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(v), nil
 }
 
-// conf.AddWriteCommand("HPERSIST", cmdHPERSIST)
 func cmdHPERSIST(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -380,7 +367,6 @@ func cmdHPERSIST(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-// conf.AddReadCommand("HKEYEXISTS", cmdHKEYEXISTS)
 func cmdHKEYEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs

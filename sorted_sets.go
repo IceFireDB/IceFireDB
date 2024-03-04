@@ -36,9 +36,11 @@ func zparseRange(a1 string, a2 string) (start int, stop int, err error) {
 	if start, err = strconv.Atoi(a1); err != nil {
 		return
 	}
+
 	if stop, err = strconv.Atoi(a2); err != nil {
 		return
 	}
+
 	return
 }
 
@@ -123,7 +125,6 @@ func cmdZCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 	}
 
 	count, err := ldb.ZCount([]byte(args[1]), int64(min), int64(max))
-
 	if err != nil {
 		return nil, err
 	}
@@ -137,10 +138,10 @@ func cmdZCARD(m uhaha.Machine, args []string) (interface{}, error) {
 	}
 
 	n, err := ldb.ZCard([]byte(args[1]))
-
 	if err != nil {
 		return nil, err
 	}
+
 	return redcon.SimpleInt(n), nil
 }
 
@@ -248,9 +249,11 @@ func cmdZRANK(m uhaha.Machine, args []string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if n == -1 {
 		return nil, nil
 	}
+
 	return redcon.SimpleInt(n), nil
 }
 
@@ -260,10 +263,10 @@ func cmdZCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	}
 
 	n, err := ldb.ZClear([]byte(args[1]))
-
 	if err != nil {
 		return nil, err
 	}
+
 	return redcon.SimpleInt(n), nil
 }
 
@@ -283,6 +286,7 @@ func cmdZREM(m uhaha.Machine, args []string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return redcon.SimpleInt(n), nil
 }
 
@@ -307,6 +311,7 @@ func cmdZADD(m uhaha.Machine, args []string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return redcon.SimpleInt(n), nil
 }
 
@@ -319,6 +324,7 @@ func cmdZSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return redcon.SimpleInt(n), nil
 }
 
@@ -336,6 +342,7 @@ func cmdZINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return redcon.SimpleInt(n), nil
 }
 

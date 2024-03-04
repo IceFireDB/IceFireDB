@@ -81,6 +81,7 @@ func cmdSCARD(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
+
 	n, err := ldb.SCard([]byte(args[1]))
 	return redcon.SimpleInt(n), err
 }
@@ -220,6 +221,7 @@ func cmdSKEYEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
+
 	n, err := ldb.SKeyExists([]byte(args[1]))
 	return redcon.SimpleInt(n), err
 }

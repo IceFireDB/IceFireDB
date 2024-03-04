@@ -32,7 +32,7 @@ race:
     	fi
 	go build $(CFLAGS) -race -o $(PROG) $(SRCS)
 
-# release  version
+# release version
 RELEASE_DATE = $(shell date '+%Y%m%d%H%M%S')
 RELEASE_VERSION = $(shell git rev-parse --short HEAD || echo "GitNotFound")
 RELEASE_DIR=release_bin

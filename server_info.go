@@ -111,7 +111,6 @@ func (i *info) dumpAll(buf *bytes.Buffer) {
 	buf.Write(Delims)
 	i.dumpGC(buf)
 	buf.Write(Delims)
-	// i.dumpReplication(buf)
 }
 
 func (i *info) dumpServer(buf *bytes.Buffer) {
@@ -166,7 +165,7 @@ func (i *info) dumpGC(buf *bytes.Buffer) {
 
 	var st deb.GCStats
 	st.Pause = make([]time.Duration, count)
-	// st.PauseQuantiles = make([]time.Duration, count)
+
 	deb.ReadGCStats(&st)
 
 	h := make([]string, 0, count)
@@ -185,22 +184,6 @@ func (i *info) dumpGC(buf *bytes.Buffer) {
 func (i *info) dumpStore(buf *bytes.Buffer) {
 	buf.WriteString("# Store\r\n")
 	s := le.StoreStat()
-
-	// getNum := s.GetNum.Get()
-	// getTotalTime := s.GetTotalTime.Get()
-
-	// gt := int64(0)
-	// if getNum > 0 {
-	// 	gt = getTotalTime.Nanoseconds() / (getNum * 1e3)
-	// }
-
-	// commitNum := s.BatchCommitNum.Get()
-	// commitTotalTime := s.BatchCommitTotalTime.Get()
-
-	// ct := int64(0)
-	// if commitNum > 0 {
-	// 	ct = commitTotalTime.Nanoseconds() / (commitNum * 1e3)
-	// }
 
 	i.dumpPairs(buf, infoPair{"name", ldsCfg.DBName},
 		infoPair{"get", s.GetNum.Get()},

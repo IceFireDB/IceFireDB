@@ -3,10 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	ipfs_log "github.com/IceFireDB/IceFireDB/driver/ipfs-log"
 	"os"
 	"strconv"
 	"strings"
+
+	ipfs_log "github.com/IceFireDB/IceFireDB/driver/ipfs-log"
 
 	"github.com/IceFireDB/IceFireDB/driver/crdt"
 
@@ -34,36 +35,36 @@ Basic options:
 Security options:
   --tls-cert path  : path to TLS certificate
   --tls-key path   : path to TLS private key
-  --auth auth      : cluster authorization, shared by all servers and clients
+  --auth auth      : cluster authorization,shared by all servers and clients
 
 Networking options: 
   --advertise addr : advertise address  (default: network bound address)
 
 Store options: 
-  --hot-cache-size int : memory cache capacity，unit:MB (default 1024)
+  --hot-cache-size int : memory cache capacity,unit:MB (default 1024)
 
 Advanced options:
   --nosync         : turn off syncing data to disk after every write. This leads
                      to faster write operations but opens up the chance for data
-                     loss due to catastrophic events such as power failure.
+                     loss due to catastrophic events such as power failure
   --openreads      : allow followers to process read commands, but with the 
-                     possibility of returning stale data.
+                     possibility of returning stale data
   --localtime      : have the raft machine time synchronized with the local
                      server rather than the public internet. This will run the 
                      risk of time shifts when the local server time is
-                     drastically changed during live operation. 
+                     drastically changed during live operation
   --restore path   : restore a raft machine from a snapshot file. This will
                      start a brand new single-node cluster using the snapshot as
                      initial data. The other nodes must be re-joined. This
-                     operation is ignored when a data directory already exists.
-                     Cannot be used with -j flag.
-  --init-run-quit  : initialize a bootstrap operation and then quit.
-  --raft-backend   : Raft storage backend. 
-  --storage-backend : Storage backend.
-  --ipfs-endpoint	: ipfs endpoint connect . 
-  --pubsub-id		: orbitdb pub sub .
-  --oss-endpoint	: aws oss endpoint connect . 
-  --oss-ak			: aws oss access key.
+                     operation is ignored when a data directory already exists
+                     Cannot be used with -j flag
+  --init-run-quit  : initialize a bootstrap operation and then quit
+  --raft-backend   : Raft storage backend
+  --storage-backend : Storage backend
+  --ipfs-endpoint	: ipfs endpoint connect
+  --pubsub-id		: orbitdb pub sub
+  --oss-endpoint	: aws oss endpoint connect
+  --oss-ak			: aws oss access key
   --oss-sk			: aws oss secret key
   --ipfs-log-dbname	: ipfs-log driver db name, multi node communication identifier
 
@@ -96,10 +97,6 @@ func confInit(conf *rafthub.Config) {
 		}
 		s = strings.ReplaceAll(s, "{{USAGE}}", "")
 		w.Write([]byte(s))
-		//if w == os.Stdout {
-		//	os.Exit(0)
-		//}
-		//fmt.Println(s)
 	}
 	var raftBackend string
 	var testNode string
