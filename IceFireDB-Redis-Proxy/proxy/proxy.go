@@ -90,7 +90,7 @@ func New() (*Proxy, error) {
 	// if enable p2p command pubsub mode,then create p2p pubsub handle
 	if config.Get().P2P.Enable {
 		// create p2p element
-		p2phost := p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID) // create p2p
+		p2phost := p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID, config.Get().P2P.NodeHostIP, config.Get().P2P.NodeHostPort)
 		p.P2pHost = p2phost
 
 		log.Println("Completed P2P Setup")
