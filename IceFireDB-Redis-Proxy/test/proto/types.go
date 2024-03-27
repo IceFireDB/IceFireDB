@@ -84,7 +84,7 @@ func Map(args ...string) string {
 	return fmt.Sprintf("%%%d\r\n", len(args)/2) + strings.Join(args, "")
 }
 
-// StringMap is is a wrapper to get a map of (bulk)strings.
+// StringMap is a wrapper to get a map of (bulk)strings.
 func StringMap(args ...string) string {
 	var strings []string
 	for _, a := range args {
@@ -99,7 +99,7 @@ func Set(args ...string) string {
 	return fmt.Sprintf("~%d\r\n", len(args)) + strings.Join(args, "")
 }
 
-// StringSet is is a wrapper to get a set of (bulk)strings.
+// StringSet is a wrapper to get a set of (bulk)strings.
 func StringSet(args ...string) string {
 	var strings []string
 	for _, a := range args {
