@@ -1,6 +1,6 @@
 module github.com/IceFireDB/IceFireDB
 
-go 1.18
+go 1.19
 
 require (
 	berty.tech/go-ipfs-log v1.8.0 // indirect
