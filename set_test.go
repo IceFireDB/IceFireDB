@@ -1,3 +1,4 @@
+//go:build alltest
 // +build alltest
 
 package main
