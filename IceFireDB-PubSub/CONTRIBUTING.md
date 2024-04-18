@@ -3,7 +3,7 @@
 ## Create an issue
 
 - If you've encountered a bug, open a [Bug Report](https://github.com/PoCInnovation/$REPOSITORY/issues/new?assignees=&labels=&template=bug_report.md&title=).
-- If you want [PROJECT'S NAME] to have a new fonctionality, open a [Feature Request](https://github.com/PoCInnovation/$REPOSITORY/issues/new?assignees=&labels=&template=feature_request.md&title=).
+- If you want [PROJECT'S NAME] to have a new functionality, open a [Feature Request](https://github.com/PoCInnovation/$REPOSITORY/issues/new?assignees=&labels=&template=feature_request.md&title=).
 
 ## Resolve an issue
 
@@ -69,7 +69,7 @@ git push -f <fork name>
 Contributions to this project must be accompanied by a Developer Certificate of
 Origin (DCO).
 
-All commit messages must contain the Signed-off-by line with an email address that matches the commit author. When commiting, use the `--signoff` flag:
+All commit messages must contain the Signed-off-by line with an email address that matches the commit author. When committing, use the `--signoff` flag:
 
 ```sh
 git commit -s
