@@ -55,13 +55,14 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
 2. Support LSM disk, OSS, IPFS underlying storage.
 3. Distributed consistency（support raft\p2p-crdt\ipfs-log mode）
 4. Based on IPFS decentralized storage, build a persistent data distributed storage layer.（beta version）
-5. Support P2P automatic networking, build decentralized NoSQL and SQL data synchronization.
-6. Support decentralized consistent kv storage engine ([icefiredb-crdt-kv](https://github.com/IceFireDB/icefiredb-crdt-kv) and [icefiredb-ipfs-log](https://github.com/IceFireDB/icefiredb-ipfs-log) is supporting)
-7. Support KV and SQL immutable storage engine (combined with [immudb](https://github.com/codenotary/immudb) storage engine)
-8. Supports scalable, auditable, and high-performance tamper-resistant logging (combined with [qed](https://github.com/BBVA/qed))
-9. Build an immutable transparent log witness layer between web2 and web3, build a data hot and cold hybrid structure and an immutable data bridge layer. (inspired by google trillian-witness and IPLD) 
-10. Support kv metadata layer and mixed storage structure of hot and cold. （web2 area support）
-11. More advanced cache implementation, faster LSM persistent storage（Source of ideas: https://dl.acm.org/doi/10.1145/3448016.3452819 ）（Support the performance improvement of blockchain full-node）
+5. Support P2P automatic networking, build decentralized NoSQL and SQL data synchronization.（beta version）
+6. Support decentralized consistent kv storage engine ([icefiredb-crdt-kv](https://github.com/IceFireDB/icefiredb-crdt-kv) and [icefiredb-ipfs-log](https://github.com/IceFireDB/icefiredb-ipfs-log) ).（beta version）
+7. Integrate with [NATS](https://nats.io/) for high-performance decentralized networking, improving edge network efficiency and reliability. (under support)
+8. Support KV and SQL immutable storage engine (combined with [immudb](https://github.com/codenotary/immudb) storage engine). (under support)
+9.  Supports scalable, auditable, and high-performance tamper-resistant logging (combined with [qed](https://github.com/BBVA/qed))
+10. Build an immutable transparent log witness layer between web2 and web3, build a data hot and cold hybrid structure and an immutable data bridge layer. (inspired by google trillian-witness and IPLD) 
+11. Support kv metadata layer and mixed storage structure of hot and cold.
+12. More advanced cache implementation, faster LSM persistent storage（Source of ideas: https://dl.acm.org/doi/10.1145/3448016.3452819 ）（Support the performance improvement of blockchain full-node）
 
 # Documentation center
 
