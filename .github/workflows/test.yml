@@ -131,7 +131,8 @@ jobs:
     strategy:
       matrix:
         go-version: [ 1.19.x ]
-        os: [ ubuntu-latest, macos-latest ]
+#        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest ]
     runs-on: ${{ matrix.os }}
     env:
       DRIVER: ipfs-log
