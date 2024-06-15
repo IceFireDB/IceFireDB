@@ -4,14 +4,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/ledisdb/ledisdb/ledis"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/go-redis/redis/v8"
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/tidwall/uhaha"
@@ -57,13 +60,13 @@ func getTestConn() *redis.Client {
 
 		log.Println("waiting for DB bootstrap")
 		// wait server starts
-		// backoff.Retry(func() error {
-		// 	_, err := testRedisClient.Set(context.Background(), "init", "1", 0).Result()
-		// 	return err
-		// }, backoff.NewConstantBackOff(1*time.Second))
+		backoff.Retry(func() error {
+			_, err := testRedisClient.Set(context.Background(), "init", "1", 0).Result()
+			return err
+		}, backoff.NewConstantBackOff(1*time.Second))
 
-		// // clean all data
-		// testRedisClient.FlushAll(context.Background())
+		// clean all data
+		testRedisClient.FlushAll(context.Background())
 	}
 	testConnOnce.Do(f)
 	return testRedisClient
