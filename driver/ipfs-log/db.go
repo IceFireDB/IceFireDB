@@ -3,6 +3,9 @@ package ipfs_log
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"os"
+
 	iflog "github.com/IceFireDB/icefiredb-ipfs-log"
 	"github.com/IceFireDB/icefiredb-ipfs-log/stores/levelkv"
 	"github.com/ledisdb/ledisdb/config"
@@ -12,15 +15,13 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 	"go.uber.org/zap"
-	"io/fs"
-	"os"
 )
 
 const (
 	StorageName = "ipfs-log"
 )
 
-var Dbname = "ifdb-event-kv"
+var Dbname = "ifdb-event-kv-ipfs-log"
 
 func init() {
 	driver.Register(Store{})
