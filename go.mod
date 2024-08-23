@@ -32,6 +32,7 @@ require (
 )
 
 require (
+	github.com/joho/godotenv v1.5.1
 	github.com/multiformats/go-multiaddr v0.13.0
 	go.uber.org/zap v1.24.0
 )
