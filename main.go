@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 
 	ipfs_log "github.com/IceFireDB/IceFireDB/driver/ipfs-log"
 	"github.com/IceFireDB/icefiredb-ipfs-log/stores/levelkv"
+	"github.com/joho/godotenv"
 
 	badger "github.com/dgraph-io/badger/v3"
 	lediscfg "github.com/ledisdb/ledisdb/config"
@@ -36,6 +38,13 @@ var (
 	// debug
 	debug bool
 )
+
+func init() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("error loading environment variables file", err)
+	}
+}
 
 func main() {
 	conf.Name = "IceFireDB"

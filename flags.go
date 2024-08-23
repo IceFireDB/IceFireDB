@@ -133,7 +133,7 @@ func confInit(conf *rafthub.Config) {
 	flag.StringVar(&crdt.DefaultConfig.DataSyncChannel, "datatopic", crdt.DefaultConfig.DataSyncChannel, "")
 	flag.StringVar(&crdt.DefaultConfig.NetDiscoveryChannel, "nettopic", crdt.DefaultConfig.NetDiscoveryChannel, "")
 	// log driver
-	flag.StringVar(&ipfs_log.Dbname, "log-dbname", ipfs_log.Dbname, "")
+	flag.StringVar(&ipfs_log.Dbname, "ipfs-log-dbname", ipfs_log.Dbname, "")
 	flag.Parse()
 
 	switch raftBackend {
