@@ -25,26 +25,10 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: go mod tidy && go mod vendor
       - name: Test
-        run: go test -v --v -tags="alltest osstest"
-
-#  hybriddbtest:
-#    strategy:
-#      matrix:
-#        go-version: [ 1.17.x ]
-#        os: [ ubuntu-latest, macos-latest, windows-latest ]
-#    runs-on: ${{ matrix.os }}
-#    env:
-#      DRIVER: hybriddb
-#    steps:
-#      - name: Install Go
-#        uses: actions/setup-go@v5
-#        with:
-#          go-version: ${{ matrix.go-version }}
-#      - name: Checkout code
-#        uses: actions/checkout@v4
-#      - name: Test
-#        run: go test -v --v -tags alltest
+        run: go test -v -tags="alltest osstest"
 
   ipfstest:
     strategy:
@@ -62,34 +46,16 @@ jobs:
           export ipfs_staging=/root/ipfs_staging
           export ipfs_data=/root/ipfs_data 
           docker run -d --name ipfs_host -v $ipfs_staging:/export -v $ipfs_data:/data/ipfs -p 4001:4001 -p 8080:8080 -p 5001:5001 ipfs/go-ipfs:latest
-          
       - name: Install Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: go mod tidy && go mod vendor
       - name: Test
-        run: go test -v --v -tags alltest
-
-#  orbitdbtest:
-#    strategy:
-#      matrix:
-#        go-version: [ 1.17.x ]
-#        os: [ ubuntu-latest, macos-latest, windows-latest ]
-#    runs-on: ${{ matrix.os }}
-#    env:
-#      DRIVER: orbitdb
-#    steps:
-#      - name: Install Go
-#        uses: actions/setup-go@v5
-#        with:
-#          go-version: ${{ matrix.go-version }}
-#      - name: Checkout code
-#        uses: actions/checkout@v4
-#      - name: Test
-#        run: go test -v --v -tags alltest
-
+        run: go test -v -tags alltest
 
   goleveldbtest:
     strategy:
@@ -106,8 +72,10 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: go mod tidy && go mod vendor
       - name: Test
-        run: go test -v --v -tags alltest
+        run: go test -v -tags alltest
 
   crdtdbtest:
     strategy:
@@ -124,8 +92,10 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: go mod tidy && go mod vendor
       - name: Test
-        run: go test -v --v -tags alltest
+        run: go test -v -tags alltest
 
   ipfslogdbtest:
     strategy:
@@ -142,5 +112,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: go mod tidy && go mod vendor
       - name: Test
-        run: go test -v --v -tags alltest
+        run: go test -v -tags alltest
