@@ -1,0 +1,30 @@
+{
+  "author": "hsanjuan",
+  "bugs": {
+    "url": "https://github.com/ipfs/go-ds-crdt"
+  },
+  "gx": {
+    "dvcsimport": "github.com/ipfs/go-ds-crdt"
+  },
+  "gxDependencies": [
+    {
+      "author": "why",
+      "hash": "QmP9i4G9nRcfKBnpk1A7CwU7ppLkSn2j6vJeWn2AJ8rfcN",
+      "name": "go-merkledag",
+      "version": "1.1.36"
+    },
+    {
+      "author": "hsanjuan",
+      "hash": "QmcUuDu8FfWiUgZ8q3Rvvr4mwFTX5t1TKmVoWsB3FVHmhQ",
+      "name": "protobuf",
+      "version": "3.6.1"
+    }
+  ],
+  "gxVersion": "0.14.0",
+  "language": "go",
+  "license": "Apache-2.0/MIT",
+  "name": "go-ds-crdt",
+  "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
+  "version": "0.0.1"
+}
+

@@ -12,7 +12,7 @@
 *.out
 
 # Dependency directories (remove the comment below to include it)
-vendor/
+#vendor/
 
 IceFireDB
 db_storage/
@@ -23,7 +23,6 @@ var
 bin/
 .idea
 release_bin
-vendor
 
 #vscode
 .vscode

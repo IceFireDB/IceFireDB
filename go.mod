@@ -280,5 +280,5 @@ require (
 replace (
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6 => github.com/IceFireDB/ledisdb v0.7.1
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 => github.com/IceFireDB/golibs v0.1.0
-	github.com/tidwall/uhaha v0.11.2 => github.com/IceFireLabs/uhaha v0.11.3
+	github.com/tidwall/uhaha v0.11.2 => github.com/IceFireDB/uhaha v0.12.0
 )

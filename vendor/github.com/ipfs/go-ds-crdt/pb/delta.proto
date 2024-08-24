@@ -1,0 +1,17 @@
+syntax = "proto3";
+package crdt.pb;
+
+option go_package = ".;pb";
+
+message Delta {
+  repeated Element elements = 1;
+  repeated Element tombstones = 2;
+  uint64 priority = 3;
+}
+
+message Element {
+  // key+id must form a unique identifier
+  string key = 1;
+  string id = 2;
+  bytes value = 3;
+}

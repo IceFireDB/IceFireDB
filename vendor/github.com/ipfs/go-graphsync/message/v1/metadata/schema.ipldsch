@@ -1,0 +1,6 @@
+type Item struct {
+  link         Link
+  blockPresent Bool
+} representation map
+
+type Metadata [Item]
