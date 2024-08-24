@@ -348,7 +348,7 @@ func bootstrapDHT(ctx context.Context, nodehost host.Host, kaddht *dht.IpfsDHT) 
 	logrus.Debugf("Connected to %d out of %d Bootstrap Peers.", connectedbootpeers, totalbootpeers)
 }
 
-// A function that connects the given host to all peers recieved from a
+// A function that connects the given host to all peers received from a
 // channel of peer address information. Meant to be started as a go routine.
 func handlePeerDiscovery(nodehost host.Host, peerchan <-chan peer.AddrInfo) {
 	// Iterate over the peer channel

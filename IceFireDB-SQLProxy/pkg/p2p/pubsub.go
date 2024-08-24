@@ -155,7 +155,7 @@ func (cr *PubSub) PubLoop() {
 
 // A method of PubSub that continously reads from the subscription
 // until either the subscription or pubsub context closes.
-// The recieved message is parsed sent into the inbound channel
+// The received message is parsed sent into the inbound channel
 func (cr *PubSub) SubLoop() {
 	// Start loop
 	for {
