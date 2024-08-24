@@ -1,0 +1,114 @@
+################################################################################
+###                  GraphSync messaging protocol version 2                  ###
+################################################################################
+
+# UUID bytes
+type GraphSyncRequestID bytes
+
+type GraphSyncPriority int
+
+# Extensions as a name:data map where the data is any arbitrary, valid Node
+type GraphSyncExtensions { String : nullable Any }
+
+type GraphSyncLinkAction enum {
+   # Present means the linked block was present on this machine, and is included
+   # in this message
+   | Present             ("p")
+   # DuplicateNotSent means the linked block was present on this machine, but I
+   # am not sending it (most likely duplicate)
+   | DuplicateNotSent   ("d")
+   # Missing means I did not have the linked block, so I skipped over this part
+   # of the traversal
+   | Missing             ("m")
+   # DuplicateDAGSkipped means the DAG with this link points toward has already
+   # been traversed entirely in the course of this request
+   # so I am skipping over it entirely
+   | DuplicateDAGSkipped ("s")
+} representation string
+
+# Metadata for each "link" in the DAG being communicated, each block gets one of
+# these and missing blocks also get one, with an explanation as per
+# GraphSyncLinkAction
+type GraphSyncMetadatum struct {
+  link         Link
+  action       GraphSyncLinkAction
+} representation tuple
+
+type GraphSyncMetadata [GraphSyncMetadatum]
+
+type GraphSyncResponseStatusCode enum {
+  # Informational Codes (request in progress)
+
+  | RequestAcknowledged           ("10")
+  | AdditionalPeers               ("11")
+  | NotEnoughGas                  ("12")
+  | OtherProtocol                 ("13")
+  | PartialResponse               ("14")
+  | RequestPaused                 ("15")
+
+  # Success Response Codes (request terminated)
+
+  | RequestCompletedFull          ("20")
+  | RequestCompletedPartial       ("21")
+
+  # Error Response Codes (request terminated)
+
+  | RequestRejected               ("30")
+  | RequestFailedBusy             ("31")
+  | RequestFailedUnknown          ("32")
+  | RequestFailedLegal            ("33")
+  | RequestFailedContentNotFound  ("34")
+  | RequestCancelled              ("35")
+} representation int
+
+type GraphSyncRequestType enum {
+   # New means a new request
+   | New     ("n")
+   # Cancel means cancel the request referenced by request ID
+   | Cancel  ("c")
+   # Update means the extensions contain an update about this request
+   | Update  ("u")
+   # Restart means restart this request from the begging, respecting the any
+   # DoNotSendCids/DoNotSendBlocks contained in the extensions--essentially a
+   # cancel followed by a new
+   # TODO: | Restart ("r")
+} representation string
+
+type GraphSyncRequest struct {
+  id                  GraphSyncRequestID   (rename "id")   # unique id set on the requester side
+  requestType         GraphSyncRequestType (rename "type") # the request type
+  priority   optional GraphSyncPriority    (rename "pri")  # the priority (normalized). default to 1
+  root       optional Link                 (rename "root") # a CID for the root node in the query
+  selector   optional Any                  (rename "sel")  # see https://github.com/ipld/specs/blob/master/selectors/selectors.md
+  extensions optional GraphSyncExtensions  (rename "ext")  # side channel information
+} representation map
+
+type GraphSyncResponse struct {
+  id          GraphSyncRequestID           (rename "reqid") # the request id we are responding to
+  status      GraphSyncResponseStatusCode  (rename "stat")  # a status code.
+  metadata    optional GraphSyncMetadata   (rename "meta")  # metadata about response
+  extensions  optional GraphSyncExtensions (rename "ext")   # side channel information
+} representation map
+
+# Block data and CID prefix that can be used to reconstruct the entire CID from
+# the hash of the bytes
+type GraphSyncBlock struct {
+  prefix  Bytes # CID prefix (cid version, multicodec and multihash prefix (type + length)
+  data    Bytes
+} representation tuple
+
+# We expect each message to contain at least one of the fields, typically either
+# just requests, or responses and possibly blocks with it
+type GraphSyncMessage struct {
+  requests  optional [GraphSyncRequest]  (rename "req")
+  responses optional [GraphSyncResponse] (rename "rsp")
+  blocks    optional [GraphSyncBlock]    (rename "blk")
+} representation map
+
+# Parent keyed union to hold the message, the root of the structure that can be
+# used to version the messaging format outside of the protocol and makes the
+# data itself more self-descriptive (i.e. `{"gs2":...` will appear at the front
+# of every msg)
+type GraphSyncMessageRoot union {
+  | GraphSyncMessage "gs2"
+} representation keyed
