@@ -7,7 +7,6 @@ on:
     branches: [ main ]
 
 jobs:
-
   build-icefiredb-nosql:
     runs-on: ubuntu-latest
     steps:
@@ -24,7 +23,6 @@ jobs:
     - name: Build
       run: make
 
-
   build-icefiredb-sqlite:
     runs-on: ubuntu-latest
     steps:
@@ -34,6 +32,11 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.19
+
+      - name: Install dependencies
+        run: |
+          cd IceFireDB-SQLite
+          go mod tidy && go mod vendor
 
       - name: Build
         run: |
@@ -50,6 +53,11 @@ jobs:
         with:
           go-version: 1.19
 
+      - name: Install dependencies
+        run: |
+          cd IceFireDB-SQLProxy
+          go mod tidy && go mod vendor
+
       - name: Build
         run: |
           cd IceFireDB-SQLProxy
@@ -65,6 +73,11 @@ jobs:
         with:
           go-version: 1.19
 
+      - name: Install dependencies
+        run: |
+          cd IceFireDB-PubSub
+          go mod tidy && go mod vendor
+
       - name: Build
         run: |
           cd IceFireDB-PubSub
@@ -79,6 +92,11 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.19
+
+      - name: Install dependencies
+        run: |
+          cd IceFireDB-Redis-Proxy
+          go mod tidy && go mod vendor
 
       - name: Build
         run: |

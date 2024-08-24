@@ -1,0 +1,27 @@
+os:
+  - linux
+
+language: go
+
+go:
+  - 1.14.x
+
+env:
+  matrix:
+    - GOTFLAGS="-race"
+    - GOTFLAGS="-race -tags=openssl"
+
+cache:
+  directories:
+    - $GOPATH/pkg/mod
+    - $HOME/.cache/go-build
+
+script:
+  - go build ./...
+  - travis_wait 30 go test -timeout 30m -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+
+notifications:
+  email: false
