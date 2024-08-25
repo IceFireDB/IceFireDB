@@ -13,7 +13,7 @@ var log = logging.Logger("discovery-backoff")
 
 type BackoffFactory func() BackoffStrategy
 
-// BackoffStrategy describes how backoff will be implemented. BackoffStratgies are stateful.
+// BackoffStrategy describes how backoff will be implemented. BackoffStrategies are stateful.
 type BackoffStrategy interface {
 	// Delay calculates how long the next backoff duration should be, given the prior calls to Delay
 	Delay() time.Duration
@@ -26,7 +26,7 @@ type BackoffStrategy interface {
 // Jitter must return a duration between min and max. Min must be lower than, or equal to, max.
 type Jitter func(duration, min, max time.Duration, rng *rand.Rand) time.Duration
 
-// FullJitter returns a random number uniformly chose from the range [min, boundedDur].
+// FullJitter returns a random number, uniformly chosen from the range [min, boundedDur].
 // boundedDur is the duration bounded between min and max.
 func FullJitter(duration, min, max time.Duration, rng *rand.Rand) time.Duration {
 	if duration <= min {

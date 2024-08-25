@@ -9,12 +9,12 @@ import (
 	"berty.tech/go-ipfs-log/enc"
 	"github.com/ipfs/go-ipld-cbor/encoding"
 
+	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
 	cbornode "github.com/ipfs/go-ipld-cbor"
 	format "github.com/ipfs/go-ipld-format"
-	core_iface "github.com/ipfs/interface-go-ipfs-core"
-	"github.com/ipfs/interface-go-ipfs-core/path"
-	ic "github.com/libp2p/go-libp2p-core/crypto"
+	coreiface "github.com/ipfs/kubo/core/coreiface"
+	ic "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/polydawn/refmt/obj/atlas"
 
 	"berty.tech/go-ipfs-log/errmsg"
@@ -230,7 +230,7 @@ func (i *IOCbor) SetDebug(val bool) {
 }
 
 // WriteCBOR writes a CBOR representation of a given object in IPFS' DAG.
-func (i *IOCbor) Write(ctx context.Context, ipfs core_iface.CoreAPI, obj interface{}, opts *iface.WriteOpts) (cid.Cid, error) {
+func (i *IOCbor) Write(ctx context.Context, ipfs coreiface.CoreAPI, obj interface{}, opts *iface.WriteOpts) (cid.Cid, error) {
 	if opts == nil {
 		opts = &iface.WriteOpts{}
 	}
@@ -261,7 +261,7 @@ func (i *IOCbor) Write(ctx context.Context, ipfs core_iface.CoreAPI, obj interfa
 	}
 
 	if opts.Pin {
-		if err = ipfs.Pin().Add(ctx, path.IpfsPath(cborNode.Cid())); err != nil {
+		if err = ipfs.Pin().Add(ctx, path.FromCid(cborNode.Cid())); err != nil {
 			return cid.Undef, errmsg.ErrIPFSOperationFailed.Wrap(err)
 		}
 	}
@@ -270,7 +270,7 @@ func (i *IOCbor) Write(ctx context.Context, ipfs core_iface.CoreAPI, obj interfa
 }
 
 // Read reads a CBOR representation of a given object from IPFS' DAG.
-func (i *IOCbor) Read(ctx context.Context, ipfs core_iface.CoreAPI, contentIdentifier cid.Cid) (format.Node, error) {
+func (i *IOCbor) Read(ctx context.Context, ipfs coreiface.CoreAPI, contentIdentifier cid.Cid) (format.Node, error) {
 	return ipfs.Dag().Get(ctx, contentIdentifier)
 }
 

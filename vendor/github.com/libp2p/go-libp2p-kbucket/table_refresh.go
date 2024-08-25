@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	mh "github.com/multiformats/go-multihash"
 )
@@ -65,9 +65,43 @@ func (rt *RoutingTable) GenRandPeerID(targetCpl uint) (peer.ID, error) {
 
 	// Convert to a known peer ID.
 	key := keyPrefixMap[targetPrefix]
-	id := [34]byte{mh.SHA2_256, 32}
+	id := [32 + 2]byte{mh.SHA2_256, 32}
 	binary.BigEndian.PutUint32(id[2:], key)
 	return peer.ID(id[:]), nil
+}
+
+// GenRandomKey generates a random key matching a provided Common Prefix Length (Cpl)
+// wrt. the local identity. The returned key matches the targetCpl first bits of the
+// local key, the following bit is the inverse of the local key's bit at position
+// targetCpl+1 and the remaining bits are randomly generated.
+func (rt *RoutingTable) GenRandomKey(targetCpl uint) (ID, error) {
+	if int(targetCpl+1) >= len(rt.local)*8 {
+		return nil, fmt.Errorf("cannot generate peer ID for Cpl greater than key length")
+	}
+	partialOffset := targetCpl / 8
+
+	// output contains the first partialOffset bytes of the local key
+	// and the remaining bytes are random
+	output := make([]byte, len(rt.local))
+	copy(output, rt.local[:partialOffset])
+	_, err := rand.Read(output[partialOffset:])
+	if err != nil {
+		return nil, err
+	}
+
+	remainingBits := 8 - targetCpl%8
+	orig := rt.local[partialOffset]
+
+	origMask := ^uint8(0) << remainingBits
+	randMask := ^origMask >> 1
+	flippedBitOffset := remainingBits - 1
+	flippedBitMask := uint8(1) << flippedBitOffset
+
+	// restore the remainingBits Most Significant Bits of orig
+	// and flip the flippedBitOffset-th bit of orig
+	output[partialOffset] = orig&origMask | (orig & flippedBitMask) ^ flippedBitMask | output[partialOffset]&randMask
+
+	return ID(output), nil
 }
 
 // ResetCplRefreshedAtForID resets the refresh time for the Cpl of the given ID.

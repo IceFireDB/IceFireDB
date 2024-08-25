@@ -15,6 +15,7 @@
 package goupnp
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -72,19 +73,22 @@ type MaybeRootDevice struct {
 	Err error
 }
 
-// DiscoverDevices attempts to find targets of the given type. This is
+// DiscoverDevicesCtx attempts to find targets of the given type. This is
 // typically the entry-point for this package. searchTarget is typically a URN
 // in the form "urn:schemas-upnp-org:device:..." or
 // "urn:schemas-upnp-org:service:...". A single error is returned for errors
 // while attempting to send the query. An error or RootDevice is returned for
 // each discovered RootDevice.
-func DiscoverDevices(searchTarget string) ([]MaybeRootDevice, error) {
+func DiscoverDevicesCtx(ctx context.Context, searchTarget string) ([]MaybeRootDevice, error) {
 	hc, hcCleanup, err := httpuClient()
 	if err != nil {
 		return nil, err
 	}
 	defer hcCleanup()
-	responses, err := ssdp.SSDPRawSearch(hc, string(searchTarget), 2, 3)
+
+	searchCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	responses, err := ssdp.RawSearch(searchCtx, hc, string(searchTarget), 3)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +103,7 @@ func DiscoverDevices(searchTarget string) ([]MaybeRootDevice, error) {
 			continue
 		}
 		maybe.Location = loc
-		if root, err := DeviceByURL(loc); err != nil {
+		if root, err := DeviceByURLCtx(ctx, loc); err != nil {
 			maybe.Err = err
 		} else {
 			maybe.Root = root
@@ -112,10 +116,16 @@ func DiscoverDevices(searchTarget string) ([]MaybeRootDevice, error) {
 	return results, nil
 }
 
-func DeviceByURL(loc *url.URL) (*RootDevice, error) {
+// DiscoverDevices is the legacy version of DiscoverDevicesCtx, but uses
+// context.Background() as the context.
+func DiscoverDevices(searchTarget string) ([]MaybeRootDevice, error) {
+	return DiscoverDevicesCtx(context.Background(), searchTarget)
+}
+
+func DeviceByURLCtx(ctx context.Context, loc *url.URL) (*RootDevice, error) {
 	locStr := loc.String()
 	root := new(RootDevice)
-	if err := requestXml(locStr, DeviceXMLNamespace, root); err != nil {
+	if err := requestXml(ctx, locStr, DeviceXMLNamespace, root); err != nil {
 		return nil, ContextError{fmt.Sprintf("error requesting root device details from %q", locStr), err}
 	}
 	var urlBaseStr string
@@ -132,17 +142,29 @@ func DeviceByURL(loc *url.URL) (*RootDevice, error) {
 	return root, nil
 }
 
+func DeviceByURL(loc *url.URL) (*RootDevice, error) {
+	return DeviceByURLCtx(context.Background(), loc)
+}
+
 // CharsetReaderDefault specifies the charset reader used while decoding the output
 // from a UPnP server. It can be modified in an init function to allow for non-utf8 encodings,
 // but should not be changed after requesting clients.
 var CharsetReaderDefault func(charset string, input io.Reader) (io.Reader, error)
 
-func requestXml(url string, defaultSpace string, doc interface{}) error {
-	timeout := time.Duration(3 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
+// HTTPClient specifies the http.Client object used when fetching the XML from the UPnP server.
+// HTTPClient defaults the http.DefaultClient.  This may be overridden by the importing application.
+var HTTPClientDefault = http.DefaultClient
+
+func requestXml(ctx context.Context, url string, defaultSpace string, doc interface{}) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
 	}
-	resp, err := client.Get(url)
+
+	resp, err := HTTPClientDefault.Do(req)
 	if err != nil {
 		return err
 	}

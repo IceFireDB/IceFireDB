@@ -8,9 +8,9 @@ import (
 
 // NewMSSelect returns a new Multistream which is able to perform
 // protocol selection with a MultistreamMuxer.
-func NewMSSelect(c io.ReadWriteCloser, proto string) LazyConn {
-	return &lazyClientConn{
-		protos: []string{ProtocolID, proto},
+func NewMSSelect[T StringLike](c io.ReadWriteCloser, proto T) LazyConn {
+	return &lazyClientConn[T]{
+		protos: []T{ProtocolID, proto},
 		con:    c,
 	}
 }
@@ -18,9 +18,9 @@ func NewMSSelect(c io.ReadWriteCloser, proto string) LazyConn {
 // NewMultistream returns a multistream for the given protocol. This will not
 // perform any protocol selection. If you are using a MultistreamMuxer, use
 // NewMSSelect.
-func NewMultistream(c io.ReadWriteCloser, proto string) LazyConn {
-	return &lazyClientConn{
-		protos: []string{proto},
+func NewMultistream[T StringLike](c io.ReadWriteCloser, proto T) LazyConn {
+	return &lazyClientConn[T]{
+		protos: []T{proto},
 		con:    c,
 	}
 }
@@ -31,7 +31,7 @@ func NewMultistream(c io.ReadWriteCloser, proto string) LazyConn {
 // It *does not* block writes waiting for the other end to respond. Instead, it
 // simply assumes the negotiation went successfully and starts writing data.
 // See: https://github.com/multiformats/go-multistream/issues/20
-type lazyClientConn struct {
+type lazyClientConn[T StringLike] struct {
 	// Used to ensure we only trigger the write half of the handshake once.
 	rhandshakeOnce sync.Once
 	rerr           error
@@ -41,7 +41,7 @@ type lazyClientConn struct {
 	werr           error
 
 	// The sequence of protocols to negotiate.
-	protos []string
+	protos []T
 
 	// The inner connection.
 	con io.ReadWriteCloser
@@ -53,7 +53,7 @@ type lazyClientConn struct {
 // half of the handshake and then waits for the read half to complete.
 //
 // It returns an error if the read half of the handshake fails.
-func (l *lazyClientConn) Read(b []byte) (int, error) {
+func (l *lazyClientConn[T]) Read(b []byte) (int, error) {
 	l.rhandshakeOnce.Do(func() {
 		go l.whandshakeOnce.Do(l.doWriteHandshake)
 		l.doReadHandshake()
@@ -68,17 +68,17 @@ func (l *lazyClientConn) Read(b []byte) (int, error) {
 	return l.con.Read(b)
 }
 
-func (l *lazyClientConn) doReadHandshake() {
+func (l *lazyClientConn[T]) doReadHandshake() {
 	for _, proto := range l.protos {
 		// read protocol
-		tok, err := ReadNextToken(l.con)
+		tok, err := ReadNextToken[T](l.con)
 		if err != nil {
 			l.rerr = err
 			return
 		}
 
 		if tok == "na" {
-			l.rerr = ErrNotSupported
+			l.rerr = ErrNotSupported[T]{[]T{proto}}
 			return
 		}
 		if tok != proto {
@@ -88,12 +88,12 @@ func (l *lazyClientConn) doReadHandshake() {
 	}
 }
 
-func (l *lazyClientConn) doWriteHandshake() {
+func (l *lazyClientConn[T]) doWriteHandshake() {
 	l.doWriteHandshakeWithData(nil)
 }
 
 // Perform the write handshake but *also* write some extra data.
-func (l *lazyClientConn) doWriteHandshakeWithData(extra []byte) int {
+func (l *lazyClientConn[T]) doWriteHandshakeWithData(extra []byte) int {
 	buf := getWriter(l.con)
 	defer putWriter(buf)
 
@@ -122,7 +122,7 @@ func (l *lazyClientConn) doWriteHandshakeWithData(extra []byte) int {
 //
 // Write *also* ignores errors from the read half of the handshake (in case the
 // stream is actually write only).
-func (l *lazyClientConn) Write(b []byte) (int, error) {
+func (l *lazyClientConn[T]) Write(b []byte) (int, error) {
 	n := 0
 	l.whandshakeOnce.Do(func() {
 		go l.rhandshakeOnce.Do(l.doReadHandshake)
@@ -137,7 +137,7 @@ func (l *lazyClientConn) Write(b []byte) (int, error) {
 // Close closes the underlying io.ReadWriteCloser
 //
 // This does not flush anything.
-func (l *lazyClientConn) Close() error {
+func (l *lazyClientConn[T]) Close() error {
 	// As the client, we flush the handshake on close to cover an
 	// interesting edge-case where the server only speaks a single protocol
 	// and responds eagerly with that protocol before waiting for out
@@ -151,7 +151,7 @@ func (l *lazyClientConn) Close() error {
 }
 
 // Flush sends the handshake.
-func (l *lazyClientConn) Flush() error {
+func (l *lazyClientConn[T]) Flush() error {
 	l.whandshakeOnce.Do(func() {
 		go l.rhandshakeOnce.Do(l.doReadHandshake)
 		l.doWriteHandshake()

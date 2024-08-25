@@ -27,12 +27,14 @@ import (
 	"reflect"
 	"sort"
 	"time"
+
+	"go.uber.org/dig/internal/digclock"
 )
 
 // A ScopeOption modifies the default behavior of Scope; currently,
 // there are no implementations.
 type ScopeOption interface {
-	noScopeOption() //yet
+	noScopeOption() // yet
 }
 
 // Scope is a scoped DAG of types and their dependencies.
@@ -75,6 +77,9 @@ type Scope struct {
 	// Defer acyclic check on provide until Invoke.
 	deferAcyclicVerification bool
 
+	// Recover from panics in user-provided code and wrap in an exported error type.
+	recoverFromPanics bool
+
 	// invokerFn calls a function with arguments provided to Provide or Invoke.
 	invokerFn invokerFn
 
@@ -87,6 +92,9 @@ type Scope struct {
 
 	// All the child scopes of this Scope.
 	childScopes []*Scope
+
+	// clockSrc stores the source of time. Defaults to system clock.
+	clockSrc digclock.Clock
 }
 
 func newScope() *Scope {
@@ -99,6 +107,7 @@ func newScope() *Scope {
 		decoratedGroups: make(map[key]reflect.Value),
 		invokerFn:       defaultInvoker,
 		rand:            rand.New(rand.NewSource(time.Now().UnixNano())),
+		clockSrc:        digclock.System,
 	}
 	s.gh = newGraphHolder(s)
 	return s
@@ -114,10 +123,17 @@ func (s *Scope) Scope(name string, opts ...ScopeOption) *Scope {
 	child.name = name
 	child.parentScope = s
 	child.invokerFn = s.invokerFn
+	child.clockSrc = s.clockSrc
 	child.deferAcyclicVerification = s.deferAcyclicVerification
+	child.recoverFromPanics = s.recoverFromPanics
 
 	// child copies the parent's graph nodes.
-	child.gh.nodes = append(child.gh.nodes, s.gh.nodes...)
+	for _, node := range s.gh.nodes {
+		child.gh.nodes = append(child.gh.nodes, node)
+		if ctrNode, ok := node.Wrapped.(*constructorNode); ok {
+			ctrNode.CopyOrder(s, child)
+		}
+	}
 
 	for _, opt := range opts {
 		opt.noScopeOption()
@@ -256,6 +272,10 @@ func (s *Scope) getAllProviders(k key) []provider {
 
 func (s *Scope) invoker() invokerFn {
 	return s.invokerFn
+}
+
+func (s *Scope) clock() digclock.Clock {
+	return s.clockSrc
 }
 
 // adds a new graphNode to this Scope and all of its descendent

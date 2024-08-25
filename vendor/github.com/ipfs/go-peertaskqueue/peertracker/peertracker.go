@@ -1,12 +1,14 @@
 package peertracker
 
 import (
+	"math"
+	"math/bits"
 	"sync"
 
 	"github.com/benbjohnson/clock"
 	pq "github.com/ipfs/go-ipfs-pq"
 	"github.com/ipfs/go-peertaskqueue/peertask"
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 var clockInstance = clock.New()
@@ -205,10 +207,31 @@ func (p *PeerTracker) SetIndex(i int) {
 
 // PushTasks adds a group of tasks onto a peer's queue
 func (p *PeerTracker) PushTasks(tasks ...peertask.Task) {
+	p.PushTasksTruncated(math.MaxUint, tasks...)
+}
+
+// PushTasksTruncated is like PushTasks but it will never grow the queue more than n.
+// When truncation happen we will keep older tasks in the queue to avoid some infinite
+// tasks rotations if we are continously receiving work faster than we process it.
+func (p *PeerTracker) PushTasksTruncated(n uint, tasks ...peertask.Task) {
 	now := clockInstance.Now()
 
 	p.activelk.Lock()
 	defer p.activelk.Unlock()
+
+	l := p.taskQueue.Len()
+	if l < 0 {
+		panic("negative length")
+	}
+
+	if wouldBe := uint(l + len(tasks)); wouldBe > n {
+		available, o := bits.Sub(n, uint(l), 0)
+		if o != 0 {
+			// happen if you mix Truncated and Untrucated or varies n.
+			available = 0
+		}
+		tasks = tasks[:available]
+	}
 
 	for _, task := range tasks {
 		// If the new task doesn't add any more information over what we

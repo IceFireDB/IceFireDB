@@ -26,6 +26,12 @@ the height of the Merkle-CRDT node in which the key was introduced.
 Implementation is independent from Broadcaster and DAG syncer layers, although the 
 easiest is to use out of the box components from the IPFS stack (see below).
 
+## Performance
+
+Using batching, Any `go-ds-crdt` replica can easily process and sync 400 keys/s at least. The largest known deployment has 100M keys.
+
+`go-ds-crdt` is used in production as state-synchronization layer for [IPFS Clusters](https://ipfscluster.io).
+
 ## Usage
 
 `go-ds-crdt` needs:

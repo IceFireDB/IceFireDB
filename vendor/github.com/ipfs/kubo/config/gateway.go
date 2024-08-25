@@ -1,14 +1,21 @@
 package config
 
+const (
+	DefaultInlineDNSLink         = false
+	DefaultDeserializedResponses = true
+	DefaultDisableHTMLErrors     = false
+	DefaultExposeRoutingAPI      = false
+)
+
 type GatewaySpec struct {
 	// Paths is explicit list of path prefixes that should be handled by
-	// this gateway. Example: `["/ipfs", "/ipns", "/api"]`
+	// this gateway. Example: `["/ipfs", "/ipns"]`
 	Paths []string
 
 	// UseSubdomains indicates whether or not this gateway uses subdomains
 	// for IPFS resources instead of paths. That is: http://CID.ipfs.GATEWAY/...
 	//
-	// If this flag is set, any /ipns/$id and/or /ipfs/$id paths in PathPrefixes
+	// If this flag is set, any /ipns/$id and/or /ipfs/$id paths in Paths
 	// will be permanently redirected to http://$id.[ipns|ipfs].$gateway/.
 	//
 	// We do not support using both paths and subdomains for a single domain
@@ -18,11 +25,20 @@ type GatewaySpec struct {
 	// NoDNSLink configures this gateway to _not_ resolve DNSLink for the FQDN
 	// provided in `Host` HTTP header.
 	NoDNSLink bool
+
+	// InlineDNSLink configures this gateway to always inline DNSLink names
+	// (FQDN) into a single DNS label in order to interop with wildcard TLS certs
+	// and Origin per CID isolation provided by rules like https://publicsuffix.org
+	InlineDNSLink Flag
+
+	// DeserializedResponses configures this gateway to respond to deserialized
+	// responses. Disabling this option enables a Trustless Gateway, as per:
+	// https://specs.ipfs.tech/http-gateways/trustless-gateway/.
+	DeserializedResponses Flag
 }
 
 // Gateway contains options for the HTTP gateway server.
 type Gateway struct {
-
 	// HTTPHeaders configures the headers that should be returned by this
 	// gateway.
 	HTTPHeaders map[string][]string // HTTP headers to return with the gateway
@@ -30,39 +46,6 @@ type Gateway struct {
 	// RootRedirect is the path to which requests to `/` on this gateway
 	// should be redirected.
 	RootRedirect string
-
-	// Writable enables PUT/POST request handling by this gateway. Usually,
-	// writing is done through the API, not the gateway.
-	Writable bool
-
-	// PathPrefixes  is an array of acceptable url paths that a client can
-	// specify in X-Ipfs-Path-Prefix header.
-	//
-	// The X-Ipfs-Path-Prefix header is used to specify a base path to prepend
-	// to links in directory listings and for trailing-slash redirects. It is
-	// intended to be set by a frontend http proxy like nginx.
-	//
-	// Example: To mount blog.ipfs.io (a DNSLink site) at ipfs.io/blog
-	// set PathPrefixes to ["/blog"] and nginx config to translate paths
-	// and pass Host header (for DNSLink):
-	//  location /blog/ {
-	//    rewrite "^/blog(/.*)$" $1 break;
-	//    proxy_set_header Host blog.ipfs.io;
-	//    proxy_set_header X-Ipfs-Gateway-Prefix /blog;
-	//    proxy_pass http://127.0.0.1:8080;
-	//  }
-	PathPrefixes []string
-
-	// FastDirIndexThreshold is the maximum number of items in a directory
-	// before the Gateway switches to a shallow, faster listing which only
-	// requires the root node. This allows for listing big directories fast,
-	// without the linear slowdown caused by reading size metadata from child
-	// nodes.
-	// Setting to 0 will enable fast listings for all directories.
-	FastDirIndexThreshold *OptionalInteger `json:",omitempty"`
-
-	// FIXME: Not yet implemented: https://github.com/ipfs/kubo/issues/8059
-	APICommands []string
 
 	// NoFetch configures the gateway to _not_ fetch blocks in response to
 	// requests.
@@ -73,7 +56,21 @@ type Gateway struct {
 	// This flag can be overridden per FQDN in PublicGateways.
 	NoDNSLink bool
 
+	// DeserializedResponses configures this gateway to respond to deserialized
+	// requests. Disabling this option enables a Trustless only gateway, as per:
+	// https://specs.ipfs.tech/http-gateways/trustless-gateway/. This can
+	// be overridden per FQDN in PublicGateways.
+	DeserializedResponses Flag
+
+	// DisableHTMLErrors disables pretty HTML pages when an error occurs. Instead, a `text/plain`
+	// page will be sent with the raw error message.
+	DisableHTMLErrors Flag
+
 	// PublicGateways configures behavior of known public gateways.
 	// Each key is a fully qualified domain name (FQDN).
 	PublicGateways map[string]*GatewaySpec
+
+	// ExposeRoutingAPI configures the gateway port to expose
+	// routing system as HTTP API at /routing/v1 (https://specs.ipfs.tech/routing/http-routing-v1/).
+	ExposeRoutingAPI Flag
 }

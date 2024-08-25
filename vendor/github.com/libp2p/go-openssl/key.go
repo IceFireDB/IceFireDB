@@ -143,36 +143,36 @@ func (key *pKey) SignPKCS1v15(method Method, data []byte) ([]byte, error) {
 			return nil, errors.New("signpkcs1v15: 0-length data or non-null digest")
 		}
 
-		if 1 != C.X_EVP_DigestSignInit(ctx, nil, nil, nil, key.key) {
+		if C.X_EVP_DigestSignInit(ctx, nil, nil, nil, key.key) != 1 {
 			return nil, errors.New("signpkcs1v15: failed to init signature")
 		}
 
 		// evp signatures are 64 bytes
-		sig := make([]byte, 64, 64)
+		sig := make([]byte, 64)
 		var sigblen C.size_t = 64
-		if 1 != C.X_EVP_DigestSign(ctx,
-			((*C.uchar)(unsafe.Pointer(&sig[0]))),
+		if C.X_EVP_DigestSign(ctx,
+			(*C.uchar)(unsafe.Pointer(&sig[0])),
 			&sigblen,
 			(*C.uchar)(unsafe.Pointer(&data[0])),
-			C.size_t(len(data))) {
+			C.size_t(len(data))) != 1 {
 			return nil, errors.New("signpkcs1v15: failed to do one-shot signature")
 		}
 
 		return sig[:sigblen], nil
 	} else {
-		if 1 != C.X_EVP_SignInit(ctx, method) {
+		if C.X_EVP_SignInit(ctx, method) != 1 {
 			return nil, errors.New("signpkcs1v15: failed to init signature")
 		}
 		if len(data) > 0 {
-			if 1 != C.X_EVP_SignUpdate(
-				ctx, unsafe.Pointer(&data[0]), C.uint(len(data))) {
+			if C.X_EVP_SignUpdate(
+				ctx, unsafe.Pointer(&data[0]), C.uint(len(data))) != 1 {
 				return nil, errors.New("signpkcs1v15: failed to update signature")
 			}
 		}
 		sig := make([]byte, C.X_EVP_PKEY_size(key.key))
 		var sigblen C.uint
-		if 1 != C.X_EVP_SignFinal(ctx,
-			((*C.uchar)(unsafe.Pointer(&sig[0]))), &sigblen, key.key) {
+		if C.X_EVP_SignFinal(ctx,
+			(*C.uchar)(unsafe.Pointer(&sig[0])), &sigblen, key.key) != 1 {
 			return nil, errors.New("signpkcs1v15: failed to finalize signature")
 		}
 		return sig[:sigblen], nil
@@ -194,32 +194,32 @@ func (key *pKey) VerifyPKCS1v15(method Method, data, sig []byte) error {
 			return errors.New("verifypkcs1v15: 0-length data or non-null digest")
 		}
 
-		if 1 != C.X_EVP_DigestVerifyInit(ctx, nil, nil, nil, key.key) {
+		if C.X_EVP_DigestVerifyInit(ctx, nil, nil, nil, key.key) != 1 {
 			return errors.New("verifypkcs1v15: failed to init verify")
 		}
 
-		if 1 != C.X_EVP_DigestVerify(ctx,
-			((*C.uchar)(unsafe.Pointer(&sig[0]))),
+		if C.X_EVP_DigestVerify(ctx,
+			(*C.uchar)(unsafe.Pointer(&sig[0])),
 			C.size_t(len(sig)),
 			(*C.uchar)(unsafe.Pointer(&data[0])),
-			C.size_t(len(data))) {
+			C.size_t(len(data))) != 1 {
 			return errors.New("verifypkcs1v15: failed to do one-shot verify")
 		}
 
 		return nil
 
 	} else {
-		if 1 != C.X_EVP_VerifyInit(ctx, method) {
+		if C.X_EVP_VerifyInit(ctx, method) != 1 {
 			return errors.New("verifypkcs1v15: failed to init verify")
 		}
 		if len(data) > 0 {
-			if 1 != C.X_EVP_VerifyUpdate(
-				ctx, unsafe.Pointer(&data[0]), C.uint(len(data))) {
+			if C.X_EVP_VerifyUpdate(
+				ctx, unsafe.Pointer(&data[0]), C.uint(len(data))) != 1 {
 				return errors.New("verifypkcs1v15: failed to update verify")
 			}
 		}
-		if 1 != C.X_EVP_VerifyFinal(ctx,
-			((*C.uchar)(unsafe.Pointer(&sig[0]))), C.uint(len(sig)), key.key) {
+		if C.X_EVP_VerifyFinal(ctx,
+			(*C.uchar)(unsafe.Pointer(&sig[0])), C.uint(len(sig)), key.key) != 1 {
 			return errors.New("verifypkcs1v15: failed to finalize verify")
 		}
 		return nil

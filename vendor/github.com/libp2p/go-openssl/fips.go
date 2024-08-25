@@ -16,15 +16,28 @@ package openssl
 
 /*
 #include <openssl/ssl.h>
+
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+	int FIPS_mode_set(int ONOFF) {
+		return 0;
+	}
+#endif
+
 */
 import "C"
+import "errors"
 import "runtime"
 
 // FIPSModeSet enables a FIPS 140-2 validated mode of operation.
 // https://wiki.openssl.org/index.php/FIPS_mode_set()
+// This call has been deleted from OpenSSL 3.0.
 func FIPSModeSet(mode bool) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+
+	if C.OPENSSL_VERSION_NUMBER >= 0x30000000 {
+		return errors.New("FIPS_mode_set() has been deleted from OpenSSL 3.0")
+	}
 
 	var r C.int
 	if mode {

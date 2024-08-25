@@ -6,6 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/transport"
+
 	ws "github.com/gorilla/websocket"
 )
 
@@ -148,4 +151,14 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 	defer c.writeLock.Unlock()
 
 	return c.Conn.SetWriteDeadline(t)
+}
+
+type capableConn struct {
+	transport.CapableConn
+}
+
+func (c *capableConn) ConnState() network.ConnectionState {
+	cs := c.CapableConn.ConnState()
+	cs.Transport = "websocket"
+	return cs
 }

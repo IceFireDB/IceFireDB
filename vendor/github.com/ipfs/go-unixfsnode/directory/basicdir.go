@@ -59,7 +59,7 @@ func (n UnixFSBasicDir) LookupBySegment(seg ipld.PathSegment) (ipld.Node, error)
 }
 
 func (n UnixFSBasicDir) MapIterator() ipld.MapIterator {
-	return iter.NewUnixFSDirMapIterator(n._substrate.Links.Iterator(), nil)
+	return iter.NewUnixFSDirMapIterator(&_UnixFSBasicDir__ListItr{n._substrate.Links.Iterator()}, nil)
 }
 
 // ListIterator returns an iterator which yields key-value pairs
@@ -129,8 +129,7 @@ func (n UnixFSBasicDir) Representation() ipld.Node {
 // Native map accessors
 
 func (n UnixFSBasicDir) Iterator() *iter.UnixFSDir__Itr {
-
-	return iter.NewUnixFSDirIterator(n._substrate.Links.Iterator(), nil)
+	return iter.NewUnixFSDirIterator(&_UnixFSBasicDir__ListItr{n._substrate.Links.Iterator()}, nil)
 }
 
 func (n UnixFSBasicDir) Lookup(key dagpb.String) dagpb.Link {
@@ -150,4 +149,17 @@ func (n UnixFSBasicDir) FieldData() dagpb.MaybeBytes {
 // Substrate returns the underlying PBNode -- note: only the substrate will encode successfully to protobuf if writing
 func (n UnixFSBasicDir) Substrate() ipld.Node {
 	return n._substrate
+}
+
+type _UnixFSBasicDir__ListItr struct {
+	_substrate *dagpb.PBLinks__Itr
+}
+
+func (itr *_UnixFSBasicDir__ListItr) Next() (int64, dagpb.PBLink, error) {
+	idx, v := itr._substrate.Next()
+	return idx, v, nil
+}
+
+func (itr *_UnixFSBasicDir__ListItr) Done() bool {
+	return itr._substrate.Done()
 }

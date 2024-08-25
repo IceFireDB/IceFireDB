@@ -9,10 +9,10 @@ import (
 	"strings"
 	"sync"
 
+	dshelp "github.com/ipfs/boxo/datastore/dshelp"
 	cid "github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
-	dshelp "github.com/ipfs/go-ipfs-ds-help"
 	logging "github.com/ipfs/go-log/v2"
 )
 

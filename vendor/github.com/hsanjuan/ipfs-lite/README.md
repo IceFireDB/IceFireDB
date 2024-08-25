@@ -10,8 +10,6 @@
 IPFS-Lite is an embeddable, lightweight IPFS peer which runs the minimal setup
 to provide an `ipld.DAGService` and UnixFS-files addition and retrieval.
 
-IPFS-Lite can be compiled to WASM and run in the browser.
-
 It can:
 
 * Add, Get, Remove IPLD Nodes to/from the IPFS Network (remove is a local blockstore operation).

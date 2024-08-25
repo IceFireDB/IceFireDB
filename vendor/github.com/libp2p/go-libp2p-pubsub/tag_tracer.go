@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 var (
@@ -34,13 +34,13 @@ var (
 // connections based on their behavior.
 //
 // We tag a peer's connections for the following reasons:
-// - Directly connected peers are tagged with GossipSubConnTagValueDirectPeer (default 1000).
-// - Mesh peers are tagged with a value of GossipSubConnTagValueMeshPeer (default 20).
-//   If a peer is in multiple topic meshes, they'll be tagged for each.
-// - For each message that we receive, we bump a delivery tag for peer that delivered the message
-//   first.
-//   The delivery tags have a maximum value, GossipSubConnTagMessageDeliveryCap, and they decay at
-//   a rate of GossipSubConnTagDecayAmount / GossipSubConnTagDecayInterval.
+//   - Directly connected peers are tagged with GossipSubConnTagValueDirectPeer (default 1000).
+//   - Mesh peers are tagged with a value of GossipSubConnTagValueMeshPeer (default 20).
+//     If a peer is in multiple topic meshes, they'll be tagged for each.
+//   - For each message that we receive, we bump a delivery tag for peer that delivered the message
+//     first.
+//     The delivery tags have a maximum value, GossipSubConnTagMessageDeliveryCap, and they decay at
+//     a rate of GossipSubConnTagDecayAmount / GossipSubConnTagDecayInterval.
 type tagTracer struct {
 	sync.RWMutex
 

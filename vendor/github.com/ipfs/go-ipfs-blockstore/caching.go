@@ -9,6 +9,8 @@ import (
 
 // CacheOpts wraps options for CachedBlockStore().
 // Next to each option is it aproximate memory usage per unit
+//
+// Deprecated: use github.com/ipfs/boxo/blockstore.CacheOpts
 type CacheOpts struct {
 	HasBloomFilterSize   int // 1 byte
 	HasBloomFilterHashes int // No size, 7 is usually best, consult bloom papers
@@ -16,6 +18,8 @@ type CacheOpts struct {
 }
 
 // DefaultCacheOpts returns a CacheOpts initialized with default values.
+//
+// Deprecated: use github.com/ipfs/boxo/blockstore.DefaultCacheOpts
 func DefaultCacheOpts() CacheOpts {
 	return CacheOpts{
 		HasBloomFilterSize:   512 << 10,
@@ -26,6 +30,8 @@ func DefaultCacheOpts() CacheOpts {
 
 // CachedBlockstore returns a blockstore wrapped in an ARCCache and
 // then in a bloom filter cache, if the options indicate it.
+//
+// Deprecated: use github.com/ipfs/boxo/blockstore.CachedBlockstore
 func CachedBlockstore(
 	ctx context.Context,
 	bs Blockstore,

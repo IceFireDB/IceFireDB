@@ -3,17 +3,18 @@ package crawler
 import (
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // Option DHT Crawler option type.
 type Option func(*options) error
 
 type options struct {
-	protocols      []protocol.ID
-	parallelism    int
-	connectTimeout time.Duration
-	perMsgTimeout  time.Duration
+	protocols            []protocol.ID
+	parallelism          int
+	connectTimeout       time.Duration
+	perMsgTimeout        time.Duration
+	dialAddressExtendDur time.Duration
 }
 
 // defaults are the default crawler options. This option will be automatically
@@ -23,6 +24,7 @@ var defaults = func(o *options) error {
 	o.parallelism = 1000
 	o.connectTimeout = time.Second * 5
 	o.perMsgTimeout = time.Second * 5
+	o.dialAddressExtendDur = time.Minute * 30
 
 	return nil
 }
@@ -55,6 +57,16 @@ func WithMsgTimeout(timeout time.Duration) Option {
 func WithConnectTimeout(timeout time.Duration) Option {
 	return func(o *options) error {
 		o.connectTimeout = timeout
+		return nil
+	}
+}
+
+// WithDialAddrExtendDuration sets the duration by which the TTL of dialed address in peer store are
+// extended.
+// Defaults to 30 minutes if unset.
+func WithDialAddrExtendDuration(ext time.Duration) Option {
+	return func(o *options) error {
+		o.dialAddressExtendDur = ext
 		return nil
 	}
 }

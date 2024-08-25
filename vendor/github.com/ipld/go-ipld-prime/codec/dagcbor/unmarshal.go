@@ -54,6 +54,14 @@ type DecodeOptions struct {
 	//
 	// Note that this option is experimental as it only implements partial strictness.
 	ExperimentalDeterminism bool
+
+	// If true, the decoder stops reading from the stream at the end of a full,
+	// valid CBOR object. This may be useful for parsing a stream of undelimited
+	// CBOR objects.
+	// As per standard IPLD behavior, in the default mode the parser considers the
+	// entire block to be part of the CBOR object and will error if there is
+	// extraneous data after the end of the object.
+	DontParseBeyondEnd bool
 }
 
 // Decode deserializes data from the given io.Reader and feeds it into the given datamodel.NodeAssembler.
@@ -75,6 +83,10 @@ func (cfg DecodeOptions) Decode(na datamodel.NodeAssembler, r io.Reader) error {
 
 	if err != nil {
 		return err
+	}
+
+	if cfg.DontParseBeyondEnd {
+		return nil
 	}
 
 	var buf [1]byte
@@ -121,7 +133,8 @@ func unmarshal1(na datamodel.NodeAssembler, tokSrc shared.TokenSource, gas *int6
 }
 
 // starts with the first token already primed.  Necessary to get recursion
-//  to flow right without a peek+unpeek system.
+//
+//	to flow right without a peek+unpeek system.
 func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.Token, gas *int64, options DecodeOptions) error {
 	// FUTURE: check for schema.TypedNodeBuilder that's going to parse a Link (they can slurp any token kind they want).
 	switch tk.Type {

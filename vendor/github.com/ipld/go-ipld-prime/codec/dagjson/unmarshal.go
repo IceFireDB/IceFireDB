@@ -116,6 +116,7 @@ type unmarshalState struct {
 //   - the first map key
 //   - the first map value (which will be a string)
 //   - the second map key
+//
 // and so (fortunately! whew!) we can do this in a fixed amount of memory,
 // since none of those states can reach a recursion.
 func (st *unmarshalState) step(tokSrc shared.TokenSource) error {
@@ -295,7 +296,8 @@ func (st *unmarshalState) bytesLookahead(na datamodel.NodeAssembler, tokSrc shar
 }
 
 // starts with the first token already primed.  Necessary to get recursion
-//  to flow right without a peek+unpeek system.
+//
+//	to flow right without a peek+unpeek system.
 func (st *unmarshalState) unmarshal(na datamodel.NodeAssembler, tokSrc shared.TokenSource) error {
 	// FUTURE: check for schema.TypedNodeBuilder that's going to parse a Link (they can slurp any token kind they want).
 	switch st.tk[0].Type {

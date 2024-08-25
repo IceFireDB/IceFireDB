@@ -26,31 +26,43 @@ type codecConverter struct {
 	converter NodeConverter
 }
 
-var codecTable = map[uint64]codecConverter{}
-
-// RegisterCodec registers a specialized prototype & converter for a specific codec
-func RegisterCodec(codec uint64, prototype ipld.NodePrototype, converter NodeConverter) {
-	codecTable[codec] = codecConverter{prototype, converter}
+type Decoder struct {
+	codecTable     map[uint64]codecConverter
+	linkSystemBase ipld.LinkSystem
 }
 
-var linkSystemBase ipld.LinkSystem
+func NewDecoder() *Decoder {
+	lsb := cidlink.DefaultLinkSystem()
+	lsb.TrustedStorage = true
+	return &Decoder{
+		codecTable:     map[uint64]codecConverter{},
+		linkSystemBase: lsb,
+	}
+}
 
-func init() {
-	linkSystemBase = cidlink.DefaultLinkSystem()
-	linkSystemBase.TrustedStorage = true
+func NewDecoderWithLS(ls ipld.LinkSystem) *Decoder {
+	return &Decoder{
+		codecTable:     map[uint64]codecConverter{},
+		linkSystemBase: ls,
+	}
+}
+
+// RegisterCodec registers a specialized prototype & converter for a specific codec
+func (d *Decoder) RegisterCodec(codec uint64, prototype ipld.NodePrototype, converter NodeConverter) {
+	d.codecTable[codec] = codecConverter{prototype, converter}
 }
 
 // DecodeNode builds a UniversalNode from a block
-func DecodeNode(ctx context.Context, b blocks.Block) (UniversalNode, error) {
+func (d *Decoder) DecodeNode(ctx context.Context, b blocks.Block) (UniversalNode, error) {
 	c := b.Cid()
 	link := cidlink.Link{Cid: c}
-	lsys := linkSystemBase
+	lsys := d.linkSystemBase
 	lsys.StorageReadOpener = func(lnkCtx ipld.LinkContext, lnk ipld.Link) (io.Reader, error) {
 		return bytes.NewBuffer(b.RawData()), nil
 	}
 
 	var prototype ipld.NodePrototype = basicnode.Prototype.Any
-	converter, hasConverter := codecTable[c.Prefix().Codec]
+	converter, hasConverter := d.codecTable[c.Prefix().Codec]
 	if hasConverter {
 		prototype = converter.prototype
 	}

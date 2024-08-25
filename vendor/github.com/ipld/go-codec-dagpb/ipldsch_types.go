@@ -11,12 +11,11 @@ var _ ipld.Node = nil // suppress errors when this dependency is not referenced
 // One of its major uses is to start the construction of a value.
 // You can use it like this:
 //
-// 		dagpb.Type.YourTypeName.NewBuilder().BeginMap() //...
+//	dagpb.Type.YourTypeName.NewBuilder().BeginMap() //...
 //
 // and:
 //
-// 		dagpb.Type.OtherTypeName.NewBuilder().AssignString("x") // ...
-//
+//	dagpb.Type.OtherTypeName.NewBuilder().AssignString("x") // ...
 var Type typeSlab
 
 type typeSlab struct {

@@ -3,11 +3,7 @@ package record
 import (
 	"errors"
 	"fmt"
-
-	logging "github.com/ipfs/go-log"
 )
-
-var log = logging.Logger("routing/record")
 
 // ErrInvalidRecordType is returned if a DHTRecord keys prefix
 // is not found in the Validator map of the DHT.

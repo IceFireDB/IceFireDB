@@ -3,7 +3,7 @@ package pubsub
 import (
 	"fmt"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // NewMessageCache creates a sliding window cache that remembers messages for as

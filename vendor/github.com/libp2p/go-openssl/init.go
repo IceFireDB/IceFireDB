@@ -88,14 +88,13 @@ package openssl
 import "C"
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
 
 func init() {
 	if rc := C.X_shim_init(); rc != 0 {
-		panic(fmt.Errorf("X_shim_init failed with %d", rc))
+		panic(fmt.Errorf("x_shim_init failed with %d", rc))
 	}
 }
 
@@ -113,5 +112,5 @@ func errorFromErrorQueue() error {
 			C.GoString(C.ERR_func_error_string(err)),
 			C.GoString(C.ERR_reason_error_string(err))))
 	}
-	return errors.New(fmt.Sprintf("SSL errors: %s", strings.Join(errs, "\n")))
+	return fmt.Errorf("SSL errors: %s", strings.Join(errs, "\n"))
 }

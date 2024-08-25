@@ -7,17 +7,17 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/libp2p/go-libp2p/p2p/protocol/holepunch/pb"
-	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
-
-	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
-
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/libp2p/go-msgio/protoio"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
+	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch/pb"
+	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
+	"github.com/libp2p/go-msgio/pbio"
+
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -54,6 +54,7 @@ type Service struct {
 	hasPublicAddrsChan chan struct{}
 
 	tracer *tracer
+	filter AddrFilter
 
 	refCount sync.WaitGroup
 }
@@ -83,6 +84,7 @@ func NewService(h host.Host, ids identify.IDService, opts ...Option) (*Service, 
 			return nil, err
 		}
 	}
+	s.tracer.Start()
 
 	s.refCount.Add(1)
 	go s.watchForPublicAddr()
@@ -123,7 +125,7 @@ func (s *Service) watchForPublicAddr() {
 	}
 
 	// Only start the holePuncher if we're behind a NAT / firewall.
-	sub, err := s.host.EventBus().Subscribe(&event.EvtLocalReachabilityChanged{})
+	sub, err := s.host.EventBus().Subscribe(&event.EvtLocalReachabilityChanged{}, eventbus.Name("holepunch"))
 	if err != nil {
 		log.Debugf("failed to subscripe to Reachability event: %s", err)
 		return
@@ -141,7 +143,7 @@ func (s *Service) watchForPublicAddr() {
 				continue
 			}
 			s.holePuncherMx.Lock()
-			s.holePuncher = newHolePuncher(s.host, s.ids, s.tracer)
+			s.holePuncher = newHolePuncher(s.host, s.ids, s.tracer, s.filter)
 			s.holePuncherMx.Unlock()
 			close(s.hasPublicAddrsChan)
 			return
@@ -164,25 +166,29 @@ func (s *Service) Close() error {
 	return err
 }
 
-func (s *Service) incomingHolePunch(str network.Stream) (rtt time.Duration, addrs []ma.Multiaddr, err error) {
+func (s *Service) incomingHolePunch(str network.Stream) (rtt time.Duration, remoteAddrs []ma.Multiaddr, ownAddrs []ma.Multiaddr, err error) {
 	// sanity check: a hole punch request should only come from peers behind a relay
 	if !isRelayAddress(str.Conn().RemoteMultiaddr()) {
-		return 0, nil, fmt.Errorf("received hole punch stream: %s", str.Conn().RemoteMultiaddr())
+		return 0, nil, nil, fmt.Errorf("received hole punch stream: %s", str.Conn().RemoteMultiaddr())
 	}
-	ownAddrs := removeRelayAddrs(s.ids.OwnObservedAddrs())
+	ownAddrs = removeRelayAddrs(s.ids.OwnObservedAddrs())
+	if s.filter != nil {
+		ownAddrs = s.filter.FilterLocal(str.Conn().RemotePeer(), ownAddrs)
+	}
+
 	// If we can't tell the peer where to dial us, there's no point in starting the hole punching.
 	if len(ownAddrs) == 0 {
-		return 0, nil, errors.New("rejecting hole punch request, as we don't have any public addresses")
+		return 0, nil, nil, errors.New("rejecting hole punch request, as we don't have any public addresses")
 	}
 
 	if err := str.Scope().ReserveMemory(maxMsgSize, network.ReservationPriorityAlways); err != nil {
-		log.Debugf("error reserving memory for stream: %s, err")
-		return 0, nil, err
+		log.Debugf("error reserving memory for stream: %s", err)
+		return 0, nil, nil, err
 	}
 	defer str.Scope().ReleaseMemory(maxMsgSize)
 
-	wr := protoio.NewDelimitedWriter(str)
-	rd := protoio.NewDelimitedReader(str, maxMsgSize)
+	wr := pbio.NewDelimitedWriter(str)
+	rd := pbio.NewDelimitedReader(str, maxMsgSize)
 
 	// Read Connect message
 	msg := new(pb.HolePunch)
@@ -190,15 +196,20 @@ func (s *Service) incomingHolePunch(str network.Stream) (rtt time.Duration, addr
 	str.SetDeadline(time.Now().Add(StreamTimeout))
 
 	if err := rd.ReadMsg(msg); err != nil {
-		return 0, nil, fmt.Errorf("failed to read message from initator: %w", err)
+		return 0, nil, nil, fmt.Errorf("failed to read message from initiator: %w", err)
 	}
 	if t := msg.GetType(); t != pb.HolePunch_CONNECT {
-		return 0, nil, fmt.Errorf("expected CONNECT message from initiator but got %d", t)
+		return 0, nil, nil, fmt.Errorf("expected CONNECT message from initiator but got %d", t)
 	}
+
 	obsDial := removeRelayAddrs(addrsFromBytes(msg.ObsAddrs))
+	if s.filter != nil {
+		obsDial = s.filter.FilterRemote(str.Conn().RemotePeer(), obsDial)
+	}
+
 	log.Debugw("received hole punch request", "peer", str.Conn().RemotePeer(), "addrs", obsDial)
 	if len(obsDial) == 0 {
-		return 0, nil, errors.New("expected CONNECT message to contain at least one address")
+		return 0, nil, nil, errors.New("expected CONNECT message to contain at least one address")
 	}
 
 	// Write CONNECT message
@@ -207,18 +218,18 @@ func (s *Service) incomingHolePunch(str network.Stream) (rtt time.Duration, addr
 	msg.ObsAddrs = addrsToBytes(ownAddrs)
 	tstart := time.Now()
 	if err := wr.WriteMsg(msg); err != nil {
-		return 0, nil, fmt.Errorf("failed to write CONNECT message to initator: %w", err)
+		return 0, nil, nil, fmt.Errorf("failed to write CONNECT message to initiator: %w", err)
 	}
 
 	// Read SYNC message
 	msg.Reset()
 	if err := rd.ReadMsg(msg); err != nil {
-		return 0, nil, fmt.Errorf("failed to read message from initator: %w", err)
+		return 0, nil, nil, fmt.Errorf("failed to read message from initiator: %w", err)
 	}
 	if t := msg.GetType(); t != pb.HolePunch_SYNC {
-		return 0, nil, fmt.Errorf("expected SYNC message from initiator but got %d", t)
+		return 0, nil, nil, fmt.Errorf("expected SYNC message from initiator but got %d", t)
 	}
-	return time.Since(tstart), obsDial, nil
+	return time.Since(tstart), obsDial, ownAddrs, nil
 }
 
 func (s *Service) handleNewStream(str network.Stream) {
@@ -239,10 +250,10 @@ func (s *Service) handleNewStream(str network.Stream) {
 	}
 
 	rp := str.Conn().RemotePeer()
-	rtt, addrs, err := s.incomingHolePunch(str)
+	rtt, addrs, ownAddrs, err := s.incomingHolePunch(str)
 	if err != nil {
 		s.tracer.ProtocolError(rp, err)
-		log.Debugw("error handling holepunching stream from", rp, "error", err)
+		log.Debugw("error handling holepunching stream from", "peer", rp, "error", err)
 		str.Reset()
 		return
 	}
@@ -260,6 +271,7 @@ func (s *Service) handleNewStream(str network.Stream) {
 	err = holePunchConnect(s.ctx, s.host, pi, false)
 	dt := time.Since(start)
 	s.tracer.EndHolePunch(rp, dt, err)
+	s.tracer.HolePunchFinished("receiver", 1, addrs, ownAddrs, getDirectConnection(s.host, rp))
 }
 
 // DirectConnect is only exposed for testing purposes.

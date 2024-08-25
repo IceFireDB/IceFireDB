@@ -3,10 +3,11 @@ package proto
 import (
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/record"
 	pbv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/pb"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/record"
+	"google.golang.org/protobuf/proto"
 )
 
 const RecordDomain = "libp2p-relay-rsvp"
@@ -38,21 +39,17 @@ func (rv *ReservationVoucher) Codec() []byte {
 }
 
 func (rv *ReservationVoucher) MarshalRecord() ([]byte, error) {
-	relay := []byte(rv.Relay)
-	peer := []byte(rv.Peer)
 	expiration := uint64(rv.Expiration.Unix())
-	pbrv := &pbv2.ReservationVoucher{
-		Relay:      relay,
-		Peer:       peer,
+	return proto.Marshal(&pbv2.ReservationVoucher{
+		Relay:      []byte(rv.Relay),
+		Peer:       []byte(rv.Peer),
 		Expiration: &expiration,
-	}
-
-	return pbrv.Marshal()
+	})
 }
 
 func (rv *ReservationVoucher) UnmarshalRecord(blob []byte) error {
 	pbrv := pbv2.ReservationVoucher{}
-	err := pbrv.Unmarshal(blob)
+	err := proto.Unmarshal(blob, &pbrv)
 	if err != nil {
 		return err
 	}

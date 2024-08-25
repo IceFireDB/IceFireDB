@@ -89,6 +89,7 @@ type filterWriter struct {
 	buf       util.Buffer
 	nKeys     int
 	offsets   []uint32
+	baseLg    uint
 }
 
 func (w *filterWriter) add(key []byte) {
@@ -103,7 +104,7 @@ func (w *filterWriter) flush(offset uint64) {
 	if w.generator == nil {
 		return
 	}
-	for x := int(offset / filterBase); x > len(w.offsets); {
+	for x := int(offset / uint64(1<<w.baseLg)); x > len(w.offsets); {
 		w.generate()
 	}
 }
@@ -122,7 +123,7 @@ func (w *filterWriter) finish() {
 		buf4 := w.buf.Alloc(4)
 		binary.LittleEndian.PutUint32(buf4, x)
 	}
-	w.buf.WriteByte(filterBaseLg)
+	w.buf.WriteByte(byte(w.baseLg))
 }
 
 func (w *filterWriter) generate() {
@@ -145,6 +146,7 @@ type Writer struct {
 	compression opt.Compression
 	blockSize   int
 
+	bpool       *util.BufferPool
 	dataBlock   blockWriter
 	indexBlock  blockWriter
 	filterBlock filterWriter
@@ -284,6 +286,16 @@ func (w *Writer) BytesLen() int {
 // after Close, but calling BlocksLen, EntriesLen and BytesLen
 // is still possible.
 func (w *Writer) Close() error {
+	defer func() {
+		if w.bpool != nil {
+			// Buffer.Bytes() returns [offset:] of the buffer.
+			// We need to Reset() so that the offset = 0, resulting
+			// in buf.Bytes() returning the whole allocated bytes.
+			w.dataBlock.buf.Reset()
+			w.bpool.Put(w.dataBlock.buf.Bytes())
+		}
+	}()
+
 	if w.err != nil {
 		return w.err
 	}
@@ -350,7 +362,15 @@ func (w *Writer) Close() error {
 // NewWriter creates a new initialized table writer for the file.
 //
 // Table writer is not safe for concurrent use.
-func NewWriter(f io.Writer, o *opt.Options) *Writer {
+func NewWriter(f io.Writer, o *opt.Options, pool *util.BufferPool, size int) *Writer {
+	var bufBytes []byte
+	if pool == nil {
+		bufBytes = make([]byte, size)
+	} else {
+		bufBytes = pool.Get(size)
+	}
+	bufBytes = bufBytes[:0]
+
 	w := &Writer{
 		writer:          f,
 		cmp:             o.GetComparer(),
@@ -358,6 +378,8 @@ func NewWriter(f io.Writer, o *opt.Options) *Writer {
 		compression:     o.GetCompression(),
 		blockSize:       o.GetBlockSize(),
 		comparerScratch: make([]byte, 0),
+		bpool:           pool,
+		dataBlock:       blockWriter{buf: *util.NewBuffer(bufBytes)},
 	}
 	// data block
 	w.dataBlock.restartInterval = o.GetBlockRestartInterval()
@@ -369,6 +391,7 @@ func NewWriter(f io.Writer, o *opt.Options) *Writer {
 	// filter block
 	if w.filter != nil {
 		w.filterBlock.generator = w.filter.NewGenerator()
+		w.filterBlock.baseLg = uint(o.GetFilterBaseLg())
 		w.filterBlock.flush(0)
 	}
 	return w

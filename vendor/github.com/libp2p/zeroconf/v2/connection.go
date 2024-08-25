@@ -62,6 +62,8 @@ func joinUdp6Multicast(interfaces []net.Interface) (*ipv6.PacketConn, error) {
 		return nil, fmt.Errorf("udp6: failed to join any of these interfaces: %v", interfaces)
 	}
 
+	_ = pkConn.SetMulticastHopLimit(255)
+
 	return pkConn, nil
 }
 
@@ -92,6 +94,8 @@ func joinUdp4Multicast(interfaces []net.Interface) (*ipv4.PacketConn, error) {
 		pkConn.Close()
 		return nil, fmt.Errorf("udp4: failed to join any of these interfaces: %v", interfaces)
 	}
+
+	_ = pkConn.SetMulticastTTL(255)
 
 	return pkConn, nil
 }

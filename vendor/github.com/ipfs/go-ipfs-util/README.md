@@ -8,9 +8,13 @@
 
 > Common utilities used by go-ipfs and other related go packages
 
-## Lead Maintainer
+## ❗ This repo is no longer maintained.
+👉 We highly recommend switching to the maintained version at https://github.com/ipfs/boxo/tree/main/util.
+🏎️ Good news!  There is [tooling and documentation](https://github.com/ipfs/boxo#migrating-to-boxo) to expedite a switch in your repo. 
 
-[Steven Allen](https://github.com/Stebalien)
+⚠️ If you continue using this repo, please note that security fixes will not be provided (unless someone steps in to maintain it).
+
+📚 Learn more, including how to take the maintainership mantle or ask questions, [here](https://github.com/ipfs/boxo/wiki/Copied-or-Migrated-Repos-FAQ).
 
 ## Install
 
@@ -32,13 +36,6 @@ gx-go --rewrite
 ```
 
 Please check [Gx](https://github.com/whyrusleeping/gx) and [Gx-go](https://github.com/whyrusleeping/gx-go) documentation for more information.
-
-
-## Contribute
-
-Feel free to join in. All welcome. Open an [issue](https://github.com/ipfs/go-ipfs-util/issues)!
-
-This repository falls under the IPFS [Code of Conduct](https://github.com/ipfs/community/blob/master/code-of-conduct.md).
 
 ### Want to hack on IPFS?
 

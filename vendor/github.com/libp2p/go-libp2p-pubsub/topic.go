@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
+	"github.com/libp2p/go-libp2p/core/crypto"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // ErrTopicClosed is returned if a Topic is utilized after it has been closed
@@ -215,6 +215,7 @@ type ProvideKey func() (crypto.PrivKey, peer.ID)
 type PublishOptions struct {
 	ready     RouterReady
 	customKey ProvideKey
+	local     bool
 }
 
 type PubOpt func(pub *PublishOptions) error
@@ -238,7 +239,7 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 		}
 	}
 
-	if pub.customKey != nil {
+	if pub.customKey != nil && !pub.local {
 		key, pid = pub.customKey()
 		if key == nil {
 			return ErrNilSignKey
@@ -307,7 +308,7 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 		}
 	}
 
-	return t.p.val.PushLocal(&Message{m, "", t.p.host.ID(), nil})
+	return t.p.val.PushLocal(&Message{m, "", t.p.host.ID(), nil, pub.local})
 }
 
 // WithReadiness returns a publishing option for only publishing when the router is ready.
@@ -315,6 +316,18 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 func WithReadiness(ready RouterReady) PubOpt {
 	return func(pub *PublishOptions) error {
 		pub.ready = ready
+		return nil
+	}
+}
+
+// WithLocalPublication returns a publishing option to notify in-process subscribers only.
+// It prevents message publication to mesh peers.
+// Useful in edge cases where the msg needs to be only delivered to the in-process subscribers,
+// e.g. not to spam the network with outdated msgs.
+// Should not be used specifically for in-process pubsubing.
+func WithLocalPublication(local bool) PubOpt {
+	return func(pub *PublishOptions) error {
+		pub.local = local
 		return nil
 	}
 }

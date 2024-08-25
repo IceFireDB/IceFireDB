@@ -13,11 +13,8 @@ func ValidateCBOR(b []byte) error {
 
 	br := bytes.NewReader(b)
 
-	// Allocate some scratch space.
-	scratch := make([]byte, maxHeaderSize)
-
 	for remaining := uint64(1); remaining > 0; remaining-- {
-		maj, extra, err := CborReadHeaderBuf(br, scratch)
+		maj, extra, err := CborReadHeader(br)
 		if err != nil {
 			return err
 		}

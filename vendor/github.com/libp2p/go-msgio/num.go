@@ -16,8 +16,9 @@ func WriteLen(w io.Writer, l int) error {
 
 // ReadLen reads a length from the given reader.
 // if buf is non-nil, it reuses the buffer. Ex:
-//    l, err := ReadLen(r, nil)
-//    _, err := ReadLen(r, buf)
+//
+//	l, err := ReadLen(r, nil)
+//	_, err := ReadLen(r, buf)
 func ReadLen(r io.Reader, buf []byte) (int, error) {
 	if len(buf) < 4 {
 		buf = make([]byte, 4)

@@ -19,14 +19,125 @@ Planned/Upcoming Changes
 
 Here are some outlines of changes we intend to make that affect the public API:
 
-- **Bindnode improvements**: Candidates for merge and release include:
-  - Custom Go type to IPLD kind conversion `Option`s: https://github.com/ipld/go-ipld-prime/pull/414
-  - Type registry for easier local maintenance of type to `Type` & `TypedPrototype` mappings and utilities for dealing with them: https://github.com/ipld/go-ipld-prime/pull/437
+- **IPLD Amend**: is likely to land soon; it implements a more efficient underlying architecture to support IPLD Patch and related features. IPLD Amend adds an interface to allow incremental changes to `Node`s in an efficient way. Whereas IPLD Patch is a protocol for expressing changes. We're still working on figuring out exactly where it fits in the stack and making sure it won't be disruptive but early benchmarks are very promising for both Patch and traversal-based transforms. See https://github.com/ipld/go-ipld-prime/pull/445 for more.
+- **Layered `Node` implementation optimizations**: When layering different implementations of `Node` builders or consumers, having to defer through basicnode types can lead to large inefficiencies of memory and speed. We are looking at ways to improve this situation, including ways to *assemble* layered assemblers. See https://github.com/ipld/go-ipld-prime/issues/443 for discussion and some initial plans.
 - **Selectors**: There have been some recurring wishes to do something about the Selector package layout.  There's no intended or prioritized date for this.  See https://github.com/ipld/go-ipld-prime/issues/236 for more.
 - **Absent / "Not found" values**: There may be some upcoming changes to exactly how "not found" values are handled in order to clarify and standardize the subject.  There's no finalized date for this.  See https://github.com/ipld/go-ipld-prime/issues/360 for more.
 
 Released Changes
 ----------------
+
+### v0.21.0
+
+_2023 August 10_
+
+go-ipld-prime's release policy says that:
+
+> even numbers should be easy upgrades; odd numbers may change things
+
+This release is an odd number, and it does change some minor things.
+
+#### 🛠 Breaking
+
+* **Build**: The minimum version of Go has been bumped from 1.18 to **1.19**.
+* **Dependencies**: The go-cid dependency was upgraded from v0.3.2 to **v0.4.1**. This is a relatively minor change but the introduction of `ErrInvalidCid` wrapping may be breaking for some users.
+* **Selectors**: Remove hard error when a traversal encounters a slice matcher with a node that is not a string or bytes, by @rvagg [#529](https://github.com/ipld/go-ipld-prime/pull/529)
+
+#### 🔦 Features
+
+* **Traversal**: `Preloader` functionality, by @hannahhoward and @rvagg [#452](https://github.com/ipld/go-ipld-prime/pull/452)
+  * See the [traversal](https://pkg.go.dev/github.com/ipld/go-ipld-prime/traversal) package documentation for more information on how a `Preloader` can be used to introduce parallelism into a traversal. The [Lassie](https://github.com/filecoin-project/lassie) project is currently using this functionality to speed up Bitswap block fetching; future releases of go-ipld-prime may include additional functionality being prototyped in Lassie to manage parallelism and caching.
+* **Schemas**: Support `listpairs` struct representation in DSL parsing, by @rvagg [#514](https://github.com/ipld/go-ipld-prime/pull/514)
+* **Schemas**: Support `inline` union representation in DSL parsing, by @rvagg [#527](https://github.com/ipld/go-ipld-prime/pull/527)
+* **Bindnode**: Support `listpairs` struct representation, by @rvagg [#514](https://github.com/ipld/go-ipld-prime/pull/514)
+* **Selectors**: Support negative values for slice matcher's `From` and `To`, by @rvagg [#530](https://github.com/ipld/go-ipld-prime/pull/530)
+  * The slice matcher is currently being used to support byte-range fetching for the [IPFS Trustless Gateway](https://specs.ipfs.tech/http-gateways/trustless-gateway/) specification. Work is ongoing and can be seen in both the [Lassie](https://github.com/filecoin-project/lassie) and [Frisbii](https://github.com/filecoin-project/lassie) projects.
+  * _Please note that this feature is currently considered **experimental** and shoule be used with care and with the expectation that it may change in the near future. Expect a release or two before this feature is considered stable._
+
+#### 🩹 Fixes
+
+* **Traversal**: `StartAtPath` work properly for matching walks, by @rvagg [#500](https://github.com/ipld/go-ipld-prime/pull/500)
+* **Traversal**: `WalkTransforming()` work properly, by @EdSchouten [#516](https://github.com/ipld/go-ipld-prime/pull/516)
+* **Basicnode**: `basic.NewInt()` returns a pointer like other constructors, by @hacdias [#525](https://github.com/ipld/go-ipld-prime/pull/525)
+* **Selectors**: Cache offsets for sequential reads in slice matcher, by @rvagg [#529](https://github.com/ipld/go-ipld-prime/pull/529)
+
+#### 🌟 Thanks!
+
+Thanks to @hacdias and @EdSchouten for their first contributions to go-ipld-prime!
+
+### v0.20.0
+
+go-ipld-prime's release policy says that:
+
+> even numbers should be easy upgrades; odd numbers may change things
+
+As such, v0.20.0 is a relatively minor release with a grab-bag of small improvements and fixes.
+
+_2023 February 11_
+
+Schema errors can now [`errors.Is`](https://pkg.go.dev/errors#Is):
+
+* \[[`61c9ab10d4`](https://github.com/ipld/go-ipld-prime/commit/61c9ab10d4)] - **feat**: support errors.Is for schema errors (Ian Davis) [#476](https://github.com/ipld/go-ipld-prime/pull/476)
+
+Schema DMT (schema/dmt) is now more usable from the outside and has a new `ConcatenateSchemas` function that can be used to combine two schemas into one:
+
+* \[[`db9d8a7512`](https://github.com/ipld/go-ipld-prime/commit/db9d8a7512)] - Export schema/dmt.TypeSystem. (Eric Myhre) [#483](https://github.com/ipld/go-ipld-prime/pull/483)
+* \[[`39818c169a`](https://github.com/ipld/go-ipld-prime/commit/39818c169a)] - Add a SchemaConcatenate operation. (Eric Myhre) [#483](https://github.com/ipld/go-ipld-prime/pull/483)
+* \[[`c68ba53c67`](https://github.com/ipld/go-ipld-prime/commit/c68ba53c67)] - More accurate name for structure that contains easy access to prototypes. (Eric Myhre) [#483](https://github.com/ipld/go-ipld-prime/pull/483)
+* \[[`2ecabf1217`](https://github.com/ipld/go-ipld-prime/commit/2ecabf1217)] - Add several pieces of docs to schema/dmt. (Eric Myhre)
+* \[[`33475f0448`](https://github.com/ipld/go-ipld-prime/commit/33475f0448)] - Fix mispatched package declaration. (Eric Myhre)
+
+The DAG-CBOR codec now has an `DontParseBeyondEnd` option (default `false`) that allows it to parse undelimited streamed objects. This matches the same functionality already in DAG-JSON and should only be used for specialised cases:
+
+* \[[`7b00b1490f`](https://github.com/ipld/go-ipld-prime/commit/7b00b1490f)] - feat(dagcbor): mode to allow parsing undelimited streamed objects (Rod Vagg) [#490](https://github.com/ipld/go-ipld-prime/pull/490)
+
+`datamodel.Copy` got some direct test coverage and will now complain if you try to copy a `nil` node:
+
+* \[[`f4bb2daa27`](https://github.com/ipld/go-ipld-prime/commit/f4bb2daa27)] - fix(datamodel): add tests to Copy, make it complain on nil (Rod Vagg) [#491](https://github.com/ipld/go-ipld-prime/pull/491)
+
+The LinkSystem data loading check will compare links (CIDs) to ensure it loaded what you wanted; this now properly supports the case where your link is a pointer:
+
+* \[[`1fc56b8e7a`](https://github.com/ipld/go-ipld-prime/commit/1fc56b8e7a)] - Fix hash mismatch error on matching link pointer (Masih H. Derkani) [#480](https://github.com/ipld/go-ipld-prime/pull/480)
+
+### v0.19.0
+
+_2022 October 13_
+
+go-ipld-prime's release policy says that:
+
+> even numbers should be easy upgrades; odd numbers may change things
+
+The major change in this release is a bump to Go 1.18.
+
+#### 🛠 Breaking Changes
+
+Update go.mod to Go 1.18.
+
+#### 🔦 Highlights
+
+* **Codecs**: [Correct JSON codec Bytes handling](https://github.com/ipld/go-ipld-prime/pull/472). This change does not impact DAG-JSON, which is the generally recommended codec for JSON output as the JSON codec cannot properly handle Bytes or Links.
+* **Dependencies**:
+  * Update to go-multihash@v0.2.1: https://github.com/multiformats/go-multihash/releases/tag/v0.2.1
+  * Update to go-multicodec@v0.6.0: https://github.com/multiformats/go-multicodec/releases/tag/v0.6.0
+  * Update to go-cid@v0.3.2: https://github.com/ipfs/go-cid/compare/v0.2.0...v0.3.2
+
+### v0.18.0
+
+_2022 August 01_
+
+go-ipld-prime's release policy says that:
+
+> even numbers should be easy upgrades; odd numbers may change things
+
+So, as an even number, this v0.18.0 release should be a smooth ride for upgraders from v0.17.0. We have 3 major feature additions, all focused on [Bindnode](https://pkg.go.dev/github.com/ipld/go-ipld-prime/node/bindnode).
+
+#### 🔦 Highlights
+
+* **Bindnode**: [Custom Go type converters](https://github.com/ipld/go-ipld-prime/pull/414) - Bindnode performs bidirectional mapping of Go types to the IPLD Data Model, and in doing so, it assumes a straightforward mapping of values to their encoded forms. But there are common cases where a Go type doesn't have a straightforward path to serialization, either because the encoded form needs a custom layout, or because bindnode doesn't have enough information to infer a serialization pattern. Custom Go type converters for bindnode allow a user to supply a pair of converter functions for a Go type that dictate how to map that type to an IPLD Data Model kind. See the **[bindnode documentation](https://pkg.go.dev/github.com/ipld/go-ipld-prime/node/bindnode)** for more information.
+* **Bindnode**: [Type registry](https://github.com/ipld/go-ipld-prime/pull/437) - Setting up Go type mappings with Bindnode involves some boilerplate. A basic type registry is now available that takes some of this boilerplate away; giving you a single place to register, and perform conversions to and from Go types, Data Model (`Node`) forms or directly through serialization. See the **[bindnode/registry documentation](https://pkg.go.dev/github.com/ipld/go-ipld-prime/node/bindnode/registry)** for more information.
+* **Bindnode** [Full `uint64` support](https://github.com/ipld/go-ipld-prime/pull/414/commits/87211682cb963ef1c98fa63909f67a8b02d1108c) - the `uint64` support introduced in go-ipld-prime@v0.17.0 has been wired into Bindnode. The Data Model (`Node`) forms expose integers as `int64` values, which is lossy for unsigned 64-bit integers. Bindnode Go types using `uint64` values are now lossless in round-trips through serialization to codecs that support the full range (DAG-CBOR most notably).
+
+You can see all of these new features in action using Filecoin Go types, allowing a mapping between Go types, Data Model (`Node`) forms, and their DAG-CBOR serialized forms with [data-transfer vouchers](https://github.com/filecoin-project/go-fil-markets/pull/713). These features also allow us to interact with the original Go types, without modification, including `big.Int` serialization to `Bytes`, Filecoin `Signature` serialization to a byte-prefix discriminated `Bytes` and more. Since the Go types are unchanged, they can also simultaneously support [cbor-gen](https://github.com/whyrusleeping/cbor-gen) serialization, allowing an easier migration path.
 
 ### v0.17.0
 

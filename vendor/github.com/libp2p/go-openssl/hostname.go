@@ -17,18 +17,26 @@ package openssl
 /*
 #include <openssl/ssl.h>
 #include <openssl/conf.h>
-#include <openssl/x509.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+	#include <openssl/x509v3.h>
+	typedef const char x509char;
+#else
+	#include <openssl/x509.h>
 
-#ifndef X509_CHECK_FLAG_ALWAYS_CHECK_SUBJECT
-#define X509_CHECK_FLAG_ALWAYS_CHECK_SUBJECT	0x1
-#define X509_CHECK_FLAG_NO_WILDCARDS	0x2
+	#ifndef X509_CHECK_FLAG_ALWAYS_CHECK_SUBJECT
+		#define X509_CHECK_FLAG_ALWAYS_CHECK_SUBJECT	0x1
+		#define X509_CHECK_FLAG_NO_WILDCARDS	0x2
 
-extern int X509_check_host(X509 *x, const unsigned char *chk, size_t chklen,
-    unsigned int flags, char **peername);
-extern int X509_check_email(X509 *x, const unsigned char *chk, size_t chklen,
-    unsigned int flags);
-extern int X509_check_ip(X509 *x, const unsigned char *chk, size_t chklen,
-		unsigned int flags);
+		extern int X509_check_host(X509 *x, const unsigned char *chk, size_t chklen,
+			unsigned int flags, char **peername);
+		extern int X509_check_email(X509 *x, const unsigned char *chk, size_t chklen,
+			unsigned int flags);
+		extern int X509_check_ip(X509 *x, const unsigned char *chk, size_t chklen,
+			unsigned int flags);
+		typedef const unsigned char x509char;
+	#else
+		typedef const char x509char;
+	#endif
 #endif
 */
 import "C"
@@ -40,7 +48,7 @@ import (
 )
 
 var (
-	ValidationError = errors.New("Host validation error")
+	ValidationError = errors.New("host validation error") //lint:ignore ST1012 rename may cause breaking changes; research before renaming.
 )
 
 type CheckFlags int
@@ -59,7 +67,7 @@ func (c *Certificate) CheckHost(host string, flags CheckFlags) error {
 	chost := unsafe.Pointer(C.CString(host))
 	defer C.free(chost)
 
-	rv := C.X509_check_host(c.x, (*C.uchar)(chost), C.size_t(len(host)),
+	rv := C.X509_check_host(c.x, (*C.x509char)(chost), C.size_t(len(host)),
 		C.uint(flags), nil)
 	if rv > 0 {
 		return nil
@@ -78,7 +86,7 @@ func (c *Certificate) CheckHost(host string, flags CheckFlags) error {
 func (c *Certificate) CheckEmail(email string, flags CheckFlags) error {
 	cemail := unsafe.Pointer(C.CString(email))
 	defer C.free(cemail)
-	rv := C.X509_check_email(c.x, (*C.uchar)(cemail), C.size_t(len(email)),
+	rv := C.X509_check_email(c.x, (*C.x509char)(cemail), C.size_t(len(email)),
 		C.uint(flags))
 	if rv > 0 {
 		return nil

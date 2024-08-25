@@ -9,7 +9,7 @@ import (
 	"github.com/polydawn/refmt/shared"
 )
 
-//HumanReadable returns a string representation of a CBOR blob
+// HumanReadable returns a string representation of a CBOR blob
 func HumanReadable(blob []byte) (string, error) {
 	reader := bytes.NewReader(blob)
 

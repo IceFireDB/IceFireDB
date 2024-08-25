@@ -1,5 +1,5 @@
 gentest:
-	rm -rf ./testing/cbor_gen.go ./testing/cbor_map_gen.go
+	rm -rf ./testing/cbor_gen.go ./testing/cbor_map_gen.go ./testing/cbor_options_gen.go
 	go run ./testgen/main.go
 .PHONY: gentest
 

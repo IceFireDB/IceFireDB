@@ -6,8 +6,8 @@
 
 // Originally found in
 // https://github.com/google/gopacket/blob/master/routing/routing.go
-// * Route selection modified to choose most selective route
-//   to break ties when route priority is insufficient.
+//   - Route selection modified to choose most selective route
+//     to break ties when route priority is insufficient.
 package netroute
 
 import (
@@ -25,6 +25,34 @@ type rtInfo struct {
 	// We currently ignore the InputIface.
 	InputIface, OutputIface uint32
 	Priority                uint32
+}
+
+func (rt rtInfo) IsMoreSpecThan(mostSpecificRt *rtInfo) bool {
+	if mostSpecificRt == nil {
+		return true
+	}
+
+	var candSpec, curSpec int
+	if rt.Dst != nil {
+		candSpec, _ = rt.Dst.Mask.Size()
+	}
+	if mostSpecificRt.Dst != nil {
+		curSpec, _ = mostSpecificRt.Dst.Mask.Size()
+	}
+
+	if candSpec > curSpec {
+		return true
+	} else if candSpec < curSpec {
+		return false
+	}
+
+	// Windows and MacOS hasn't metric/priority on rule entry,
+	// But the interface device has the priority property.
+	//
+	// Before we find more correctly way on different OS platform,
+	// we keep the same rule selecting logical as before which
+	// is more later more special
+	return mostSpecificRt.Priority >= rt.Priority
 }
 
 // routeSlice implements sort.Interface to sort routes by Priority.
@@ -121,19 +149,9 @@ func (r *router) route(routes routeSlice, input net.HardwareAddr, src, dst net.I
 		if rt.Dst != nil && !rt.Dst.Contains(dst) {
 			continue
 		}
-		if mostSpecificRt != nil {
-			var candSpec, curSpec int
-			if rt.Dst != nil {
-				candSpec, _ = rt.Dst.Mask.Size()
-			}
-			if mostSpecificRt.Dst != nil {
-				curSpec, _ = mostSpecificRt.Dst.Mask.Size()
-			}
-			if candSpec < curSpec {
-				continue
-			}
+		if rt.IsMoreSpecThan(mostSpecificRt) {
+			mostSpecificRt = rt
 		}
-		mostSpecificRt = rt
 	}
 	if mostSpecificRt != nil {
 		return int(mostSpecificRt.OutputIface), mostSpecificRt.Gateway, mostSpecificRt.PrefSrc, nil

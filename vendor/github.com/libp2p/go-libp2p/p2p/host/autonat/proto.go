@@ -1,12 +1,13 @@
 package autonat
 
 import (
-	pb "github.com/libp2p/go-libp2p/p2p/host/autonat/pb"
-
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/host/autonat/pb"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
+
+//go:generate protoc --proto_path=$PWD:$PWD/../../.. --go_out=. --go_opt=Mpb/autonat.proto=./pb pb/autonat.proto
 
 // AutoNATProto identifies the autonat service protocol
 const AutoNATProto = "/libp2p/autonat/1.0.0"

@@ -9,7 +9,6 @@ package raw
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/ipld/go-ipld-prime/codec"
 	"github.com/ipld/go-ipld-prime/datamodel"
@@ -40,14 +39,14 @@ func init() {
 // To disable the shortcut above, hide the Bytes method by wrapping the buffer
 // with an io.Reader:
 //
-//     Decode([...], struct{io.Reader}{buf})
+//	Decode([...], struct{io.Reader}{buf})
 func Decode(am datamodel.NodeAssembler, r io.Reader) error {
 	var data []byte
 	if buf, ok := r.(interface{ Bytes() []byte }); ok {
 		data = buf.Bytes()
 	} else {
 		var err error
-		data, err = ioutil.ReadAll(r)
+		data, err = io.ReadAll(r)
 		if err != nil {
 			return fmt.Errorf("could not decode raw node: %v", err)
 		}

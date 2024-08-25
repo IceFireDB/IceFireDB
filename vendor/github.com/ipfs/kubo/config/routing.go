@@ -1,28 +1,109 @@
 package config
 
-// Routing defines configuration options for libp2p routing
+import (
+	"encoding/json"
+	"fmt"
+	"runtime"
+)
+
+var (
+	DefaultAcceleratedDHTClient      = false
+	DefaultLoopbackAddressesOnLanDHT = false
+)
+
+// Routing defines configuration options for libp2p routing.
 type Routing struct {
 	// Type sets default daemon routing mode.
 	//
-	// Can be one of "dht", "dhtclient", "dhtserver", "none", or unset.
+	// Can be one of "auto", "autoclient", "dht", "dhtclient", "dhtserver", "none", or "custom".
+	// When unset or set to "auto", DHT and implicit routers are used.
+	// When "custom" is set, user-provided Routing.Routers is used.
 	Type *OptionalString `json:",omitempty"`
 
-	Routers map[string]Router
+	AcceleratedDHTClient Flag `json:",omitempty"`
+
+	LoopbackAddressesOnLanDHT Flag `json:",omitempty"`
+
+	Routers Routers
+
+	Methods Methods
 }
 
 type Router struct {
-
-	// Currenly only supported Type is "reframe".
-	// Reframe type allows to add other resolvers using the Reframe spec:
-	// https://github.com/ipfs/specs/tree/main/reframe
-	// In the future we will support "dht" and other Types here.
-	Type string
-
-	Enabled Flag `json:",omitempty"`
+	// Router type ID. See RouterType for more info.
+	Type RouterType
 
 	// Parameters are extra configuration that this router might need.
-	// A common one for reframe router is "Endpoint".
-	Parameters map[string]string
+	// A common one for HTTP router is "Endpoint".
+	Parameters interface{}
+}
+
+type (
+	Routers map[string]RouterParser
+	Methods map[MethodName]Method
+)
+
+func (m Methods) Check() error {
+	// Check supported methods
+	for _, mn := range MethodNameList {
+		_, ok := m[mn]
+		if !ok {
+			return fmt.Errorf("method name %q is missing from Routing.Methods config param", mn)
+		}
+	}
+
+	// Check unsupported methods
+	for k := range m {
+		seen := false
+		for _, mn := range MethodNameList {
+			if mn == k {
+				seen = true
+				break
+			}
+		}
+
+		if seen {
+			continue
+		}
+
+		return fmt.Errorf("method name %q is not a supported method on Routing.Methods config param", k)
+	}
+
+	return nil
+}
+
+type RouterParser struct {
+	Router
+}
+
+func (r *RouterParser) UnmarshalJSON(b []byte) error {
+	out := Router{}
+	out.Parameters = &json.RawMessage{}
+	if err := json.Unmarshal(b, &out); err != nil {
+		return err
+	}
+	raw := out.Parameters.(*json.RawMessage)
+
+	var p interface{}
+	switch out.Type {
+	case RouterTypeHTTP:
+		p = &HTTPRouterParams{}
+	case RouterTypeDHT:
+		p = &DHTRouterParams{}
+	case RouterTypeSequential:
+		p = &ComposableRouterParams{}
+	case RouterTypeParallel:
+		p = &ComposableRouterParams{}
+	}
+
+	if err := json.Unmarshal(*raw, &p); err != nil {
+		return err
+	}
+
+	r.Router.Type = out.Type
+	r.Router.Parameters = p
+
+	return nil
 }
 
 // Type is the routing type.
@@ -30,15 +111,72 @@ type Router struct {
 type RouterType string
 
 const (
-	RouterTypeReframe RouterType = "reframe"
+	RouterTypeHTTP       RouterType = "http"       // HTTP JSON API for delegated routing systems (IPIP-337).
+	RouterTypeDHT        RouterType = "dht"        // DHT router.
+	RouterTypeSequential RouterType = "sequential" // Router helper to execute several routers sequentially.
+	RouterTypeParallel   RouterType = "parallel"   // Router helper to execute several routers in parallel.
 )
 
-type RouterParam string
+type DHTMode string
 
 const (
-	// RouterParamEndpoint is the URL where the routing implementation will point to get the information.
-	// Usually used for reframe Routers.
-	RouterParamEndpoint RouterParam = "Endpoint"
-
-	RouterParamPriority RouterParam = "Priority"
+	DHTModeServer DHTMode = "server"
+	DHTModeClient DHTMode = "client"
+	DHTModeAuto   DHTMode = "auto"
 )
+
+type MethodName string
+
+const (
+	MethodNameProvide       MethodName = "provide"
+	MethodNameFindProviders MethodName = "find-providers"
+	MethodNameFindPeers     MethodName = "find-peers"
+	MethodNameGetIPNS       MethodName = "get-ipns"
+	MethodNamePutIPNS       MethodName = "put-ipns"
+)
+
+var MethodNameList = []MethodName{MethodNameProvide, MethodNameFindPeers, MethodNameFindProviders, MethodNameGetIPNS, MethodNamePutIPNS}
+
+type HTTPRouterParams struct {
+	// Endpoint is the URL where the routing implementation will point to get the information.
+	Endpoint string
+
+	// MaxProvideBatchSize determines the maximum amount of CIDs sent per batch.
+	// Servers might not accept more than 100 elements per batch. 100 elements by default.
+	MaxProvideBatchSize int
+
+	// MaxProvideConcurrency determines the number of threads used when providing content. GOMAXPROCS by default.
+	MaxProvideConcurrency int
+}
+
+func (hrp *HTTPRouterParams) FillDefaults() {
+	if hrp.MaxProvideBatchSize == 0 {
+		hrp.MaxProvideBatchSize = 100
+	}
+
+	if hrp.MaxProvideConcurrency == 0 {
+		hrp.MaxProvideConcurrency = runtime.GOMAXPROCS(0)
+	}
+}
+
+type DHTRouterParams struct {
+	Mode                 DHTMode
+	AcceleratedDHTClient bool `json:",omitempty"`
+	PublicIPNetwork      bool
+}
+
+type ComposableRouterParams struct {
+	Routers []ConfigRouter
+	Timeout *OptionalDuration `json:",omitempty"`
+}
+
+type ConfigRouter struct {
+	RouterName   string
+	Timeout      Duration
+	IgnoreErrors bool
+	ExecuteAfter *OptionalDuration `json:",omitempty"`
+}
+
+type Method struct {
+	RouterName string
+}

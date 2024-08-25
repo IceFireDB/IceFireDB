@@ -7,7 +7,7 @@ import (
 
 	"math/bits"
 
-	"github.com/Stebalien/go-bitfield"
+	bitfield "github.com/ipfs/go-bitfield"
 	"github.com/ipfs/go-unixfsnode/data"
 	dagpb "github.com/ipld/go-codec-dagpb"
 	"github.com/spaolacci/murmur3"
@@ -88,10 +88,19 @@ func maxPadLength(nd data.UnixFSData) int {
 	return len(fmt.Sprintf("%X", nd.FieldFanout().Must().Int()-1))
 }
 
-func bitField(nd data.UnixFSData) bitfield.Bitfield {
-	bf := bitfield.NewBitfield(int(nd.FieldFanout().Must().Int()))
+const maximumHamtWidth = 1 << 10
+
+func bitField(nd data.UnixFSData) (bitfield.Bitfield, error) {
+	fanout := int(nd.FieldFanout().Must().Int())
+	if fanout > maximumHamtWidth {
+		return nil, fmt.Errorf("hamt witdh (%d) exceed maximum allowed (%d)", fanout, maximumHamtWidth)
+	}
+	bf, err := bitfield.NewBitfield(fanout)
+	if err != nil {
+		return nil, err
+	}
 	bf.SetBytes(nd.FieldData().Must().Bytes())
-	return bf
+	return bf, nil
 }
 
 func checkLogTwo(v int) error {

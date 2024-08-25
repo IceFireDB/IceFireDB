@@ -13,6 +13,8 @@ import (
 	cbg "github.com/whyrusleeping/cbor-gen"
 )
 
+const DefaultMultihash = uint64(mh.BLAKE2B_MIN + 31)
+
 // IpldStore wraps a Blockstore and provides an interface for storing and retrieving CBOR encoded data.
 type IpldStore interface {
 	Get(ctx context.Context, c cid.Cid, out interface{}) error
@@ -41,6 +43,8 @@ type BasicIpldStore struct {
 	Viewer IpldBlockstoreViewer
 
 	Atlas *atlas.Atlas
+
+	DefaultMultihash uint64
 }
 
 var _ IpldStore = &BasicIpldStore{}
@@ -89,7 +93,11 @@ type cidProvider interface {
 
 // Put marshals and writes content `v` to the backing blockstore returning its CID.
 func (s *BasicIpldStore) Put(ctx context.Context, v interface{}) (cid.Cid, error) {
-	mhType := uint64(mh.BLAKE2B_MIN + 31)
+	mhType := DefaultMultihash
+	if s.DefaultMultihash != 0 {
+		mhType = s.DefaultMultihash
+	}
+
 	mhLen := -1
 	codec := uint64(cid.DagCBOR)
 

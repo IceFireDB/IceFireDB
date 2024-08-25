@@ -1,4 +1,4 @@
-// Package dual provides an implementaiton of a split or "dual" dht, where two parallel instances
+// Package dual provides an implementation of a split or "dual" dht, where two parallel instances
 // are maintained for the global internet and the local LAN respectively.
 package dual
 
@@ -8,20 +8,26 @@ import (
 	"sync"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-kad-dht/internal"
+	"github.com/libp2p/go-libp2p-routing-helpers/tracing"
 
 	"github.com/ipfs/go-cid"
-	ci "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/libp2p/go-libp2p-core/routing"
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	"github.com/libp2p/go-libp2p-kbucket/peerdiversity"
 	helper "github.com/libp2p/go-libp2p-routing-helpers"
+	ci "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/core/routing"
 	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr/net"
 
 	"github.com/hashicorp/go-multierror"
 )
+
+const tracer = tracing.Tracer("go-libp2p-kad-dht/dual")
+const dualName = "Dual"
 
 // DHT implements the routing interface to provide two concrete DHT implementationts for use
 // in IPFS that are used to support both global network users and disjoint LAN usecases.
@@ -101,6 +107,8 @@ func New(ctx context.Context, h host.Host, options ...Option) (*DHT, error) {
 			dht.QueryFilter(dht.PublicQueryFilter),
 			dht.RoutingTableFilter(dht.PublicRoutingTableFilter),
 			dht.RoutingTablePeerDiversityFilter(dht.NewRTPeerDiversityFilter(h, maxPrefixCountPerCpl, maxPrefixCount)),
+			// filter out all private addresses
+			dht.AddressFilter(func(addrs []ma.Multiaddr) []ma.Multiaddr { return ma.FilterAddrs(addrs, manet.IsPublicAddr) }),
 		),
 	)
 	if err != nil {
@@ -111,6 +119,10 @@ func New(ctx context.Context, h host.Host, options ...Option) (*DHT, error) {
 			dht.ProtocolExtension(LanExtension),
 			dht.QueryFilter(dht.PrivateQueryFilter),
 			dht.RoutingTableFilter(dht.PrivateRoutingTableFilter),
+			// filter out localhost IP addresses
+			dht.AddressFilter(func(addrs []ma.Multiaddr) []ma.Multiaddr {
+				return ma.FilterAddrs(addrs, func(a ma.Multiaddr) bool { return !manet.IsIPLoopback(a) })
+			}),
 		),
 	)
 	if err != nil {
@@ -151,7 +163,10 @@ func (dht *DHT) WANActive() bool {
 }
 
 // Provide adds the given cid to the content routing system.
-func (dht *DHT) Provide(ctx context.Context, key cid.Cid, announce bool) error {
+func (dht *DHT) Provide(ctx context.Context, key cid.Cid, announce bool) (err error) {
+	ctx, end := tracer.Provide(dualName, ctx, key, announce)
+	defer func() { end(err) }()
+
 	if dht.WANActive() {
 		return dht.WAN.Provide(ctx, key, announce)
 	}
@@ -167,7 +182,10 @@ func (dht *DHT) GetRoutingTableDiversityStats() []peerdiversity.CplDiversityStat
 }
 
 // FindProvidersAsync searches for peers who are able to provide a given key
-func (dht *DHT) FindProvidersAsync(ctx context.Context, key cid.Cid, count int) <-chan peer.AddrInfo {
+func (dht *DHT) FindProvidersAsync(ctx context.Context, key cid.Cid, count int) (ch <-chan peer.AddrInfo) {
+	ctx, end := tracer.FindProvidersAsync(dualName, ctx, key, count)
+	defer func() { ch = end(ch, nil) }()
+
 	reqCtx, cancel := context.WithCancel(ctx)
 	outCh := make(chan peer.AddrInfo)
 
@@ -178,10 +196,13 @@ func (dht *DHT) FindProvidersAsync(ctx context.Context, key cid.Cid, count int) 
 		subCtx, evtCh = routing.RegisterForQueryEvents(reqCtx)
 	}
 
+	subCtx, span := internal.StartSpan(subCtx, "Dual.worker")
 	wanCh := dht.WAN.FindProvidersAsync(subCtx, key, count)
 	lanCh := dht.LAN.FindProvidersAsync(subCtx, key, count)
 	zeroCount := (count == 0)
 	go func() {
+		defer span.End()
+
 		defer cancel()
 		defer close(outCh)
 
@@ -200,11 +221,13 @@ func (dht *DHT) FindProvidersAsync(ctx context.Context, key cid.Cid, count int) 
 				continue
 			case pi, ok = <-wanCh:
 				if !ok {
+					span.AddEvent("wan finished")
 					wanCh = nil
 					continue
 				}
 			case pi, ok = <-lanCh:
 				if !ok {
+					span.AddEvent("lan finished")
 					lanCh = nil
 					continue
 				}
@@ -231,7 +254,10 @@ func (dht *DHT) FindProvidersAsync(ctx context.Context, key cid.Cid, count int) 
 
 // FindPeer searches for a peer with given ID
 // Note: with signed peer records, we can change this to short circuit once either DHT returns.
-func (dht *DHT) FindPeer(ctx context.Context, pid peer.ID) (peer.AddrInfo, error) {
+func (dht *DHT) FindPeer(ctx context.Context, pid peer.ID) (pi peer.AddrInfo, err error) {
+	ctx, end := tracer.FindPeer(dualName, ctx, pid)
+	defer func() { end(pi, err) }()
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 	var wanInfo, lanInfo peer.AddrInfo
@@ -297,14 +323,20 @@ func combineErrors(erra, errb error) error {
 
 // Bootstrap allows callers to hint to the routing system to get into a
 // Boostrapped state and remain there.
-func (dht *DHT) Bootstrap(ctx context.Context) error {
+func (dht *DHT) Bootstrap(ctx context.Context) (err error) {
+	ctx, end := tracer.Bootstrap(dualName, ctx)
+	defer func() { end(err) }()
+
 	erra := dht.WAN.Bootstrap(ctx)
 	errb := dht.LAN.Bootstrap(ctx)
 	return combineErrors(erra, errb)
 }
 
 // PutValue adds value corresponding to given Key.
-func (dht *DHT) PutValue(ctx context.Context, key string, val []byte, opts ...routing.Option) error {
+func (dht *DHT) PutValue(ctx context.Context, key string, val []byte, opts ...routing.Option) (err error) {
+	ctx, end := tracer.PutValue(dualName, ctx, key, val, opts...)
+	defer func() { end(err) }()
+
 	if dht.WANActive() {
 		return dht.WAN.PutValue(ctx, key, val, opts...)
 	}
@@ -312,7 +344,10 @@ func (dht *DHT) PutValue(ctx context.Context, key string, val []byte, opts ...ro
 }
 
 // GetValue searches for the value corresponding to given Key.
-func (d *DHT) GetValue(ctx context.Context, key string, opts ...routing.Option) ([]byte, error) {
+func (d *DHT) GetValue(ctx context.Context, key string, opts ...routing.Option) (result []byte, err error) {
+	ctx, end := tracer.GetValue(dualName, ctx, key, opts...)
+	defer func() { end(result, err) }()
+
 	lanCtx, cancelLan := context.WithCancel(ctx)
 	defer cancelLan()
 
@@ -342,7 +377,10 @@ func (d *DHT) GetValue(ctx context.Context, key string, opts ...routing.Option) 
 }
 
 // SearchValue searches for better values from this value
-func (dht *DHT) SearchValue(ctx context.Context, key string, opts ...routing.Option) (<-chan []byte, error) {
+func (dht *DHT) SearchValue(ctx context.Context, key string, opts ...routing.Option) (ch <-chan []byte, err error) {
+	ctx, end := tracer.SearchValue(dualName, ctx, key, opts...)
+	defer func() { ch, err = end(ch, err) }()
+
 	p := helper.Parallel{Routers: []routing.Routing{dht.WAN, dht.LAN}, Validator: dht.WAN.Validator}
 	return p.SearchValue(ctx, key, opts...)
 }

@@ -1,20 +1,27 @@
 package selector
 
-import "io"
+import (
+	"io"
+)
 
 type readerat struct {
-	io.ReadSeeker
+	rs  io.ReadSeeker
+	off int64
 }
 
-// ReadAt provides the io.ReadAt method over a ReadSeeker.
-// This implementation does not support concurrent calls to `ReadAt`,
-// as specified by the ReaderAt interface, and so must only be used
-// in non-concurrent use cases.
-func (r readerat) ReadAt(p []byte, off int64) (n int, err error) {
-	// TODO: consider keeping track of current offset.
-	_, err = r.Seek(off, 0)
-	if err != nil {
-		return 0, err
+// ReadAt provides the io.ReadAt method over a ReadSeeker. It will track the
+// current offset and seek if necessary.
+func (r *readerat) ReadAt(p []byte, off int64) (n int, err error) {
+	if off != r.off {
+		if _, err = r.rs.Seek(off, io.SeekStart); err != nil {
+			return 0, err
+		}
+		r.off = off
 	}
-	return r.Read(p)
+	c, err := r.rs.Read(p)
+	if err != nil {
+		return c, err
+	}
+	r.off += int64(c)
+	return c, nil
 }

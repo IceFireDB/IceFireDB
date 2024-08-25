@@ -11,7 +11,7 @@ jobs:
   osstest:
     strategy:
       matrix:
-        go-version: [1.19.x]
+        go-version: [1.22.x]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     env:
@@ -33,7 +33,7 @@ jobs:
   ipfstest:
     strategy:
       matrix:
-        go-version: [ 1.19.x ]
+        go-version: [ 1.22.x ]
         os: [ ubuntu-latest]
     runs-on: ${{ matrix.os }}
     env:
@@ -60,7 +60,7 @@ jobs:
   goleveldbtest:
     strategy:
       matrix:
-        go-version: [ 1.19.x ]
+        go-version: [ 1.22.x ]
         os: [ ubuntu-latest, macos-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
     env:
@@ -80,7 +80,7 @@ jobs:
   crdtdbtest:
     strategy:
       matrix:
-        go-version: [ 1.19.x ]
+        go-version: [ 1.22.x ]
         os: [ ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     env:
@@ -100,7 +100,7 @@ jobs:
   ipfslogdbtest:
     strategy:
       matrix:
-        go-version: [ 1.19.x ]
+        go-version: [ 1.22.x ]
         os: [ ubuntu-latest, macos-latest , windows-latest ]
     runs-on: ${{ matrix.os }}
     env:

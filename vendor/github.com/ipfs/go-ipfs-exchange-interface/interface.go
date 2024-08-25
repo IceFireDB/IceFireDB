@@ -10,6 +10,8 @@ import (
 )
 
 // Interface defines the functionality of the IPFS block exchange protocol.
+//
+// Deprecated: use github.com/ipfs/boxo/exchange.Interface
 type Interface interface { // type Exchanger interface
 	Fetcher
 
@@ -20,15 +22,25 @@ type Interface interface { // type Exchanger interface
 }
 
 // Fetcher is an object that can be used to retrieve blocks
+//
+// Deprecated: use github.com/ipfs/boxo/exchange.Fetcher
 type Fetcher interface {
-	// GetBlock returns the block associated with a given key.
+	// GetBlock returns the block associated with a given cid.
 	GetBlock(context.Context, cid.Cid) (blocks.Block, error)
+	// GetBlocks returns the blocks associated with the given cids.
+	// If the requested blocks are not found immediately, this function should hang until
+	// they are found. If they can't be found later, it's also acceptable to terminate.
 	GetBlocks(context.Context, []cid.Cid) (<-chan blocks.Block, error)
 }
 
 // SessionExchange is an exchange.Interface which supports
 // sessions.
+//
+// Deprecated: use github.com/ipfs/boxo/exchange.SessionExchange
 type SessionExchange interface {
 	Interface
+	// NewSession generates a new exchange session. You should use this, rather
+	// that calling GetBlocks, any time you intend to do several related calls
+	// in a row. The exchange can leverage that to be more efficient.
 	NewSession(context.Context) Fetcher
 }

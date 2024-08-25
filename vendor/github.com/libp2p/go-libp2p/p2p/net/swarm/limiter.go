@@ -7,23 +7,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/transport"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/transport"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
-
-type dialResult struct {
-	Conn transport.CapableConn
-	Addr ma.Multiaddr
-	Err  error
-}
 
 type dialJob struct {
 	addr    ma.Multiaddr
 	peer    peer.ID
 	ctx     context.Context
-	resp    chan dialResult
+	resp    chan transport.DialUpdate
 	timeout time.Duration
 }
 
@@ -45,7 +39,7 @@ type dialLimiter struct {
 	waitingOnPeerLimit map[peer.ID][]*dialJob
 }
 
-type dialfunc func(context.Context, peer.ID, ma.Multiaddr) (transport.CapableConn, error)
+type dialfunc func(context.Context, peer.ID, ma.Multiaddr, chan<- transport.DialUpdate) (transport.CapableConn, error)
 
 func newDialLimiter(df dialfunc) *dialLimiter {
 	fd := ConcurrentFdDials
@@ -216,9 +210,13 @@ func (dl *dialLimiter) executeDial(j *dialJob) {
 	dctx, cancel := context.WithTimeout(j.ctx, j.timeout)
 	defer cancel()
 
-	con, err := dl.dialFunc(dctx, j.peer, j.addr)
+	con, err := dl.dialFunc(dctx, j.peer, j.addr, j.resp)
+	kind := transport.UpdateKindDialSuccessful
+	if err != nil {
+		kind = transport.UpdateKindDialFailed
+	}
 	select {
-	case j.resp <- dialResult{Conn: con, Addr: j.addr, Err: err}:
+	case j.resp <- transport.DialUpdate{Kind: kind, Conn: con, Addr: j.addr, Err: err}:
 	case <-j.ctx.Done():
 		if con != nil {
 			con.Close()

@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // Validate Stream conforms to the go-libp2p-net Stream interface
@@ -22,9 +22,12 @@ type Stream struct {
 	conn   *Conn
 	scope  network.StreamManagementScope
 
-	closeOnce sync.Once
+	closeMx  sync.Mutex
+	isClosed bool
+	// acceptStreamGoroutineCompleted indicates whether the goroutine handling the incoming stream has exited
+	acceptStreamGoroutineCompleted bool
 
-	protocol atomic.Value
+	protocol atomic.Pointer[protocol.ID]
 
 	stat network.Stats
 }
@@ -76,7 +79,7 @@ func (s *Stream) Write(p []byte) (int, error) {
 // resources.
 func (s *Stream) Close() error {
 	err := s.stream.Close()
-	s.closeOnce.Do(s.remove)
+	s.closeAndRemoveStream()
 	return err
 }
 
@@ -84,8 +87,23 @@ func (s *Stream) Close() error {
 // associated resources.
 func (s *Stream) Reset() error {
 	err := s.stream.Reset()
-	s.closeOnce.Do(s.remove)
+	s.closeAndRemoveStream()
 	return err
+}
+
+func (s *Stream) closeAndRemoveStream() {
+	s.closeMx.Lock()
+	defer s.closeMx.Unlock()
+	if s.isClosed {
+		return
+	}
+	s.isClosed = true
+	// We don't want to keep swarm from closing till the stream handler has exited
+	s.conn.swarm.refs.Done()
+	// Cleanup the stream from connection only after the stream handler has completed
+	if s.acceptStreamGoroutineCompleted {
+		s.conn.removeStream(s)
+	}
 }
 
 // CloseWrite closes the stream for writing, flushing all data and sending an EOF.
@@ -101,16 +119,25 @@ func (s *Stream) CloseRead() error {
 	return s.stream.CloseRead()
 }
 
-func (s *Stream) remove() {
-	s.conn.removeStream(s)
-	s.conn.swarm.refs.Done()
+func (s *Stream) completeAcceptStreamGoroutine() {
+	s.closeMx.Lock()
+	defer s.closeMx.Unlock()
+	if s.acceptStreamGoroutineCompleted {
+		return
+	}
+	s.acceptStreamGoroutineCompleted = true
+	if s.isClosed {
+		s.conn.removeStream(s)
+	}
 }
 
 // Protocol returns the protocol negotiated on this stream (if set).
 func (s *Stream) Protocol() protocol.ID {
-	// Ignore type error. It means that the protocol is unset.
-	p, _ := s.protocol.Load().(protocol.ID)
-	return p
+	p := s.protocol.Load()
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 // SetProtocol sets the protocol for this stream.
@@ -123,7 +150,7 @@ func (s *Stream) SetProtocol(p protocol.ID) error {
 		return err
 	}
 
-	s.protocol.Store(p)
+	s.protocol.Store(&p)
 	return nil
 }
 

@@ -11,37 +11,28 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ipfs/go-bitswap"
-	"github.com/ipfs/go-bitswap/network"
-	blockservice "github.com/ipfs/go-blockservice"
+	"github.com/ipfs/boxo/bitswap"
+	"github.com/ipfs/boxo/bitswap/network"
+	"github.com/ipfs/boxo/blockservice"
+	blockstore "github.com/ipfs/boxo/blockstore"
+	chunker "github.com/ipfs/boxo/chunker"
+	exchange "github.com/ipfs/boxo/exchange"
+	offline "github.com/ipfs/boxo/exchange/offline"
+	"github.com/ipfs/boxo/ipld/merkledag"
+	"github.com/ipfs/boxo/ipld/unixfs/importer/balanced"
+	"github.com/ipfs/boxo/ipld/unixfs/importer/helpers"
+	"github.com/ipfs/boxo/ipld/unixfs/importer/trickle"
+	ufsio "github.com/ipfs/boxo/ipld/unixfs/io"
+	provider "github.com/ipfs/boxo/provider"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	chunker "github.com/ipfs/go-ipfs-chunker"
-	"github.com/ipfs/go-ipfs-exchange-interface"
-	offline "github.com/ipfs/go-ipfs-exchange-offline"
-	provider "github.com/ipfs/go-ipfs-provider"
-	"github.com/ipfs/go-ipfs-provider/queue"
-	"github.com/ipfs/go-ipfs-provider/simple"
-	cbor "github.com/ipfs/go-ipld-cbor"
 	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipfs/go-merkledag"
-	"github.com/ipfs/go-unixfs/importer/balanced"
-	"github.com/ipfs/go-unixfs/importer/helpers"
-	"github.com/ipfs/go-unixfs/importer/trickle"
-	ufsio "github.com/ipfs/go-unixfs/io"
-	host "github.com/libp2p/go-libp2p-core/host"
-	peer "github.com/libp2p/go-libp2p-core/peer"
-	routing "github.com/libp2p/go-libp2p-core/routing"
-	multihash "github.com/multiformats/go-multihash"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/multiformats/go-multihash"
 )
-
-func init() {
-	ipld.Register(cid.DagProtobuf, merkledag.DecodeProtobufBlock)
-	ipld.Register(cid.Raw, merkledag.DecodeRawBlock)
-	ipld.Register(cid.DagCBOR, cbor.DecodeBlock) // need to decode CBOR
-}
 
 var logger = logging.Logger("ipfslite")
 
@@ -55,6 +46,10 @@ type Config struct {
 	Offline bool
 	// ReprovideInterval sets how often to reprovide records to the DHT
 	ReprovideInterval time.Duration
+	// Disables wrapping the blockstore in an ARC cache + Bloomfilter. Use
+	// when the given blockstore or datastore already has caching, or when
+	// caching is not needed.
+	UncachedBlockstore bool
 }
 
 func (cfg *Config) setDefaults() {
@@ -81,13 +76,15 @@ type Peer struct {
 	reprovider      provider.System
 }
 
-// New creates an IPFS-Lite Peer. It uses the given datastore, libp2p Host and
-// Routing (usuall the DHT). The Host and the Routing may be nil if
-// config.Offline is set to true, as they are not used in that case. Peer
-// implements the ipld.DAGService interface.
+// New creates an IPFS-Lite Peer. It uses the given datastore, blockstore,
+// libp2p Host and Routing (usuall the DHT). If the blockstore is nil, the
+// given datastore will be wrapped to create one. The Host and the Routing may
+// be nil if config.Offline is set to true, as they are not used in that
+// case. Peer implements the ipld.DAGService interface.
 func New(
 	ctx context.Context,
-	store datastore.Batching,
+	datastore datastore.Batching,
+	blockstore blockstore.Blockstore,
 	host host.Host,
 	dht routing.Routing,
 	cfg *Config,
@@ -104,10 +101,10 @@ func New(
 		cfg:   cfg,
 		host:  host,
 		dht:   dht,
-		store: store,
+		store: datastore,
 	}
 
-	err := p.setupBlockstore()
+	err := p.setupBlockstore(blockstore)
 	if err != nil {
 		return nil, err
 	}
@@ -131,14 +128,22 @@ func New(
 	return p, nil
 }
 
-func (p *Peer) setupBlockstore() error {
-	bs := blockstore.NewBlockstore(p.store)
-	bs = blockstore.NewIdStore(bs)
-	cachedbs, err := blockstore.CachedBlockstore(p.ctx, bs, blockstore.DefaultCacheOpts())
-	if err != nil {
-		return err
+func (p *Peer) setupBlockstore(bs blockstore.Blockstore) error {
+	var err error
+	if bs == nil {
+		bs = blockstore.NewBlockstore(p.store)
 	}
-	p.bstore = cachedbs
+
+	// Support Identity multihashes.
+	bs = blockstore.NewIdStore(bs)
+
+	if !p.cfg.UncachedBlockstore {
+		bs, err = blockstore.CachedBlockstore(p.ctx, bs, blockstore.DefaultCacheOpts())
+		if err != nil {
+			return err
+		}
+	}
+	p.bstore = bs
 	return nil
 }
 
@@ -162,30 +167,20 @@ func (p *Peer) setupDAGService() error {
 
 func (p *Peer) setupReprovider() error {
 	if p.cfg.Offline || p.cfg.ReprovideInterval < 0 {
-		p.reprovider = provider.NewOfflineProvider()
+		p.reprovider = provider.NewNoopProvider()
 		return nil
 	}
 
-	queue, err := queue.NewQueue(p.ctx, "repro", p.store)
+	prov, err := provider.New(p.store,
+		provider.DatastorePrefix(datastore.NewKey("repro")),
+		provider.Online(p.dht),
+		provider.ReproviderInterval(p.cfg.ReprovideInterval),
+		provider.KeyProvider(provider.NewBlockstoreProvider(p.bstore)))
 	if err != nil {
 		return err
 	}
+	p.reprovider = prov
 
-	prov := simple.NewProvider(
-		p.ctx,
-		queue,
-		p.dht,
-	)
-
-	reprov := simple.NewReprovider(
-		p.ctx,
-		p.cfg.ReprovideInterval,
-		p.dht,
-		simple.NewBlockstoreProvider(p.bstore),
-	)
-
-	p.reprovider = provider.NewSystem(prov, reprov)
-	p.reprovider.Run()
 	return nil
 }
 
@@ -333,7 +328,12 @@ func (p *Peer) HasBlock(ctx context.Context, c cid.Cid) (bool, error) {
 	return p.BlockStore().Has(ctx, c)
 }
 
-// Exchange returns the underlying exchange implementation
+// Exchange returns the underlying exchange implementation.
 func (p *Peer) Exchange() exchange.Interface {
 	return p.exch
+}
+
+// BlockService returns the underlying blockservice implementation.
+func (p *Peer) BlockService() blockservice.BlockService {
+	return p.bserv
 }

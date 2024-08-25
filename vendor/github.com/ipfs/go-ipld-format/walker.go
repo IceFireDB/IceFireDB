@@ -165,6 +165,7 @@ var errUpOnRoot = errors.New("can't go up, already on root")
 
 // EndOfDag wraps the `errUpOnRoot` and signals to the user that the
 // entire DAG has been iterated.
+//
 //lint:ignore ST1012 // This is roughly equivalent to io.EOF.
 var EndOfDag = errors.New("end of DAG")
 

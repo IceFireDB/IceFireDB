@@ -28,13 +28,14 @@ import (
 	"unsafe"
 
 	"github.com/libp2p/go-openssl/utils"
+	"github.com/mattn/go-pointer"
 )
 
 var (
-	zeroReturn = errors.New("zero return")
-	wantRead   = errors.New("want read")
-	wantWrite  = errors.New("want write")
-	tryAgain   = errors.New("try again")
+	errZeroReturn = errors.New("zero return")
+	errWantRead   = errors.New("want read")
+	errWantWrite  = errors.New("want write")
+	errTryAgain   = errors.New("try again")
 )
 
 type Conn struct {
@@ -137,7 +138,7 @@ func newConn(conn net.Conn, ctx *Ctx) (*Conn, error) {
 	C.SSL_set_bio(ssl, into_ssl_cbio, from_ssl_cbio)
 
 	s := &SSL{ssl: ssl}
-	C.SSL_set_ex_data(s.ssl, get_ssl_idx(), unsafe.Pointer(s))
+	C.SSL_set_ex_data(s.ssl, get_ssl_idx(), pointer.Save(s))
 
 	c := &Conn{
 		SSL: s,
@@ -192,7 +193,7 @@ func (c *Conn) GetCtx() *Ctx { return c.ctx }
 func (c *Conn) CurrentCipher() (string, error) {
 	p := C.X_SSL_get_cipher_name(c.ssl)
 	if p == nil {
-		return "", errors.New("Session not established")
+		return "", errors.New("session not established")
 	}
 
 	return C.GoString(p), nil
@@ -247,7 +248,7 @@ func (c *Conn) getErrorHandler(rv C.int, errno error) func() error {
 			if err != nil {
 				return err
 			}
-			return tryAgain
+			return errTryAgain
 		}
 	case C.SSL_ERROR_WANT_WRITE:
 		return func() error {
@@ -255,7 +256,7 @@ func (c *Conn) getErrorHandler(rv C.int, errno error) func() error {
 			if err != nil {
 				return err
 			}
-			return tryAgain
+			return errTryAgain
 		}
 	case C.SSL_ERROR_SYSCALL:
 		var err error
@@ -303,8 +304,8 @@ func (c *Conn) handshake() func() error {
 // Handshake performs an SSL handshake. If a handshake is not manually
 // triggered, it will run before the first I/O on the encrypted stream.
 func (c *Conn) Handshake() error {
-	err := tryAgain
-	for err == tryAgain {
+	err := errTryAgain
+	for err == errTryAgain {
 		err = c.handleError(c.handshake())
 	}
 	go c.flushOutputBuffer()
@@ -404,15 +405,15 @@ func (c *Conn) shutdown() func() error {
 }
 
 func (c *Conn) shutdownLoop() error {
-	err := tryAgain
+	err := errTryAgain
 	shutdown_tries := 0
-	for err == tryAgain {
+	for err == errTryAgain {
 		shutdown_tries = shutdown_tries + 1
 		err = c.handleError(c.shutdown())
 		if err == nil {
 			return c.flushOutputBuffer()
 		}
-		if err == tryAgain && shutdown_tries >= 2 {
+		if err == errTryAgain && shutdown_tries >= 2 {
 			return errors.New("shutdown requested a third time?")
 		}
 	}
@@ -463,8 +464,8 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	if len(b) == 0 {
 		return 0, nil
 	}
-	err = tryAgain
-	for err == tryAgain {
+	err = errTryAgain
+	for err == errTryAgain {
 		n, errcb := c.read(b)
 		err = c.handleError(errcb)
 		if err == nil {
@@ -504,8 +505,8 @@ func (c *Conn) Write(b []byte) (written int, err error) {
 	if len(b) == 0 {
 		return 0, nil
 	}
-	err = tryAgain
-	for err == tryAgain {
+	err = errTryAgain
+	for err == errTryAgain {
 		n, errcb := c.write(b)
 		err = c.handleError(errcb)
 		if err == nil {

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"berty.tech/go-ipfs-log/keystore"
-	crypto "github.com/libp2p/go-libp2p-core/crypto"
+	crypto "github.com/libp2p/go-libp2p/core/crypto"
 )
 
 type CreateIdentityOptions struct {

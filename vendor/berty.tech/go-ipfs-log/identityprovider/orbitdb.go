@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p/core/crypto"
 
 	"berty.tech/go-ipfs-log/errmsg"
 	"berty.tech/go-ipfs-log/keystore"
@@ -15,7 +15,7 @@ type OrbitDBIdentityProvider struct {
 }
 
 // VerifyIdentity checks an OrbitDB identity.
-func (p *OrbitDBIdentityProvider) VerifyIdentity(identity *Identity) error {
+func (p *OrbitDBIdentityProvider) VerifyIdentity(_ *Identity) error {
 	return nil
 }
 

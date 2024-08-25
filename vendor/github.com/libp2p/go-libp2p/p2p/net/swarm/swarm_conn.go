@@ -5,13 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	ic "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/transport"
+	ic "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/transport"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -43,9 +42,13 @@ type Conn struct {
 
 var _ network.Conn = &Conn{}
 
+func (c *Conn) IsClosed() bool {
+	return c.conn.IsClosed()
+}
+
 func (c *Conn) ID() string {
 	// format: <first 10 chars of peer id>-<global conn ordinal>
-	return fmt.Sprintf("%s-%d", c.RemotePeer().Pretty()[0:10], c.id)
+	return fmt.Sprintf("%s-%d", c.RemotePeer().String()[:10], c.id)
 }
 
 // Close closes this connection.
@@ -70,6 +73,11 @@ func (c *Conn) doClose() {
 
 	c.err = c.conn.Close()
 
+	// Send the connectedness event after closing the connection.
+	// This ensures that both remote connection close and local connection
+	// close events are sent after the underlying transport connection is closed.
+	c.swarm.connectednessEventEmitter.RemoveConn(c.RemotePeer())
+
 	// This is just for cleaning up state. The connection has already been closed.
 	// We *could* optimize this but it really isn't worth it.
 	for s := range streams {
@@ -82,10 +90,11 @@ func (c *Conn) doClose() {
 		c.notifyLk.Lock()
 		defer c.notifyLk.Unlock()
 
+		// Only notify for disconnection if we notified for connection
 		c.swarm.notifyAll(func(f network.Notifiee) {
 			f.Disconnected(c.swarm, c)
 		})
-		c.swarm.refs.Done() // taken in Swarm.addConn
+		c.swarm.refs.Done()
 	}()
 }
 
@@ -105,7 +114,6 @@ func (c *Conn) start() {
 	go func() {
 		defer c.swarm.refs.Done()
 		defer c.Close()
-
 		for {
 			ts, err := c.conn.AcceptStream()
 			if err != nil {
@@ -126,12 +134,14 @@ func (c *Conn) start() {
 
 				// We only get an error here when the swarm is closed or closing.
 				if err != nil {
+					scope.Done()
 					return
 				}
 
 				if h := c.swarm.StreamHandler(); h != nil {
 					h(s)
 				}
+				s.completeAcceptStreamGoroutine()
 			}()
 		}
 	}()
@@ -142,9 +152,9 @@ func (c *Conn) String() string {
 		"<swarm.Conn[%T] %s (%s) <-> %s (%s)>",
 		c.conn.Transport(),
 		c.conn.LocalMultiaddr(),
-		c.conn.LocalPeer().Pretty(),
+		c.conn.LocalPeer(),
 		c.conn.RemoteMultiaddr(),
-		c.conn.RemotePeer().Pretty(),
+		c.conn.RemotePeer(),
 	)
 }
 
@@ -168,14 +178,15 @@ func (c *Conn) RemotePeer() peer.ID {
 	return c.conn.RemotePeer()
 }
 
-// LocalPrivateKey is the public key of the peer on this side
-func (c *Conn) LocalPrivateKey() ic.PrivKey {
-	return c.conn.LocalPrivateKey()
-}
-
 // RemotePublicKey is the public key of the peer on the remote side
 func (c *Conn) RemotePublicKey() ic.PubKey {
 	return c.conn.RemotePublicKey()
+}
+
+// ConnState is the security connection state. including early data result.
+// Empty if not supported.
+func (c *Conn) ConnState() network.ConnectionState {
+	return c.conn.ConnState()
 }
 
 // Stat returns metadata pertaining to this connection
@@ -187,9 +198,9 @@ func (c *Conn) Stat() network.ConnStats {
 
 // NewStream returns a new Stream from this connection
 func (c *Conn) NewStream(ctx context.Context) (network.Stream, error) {
-	if c.Stat().Transient {
-		if useTransient, _ := network.GetUseTransient(ctx); !useTransient {
-			return nil, network.ErrTransientConn
+	if c.Stat().Limited {
+		if useLimited, _ := network.GetAllowLimitedConn(ctx); !useLimited {
+			return nil, network.ErrLimitedConn
 		}
 	}
 
@@ -197,9 +208,27 @@ func (c *Conn) NewStream(ctx context.Context) (network.Stream, error) {
 	if err != nil {
 		return nil, err
 	}
-	ts, err := c.conn.OpenStream(ctx)
+
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, defaultNewStreamTimeout)
+		defer cancel()
+	}
+
+	s, err := c.openAndAddStream(ctx, scope)
 	if err != nil {
 		scope.Done()
+		if errors.Is(err, context.DeadlineExceeded) {
+			err = fmt.Errorf("timed out: %w", err)
+		}
+		return nil, err
+	}
+	return s, nil
+}
+
+func (c *Conn) openAndAddStream(ctx context.Context, scope network.StreamManagementScope) (network.Stream, error) {
+	ts, err := c.conn.OpenStream(ctx)
+	if err != nil {
 		return nil, err
 	}
 	return c.addStream(ts, network.DirOutbound, scope)
@@ -210,7 +239,6 @@ func (c *Conn) addStream(ts network.MuxedStream, dir network.Direction, scope ne
 	// Are we still online?
 	if c.streams.m == nil {
 		c.streams.Unlock()
-		scope.Done()
 		ts.Reset()
 		return nil, ErrConnClosed
 	}
@@ -224,7 +252,8 @@ func (c *Conn) addStream(ts network.MuxedStream, dir network.Direction, scope ne
 			Direction: dir,
 			Opened:    time.Now(),
 		},
-		id: atomic.AddUint64(&c.swarm.nextStreamID, 1),
+		id:                             c.swarm.nextStreamID.Add(1),
+		acceptStreamGoroutineCompleted: dir != network.DirInbound,
 	}
 	c.stat.NumStreams++
 	c.streams.m[s] = struct{}{}
