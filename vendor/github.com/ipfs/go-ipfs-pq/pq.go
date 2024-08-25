@@ -61,7 +61,7 @@ func (w *wrapper) Peek() Elem {
 	if len(w.heapinterface.elems) == 0 {
 		return nil
 	}
-	return w.heapinterface.elems[0].(Elem)
+	return w.heapinterface.elems[0]
 }
 
 func (w *wrapper) Remove(index int) Elem {
@@ -113,6 +113,7 @@ func (q *heapinterface) Pop() interface{} {
 	n := len(old)
 	elem := old[n-1]       // remove the last
 	elem.SetIndex(-1)      // for safety // FIXME why?
+	old[n-1] = nil         // allow for GC
 	q.elems = old[0 : n-1] // shrink
 	return elem
 }

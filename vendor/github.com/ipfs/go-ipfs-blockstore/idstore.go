@@ -19,6 +19,7 @@ var _ Blockstore = (*idstore)(nil)
 var _ Viewer = (*idstore)(nil)
 var _ io.Closer = (*idstore)(nil)
 
+// Deprecated: use github.com/ipfs/boxo/blockstore.NewIdStore
 func NewIdStore(bs Blockstore) Blockstore {
 	ids := &idstore{bs: bs}
 	if v, ok := bs.(Viewer); ok {

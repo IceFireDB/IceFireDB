@@ -4,7 +4,7 @@ import (
 	"time"
 
 	pq "github.com/ipfs/go-ipfs-pq"
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type QueueTaskComparator func(a, b *QueueTask) bool

@@ -53,7 +53,7 @@ import (
 // "/cats" and "/dogs" and exposes it on a localhost:8765. It then opens connections
 // to that port, selects the protocols and tests that the handlers are working.
 func main() {
-	mux := ms.NewMultistreamMuxer()
+	mux := ms.NewMultistreamMuxer[string]()
 	mux.AddHandler("/cats", func(proto string, rwc io.ReadWriteCloser) error {
 		fmt.Fprintln(rwc, proto, ": HELLO I LIKE CATS")
 		return rwc.Close()

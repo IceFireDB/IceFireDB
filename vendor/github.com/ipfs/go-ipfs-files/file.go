@@ -63,7 +63,9 @@ type DirIterator interface {
 type Directory interface {
 	Node
 
-	// Entries returns a stateful iterator over directory entries.
+	// Entries returns a stateful iterator over directory entries. The iterator
+	// may consume the Directory state so it must be called only once (this
+	// applies specifically to the multipartIterator).
 	//
 	// Example usage:
 	//

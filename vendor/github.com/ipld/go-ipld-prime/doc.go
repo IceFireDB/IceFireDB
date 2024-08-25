@@ -33,7 +33,7 @@
 // The most typical use of LinkSystem is to use the linking/cid package
 // to get a LinkSystem that works with CIDs:
 //
-//   lsys := cidlink.DefaultLinkSystem()
+//	lsys := cidlink.DefaultLinkSystem()
 //
 // ... and then assign the StorageWriteOpener and StorageReadOpener fields
 // in order to control where data is stored to and read from.
@@ -49,21 +49,20 @@
 // Particularly interesting subpackages include:
 //
 //   - datamodel -- the most essential interfaces for describing data live here,
-//        describing Node, NodePrototype, NodeBuilder, Link, and Path.
+//     describing Node, NodePrototype, NodeBuilder, Link, and Path.
 //   - node/* -- various Node + NodeBuilder implementations.
 //   - node/basicnode -- the first Node implementation you should try.
 //   - codec/* -- functions for serializing and deserializing Nodes.
 //   - linking -- the LinkSystem, which is a facade to all data loading and storing and hashing.
 //   - linking/* -- ways to bind concrete Link implementations (namely,
-//        the linking/cidlink package, which connects the go-cid library to our datamodel.Link interface).
+//     the linking/cidlink package, which connects the go-cid library to our datamodel.Link interface).
 //   - traversal -- functions for walking Node graphs (including automatic link loading)
-//        and visiting them programmatically.
+//     and visiting them programmatically.
 //   - traversal/selector -- functions for working with IPLD Selectors,
-//        which are a language-agnostic declarative format for describing graph walks.
+//     which are a language-agnostic declarative format for describing graph walks.
 //   - fluent/* -- various options for making datamodel Node and NodeBuilder easier to work with.
 //   - schema -- interfaces for working with IPLD Schemas, which can bring constraints
-//        and validation systems to otherwise schemaless and unstructured IPLD data.
+//     and validation systems to otherwise schemaless and unstructured IPLD data.
 //   - adl/* -- examples of creating and using Advanced Data Layouts (in short, custom Node implementations)
-//        to do complex data structures transparently within the IPLD Data Model.
-//
+//     to do complex data structures transparently within the IPLD Data Model.
 package ipld

@@ -1,5 +1,4 @@
-//go:build !windows
-// +build !windows
+//go:build !windows && !riscv64 && !loong64
 
 package tcp
 
@@ -27,7 +26,9 @@ const collectFrequency = 10 * time.Second
 
 var collector *aggregatingCollector
 
-func init() {
+var initMetricsOnce sync.Once
+
+func initMetrics() {
 	segsSentDesc = prometheus.NewDesc("tcp_sent_segments_total", "TCP segments sent", nil, nil)
 	segsRcvdDesc = prometheus.NewDesc("tcp_rcvd_segments_total", "TCP segments received", nil, nil)
 	bytesSentDesc = prometheus.NewDesc("tcp_sent_bytes", "TCP bytes sent", nil, nil)
@@ -211,6 +212,7 @@ type tracingConn struct {
 }
 
 func newTracingConn(c manet.Conn, isClient bool) (*tracingConn, error) {
+	initMetricsOnce.Do(func() { initMetrics() })
 	conn, err := tcp.NewConn(c)
 	if err != nil {
 		return nil, err

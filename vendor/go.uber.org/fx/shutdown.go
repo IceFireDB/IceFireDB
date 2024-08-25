@@ -21,8 +21,7 @@
 package fx
 
 import (
-	"fmt"
-	"os"
+	"time"
 )
 
 // Shutdowner provides a method that can manually trigger the shutdown of the
@@ -39,45 +38,57 @@ type ShutdownOption interface {
 	apply(*shutdowner)
 }
 
+type exitCodeOption int
+
+func (code exitCodeOption) apply(s *shutdowner) {
+	s.exitCode = int(code)
+}
+
+var _ ShutdownOption = exitCodeOption(0)
+
+// ExitCode is a [ShutdownOption] that may be passed to the Shutdown method of the
+// [Shutdowner] interface.
+// The given integer exit code will be broadcasted to any receiver waiting
+// on a [ShutdownSignal] from the [Wait] method.
+func ExitCode(code int) ShutdownOption {
+	return exitCodeOption(code)
+}
+
+type shutdownTimeoutOption time.Duration
+
+func (shutdownTimeoutOption) apply(*shutdowner) {}
+
+var _ ShutdownOption = shutdownTimeoutOption(0)
+
+// ShutdownTimeout is a [ShutdownOption] that allows users to specify a timeout
+// for a given call to Shutdown method of the [Shutdowner] interface. As the
+// Shutdown method will block while waiting for a signal receiver relay
+// goroutine to stop.
+//
+// Deprecated: This option has no effect. Shutdown is not a blocking operation.
+func ShutdownTimeout(timeout time.Duration) ShutdownOption {
+	return shutdownTimeoutOption(timeout)
+}
+
 type shutdowner struct {
-	app *App
+	app      *App
+	exitCode int
 }
 
 // Shutdown broadcasts a signal to all of the application's Done channels
 // and begins the Stop process. Applications can be shut down only after they
 // have finished starting up.
-// In practice this means Shutdowner.Shutdown should not be called from an
-// fx.Invoke, but from a fx.Lifecycle.OnStart hook.
 func (s *shutdowner) Shutdown(opts ...ShutdownOption) error {
-	return s.app.broadcastSignal(_sigTERM)
+	for _, opt := range opts {
+		opt.apply(s)
+	}
+
+	return s.app.receivers.b.Broadcast(ShutdownSignal{
+		Signal:   _sigTERM,
+		ExitCode: s.exitCode,
+	})
 }
 
 func (app *App) shutdowner() Shutdowner {
 	return &shutdowner{app: app}
-}
-
-func (app *App) broadcastSignal(signal os.Signal) error {
-	app.donesMu.Lock()
-	defer app.donesMu.Unlock()
-
-	app.shutdownSig = signal
-
-	var unsent int
-	for _, done := range app.dones {
-		select {
-		case done <- signal:
-		default:
-			// shutdown called when done channel has already received a
-			// termination signal that has not been cleared
-			unsent++
-		}
-	}
-
-	if unsent != 0 {
-		return fmt.Errorf("failed to send %v signal to %v out of %v channels",
-			signal, unsent, len(app.dones),
-		)
-	}
-
-	return nil
 }

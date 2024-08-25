@@ -61,14 +61,14 @@ func (p *peeker) ReadByte() (byte, error) {
 		return p.lastByte, nil
 	}
 	var buf [1]byte
-	n, err := p.reader.Read(buf[:])
-	if n == 0 {
+	_, err := io.ReadFull(p.reader, buf[:])
+	if err != nil {
 		return 0, err
 	}
 	b := buf[0]
 	p.lastByte = b
 	p.peekState = peekSet
-	return b, err
+	return b, nil
 }
 
 func (p *peeker) UnreadByte() error {

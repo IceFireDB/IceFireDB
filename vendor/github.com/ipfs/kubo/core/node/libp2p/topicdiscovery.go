@@ -4,12 +4,12 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/discovery"
-	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p/core/discovery"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	disc "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 
-	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/libp2p/go-libp2p/core/routing"
 )
 
 func TopicDiscovery() interface{} {
@@ -21,7 +21,6 @@ func TopicDiscovery() interface{} {
 			baseDisc,
 			backoff.NewExponentialBackoff(minBackoff, maxBackoff, backoff.FullJitter, time.Second, 5.0, 0, rng),
 		)
-
 		if err != nil {
 			return nil, err
 		}

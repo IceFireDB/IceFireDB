@@ -4,7 +4,7 @@ import (
 	"container/list"
 	"sort"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // A helper struct to sort peers by their distance to the local node
@@ -46,7 +46,7 @@ func (pds *peerDistanceSorter) sort() {
 	sort.Sort(pds)
 }
 
-// Sort the given peers by their ascending distance from the target. A new slice is returned.
+// SortClosestPeers Sort the given peers by their ascending distance from the target. A new slice is returned.
 func SortClosestPeers(peers []peer.ID, target ID) []peer.ID {
 	sorter := peerDistanceSorter{
 		peers:  make([]peerDistance, 0, len(peers)),

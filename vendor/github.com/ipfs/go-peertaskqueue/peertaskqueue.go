@@ -1,12 +1,13 @@
 package peertaskqueue
 
 import (
+	"math"
 	"sync"
 
 	pq "github.com/ipfs/go-ipfs-pq"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	"github.com/ipfs/go-peertaskqueue/peertracker"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type peerTaskQueueEvent int
@@ -204,6 +205,13 @@ func (ptq *PeerTaskQueue) PeerTopics(p peer.ID) *peertracker.PeerTrackerTopics {
 
 // PushTasks adds a new group of tasks for the given peer to the queue
 func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
+	ptq.PushTasksTruncated(math.MaxUint, to, tasks...)
+}
+
+// PushTasksTruncated is like PushTasks but it will not grow that peers's queue beyond n.
+// When truncation happen we will keep older tasks in the queue to avoid some infinite
+// tasks rotations if we are continously receiving work faster than we process it.
+func (ptq *PeerTaskQueue) PushTasksTruncated(n uint, to peer.ID, tasks ...peertask.Task) {
 	ptq.lock.Lock()
 	defer ptq.lock.Unlock()
 
@@ -219,7 +227,7 @@ func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 		ptq.callHooks(to, peerAdded)
 	}
 
-	peerTracker.PushTasks(tasks...)
+	peerTracker.PushTasksTruncated(n, tasks...)
 	ptq.pQueue.Update(peerTracker.Index())
 }
 
@@ -227,10 +235,11 @@ func (ptq *PeerTaskQueue) PushTasks(to peer.ID, tasks ...peertask.Task) {
 // off the peer's queue as necessary to cover targetMinWork, in priority order.
 // If there are not enough tasks to cover targetMinWork it just returns
 // whatever is in the peer's queue.
-// - Peers with the most "active" work are deprioritized.
-//   This heuristic is for fairness, we try to keep all peers "busy".
-// - Peers with the most "pending" work are prioritized.
-//   This heuristic is so that peers with a lot to do get asked for work first.
+//   - Peers with the most "active" work are deprioritized.
+//     This heuristic is for fairness, we try to keep all peers "busy".
+//   - Peers with the most "pending" work are prioritized.
+//     This heuristic is so that peers with a lot to do get asked for work first.
+//
 // The third response argument is pending work: the amount of work in the
 // queue for this peer.
 func (ptq *PeerTaskQueue) PopTasks(targetMinWork int) (peer.ID, []*peertask.Task, int) {
@@ -341,5 +350,20 @@ func (ptq *PeerTaskQueue) ThawRound() {
 			}
 			ptq.pQueue.Update(peerTracker.Index())
 		}
+	}
+}
+
+// Clear fully remove a peer from the task queue.
+func (ptq *PeerTaskQueue) Clear(p peer.ID) {
+	ptq.lock.Lock()
+	defer ptq.lock.Unlock()
+
+	if peerTracker, ok := ptq.peerTrackers[p]; ok {
+		delete(ptq.peerTrackers, p)
+		ptq.pQueue.Remove(peerTracker.Index())
+	}
+
+	if _, ok := ptq.frozenPeers[p]; ok {
+		delete(ptq.frozenPeers, p)
 	}
 }

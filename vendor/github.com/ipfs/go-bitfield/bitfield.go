@@ -3,28 +3,33 @@ package bitfield
 // NOTE: Don't bother replacing the divisions/modulo with shifts/ands, go is smart.
 
 import (
+	"fmt"
 	"math/bits"
 )
 
 // NewBitfield creates a new fixed-sized Bitfield (allocated up-front).
-//
-// Panics if size is not a multiple of 8.
-func NewBitfield(size int) Bitfield {
-	if size%8 != 0 {
-		panic("Bitfield size must be a multiple of 8")
+func NewBitfield(size int) (Bitfield, error) {
+	if size < 0 {
+		return nil, fmt.Errorf("bitfield size must be positive; got %d", size)
 	}
-	return make([]byte, size/8)
+	if size%8 != 0 {
+		return nil, fmt.Errorf("bitfield size must be a multiple of 8; got %d", size)
+	}
+	return make([]byte, size/8), nil
 }
 
 // FromBytes constructs a new bitfield from a serialized bitfield.
-func FromBytes(size int, bits []byte) Bitfield {
-	bf := NewBitfield(size)
+func FromBytes(size int, bits []byte) (Bitfield, error) {
+	bf, err := NewBitfield(size)
+	if err != nil {
+		return nil, err
+	}
 	start := len(bf) - len(bits)
 	if start < 0 {
-		panic("bitfield too small")
+		return nil, fmt.Errorf("bitfield too small: got %d; need %d", size, len(bits)*8)
 	}
 	copy(bf[start:], bits)
-	return bf
+	return bf, nil
 }
 
 func (bf Bitfield) offset(i int) (uint, uint8) {

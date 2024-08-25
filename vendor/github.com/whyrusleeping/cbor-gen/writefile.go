@@ -2,13 +2,25 @@ package typegen
 
 import (
 	"bytes"
+	"fmt"
 	"go/format"
 	"os"
 
 	"golang.org/x/xerrors"
 )
 
+// WriteTupleFileEncodersToFile is a convenience wrapper around Gen.WriteTupleEncodersToFile using
+// default options.
 func WriteTupleEncodersToFile(fname, pkg string, types ...interface{}) error {
+	return Gen{}.WriteTupleEncodersToFile(fname, pkg, types...)
+}
+
+// WriteTupleFileEncodersToFile generates array backed MarshalCBOR and UnmarshalCBOR implementations for the
+// given types in the specified file, with the specified package name.
+//
+// The MarshalCBOR and UnmarshalCBOR implementations will marshal/unmarshal each type's fields as a
+// fixed-length CBOR array of field values.
+func (g Gen) WriteTupleEncodersToFile(fname, pkg string, types ...interface{}) error {
 	buf := new(bytes.Buffer)
 
 	typeInfos := make([]*GenTypeInfo, len(types))
@@ -20,19 +32,19 @@ func WriteTupleEncodersToFile(fname, pkg string, types ...interface{}) error {
 		typeInfos[i] = gti
 	}
 
-	if err := PrintHeaderAndUtilityMethods(buf, pkg, typeInfos); err != nil {
+	if err := g.PrintHeaderAndUtilityMethods(buf, pkg, typeInfos); err != nil {
 		return xerrors.Errorf("failed to write header: %w", err)
 	}
 
 	for _, t := range typeInfos {
-		if err := GenTupleEncodersForType(t, buf); err != nil {
+		if err := g.GenTupleEncodersForType(t, buf); err != nil {
 			return xerrors.Errorf("failed to generate encoders: %w", err)
 		}
 	}
 
 	data, err := format.Source(buf.Bytes())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to format: %w", err)
 	}
 
 	fi, err := os.Create(fname)
@@ -50,7 +62,18 @@ func WriteTupleEncodersToFile(fname, pkg string, types ...interface{}) error {
 	return nil
 }
 
+// WriteMapFileEncodersToFile is a convenience wrapper around Gen.WriteMapEncodersToFile using
+// default options.
 func WriteMapEncodersToFile(fname, pkg string, types ...interface{}) error {
+	return Gen{}.WriteMapEncodersToFile(fname, pkg, types...)
+}
+
+// WriteMapFileEncodersToFile generates map backed MarshalCBOR and UnmarshalCBOR implementations for
+// the given types in the specified file, with the specified package name.
+//
+// The MarshalCBOR and UnmarshalCBOR implementations will marshal/unmarshal each type's fields as a
+// map of field names to field values.
+func (g Gen) WriteMapEncodersToFile(fname, pkg string, types ...interface{}) error {
 	buf := new(bytes.Buffer)
 
 	typeInfos := make([]*GenTypeInfo, len(types))
@@ -62,12 +85,12 @@ func WriteMapEncodersToFile(fname, pkg string, types ...interface{}) error {
 		typeInfos[i] = gti
 	}
 
-	if err := PrintHeaderAndUtilityMethods(buf, pkg, typeInfos); err != nil {
+	if err := g.PrintHeaderAndUtilityMethods(buf, pkg, typeInfos); err != nil {
 		return xerrors.Errorf("failed to write header: %w", err)
 	}
 
 	for _, t := range typeInfos {
-		if err := GenMapEncodersForType(t, buf); err != nil {
+		if err := g.GenMapEncodersForType(t, buf); err != nil {
 			return xerrors.Errorf("failed to generate encoders: %w", err)
 		}
 	}

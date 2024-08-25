@@ -8,16 +8,26 @@ import (
 	"github.com/ipld/go-ipld-prime/schema"
 )
 
-// This schema follows https://ipld.io/specs/schemas/schema-schema.ipldsch.
-
-var Type struct {
+// Prototypes contains some schema.TypedPrototype values which match
+// the IPLD schema-schema -- that is, the schema that describes IPLD schemas.
+// These prototypes create an in-memory representation that is backed by
+// structs in this package and bindnode.
+var Prototypes struct {
 	Schema schema.TypedPrototype
 }
 
 //go:generate go run -tags=schemadmtgen gen.go
 
-var schemaTypeSystem schema.TypeSystem
+// TypeSystem is a compiled equivalent of the IPLD schema-schema -- that is, the schema that describes IPLD schemas.
+//
+// The IPLD schema-schema can be found at https://ipld.io/specs/schemas/schema-schema.ipldsch .
+var TypeSystem schema.TypeSystem
 
+// In this init function, we manually create a type system that *matches* the IPLD schema-schema.
+// This manual work is unfortunate, and also must be kept in-sync manually,
+// but is important because breaks a cyclic dependency --
+// we use the compiled schema-schema produced by this to parse other schema documents.
+// We would also use it to parse... the IPLD schema-schema... if that weren't a cyclic dependency.
 func init() {
 	var ts schema.TypeSystem
 	ts.Init()
@@ -433,10 +443,10 @@ func init() {
 		panic("not happening")
 	}
 
-	schemaTypeSystem = ts
+	TypeSystem = ts
 
-	Type.Schema = bindnode.Prototype(
+	Prototypes.Schema = bindnode.Prototype(
 		(*Schema)(nil),
-		schemaTypeSystem.TypeByName("Schema"),
+		TypeSystem.TypeByName("Schema"),
 	)
 }

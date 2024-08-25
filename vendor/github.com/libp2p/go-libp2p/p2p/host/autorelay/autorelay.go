@@ -2,14 +2,14 @@ package autorelay
 
 import (
 	"context"
+	"errors"
 	"sync"
 
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	basic "github.com/libp2p/go-libp2p/p2p/host/basic"
-
-	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 
 	logging "github.com/ipfs/go-log/v2"
 	ma "github.com/multiformats/go-multiaddr"
@@ -29,10 +29,10 @@ type AutoRelay struct {
 
 	relayFinder *relayFinder
 
-	peerChanOut chan peer.AddrInfo // capacity 20
-
 	host   host.Host
 	addrsF basic.AddrsFactory
+
+	metricsTracer MetricsTracer
 }
 
 func NewAutoRelay(bhost *basic.BasicHost, opts ...Option) (*AutoRelay, error) {
@@ -48,45 +48,29 @@ func NewAutoRelay(bhost *basic.BasicHost, opts ...Option) (*AutoRelay, error) {
 		}
 	}
 	r.ctx, r.ctxCancel = context.WithCancel(context.Background())
-	r.peerChanOut = make(chan peer.AddrInfo, conf.maxCandidates)
 	r.conf = &conf
-	r.relayFinder = newRelayFinder(bhost, r.peerChanOut, &conf)
+	r.relayFinder = newRelayFinder(bhost, conf.peerSource, &conf)
+	r.metricsTracer = &wrappedMetricsTracer{conf.metricsTracer}
 	bhost.AddrsFactory = r.hostAddrs
 
+	return r, nil
+}
+
+func (r *AutoRelay) Start() {
 	r.refCount.Add(1)
 	go func() {
 		defer r.refCount.Done()
 		r.background()
 	}()
-	return r, nil
 }
 
 func (r *AutoRelay) background() {
-	subReachability, err := r.host.EventBus().Subscribe(new(event.EvtLocalReachabilityChanged))
+	subReachability, err := r.host.EventBus().Subscribe(new(event.EvtLocalReachabilityChanged), eventbus.Name("autorelay (background)"))
 	if err != nil {
 		log.Debug("failed to subscribe to the EvtLocalReachabilityChanged")
 		return
 	}
 	defer subReachability.Close()
-
-	var peerChan <-chan peer.AddrInfo
-	if len(r.conf.staticRelays) == 0 {
-		peerChan = r.conf.peerChan
-	} else {
-		pc := make(chan peer.AddrInfo)
-		peerChan = pc
-		r.refCount.Add(1)
-		go func() {
-			defer r.refCount.Done()
-			for _, sr := range r.conf.staticRelays {
-				select {
-				case pc <- sr:
-				case <-r.ctx.Done():
-					return
-				}
-			}
-		}()
-	}
 
 	for {
 		select {
@@ -100,26 +84,21 @@ func (r *AutoRelay) background() {
 			evt := ev.(event.EvtLocalReachabilityChanged)
 			switch evt.Reachability {
 			case network.ReachabilityPrivate, network.ReachabilityUnknown:
-				if err := r.relayFinder.Start(); err != nil {
+				err := r.relayFinder.Start()
+				if errors.Is(err, errAlreadyRunning) {
+					log.Debug("tried to start already running relay finder")
+				} else if err != nil {
 					log.Errorw("failed to start relay finder", "error", err)
+				} else {
+					r.metricsTracer.RelayFinderStatus(true)
 				}
 			case network.ReachabilityPublic:
 				r.relayFinder.Stop()
+				r.metricsTracer.RelayFinderStatus(false)
 			}
 			r.mx.Lock()
 			r.status = evt.Reachability
 			r.mx.Unlock()
-		case pi := <-peerChan:
-			select {
-			case r.peerChanOut <- pi: // if there's space in the channel, great
-			default:
-				// no space left in the channel. Drop the oldest entry.
-				select {
-				case <-r.peerChanOut:
-				default: // The consumer might just have emptied the channel. Make sure we don't block in that case.
-				}
-				r.peerChanOut <- pi
-			}
 		}
 	}
 }

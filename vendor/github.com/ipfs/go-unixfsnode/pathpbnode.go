@@ -49,7 +49,7 @@ func (n PathedPBNode) LookupBySegment(seg ipld.PathSegment) (ipld.Node, error) {
 }
 
 func (n PathedPBNode) MapIterator() ipld.MapIterator {
-	return iter.NewUnixFSDirMapIterator(n._substrate.Links.Iterator(), nil)
+	return iter.NewUnixFSDirMapIterator(&_PathedPBNode__ListItr{n._substrate.Links.Iterator()}, nil)
 }
 
 // ListIterator returns an iterator which yields key-value pairs
@@ -119,8 +119,7 @@ func (n PathedPBNode) Representation() ipld.Node {
 // Native map accessors
 
 func (n PathedPBNode) Iterator() *iter.UnixFSDir__Itr {
-
-	return iter.NewUnixFSDirIterator(n._substrate.Links.Iterator(), nil)
+	return iter.NewUnixFSDirIterator(&_PathedPBNode__ListItr{n._substrate.Links.Iterator()}, nil)
 }
 
 func (n PathedPBNode) Lookup(key dagpb.String) dagpb.Link {
@@ -140,4 +139,17 @@ func (n PathedPBNode) FieldData() dagpb.MaybeBytes {
 // Substrate returns the underlying PBNode -- note: only the substrate will encode successfully to protobuf if writing
 func (n PathedPBNode) Substrate() ipld.Node {
 	return n._substrate
+}
+
+type _PathedPBNode__ListItr struct {
+	_substrate *dagpb.PBLinks__Itr
+}
+
+func (itr *_PathedPBNode__ListItr) Next() (int64, dagpb.PBLink, error) {
+	idx, v := itr._substrate.Next()
+	return idx, v, nil
+}
+
+func (itr *_PathedPBNode__ListItr) Done() bool {
+	return itr._substrate.Done()
 }

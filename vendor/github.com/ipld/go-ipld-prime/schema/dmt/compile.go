@@ -7,10 +7,25 @@ import (
 	"github.com/ipld/go-ipld-prime/schema"
 )
 
-// Compile transforms a schema in DMT form into a TypeSystem.
+// Compile transforms a description of a schema in raw data model ("dmt") form
+// into a compiled schema.TypeSystem, which is the ready-to-use form.
+//
+// The first parameter is mutated by this process,
+// and the second parameter is the data source.
+//
+// The compilation process includes first inserting the "prelude" types into the
+// schema.TypeSystem -- that is, the "type Bool bool" and "type String string", etc,
+// which are generally presumed to be present in any type system.
+//
+// The compilation process attempts to check the validity of the schema at a logical level as it goes.
+// For example, references to type names not present elsewhere in the same schema are now an error
+// (even though that has been easily representable in the dmt.Schema form up until this point).
 //
 // Note that this API is EXPERIMENTAL and will likely change.
-// It is also unfinished and buggy.
+// It supports many features of IPLD Schemas,
+// but it may yet not support all of them.
+// It supports several validations for logical coherency of schemas,
+// but may not yet successfully reject all invalid schemas.
 func Compile(ts *schema.TypeSystem, node *Schema) error {
 	// Prelude; probably belongs elsewhere.
 	{
@@ -262,6 +277,8 @@ func spawnType(ts *schema.TypeSystem, name schema.TypeName, defn TypeDefn) (sche
 				return nil, fmt.Errorf("stringjoin has empty join value")
 			}
 			repr = schema.SpawnStructRepresentationStringjoin(join)
+		case typ.Representation.StructRepresentation_Listpairs != nil:
+			repr = schema.SpawnStructRepresentationListPairs()
 		default:
 			return nil, fmt.Errorf("TODO: support other struct repr in schema package")
 		}
@@ -317,11 +334,15 @@ func spawnType(ts *schema.TypeSystem, name schema.TypeName, defn TypeDefn) (sche
 				switch {
 				case member.TypeName != nil:
 					memberName := *member.TypeName
-					validMember(memberName)
+					if err := validMember(memberName); err != nil {
+						return nil, err
+					}
 					table[kind] = memberName
 				case member.UnionMemberInlineDefn != nil:
 					tname := anonLinkName(*member.UnionMemberInlineDefn.TypeDefnLink)
-					validMember(tname)
+					if err := validMember(tname); err != nil {
+						return nil, err
+					}
 					table[kind] = tname
 				}
 			}
@@ -334,11 +355,15 @@ func spawnType(ts *schema.TypeSystem, name schema.TypeName, defn TypeDefn) (sche
 				switch {
 				case member.TypeName != nil:
 					memberName := *member.TypeName
-					validMember(memberName)
+					if err := validMember(memberName); err != nil {
+						return nil, err
+					}
 					table[key] = memberName
 				case member.UnionMemberInlineDefn != nil:
 					tname := anonLinkName(*member.UnionMemberInlineDefn.TypeDefnLink)
-					validMember(tname)
+					if err := validMember(tname); err != nil {
+						return nil, err
+					}
 					table[key] = tname
 				}
 			}
@@ -346,9 +371,25 @@ func spawnType(ts *schema.TypeSystem, name schema.TypeName, defn TypeDefn) (sche
 		case typ.Representation.UnionRepresentation_StringPrefix != nil:
 			prefixes := typ.Representation.UnionRepresentation_StringPrefix.Prefixes
 			for _, key := range prefixes.Keys {
-				validMember(prefixes.Values[key])
+				if err := validMember(prefixes.Values[key]); err != nil {
+					return nil, err
+				}
 			}
 			repr = schema.SpawnUnionRepresentationStringprefix("", prefixes.Values)
+		case typ.Representation.UnionRepresentation_Inline != nil:
+			rp := typ.Representation.UnionRepresentation_Inline
+			if rp.DiscriminantKey == "" {
+				return nil, fmt.Errorf("inline union has empty discriminantKey value")
+			}
+			if rp.DiscriminantTable.Keys == nil || rp.DiscriminantTable.Values == nil {
+				return nil, fmt.Errorf("inline union has empty discriminantTable")
+			}
+			for _, key := range rp.DiscriminantTable.Keys {
+				if err := validMember(rp.DiscriminantTable.Values[key]); err != nil {
+					return nil, err
+				}
+			}
+			repr = schema.SpawnUnionRepresentationInline(rp.DiscriminantKey, rp.DiscriminantTable.Values)
 		default:
 			return nil, fmt.Errorf("TODO: support other union repr in schema package")
 		}

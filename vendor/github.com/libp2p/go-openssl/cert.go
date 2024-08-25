@@ -267,8 +267,8 @@ func (c *Certificate) Sign(privKey PrivateKey, digest EVP_MD) error {
 	case EVP_SHA384:
 	case EVP_SHA512:
 	default:
-		return errors.New("Unsupported digest" +
-			"You're probably looking for 'EVP_SHA256' or 'EVP_SHA512'.")
+		return errors.New("unsupported digest; " +
+			"you're probably looking for 'EVP_SHA256' or 'EVP_SHA512'")
 	}
 	return c.insecureSign(privKey, digest)
 }
@@ -336,7 +336,7 @@ func (c *Certificate) AddCustomExtension(nid NID, value []byte) error {
 	val := (*C.char)(C.CBytes(value))
 	defer C.free(unsafe.Pointer(val))
 	if int(C.add_custom_ext(c.x, C.int(nid), val, C.int(len(value)))) == 0 {
-		return errors.New("Unable to add extension")
+		return errors.New("unable to add extension")
 	}
 	return nil
 }

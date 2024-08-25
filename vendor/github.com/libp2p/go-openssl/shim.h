@@ -67,6 +67,8 @@ extern int X_SSL_verify_cb(int ok, X509_STORE_CTX* store);
 
 /* SSL_CTX methods */
 extern int X_SSL_CTX_new_index();
+extern int X_SSL_CTX_set_min_proto_version(SSL_CTX *ctx, int version);
+extern int X_SSL_CTX_set_max_proto_version(SSL_CTX *ctx, int version);
 extern long X_SSL_CTX_set_options(SSL_CTX* ctx, long options);
 extern long X_SSL_CTX_clear_options(SSL_CTX* ctx, long options);
 extern long X_SSL_CTX_get_options(SSL_CTX* ctx);

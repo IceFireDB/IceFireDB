@@ -366,9 +366,9 @@ func (b *arccache) cacheInvalidate(key string) {
 
 // queryCache checks if the CID is in the cache. If so, it returns:
 //
-//  * exists (bool): whether the CID is known to exist or not.
-//  * size (int): the size if cached, or -1 if not cached.
-//  * ok (bool): whether present in the cache.
+//   - exists (bool): whether the CID is known to exist or not.
+//   - size (int): the size if cached, or -1 if not cached.
+//   - ok (bool): whether present in the cache.
 //
 // When ok is false, the answer in inconclusive and the caller must ignore the
 // other two return values. Querying the underying store is necessary.

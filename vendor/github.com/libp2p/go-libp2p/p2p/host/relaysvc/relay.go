@@ -4,11 +4,11 @@ import (
 	"context"
 	"sync"
 
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
-
-	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
 )
 
 type RelayManager struct {
@@ -44,7 +44,7 @@ func (m *RelayManager) background(ctx context.Context) {
 		m.mutex.Unlock()
 	}()
 
-	subReachability, _ := m.host.EventBus().Subscribe(new(event.EvtLocalReachabilityChanged))
+	subReachability, _ := m.host.EventBus().Subscribe(new(event.EvtLocalReachabilityChanged), eventbus.Name("relaysvc"))
 	defer subReachability.Close()
 
 	for {
@@ -65,14 +65,19 @@ func (m *RelayManager) background(ctx context.Context) {
 func (m *RelayManager) reachabilityChanged(r network.Reachability) error {
 	switch r {
 	case network.ReachabilityPublic:
+		m.mutex.Lock()
+		defer m.mutex.Unlock()
+		// This could happen if two consecutive EvtLocalReachabilityChanged report the same reachability.
+		// This shouldn't happen, but it's safer to double-check.
+		if m.relay != nil {
+			return nil
+		}
 		relay, err := relayv2.New(m.host, m.opts...)
 		if err != nil {
 			return err
 		}
-		m.mutex.Lock()
-		defer m.mutex.Unlock()
 		m.relay = relay
-	case network.ReachabilityPrivate:
+	default:
 		m.mutex.Lock()
 		defer m.mutex.Unlock()
 		if m.relay != nil {

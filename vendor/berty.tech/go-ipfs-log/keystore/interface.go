@@ -3,7 +3,7 @@ package keystore // import "berty.tech/go-ipfs-log/keystore"
 import (
 	"context"
 
-	crypto "github.com/libp2p/go-libp2p-core/crypto"
+	crypto "github.com/libp2p/go-libp2p/core/crypto"
 )
 
 type Interface interface {

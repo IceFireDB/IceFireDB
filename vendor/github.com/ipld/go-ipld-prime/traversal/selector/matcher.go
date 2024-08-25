@@ -3,6 +3,7 @@ package selector
 import (
 	"fmt"
 	"io"
+	"math"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
@@ -26,9 +27,33 @@ type Matcher struct {
 // The returned node will be limited based on slicing the specified range of the
 // node into a new node, or making use of the `AsLargeBytes` io.ReadSeeker to
 // restrict response with a SectionReader.
+//
+// Slice supports [From,To) ranges, where From is inclusive and To is exclusive.
+// Negative values for From and To are interpreted as offsets from the end of
+// the node. If To is greater than the node length, it will be truncated to the
+// node length. If From is greater than the node length or greater than To, the
+// result will be a non-match.
 type Slice struct {
 	From int64
 	To   int64
+}
+
+func sliceBounds(from, to, length int64) (bool, int64, int64) {
+	if to < 0 {
+		to = length + to
+	} else if length < to {
+		to = length
+	}
+	if from < 0 {
+		from = length + from
+		if from < 0 {
+			from = 0
+		}
+	}
+	if from > to || from >= length {
+		return false, 0, 0
+	}
+	return true, from, to
 }
 
 func (s Slice) Slice(n datamodel.Node) (datamodel.Node, error) {
@@ -39,41 +64,56 @@ func (s Slice) Slice(n datamodel.Node) (datamodel.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		to = s.To
-		if len(str) < int(to) {
-			to = int64(len(str))
-		}
-		from = s.From
-		if len(str) < int(from) {
-			from = int64(len(str))
+
+		var match bool
+		match, from, to = sliceBounds(s.From, s.To, int64(len(str)))
+		if !match {
+			return nil, nil
 		}
 		return basicnode.NewString(str[from:to]), nil
 	case datamodel.Kind_Bytes:
+		to = s.To
+		from = s.From
+		var length int64 = math.MaxInt64
+		var rdr io.ReadSeeker
+		var bytes []byte
+		var err error
+
 		if lbn, ok := n.(datamodel.LargeBytesNode); ok {
-			rdr, err := lbn.AsLargeBytes()
+			rdr, err = lbn.AsLargeBytes()
 			if err != nil {
 				return nil, err
 			}
+			// calculate length from seeker
+			length, err = rdr.Seek(0, io.SeekEnd)
+			if err != nil {
+				return nil, err
+			}
+			// reset
+			_, err = rdr.Seek(0, io.SeekStart)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			bytes, err = n.AsBytes()
+			if err != nil {
+				return nil, err
+			}
+			length = int64(len(bytes))
+		}
 
-			sr := io.NewSectionReader(readerat{rdr}, s.From, s.To-s.From)
+		var match bool
+		match, from, to = sliceBounds(from, to, length)
+		if !match {
+			return nil, nil
+		}
+		if rdr != nil {
+			sr := io.NewSectionReader(&readerat{rdr, 0}, from, to-from)
 			return basicnode.NewBytesFromReader(sr), nil
 		}
-		bytes, err := n.AsBytes()
-		if err != nil {
-			return nil, err
-		}
-		to = s.To
-		if len(bytes) < int(to) {
-			to = int64(len(bytes))
-		}
-		from = s.From
-		if len(bytes) < int(from) {
-			from = int64(len(bytes))
-		}
-
 		return basicnode.NewBytes(bytes[from:to]), nil
 	default:
-		return nil, fmt.Errorf("selector slice rejected on %s: subset match must be over string or bytes", n.Kind())
+		return nil, nil
 	}
 }
 
@@ -131,11 +171,8 @@ func (pc ParseContext) ParseMatcher(n datamodel.Node) (Selector, error) {
 		if err != nil {
 			return nil, fmt.Errorf("selector spec parse rejected: selector body must be a map with a 'to' key that is a number")
 		}
-		if fromN > toN {
+		if toN >= 0 && fromN > toN {
 			return nil, fmt.Errorf("selector spec parse rejected: selector body must be a map with a 'from' key that is less than or equal to the 'to' key")
-		}
-		if fromN < 0 || toN < 0 {
-			return nil, fmt.Errorf("selector spec parse rejected: selector body must be a map with keys not less than 0")
 		}
 		return Matcher{&Slice{
 			From: fromN,

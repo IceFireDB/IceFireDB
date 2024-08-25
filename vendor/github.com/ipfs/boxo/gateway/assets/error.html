@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="description" content="A {{ .StatusCode }} {{ .StatusText }} error has occurred when trying to fetch content from the IPFS network.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlo89/56ZQ/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACUjDu1lo89/6mhTP+zrVP/nplD/5+aRK8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHNiIS6Wjz3/ubFY/761W/+vp1D/urRZ/8vDZf/GvmH/nplD/1BNIm8AAAAAAAAAAAAAAAAAAAAAAAAAAJaPPf+knEj/vrVb/761W/++tVv/r6dQ/7q0Wf/Lw2X/y8Nl/8vDZf+tpk7/nplD/wAAAAAAAAAAAAAAAJaPPf+2rVX/vrVb/761W/++tVv/vrVb/6+nUP+6tFn/y8Nl/8vDZf/Lw2X/y8Nl/8G6Xv+emUP/AAAAAAAAAACWjz3/vrVb/761W/++tVv/vrVb/761W/+vp1D/urRZ/8vDZf/Lw2X/y8Nl/8vDZf/Lw2X/nplD/wAAAAAAAAAAlo89/761W/++tVv/vrVb/761W/++tVv/r6dQ/7q0Wf/Lw2X/y8Nl/8vDZf/Lw2X/y8Nl/56ZQ/8AAAAAAAAAAJaPPf++tVv/vrVb/761W/++tVv/vbRa/5aPPf+emUP/y8Nl/8vDZf/Lw2X/y8Nl/8vDZf+emUP/AAAAAAAAAACWjz3/vrVb/761W/++tVv/vrVb/5qTQP+inkb/op5G/6KdRv/Lw2X/y8Nl/8vDZf/Lw2X/nplD/wAAAAAAAAAAlo89/761W/++tVv/sqlS/56ZQ//LxWb/0Mlp/9DJaf/Kw2X/oJtE/7+3XP/Lw2X/y8Nl/56ZQ/8AAAAAAAAAAJaPPf+9tFr/mJE+/7GsUv/Rymr/0cpq/9HKav/Rymr/0cpq/9HKav+xrFL/nplD/8vDZf+emUP/AAAAAAAAAACWjz3/op5G/9HKav/Rymr/0cpq/9HKav/Rymr/0cpq/9HKav/Rymr/0cpq/9HKav+inkb/nplD/wAAAAAAAAAAAAAAAKKeRv+3slb/0cpq/9HKav/Rymr/0cpq/9HKav/Rymr/0cpq/9HKav+1sFX/op5G/wAAAAAAAAAAAAAAAAAAAAAAAAAAop5GUKKeRv/Nxmf/0cpq/9HKav/Rymr/0cpq/83GZ/+inkb/op5GSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAop5G16KeRv/LxWb/y8Vm/6KeRv+inkaPAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAop5G/6KeRtcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/n8AAPgfAADwDwAAwAMAAIABAACAAQAAgAEAAIABAACAAQAAgAEAAIABAACAAQAAwAMAAPAPAAD4HwAA/n8AAA==" />
+  <title>{{ .StatusCode }} {{ .StatusText }}</title>
+  <link rel="stylesheet">
+</head>
+<body>
+  <header></header>
+  <main id="main">
+    <header>
+      <strong>{{ .StatusCode }} {{ .StatusText }}</strong>
+    </header>
+    <section class="container">
+      {{ if eq .StatusCode 400 }}
+        <p>Your request is invalid. Please check the error below for more information.</p>
+      {{ else if eq .StatusCode 404 }}
+        <p>The content path you requested cannot be found. There's likely an invalid or missing DAG node.</p>
+      {{ else if eq .StatusCode 406 }}
+        <p>This gateway is unable to return the data in the format requested by the client.</p>
+      {{ else if eq .StatusCode 410 }}
+        <p>This gateway refuses to return the requested data.</p>
+      {{ else if eq .StatusCode 412 }}
+        <p>This gateway is unable to return the requested data under the conditions sent by the client.</p>
+      {{ else if eq .StatusCode 429 }}
+        <p>There are too many pending requests. Please wait some time and try again.</p>
+      {{ else if eq .StatusCode 451 }}
+        <p>This gateway is not allowed to return the requested data due to legal reasons.</p>
+      {{ else if eq .StatusCode 500 }}
+        <p>This gateway was unable to return the requested data due to an internal error. Please check the error below for more information.</p>
+      {{ else if eq .StatusCode 502 }}
+        <p>The gateway backed was unable to fullfil your request due to an error.</p>
+      {{ else if eq .StatusCode 504 }}
+        <p>The gateway backend was unable to fullfil your request due to a timeout.</p>
+      {{ else if eq .StatusCode 506 }}
+        <p>The gateway backend was unable to fullfil your request at this time. Try again later.</p>
+      {{ end }}
+
+      <pre class="terminal wrap">{{ .Error }}</pre>
+         
+      <p>How you can proceed:</p>
+      <ul>
+        <li>Check the <a href="https://discuss.ipfs.tech/c/help/13" rel="noopener noreferrer">Discussion Forums</a> for similar errors.</li>
+        <li>Try diagnosing your request with the <a href="https://docs.ipfs.tech/reference/diagnostic-tools/" rel="noopener noreferrer">diagnostic tools</a>.</li>
+        <li>Self-host and run an <a href="https://docs.ipfs.tech/concepts/ipfs-implementations/" rel="noopener noreferrer">IPFS client</a> that verifies your data.</li>
+        {{ if or (eq .StatusCode 400) (eq .StatusCode 404) }}
+          <li>Inspect the <a href="https://cid.ipfs.tech/" rel="noopener noreferrer">CID</a> or <a href="https://explore.ipld.io/" rel="noopener noreferrer">DAG</a>.</li>
+        {{ end }}
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<header id="header">
+  <div class="ipfs-logo">&nbsp;</div>
+  <nav>
+    <a href="https://ipfs.tech" target="_blank" rel="noopener noreferrer">About<span class="dn-mobile"> IPFS</span></a>
+    <a href="https://docs.ipfs.tech/install/" target="_blank" rel="noopener noreferrer">Install<span class="dn-mobile"> IPFS</span></a>
+    {{ range .Menu }}
+      <a href="{{ .URL }}" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
+    {{ end }}
+  </nav>
+</header>

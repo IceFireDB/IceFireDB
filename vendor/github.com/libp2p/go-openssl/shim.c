@@ -428,7 +428,7 @@ int X_SSL_session_reused(SSL *ssl) {
 }
 
 int X_SSL_new_index() {
-	return SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
+	return SSL_get_ex_new_index(0, NULL, NULL, NULL, go_ssl_crypto_ex_free);
 }
 
 int X_SSL_verify_cb(int ok, X509_STORE_CTX* store) {
@@ -473,6 +473,14 @@ const SSL_METHOD *X_TLSv1_2_method() {
 
 int X_SSL_CTX_new_index() {
 	return SSL_CTX_get_ex_new_index(0, NULL, NULL, NULL, NULL);
+}
+
+int X_SSL_CTX_set_min_proto_version(SSL_CTX *ctx, int version) {
+	return SSL_CTX_set_min_proto_version(ctx, version);
+}
+
+int X_SSL_CTX_set_max_proto_version(SSL_CTX *ctx, int version) {
+	return SSL_CTX_set_max_proto_version(ctx, version);
 }
 
 long X_SSL_CTX_set_options(SSL_CTX* ctx, long options) {

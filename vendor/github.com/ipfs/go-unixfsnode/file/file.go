@@ -5,6 +5,8 @@ import (
 	"io"
 
 	"github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/adl"
+	"github.com/ipld/go-ipld-prime/datamodel"
 )
 
 // NewUnixFSFile attempts to construct an ipld node from the base protobuf node representing the
@@ -33,9 +35,28 @@ func NewUnixFSFile(ctx context.Context, substrate ipld.Node, lsys *ipld.LinkSyst
 	}, nil
 }
 
+// NewUnixFSFileWithPreload is the same as NewUnixFSFile but it performs a full load of constituent
+// blocks where the file spans multiple blocks. This is useful where a system needs to watch the
+// LinkSystem for block loads to determine which blocks make up this file.
+// NewUnixFSFileWithPreload is used by the "unixfs-preload" reifier.
+func NewUnixFSFileWithPreload(ctx context.Context, substrate ipld.Node, lsys *ipld.LinkSystem) (LargeBytesNode, error) {
+	f, err := NewUnixFSFile(ctx, substrate, lsys)
+	if err != nil {
+		return nil, err
+	}
+	r, err := f.AsLargeBytes()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := io.Copy(io.Discard, r); err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
 // A LargeBytesNode is an ipld.Node that can be streamed over. It is guaranteed to have a Bytes type.
 type LargeBytesNode interface {
-	ipld.Node
+	adl.ADL
 	AsLargeBytes() (io.ReadSeeker, error)
 }
 
@@ -45,6 +66,10 @@ type singleNodeFile struct {
 
 func (f *singleNodeFile) AsLargeBytes() (io.ReadSeeker, error) {
 	return &singleNodeReader{f, 0}, nil
+}
+
+func (f *singleNodeFile) Substrate() datamodel.Node {
+	return f.Node
 }
 
 type singleNodeReader struct {

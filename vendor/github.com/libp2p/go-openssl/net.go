@@ -17,6 +17,7 @@ package openssl
 import (
 	"errors"
 	"net"
+	"time"
 )
 
 type listener struct {
@@ -80,6 +81,18 @@ func Dial(network, addr string, ctx *Ctx, flags DialFlags) (*Conn, error) {
 	return DialSession(network, addr, ctx, flags, nil)
 }
 
+// DialTimeout acts like Dial but takes a timeout for network dial.
+//
+// The timeout includes only network dial. It does not include OpenSSL calls.
+//
+// See func Dial for a description of the network, addr, ctx and flags
+// parameters.
+func DialTimeout(network, addr string, timeout time.Duration, ctx *Ctx,
+	flags DialFlags) (*Conn, error) {
+	d := net.Dialer{Timeout: timeout}
+	return dialSession(d, network, addr, ctx, flags, nil)
+}
+
 // DialSession will connect to network/address and then wrap the corresponding
 // underlying connection with an OpenSSL client connection using context ctx.
 // If flags includes InsecureSkipHostVerification, the server certificate's
@@ -95,7 +108,12 @@ func Dial(network, addr string, ctx *Ctx, flags DialFlags) (*Conn, error) {
 // can be retrieved from the GetSession method on the Conn.
 func DialSession(network, addr string, ctx *Ctx, flags DialFlags,
 	session []byte) (*Conn, error) {
+	var d net.Dialer
+	return dialSession(d, network, addr, ctx, flags, session)
+}
 
+func dialSession(d net.Dialer, network, addr string, ctx *Ctx, flags DialFlags,
+	session []byte) (*Conn, error) {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
@@ -108,7 +126,8 @@ func DialSession(network, addr string, ctx *Ctx, flags DialFlags,
 		}
 		// TODO: use operating system default certificate chain?
 	}
-	c, err := net.Dial(network, addr)
+
+	c, err := d.Dial(network, addr)
 	if err != nil {
 		return nil, err
 	}

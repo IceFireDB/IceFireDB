@@ -26,6 +26,8 @@ var logger = logging.Logger("blockservice")
 
 // BlockGetter is the common interface shared between blockservice sessions and
 // the blockservice.
+//
+// Deprecated: use github.com/ipfs/boxo/blockservice.BlockGetter
 type BlockGetter interface {
 	// GetBlock gets the requested block.
 	GetBlock(ctx context.Context, c cid.Cid) (blocks.Block, error)
@@ -43,6 +45,8 @@ type BlockGetter interface {
 // BlockService is a hybrid block datastore. It stores data in a local
 // datastore and may retrieve data from a remote Exchange.
 // It uses an internal `datastore.Datastore` instance to store values.
+//
+// Deprecated: use github.com/ipfs/boxo/blockservice.BlockService
 type BlockService interface {
 	io.Closer
 	BlockGetter
@@ -73,6 +77,8 @@ type blockService struct {
 }
 
 // NewBlockService creates a BlockService with given datastore instance.
+//
+// Deprecated: use github.com/ipfs/boxo/blockservice.New
 func New(bs blockstore.Blockstore, rem exchange.Interface) BlockService {
 	if rem == nil {
 		logger.Debug("blockservice running in local (offline) mode.")
@@ -87,6 +93,8 @@ func New(bs blockstore.Blockstore, rem exchange.Interface) BlockService {
 
 // NewWriteThrough creates a BlockService that guarantees writes will go
 // through to the blockstore and are not skipped by cache checks.
+//
+// Deprecated: use github.com/ipfs/boxo/blockservice.NewWriteThrough
 func NewWriteThrough(bs blockstore.Blockstore, rem exchange.Interface) BlockService {
 	if rem == nil {
 		logger.Debug("blockservice running in local (offline) mode.")
@@ -114,6 +122,8 @@ func (s *blockService) Exchange() exchange.Interface {
 // If the current exchange is a SessionExchange, a new exchange
 // session will be created. Otherwise, the current exchange will be used
 // directly.
+//
+// Deprecated: use github.com/ipfs/boxo/blockservice.NewSession
 func NewSession(ctx context.Context, bs BlockService) *Session {
 	exch := bs.Exchange()
 	if sessEx, ok := exch.(exchange.SessionExchange); ok {
@@ -296,6 +306,7 @@ func getBlocks(ctx context.Context, ks []cid.Cid, bs blockstore.Blockstore, fget
 		}
 
 		if !allValid {
+			// can't shift in place because we don't want to clobber callers.
 			ks2 := make([]cid.Cid, 0, len(ks))
 			for _, c := range ks {
 				// hash security
@@ -333,52 +344,39 @@ func getBlocks(ctx context.Context, ks []cid.Cid, bs blockstore.Blockstore, fget
 			return
 		}
 
-		// batch available blocks together
-		const batchSize = 32
-		batch := make([]blocks.Block, 0, batchSize)
+		var cache [1]blocks.Block // preallocate once for all iterations
 		for {
-			var noMoreBlocks bool
-		batchLoop:
-			for len(batch) < batchSize {
-				select {
-				case b, ok := <-rblocks:
-					if !ok {
-						noMoreBlocks = true
-						break batchLoop
-					}
-
-					logger.Debugf("BlockService.BlockFetched %s", b.Cid())
-					batch = append(batch, b)
-				case <-ctx.Done():
+			var b blocks.Block
+			select {
+			case v, ok := <-rblocks:
+				if !ok {
 					return
-				default:
-					break batchLoop
 				}
+				b = v
+			case <-ctx.Done():
+				return
 			}
 
-			// also write in the blockstore for caching, inform the exchange that the blocks are available
-			err = bs.PutMany(ctx, batch)
+			// write in the blockstore for caching
+			err = bs.Put(ctx, b)
 			if err != nil {
 				logger.Errorf("could not write blocks from the network to the blockstore: %s", err)
 				return
 			}
 
-			err = f.NotifyNewBlocks(ctx, batch...)
+			// inform the exchange that the blocks are available
+			cache[0] = b
+			err = f.NotifyNewBlocks(ctx, cache[:]...)
 			if err != nil {
 				logger.Errorf("could not tell the exchange about new blocks: %s", err)
 				return
 			}
+			cache[0] = nil // early gc
 
-			for _, b := range batch {
-				select {
-				case out <- b:
-				case <-ctx.Done():
-					return
-				}
-			}
-			batch = batch[:0]
-			if noMoreBlocks {
-				break
+			select {
+			case out <- b:
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
@@ -407,6 +405,8 @@ type notifier interface {
 }
 
 // Session is a helper type to provide higher level access to bitswap sessions
+//
+// Deprecated: use github.com/ipfs/boxo/blockservice.Session
 type Session struct {
 	bs       blockstore.Blockstore
 	ses      exchange.Fetcher

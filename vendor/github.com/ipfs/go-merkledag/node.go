@@ -3,15 +3,20 @@ package merkledag
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
+	"sort"
 
 	blocks "github.com/ipfs/go-block-format"
 	cid "github.com/ipfs/go-cid"
 	format "github.com/ipfs/go-ipld-format"
 	legacy "github.com/ipfs/go-ipld-legacy"
+	logging "github.com/ipfs/go-log/v2"
 	dagpb "github.com/ipld/go-codec-dagpb"
 	ipld "github.com/ipld/go-ipld-prime"
 	mh "github.com/multiformats/go-multihash"
+	mhcore "github.com/multiformats/go-multihash/core"
 )
 
 // Common errors
@@ -20,6 +25,12 @@ var (
 	ErrNotRawNode   = fmt.Errorf("expected raw bytes node")
 	ErrLinkNotFound = fmt.Errorf("no link by that name")
 )
+
+var log = logging.Logger("merkledag")
+
+// for testing custom CidBuilders
+var zeros [256]byte
+var zeroCid = mustZeroCid()
 
 type immutableProtoNode struct {
 	encoded []byte
@@ -41,10 +52,12 @@ type immutableProtoNode struct {
 // this mutable protonode implementation is needed to support go-unixfs,
 // the only library that implements both read and write for UnixFS v1.
 type ProtoNode struct {
-	links []*format.Link
-	data  []byte
+	links      []*format.Link
+	linksDirty bool
+	data       []byte
 
-	// cache encoded/marshaled value
+	// cache encoded/marshaled value, kept to make the go-ipld-prime Node interface
+	// work (see prime.go), and to provide a cached []byte encoded form available
 	encoded *immutableProtoNode
 	cached  cid.Cid
 
@@ -93,14 +106,43 @@ func (n *ProtoNode) CidBuilder() cid.Builder {
 }
 
 // SetCidBuilder sets the CID builder if it is non nil, if nil then it
-// is reset to the default value
-func (n *ProtoNode) SetCidBuilder(builder cid.Builder) {
+// is reset to the default value. An error will be returned if the builder
+// is not usable.
+func (n *ProtoNode) SetCidBuilder(builder cid.Builder) error {
 	if builder == nil {
 		n.builder = v0CidPrefix
-	} else {
-		n.builder = builder.WithCodec(cid.DagProtobuf)
-		n.cached = cid.Undef
+		return nil
 	}
+	switch b := builder.(type) {
+	case cid.Prefix:
+		if err := checkHasher(b.MhType, b.MhLength); err != nil {
+			return err
+		}
+	case *cid.Prefix:
+		if err := checkHasher(b.MhType, b.MhLength); err != nil {
+			return err
+		}
+	default:
+		// We have to test it's a usable hasher by invoking it and checking it
+		// doesn't error. This is only a basic check, there are still ways it may
+		// break
+		if _, err := builder.Sum(zeros[:]); err != nil {
+			return err
+		}
+	}
+	n.builder = builder.WithCodec(cid.DagProtobuf)
+	n.cached = cid.Undef
+	return nil
+}
+
+// check whether the hasher is likely to be a usable one
+func checkHasher(indicator uint64, sizeHint int) error {
+	mhLen := sizeHint
+	if mhLen <= 0 {
+		mhLen = -1
+	}
+	_, err := mhcore.GetVariableHasher(indicator, mhLen)
+	return err
 }
 
 // LinkSlice is a slice of format.Links
@@ -115,7 +157,15 @@ func NodeWithData(d []byte) *ProtoNode {
 	return &ProtoNode{data: d}
 }
 
-// AddNodeLink adds a link to another node.
+// AddNodeLink adds a link to another node. The link will be added in
+// sorted order.
+//
+// If sorting has not already been applied to this node (because
+// it was deserialized from a form that did not have sorted links), the links
+// list will be sorted. If a ProtoNode was deserialized from a badly encoded
+// form that did not already have its links sorted, calling AddNodeLink and then
+// RemoveNodeLink for the same link, will not result in an identically encoded
+// form as the links will have been sorted.
 func (n *ProtoNode) AddNodeLink(name string, that format.Node) error {
 	lnk, err := format.MakeLink(that)
 	if err != nil {
@@ -129,22 +179,34 @@ func (n *ProtoNode) AddNodeLink(name string, that format.Node) error {
 	return nil
 }
 
-// AddRawLink adds a copy of a link to this node
+// AddRawLink adds a copy of a link to this node. The link will be added in
+// sorted order.
+//
+// If sorting has not already been applied to this node (because
+// it was deserialized from a form that did not have sorted links), the links
+// list will be sorted. If a ProtoNode was deserialized from a badly encoded
+// form that did not already have its links sorted, calling AddRawLink and then
+// RemoveNodeLink for the same link, will not result in an identically encoded
+// form as the links will have been sorted.
 func (n *ProtoNode) AddRawLink(name string, l *format.Link) error {
-	n.encoded = nil
-	n.links = append(n.links, &format.Link{
+	lnk := &format.Link{
 		Name: name,
 		Size: l.Size,
 		Cid:  l.Cid,
-	})
-
+	}
+	if err := checkLink(lnk); err != nil {
+		return err
+	}
+	n.links = append(n.links, lnk)
+	n.linksDirty = true // needs a sort
+	n.encoded = nil
 	return nil
 }
 
-// RemoveNodeLink removes a link on this node by the given name.
+// RemoveNodeLink removes a link on this node by the given name. If there are
+// no links with this name, ErrLinkNotFound will be returned. If there are more
+// than one link with this name, they will all be removed.
 func (n *ProtoNode) RemoveNodeLink(name string) error {
-	n.encoded = nil
-
 	ref := n.links[:0]
 	found := false
 
@@ -161,6 +223,11 @@ func (n *ProtoNode) RemoveNodeLink(name string) error {
 	}
 
 	n.links = ref
+	// Even though a removal won't change sorting, this node may have come from
+	// a deserialized state with badly sorted links. Now that we are mutating,
+	// we need to ensure the resulting link list is sorted when it gets consumed.
+	n.linksDirty = true
+	n.encoded = nil
 
 	return nil
 }
@@ -204,8 +271,10 @@ func (n *ProtoNode) GetLinkedNode(ctx context.Context, ds format.DAGService, nam
 	return lnk.GetNode(ctx, ds)
 }
 
-// Copy returns a copy of the node.
-// NOTE: Does not make copies of Node objects in the links.
+// Copy returns a copy of the node. The resulting node will have a properly
+// sorted Links list regardless of whether the original came from a badly
+// serialized form that didn't have a sorted list.
+// NOTE: This does not make copies of Node objects in the links.
 func (n *ProtoNode) Copy() format.Node {
 	nnode := new(ProtoNode)
 	if len(n.data) > 0 {
@@ -214,8 +283,11 @@ func (n *ProtoNode) Copy() format.Node {
 	}
 
 	if len(n.links) > 0 {
-		nnode.links = make([]*format.Link, len(n.links))
-		copy(nnode.links, n.links)
+		nnode.links = append([]*format.Link(nil), n.links...)
+		// Sort links regardless of linksDirty state, this may have come from a
+		// serialized form that had badly sorted links, in which case linksDirty
+		// will not be true.
+		sort.Stable(LinkSlice(nnode.links))
 	}
 
 	nnode.builder = n.builder
@@ -223,10 +295,18 @@ func (n *ProtoNode) Copy() format.Node {
 	return nnode
 }
 
+// RawData returns the encoded byte form of this node.
+//
+// Note that this method may return an empty byte slice if there is an error
+// performing the encode. To check whether such an error may have occurred, use
+// node.EncodeProtobuf(false), instead (or prior to calling RawData) and check
+// for its returned error value; the result of EncodeProtobuf is cached so there
+// is minimal overhead when invoking both methods.
 func (n *ProtoNode) RawData() []byte {
 	out, err := n.EncodeProtobuf(false)
 	if err != nil {
-		panic(err)
+		log.Errorf("failed to encode dag-pb block: %s", err.Error())
+		return nil
 	}
 	return out
 }
@@ -244,7 +324,12 @@ func (n *ProtoNode) SetData(d []byte) {
 }
 
 // UpdateNodeLink return a copy of the node with the link name set to point to
-// that. If a link of the same name existed, it is removed.
+// that. The link will be added in sorted order. If a link of the same name
+// existed, it is removed.
+//
+// If sorting has not already been applied to this node (because
+// it was deserialized from a form that did not have sorted links), the links
+// list will be sorted in the returned copy.
 func (n *ProtoNode) UpdateNodeLink(name string, that *ProtoNode) (*ProtoNode, error) {
 	newnode := n.Copy().(*ProtoNode)
 	_ = newnode.RemoveNodeLink(name) // ignore error
@@ -309,12 +394,39 @@ func (n *ProtoNode) UnmarshalJSON(b []byte) error {
 	}
 
 	n.data = s.Data
+	// Links may not be sorted after deserialization, but we don't change
+	// them until we mutate this node since we're representing the current,
+	// as-serialized state. So n.linksDirty is not set here.
 	n.links = s.Links
+	for _, lnk := range s.Links {
+		if err := checkLink(lnk); err != nil {
+			return err
+		}
+	}
+
+	n.encoded = nil
+	return nil
+}
+
+func checkLink(lnk *format.Link) error {
+	if lnk.Size > math.MaxInt64 {
+		return fmt.Errorf("value of Tsize is too large: %d", lnk.Size)
+	}
+	if !lnk.Cid.Defined() {
+		return errors.New("link must have a value Cid value")
+	}
 	return nil
 }
 
 // MarshalJSON returns a JSON representation of the node.
 func (n *ProtoNode) MarshalJSON() ([]byte, error) {
+	if n.linksDirty {
+		// there was a mutation involving links, make sure we sort
+		sort.Stable(LinkSlice(n.links))
+		n.linksDirty = false
+		n.encoded = nil
+	}
+
 	out := map[string]interface{}{
 		"data":  n.data,
 		"links": n.links,
@@ -325,47 +437,75 @@ func (n *ProtoNode) MarshalJSON() ([]byte, error) {
 
 // Cid returns the node's Cid, calculated according to its prefix
 // and raw data contents.
+//
+// Note that this method may return a CID representing a zero-length byte slice
+// if there is an error performing the encode. To check whether such an error
+// may have occurred, use node.EncodeProtobuf(false), instead (or prior to
+// calling RawData) and check for its returned error value; the result of
+// EncodeProtobuf is cached so there is minimal overhead when invoking both
+// methods.
 func (n *ProtoNode) Cid() cid.Cid {
-	if n.encoded != nil && n.cached.Defined() {
-		return n.cached
+	// re-encode if necessary and we'll get a new cached CID
+	if _, err := n.EncodeProtobuf(false); err != nil {
+		log.Errorf("failed to encode dag-pb block: %s", err.Error())
+		// error, return a zero-CID
+		c, err := n.CidBuilder().Sum([]byte{})
+		if err != nil {
+			// CidBuilder was a source of error, return _the_ dag-pb zero CIDv1
+			return zeroCid
+		}
+		return c
 	}
-
-	c, err := n.CidBuilder().Sum(n.RawData())
-	if err != nil {
-		// programmer error
-		err = fmt.Errorf("invalid CID of length %d: %x: %v", len(n.RawData()), n.RawData(), err)
-		panic(err)
-	}
-
-	n.cached = c
-	return c
+	return n.cached
 }
 
 // String prints the node's Cid.
+//
+// Note that this method may return a CID representing a zero-length byte slice
+// if there is an error performing the encode. To check whether such an error
+// may have occurred, use node.EncodeProtobuf(false), instead (or prior to
+// calling RawData) and check for its returned error value; the result of
+// EncodeProtobuf is cached so there is minimal overhead when invoking both
+// methods.
 func (n *ProtoNode) String() string {
 	return n.Cid().String()
 }
 
 // Multihash hashes the encoded data of this node.
+//
+// Note that this method may return a multihash representing a zero-length byte
+// slice if there is an error performing the encode. To check whether such an
+// error may have occurred, use node.EncodeProtobuf(false), instead (or prior to
+// calling RawData) and check for its returned error value; the result of
+// EncodeProtobuf is cached so there is minimal overhead when invoking both
+// methods.
 func (n *ProtoNode) Multihash() mh.Multihash {
-	// NOTE: EncodeProtobuf generates the hash and puts it in n.cached.
-	_, err := n.EncodeProtobuf(false)
-	if err != nil {
-		// Note: no possibility exists for an error to be returned through here
-		panic(err)
-	}
-
-	return n.cached.Hash()
+	return n.Cid().Hash()
 }
 
-// Links returns the node links.
+// Links returns a copy of the node's links.
 func (n *ProtoNode) Links() []*format.Link {
-	return n.links
+	if n.linksDirty {
+		// there was a mutation involving links, make sure we sort
+		sort.Stable(LinkSlice(n.links))
+		n.linksDirty = false
+		n.encoded = nil
+	}
+	return append([]*format.Link(nil), n.links...)
 }
 
-// SetLinks replaces the node links with the given ones.
-func (n *ProtoNode) SetLinks(links []*format.Link) {
-	n.links = links
+// SetLinks replaces the node links with a copy of the provided links. Sorting
+// will be applied to the list.
+func (n *ProtoNode) SetLinks(links []*format.Link) error {
+	for _, lnk := range links {
+		if err := checkLink(lnk); err != nil {
+			return err
+		}
+	}
+	n.links = append([]*format.Link(nil), links...)
+	n.linksDirty = true // needs a sort
+	n.encoded = nil
+	return nil
 }
 
 // Resolve is an alias for ResolveLink.
@@ -397,6 +537,13 @@ func (n *ProtoNode) Tree(p string, depth int) []string {
 		return nil
 	}
 
+	if n.linksDirty {
+		// there was a mutation involving links, make sure we sort
+		sort.Stable(LinkSlice(n.links))
+		n.linksDirty = false
+		n.encoded = nil
+	}
+
 	out := make([]string, 0, len(n.links))
 	for _, lnk := range n.links {
 		out = append(out, lnk.Name)
@@ -414,6 +561,15 @@ func ProtoNodeConverter(b blocks.Block, nd ipld.Node) (legacy.UniversalNode, err
 	pn.cached = b.Cid()
 	pn.builder = b.Cid().Prefix()
 	return pn, nil
+}
+
+// TODO: replace with cid.MustParse() when we bump go-cid
+func mustZeroCid() cid.Cid {
+	c, err := cid.Parse("bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku")
+	if err != nil {
+		panic(err)
+	}
+	return c
 }
 
 var _ legacy.UniversalNode = &ProtoNode{}

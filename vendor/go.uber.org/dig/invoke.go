@@ -21,17 +21,50 @@
 package dig
 
 import (
-	"errors"
+	"fmt"
 	"reflect"
 
 	"go.uber.org/dig/internal/digreflect"
 	"go.uber.org/dig/internal/graph"
 )
 
-// An InvokeOption modifies the default behavior of Invoke. It's included for
-// future functionality; currently, there are no concrete implementations.
+// An InvokeOption modifies the default behavior of Invoke.
 type InvokeOption interface {
-	unimplemented()
+	applyInvokeOption(*invokeOptions)
+}
+
+type invokeOptions struct {
+	Info *InvokeInfo
+}
+
+// InvokeInfo provides information about an Invoke.
+type InvokeInfo struct {
+	Inputs []*Input
+}
+
+// FillInvokeInfo is an InvokeOption that writes information on the types
+// accepted by the Invoke function into the specified InvokeInfo.
+// For example:
+//
+//			var info dig.InvokeInfo
+//			err := c.Invoke(func(string, int){}, dig.FillInvokeInfo(&info))
+//
+//	  info.Inputs[0].String() will be string.
+//	  info.Inputs[1].String() will be int.
+func FillInvokeInfo(info *InvokeInfo) InvokeOption {
+	return fillInvokeInfoOption{info: info}
+}
+
+type fillInvokeInfoOption struct {
+	info *InvokeInfo
+}
+
+func (o fillInvokeInfoOption) String() string {
+	return fmt.Sprintf("FillInvokeInfo(%p)", o.info)
+}
+
+func (o fillInvokeInfoOption) applyInvokeOption(opts *invokeOptions) {
+	opts.Info = o.info
 }
 
 // Invoke runs the given function after instantiating its dependencies.
@@ -42,6 +75,10 @@ type InvokeOption interface {
 //
 // The function may return an error to indicate failure. The error will be
 // returned to the caller as-is.
+//
+// If the [RecoverFromPanics] option was given to the container and a panic
+// occurs when invoking, a [PanicError] with the panic contained will be
+// returned. See [PanicError] for more info.
 func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 	return c.scope.Invoke(function, opts...)
 }
@@ -54,13 +91,14 @@ func (c *Container) Invoke(function interface{}, opts ...InvokeOption) error {
 //
 // The function may return an error to indicate failure. The error will be
 // returned to the caller as-is.
-func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) error {
+func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) (err error) {
 	ftype := reflect.TypeOf(function)
 	if ftype == nil {
-		return errors.New("can't invoke an untyped nil")
+		return newErrInvalidInput("can't invoke an untyped nil", nil)
 	}
 	if ftype.Kind() != reflect.Func {
-		return errf("can't invoke non-function %v (type %v)", function, ftype)
+		return newErrInvalidInput(
+			fmt.Sprintf("can't invoke non-function %v (type %v)", function, ftype), nil)
 	}
 
 	pl, err := newParamList(ftype, s)
@@ -77,7 +115,7 @@ func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) error {
 
 	if !s.isVerifiedAcyclic {
 		if ok, cycle := graph.IsAcyclic(s.gh); !ok {
-			return errf("cycle detected in dependency graph", s.cycleDetectedError(cycle))
+			return newErrInvalidInput("cycle detected in dependency graph", s.cycleDetectedError(cycle))
 		}
 		s.isVerifiedAcyclic = true
 	}
@@ -89,6 +127,37 @@ func (s *Scope) Invoke(function interface{}, opts ...InvokeOption) error {
 			Reason: err,
 		}
 	}
+	if s.recoverFromPanics {
+		defer func() {
+			if p := recover(); p != nil {
+				err = PanicError{
+					fn:    digreflect.InspectFunc(function),
+					Panic: p,
+				}
+			}
+		}()
+	}
+
+	var options invokeOptions
+	for _, o := range opts {
+		o.applyInvokeOption(&options)
+	}
+
+	// Record info for the invoke if requested
+	if info := options.Info; info != nil {
+		params := pl.DotParam()
+		info.Inputs = make([]*Input, len(params))
+		for i, p := range params {
+			info.Inputs[i] = &Input{
+				t:        p.Type,
+				optional: p.Optional,
+				name:     p.Name,
+				group:    p.Group,
+			}
+		}
+
+	}
+
 	returned := s.invokerFn(reflect.ValueOf(function), args)
 	if len(returned) == 0 {
 		return nil

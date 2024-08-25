@@ -6,7 +6,7 @@ import (
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // ErrTooManySubscriptions may be returned by a SubscriptionFilter to signal that there are too many

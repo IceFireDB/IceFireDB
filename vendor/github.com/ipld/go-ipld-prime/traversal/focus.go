@@ -195,7 +195,6 @@ func (prog *Progress) get(n datamodel.Node, p datamodel.Path, trackProgress bool
 // do with regular Node and NodeBuilder usage directly.  Transform just
 // does a large amount of the intermediate bookkeeping that's useful when
 // creating new values which are partial updates to existing values.
-//
 func (prog Progress) FocusedTransform(n datamodel.Node, p datamodel.Path, fn TransformFn, createParents bool) (datamodel.Node, error) {
 	prog.init()
 	nb := n.Prototype().NewBuilder()

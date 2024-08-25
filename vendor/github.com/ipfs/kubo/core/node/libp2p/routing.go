@@ -7,16 +7,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ipfs/kubo/core/node/helpers"
-	irouting "github.com/ipfs/kubo/routing"
-
+	"github.com/cenkalti/backoff/v4"
+	offroute "github.com/ipfs/boxo/routing/offline"
 	ds "github.com/ipfs/go-datastore"
-	offroute "github.com/ipfs/go-ipfs-routing/offline"
-	config "github.com/ipfs/kubo/config"
-	"github.com/ipfs/kubo/repo"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	ddht "github.com/libp2p/go-libp2p-kad-dht/dual"
 	"github.com/libp2p/go-libp2p-kad-dht/fullrt"
@@ -24,9 +17,15 @@ import (
 	namesys "github.com/libp2p/go-libp2p-pubsub-router"
 	record "github.com/libp2p/go-libp2p-record"
 	routinghelpers "github.com/libp2p/go-libp2p-routing-helpers"
-
-	"github.com/cenkalti/backoff/v4"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"go.uber.org/fx"
+
+	config "github.com/ipfs/kubo/config"
+	"github.com/ipfs/kubo/core/node/helpers"
+	"github.com/ipfs/kubo/repo"
+	irouting "github.com/ipfs/kubo/routing"
 )
 
 type Router struct {
@@ -64,20 +63,34 @@ type processInitialRoutingOut struct {
 
 type AddrInfoChan chan peer.AddrInfo
 
-func BaseRouting(experimentalDHTClient bool) interface{} {
+func BaseRouting(cfg *config.Config) interface{} {
 	return func(lc fx.Lifecycle, in processInitialRoutingIn) (out processInitialRoutingOut, err error) {
-		var dr *ddht.DHT
+		var dualDHT *ddht.DHT
 		if dht, ok := in.Router.(*ddht.DHT); ok {
-			dr = dht
+			dualDHT = dht
 
 			lc.Append(fx.Hook{
 				OnStop: func(ctx context.Context) error {
-					return dr.Close()
+					return dualDHT.Close()
 				},
 			})
 		}
 
-		if dr != nil && experimentalDHTClient {
+		if cr, ok := in.Router.(routinghelpers.ComposableRouter); ok {
+			for _, r := range cr.Routers() {
+				if dht, ok := r.(*ddht.DHT); ok {
+					dualDHT = dht
+					lc.Append(fx.Hook{
+						OnStop: func(ctx context.Context) error {
+							return dualDHT.Close()
+						},
+					})
+					break
+				}
+			}
+		}
+
+		if dualDHT != nil && cfg.Routing.AcceleratedDHTClient.WithDefault(config.DefaultAcceleratedDHTClient) {
 			cfg, err := in.Repo.Config()
 			if err != nil {
 				return out, err
@@ -87,7 +100,7 @@ func BaseRouting(experimentalDHTClient bool) interface{} {
 				return out, err
 			}
 
-			expClient, err := fullrt.NewFullRT(in.Host,
+			fullRTClient, err := fullrt.NewFullRT(in.Host,
 				dht.DefaultPrefix,
 				fullrt.DHTOption(
 					dht.Validator(in.Validator),
@@ -102,18 +115,30 @@ func BaseRouting(experimentalDHTClient bool) interface{} {
 
 			lc.Append(fx.Hook{
 				OnStop: func(ctx context.Context) error {
-					return expClient.Close()
+					return fullRTClient.Close()
 				},
 			})
 
+			// we want to also use the default HTTP routers, so wrap the FullRT client
+			// in a parallel router that calls them in parallel
+			httpRouters, err := constructDefaultHTTPRouters(cfg)
+			if err != nil {
+				return out, err
+			}
+			routers := []*routinghelpers.ParallelRouter{
+				{Router: fullRTClient, DoNotWaitForSearchValue: true},
+			}
+			routers = append(routers, httpRouters...)
+			router := routinghelpers.NewComposableParallel(routers)
+
 			return processInitialRoutingOut{
 				Router: Router{
-					Routing:  expClient,
 					Priority: 1000,
+					Routing:  router,
 				},
-				DHT:           dr,
-				DHTClient:     expClient,
-				ContentRouter: expClient,
+				DHT:           dualDHT,
+				DHTClient:     fullRTClient,
+				ContentRouter: fullRTClient,
 			}, nil
 		}
 
@@ -122,43 +147,10 @@ func BaseRouting(experimentalDHTClient bool) interface{} {
 				Priority: 1000,
 				Routing:  in.Router,
 			},
-			DHT:           dr,
-			DHTClient:     dr,
+			DHT:           dualDHT,
+			DHTClient:     dualDHT,
 			ContentRouter: in.Router,
 		}, nil
-	}
-}
-
-type delegatedRouterOut struct {
-	fx.Out
-
-	Routers       []Router                 `group:"routers,flatten"`
-	ContentRouter []routing.ContentRouting `group:"content-routers,flatten"`
-}
-
-func DelegatedRouting(routers map[string]config.Router) interface{} {
-	return func() (delegatedRouterOut, error) {
-		out := delegatedRouterOut{}
-
-		for _, v := range routers {
-			if !v.Enabled.WithDefault(true) {
-				continue
-			}
-
-			r, err := irouting.RoutingFromConfig(v)
-			if err != nil {
-				return out, err
-			}
-
-			out.Routers = append(out.Routers, Router{
-				Routing:  r,
-				Priority: irouting.GetPriority(v.Parameters),
-			})
-
-			out.ContentRouter = append(out.ContentRouter, r)
-		}
-
-		return out, nil
 	}
 }
 
@@ -195,24 +187,23 @@ type p2pOnlineRoutingIn struct {
 // Routing will get all routers obtained from different methods
 // (delegated routers, pub-sub, and so on) and add them all together
 // using a TieredRouter.
-func Routing(in p2pOnlineRoutingIn) irouting.TieredRouter {
+func Routing(in p2pOnlineRoutingIn) irouting.ProvideManyRouter {
 	routers := in.Routers
 
 	sort.SliceStable(routers, func(i, j int) bool {
 		return routers[i].Priority < routers[j].Priority
 	})
 
-	irouters := make([]routing.Routing, len(routers))
-	for i, v := range routers {
-		irouters[i] = v.Routing
+	var cRouters []*routinghelpers.ParallelRouter
+	for _, v := range routers {
+		cRouters = append(cRouters, &routinghelpers.ParallelRouter{
+			IgnoreError:             true,
+			DoNotWaitForSearchValue: true,
+			Router:                  v.Routing,
+		})
 	}
 
-	return irouting.Tiered{
-		Tiered: routinghelpers.Tiered{
-			Routers:   irouters,
-			Validator: in.Validator,
-		},
-	}
+	return routinghelpers.NewComposableParallel(cRouters)
 }
 
 // OfflineRouting provides a special Router to the routers list when we are creating a offline node.
@@ -241,7 +232,6 @@ func PubsubRouter(mctx helpers.MetricsCtx, lc fx.Lifecycle, in p2pPSRoutingIn) (
 		in.Validator,
 		namesys.WithRebroadcastInterval(time.Minute),
 	)
-
 	if err != nil {
 		return p2pRouterOut{}, nil, err
 	}
@@ -259,8 +249,8 @@ func PubsubRouter(mctx helpers.MetricsCtx, lc fx.Lifecycle, in p2pPSRoutingIn) (
 	}, psRouter, nil
 }
 
-func AutoRelayFeeder(cfgPeering config.Peering) func(fx.Lifecycle, host.Host, AddrInfoChan, *ddht.DHT) {
-	return func(lc fx.Lifecycle, h host.Host, peerChan AddrInfoChan, dht *ddht.DHT) {
+func autoRelayFeeder(cfgPeering config.Peering, peerChan chan<- peer.AddrInfo) fx.Option {
+	return fx.Invoke(func(lc fx.Lifecycle, h host.Host, dht *ddht.DHT) {
 		ctx, cancel := context.WithCancel(context.Background())
 		done := make(chan struct{})
 
@@ -333,5 +323,5 @@ func AutoRelayFeeder(cfgPeering config.Peering) func(fx.Lifecycle, host.Host, Ad
 				return nil
 			},
 		})
-	}
+	})
 }

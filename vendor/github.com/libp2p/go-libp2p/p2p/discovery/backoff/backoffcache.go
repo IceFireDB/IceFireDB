@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/discovery"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/discovery"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -80,14 +80,6 @@ type realClock struct{}
 
 func (c realClock) Now() time.Time {
 	return time.Now()
-}
-
-// withClock lets you override the default time.Now() call. Useful for tests.
-func withClock(c clock) BackoffDiscoveryOption {
-	return func(b *BackoffDiscovery) error {
-		b.clock = c
-		return nil
-	}
 }
 
 type backoffCache struct {

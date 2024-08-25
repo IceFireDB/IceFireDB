@@ -3,6 +3,8 @@ package connmgr
 import (
 	"errors"
 	"time"
+
+	"github.com/benbjohnson/clock"
 )
 
 // config is the configuration struct for the basic connection manager.
@@ -13,6 +15,7 @@ type config struct {
 	silencePeriod time.Duration
 	decayer       *DecayerCfg
 	emergencyTrim bool
+	clock         clock.Clock
 }
 
 // Option represents an option for the basic connection manager.
@@ -22,6 +25,14 @@ type Option func(*config) error
 func DecayerConfig(opts *DecayerCfg) Option {
 	return func(cfg *config) error {
 		cfg.decayer = opts
+		return nil
+	}
+}
+
+// WithClock sets the internal clock impl
+func WithClock(c clock.Clock) Option {
+	return func(cfg *config) error {
+		cfg.clock = c
 		return nil
 	}
 }

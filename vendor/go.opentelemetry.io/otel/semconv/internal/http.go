@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package internal // import "go.opentelemetry.io/otel/semconv/internal"
 
@@ -147,12 +136,6 @@ func (sc *SemanticConventions) EndUserAttributesFromHTTPRequest(request *http.Re
 func (sc *SemanticConventions) HTTPClientAttributesFromHTTPRequest(request *http.Request) []attribute.KeyValue {
 	attrs := []attribute.KeyValue{}
 
-	if request.Method != "" {
-		attrs = append(attrs, sc.HTTPMethodKey.String(request.Method))
-	} else {
-		attrs = append(attrs, sc.HTTPMethodKey.String(http.MethodGet))
-	}
-
 	// remove any username/password info that may be in the URL
 	// before adding it to the attributes
 	userinfo := request.URL.User
@@ -204,6 +187,12 @@ func (sc *SemanticConventions) httpBasicAttributesFromHTTPRequest(request *http.
 		attrs = append(attrs, sc.HTTPFlavorKey.String(flavor))
 	}
 
+	if request.Method != "" {
+		attrs = append(attrs, sc.HTTPMethodKey.String(request.Method))
+	} else {
+		attrs = append(attrs, sc.HTTPMethodKey.String(http.MethodGet))
+	}
+
 	return attrs
 }
 
@@ -223,7 +212,6 @@ func (sc *SemanticConventions) HTTPServerMetricAttributesFromHTTPRequest(serverN
 // supported.
 func (sc *SemanticConventions) HTTPServerAttributesFromHTTPRequest(serverName, route string, request *http.Request) []attribute.KeyValue {
 	attrs := []attribute.KeyValue{
-		sc.HTTPMethodKey.String(request.Method),
 		sc.HTTPTargetKey.String(request.RequestURI),
 	}
 
@@ -233,10 +221,12 @@ func (sc *SemanticConventions) HTTPServerAttributesFromHTTPRequest(serverName, r
 	if route != "" {
 		attrs = append(attrs, sc.HTTPRouteKey.String(route))
 	}
-	if values, ok := request.Header["X-Forwarded-For"]; ok && len(values) > 0 {
-		if addresses := strings.SplitN(values[0], ",", 2); len(addresses) > 0 {
-			attrs = append(attrs, sc.HTTPClientIPKey.String(addresses[0]))
+	if values := request.Header["X-Forwarded-For"]; len(values) > 0 {
+		addr := values[0]
+		if i := strings.Index(addr, ","); i > 0 {
+			addr = addr[:i]
 		}
+		attrs = append(attrs, sc.HTTPClientIPKey.String(addr))
 	}
 
 	return append(attrs, sc.httpCommonAttributesFromHTTPRequest(request)...)

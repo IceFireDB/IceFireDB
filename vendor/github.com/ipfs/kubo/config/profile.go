@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-// Transformer is a function which takes configuration and applies some filter to it
+// Transformer is a function which takes configuration and applies some filter to it.
 type Transformer func(c *Config) error
 
-// Profile contains the profile transformer the description of the profile
+// Profile contains the profile transformer the description of the profile.
 type Profile struct {
 	// Description briefly describes the functionality of the profile.
 	Description string
@@ -43,7 +43,7 @@ var defaultServerFilters = []string{
 	"/ip6/fe80::/ipcidr/10",
 }
 
-// Profiles is a map holding configuration transformers. Docs are in docs/config.md
+// Profiles is a map holding configuration transformers. Docs are in docs/config.md.
 var Profiles = map[string]Profile{
 	"server": {
 		Description: `Disables local host discovery, recommended when
@@ -82,6 +82,7 @@ is useful when using the daemon in test environments.`,
 			}
 
 			c.Swarm.DisableNatPortMap = true
+			c.Routing.LoopbackAddressesOnLanDHT = True
 
 			c.Bootstrap = []string{}
 			c.Discovery.MDNS.Enabled = false
@@ -174,13 +175,17 @@ functionality - performance of content discovery and data
 fetching may be degraded.
 `,
 		Transform: func(c *Config) error {
-			c.Routing.Type = NewOptionalString("dhtclient")
+			c.Routing.Type = NewOptionalString("autoclient")
 			c.AutoNAT.ServiceMode = AutoNATServiceDisabled
-			c.Reprovider.Interval = "0"
+			c.Reprovider.Interval = NewOptionalDuration(0)
 
-			c.Swarm.ConnMgr.LowWater = 20
-			c.Swarm.ConnMgr.HighWater = 40
-			c.Swarm.ConnMgr.GracePeriod = time.Minute.String()
+			lowWater := int64(20)
+			highWater := int64(40)
+			gracePeriod := time.Minute
+			c.Swarm.ConnMgr.Type = NewOptionalString("basic")
+			c.Swarm.ConnMgr.LowWater = &OptionalInteger{value: &lowWater}
+			c.Swarm.ConnMgr.HighWater = &OptionalInteger{value: &highWater}
+			c.Swarm.ConnMgr.GracePeriod = &OptionalDuration{&gracePeriod}
 			return nil
 		},
 	},
@@ -196,6 +201,28 @@ fetching may be degraded.
 				fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port),
 				fmt.Sprintf("/ip6/::/tcp/%d", port),
 			}
+			return nil
+		},
+	},
+	"legacy-cid-v0": {
+		Description: `Makes UnixFS import produce legacy CIDv0 with no raw leaves, sha2-256 and 256 KiB chunks.`,
+
+		Transform: func(c *Config) error {
+			c.Import.CidVersion = *NewOptionalInteger(0)
+			c.Import.UnixFSRawLeaves = False
+			c.Import.UnixFSChunker = *NewOptionalString("size-262144")
+			c.Import.HashFunction = *NewOptionalString("sha2-256")
+			return nil
+		},
+	},
+	"test-cid-v1": {
+		Description: `Makes UnixFS import produce modern CIDv1 with raw leaves, sha2-256 and 1 MiB chunks.`,
+
+		Transform: func(c *Config) error {
+			c.Import.CidVersion = *NewOptionalInteger(1)
+			c.Import.UnixFSRawLeaves = True
+			c.Import.UnixFSChunker = *NewOptionalString("size-1048576")
+			c.Import.HashFunction = *NewOptionalString("sha2-256")
 			return nil
 		},
 	},

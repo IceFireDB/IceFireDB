@@ -21,15 +21,11 @@ linters:
   enable:
     - goconst
     - misspell
-    - deadcode
-    - misspell
-    - structcheck
     - errcheck
     - unused
-    - varcheck
     - staticcheck
     - unconvert
     - gofmt
-    #- goimports # disabling goimports while we can't configure it to ignore vendors (github.com/whyrusleeping/go-logging seems to be badly formated)
-    - golint
+    - goimports
+    - revive
     - ineffassign

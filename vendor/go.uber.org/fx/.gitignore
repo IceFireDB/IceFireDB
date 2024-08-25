@@ -12,3 +12,5 @@ coverage.txt
 /.bin
 /.cache
 /bin
+.vscode
+.mdoxcache

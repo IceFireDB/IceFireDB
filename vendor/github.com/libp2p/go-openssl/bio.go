@@ -112,14 +112,14 @@ func writeBioPending(b *C.BIO) C.long {
 	return C.long(len(ptr.buf))
 }
 
-func (b *writeBio) WriteTo(w io.Writer) (rv int64, err error) {
-	b.op_mtx.Lock()
-	defer b.op_mtx.Unlock()
+func (wb *writeBio) WriteTo(w io.Writer) (rv int64, err error) {
+	wb.op_mtx.Lock()
+	defer wb.op_mtx.Unlock()
 
 	// write whatever data we currently have
-	b.data_mtx.Lock()
-	data := b.buf
-	b.data_mtx.Unlock()
+	wb.data_mtx.Lock()
+	data := wb.buf
+	wb.data_mtx.Unlock()
 
 	if len(data) == 0 {
 		return 0, nil
@@ -127,26 +127,26 @@ func (b *writeBio) WriteTo(w io.Writer) (rv int64, err error) {
 	n, err := w.Write(data)
 
 	// subtract however much data we wrote from the buffer
-	b.data_mtx.Lock()
-	b.buf = b.buf[:copy(b.buf, b.buf[n:])]
-	if b.release_buffers && len(b.buf) == 0 {
-		b.buf = nil
+	wb.data_mtx.Lock()
+	wb.buf = wb.buf[:copy(wb.buf, wb.buf[n:])]
+	if wb.release_buffers && len(wb.buf) == 0 {
+		wb.buf = nil
 	}
-	b.data_mtx.Unlock()
+	wb.data_mtx.Unlock()
 
 	return int64(n), err
 }
 
-func (self *writeBio) Disconnect(b *C.BIO) {
-	if loadWritePtr(b) == self {
+func (wb *writeBio) Disconnect(b *C.BIO) {
+	if loadWritePtr(b) == wb {
 		writeBioMapping.Del(token(C.X_BIO_get_data(b)))
 		C.X_BIO_set_data(b, nil)
 	}
 }
 
-func (b *writeBio) MakeCBIO() *C.BIO {
+func (wb *writeBio) MakeCBIO() *C.BIO {
 	rv := C.X_BIO_new_write_bio()
-	token := writeBioMapping.Add(unsafe.Pointer(b))
+	token := writeBioMapping.Add(unsafe.Pointer(wb))
 	C.X_BIO_set_data(rv, unsafe.Pointer(token))
 	return rv
 }
@@ -228,53 +228,53 @@ func readBioPending(b *C.BIO) C.long {
 	return C.long(len(ptr.buf))
 }
 
-func (b *readBio) ReadFromOnce(r io.Reader) (n int, err error) {
-	b.op_mtx.Lock()
-	defer b.op_mtx.Unlock()
+func (rb *readBio) ReadFromOnce(r io.Reader) (n int, err error) {
+	rb.op_mtx.Lock()
+	defer rb.op_mtx.Unlock()
 
 	// make sure we have a destination that fits at least one SSL record
-	b.data_mtx.Lock()
-	if cap(b.buf) < len(b.buf)+SSLRecordSize {
-		new_buf := make([]byte, len(b.buf), len(b.buf)+SSLRecordSize)
-		copy(new_buf, b.buf)
-		b.buf = new_buf
+	rb.data_mtx.Lock()
+	if cap(rb.buf) < len(rb.buf)+SSLRecordSize {
+		new_buf := make([]byte, len(rb.buf), len(rb.buf)+SSLRecordSize)
+		copy(new_buf, rb.buf)
+		rb.buf = new_buf
 	}
-	dst := b.buf[len(b.buf):cap(b.buf)]
-	dst_slice := b.buf
-	b.data_mtx.Unlock()
+	dst := rb.buf[len(rb.buf):cap(rb.buf)]
+	dst_slice := rb.buf
+	rb.data_mtx.Unlock()
 
 	n, err = r.Read(dst)
-	b.data_mtx.Lock()
-	defer b.data_mtx.Unlock()
+	rb.data_mtx.Lock()
+	defer rb.data_mtx.Unlock()
 	if n > 0 {
-		if len(dst_slice) != len(b.buf) {
+		if len(dst_slice) != len(rb.buf) {
 			// someone shrunk the buffer, so we read in too far ahead and we
 			// need to slide backwards
-			copy(b.buf[len(b.buf):len(b.buf)+n], dst)
+			copy(rb.buf[len(rb.buf):len(rb.buf)+n], dst)
 		}
-		b.buf = b.buf[:len(b.buf)+n]
+		rb.buf = rb.buf[:len(rb.buf)+n]
 	}
 	return n, err
 }
 
-func (b *readBio) MakeCBIO() *C.BIO {
+func (rb *readBio) MakeCBIO() *C.BIO {
 	rv := C.X_BIO_new_read_bio()
-	token := readBioMapping.Add(unsafe.Pointer(b))
+	token := readBioMapping.Add(unsafe.Pointer(rb))
 	C.X_BIO_set_data(rv, unsafe.Pointer(token))
 	return rv
 }
 
-func (self *readBio) Disconnect(b *C.BIO) {
-	if loadReadPtr(b) == self {
+func (rb *readBio) Disconnect(b *C.BIO) {
+	if loadReadPtr(b) == rb {
 		readBioMapping.Del(token(C.X_BIO_get_data(b)))
 		C.X_BIO_set_data(b, nil)
 	}
 }
 
-func (b *readBio) MarkEOF() {
-	b.data_mtx.Lock()
-	defer b.data_mtx.Unlock()
-	b.eof = true
+func (rb *readBio) MarkEOF() {
+	rb.data_mtx.Lock()
+	defer rb.data_mtx.Unlock()
+	rb.eof = true
 }
 
 type anyBio C.BIO

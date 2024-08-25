@@ -1,7 +1,5 @@
 package config
 
-import rcmgr "github.com/libp2p/go-libp2p-resource-manager"
-
 type SwarmConfig struct {
 	// AddrFilters specifies a set libp2p addresses that we should never
 	// dial or receive connections from.
@@ -14,26 +12,6 @@ type SwarmConfig struct {
 
 	// DisableNatPortMap turns off NAT port mapping (UPnP, etc.).
 	DisableNatPortMap bool
-
-	// DisableRelay explicitly disables the relay transport.
-	//
-	// Deprecated: This flag is deprecated and is overridden by
-	// `Swarm.Transports.Relay` if specified.
-	DisableRelay bool `json:",omitempty"`
-
-	// EnableRelayHop makes this node act as a public relay v1
-	//
-	// Deprecated: The circuit v1 protocol is deprecated.
-	// Use `Swarm.RelayService` to configure the circuit v2 relay.
-	EnableRelayHop bool `json:",omitempty"`
-
-	// EnableAutoRelay enables the "auto relay user" feature.
-	// Node will find and use advertised public relays when it determines that
-	// it's not reachable from the public internet.
-	//
-	// Deprecated: This flag is deprecated and is overridden by
-	// `Swarm.RelayClient.Enabled` if specified.
-	EnableAutoRelay bool `json:",omitempty"`
 
 	// RelayClient controls the client side of "auto relay" feature.
 	// When enabled, the node will use relays if it is not publicly reachable.
@@ -100,10 +78,13 @@ type Transports struct {
 	// listen on a transport, add the transport to your Addresses.Swarm.
 	Network struct {
 		// All default to on.
-		QUIC      Flag `json:",omitempty"`
-		TCP       Flag `json:",omitempty"`
-		Websocket Flag `json:",omitempty"`
-		Relay     Flag `json:",omitempty"`
+		QUIC         Flag `json:",omitempty"`
+		TCP          Flag `json:",omitempty"`
+		Websocket    Flag `json:",omitempty"`
+		Relay        Flag `json:",omitempty"`
+		WebTransport Flag `json:",omitempty"`
+		// except WebRTCDirect which is experimental and opt-in.
+		WebRTCDirect Flag `json:",omitempty"`
 	}
 
 	// Security specifies the transports used to encrypt insecure network
@@ -111,8 +92,6 @@ type Transports struct {
 	Security struct {
 		// Defaults to 100.
 		TLS Priority `json:",omitempty"`
-		// Defaults to 200.
-		SECIO Priority `json:",omitempty"`
 		// Defaults to 300.
 		Noise Priority `json:",omitempty"`
 	}
@@ -122,28 +101,30 @@ type Transports struct {
 	Multiplexers struct {
 		// Defaults to 100.
 		Yamux Priority `json:",omitempty"`
-		// Defaults to 200.
-		Mplex Priority `json:",omitempty"`
 	}
 }
 
-// ConnMgr defines configuration options for the libp2p connection manager
+// ConnMgr defines configuration options for the libp2p connection manager.
 type ConnMgr struct {
-	Type        string
-	LowWater    int
-	HighWater   int
-	GracePeriod string
+	Type        *OptionalString   `json:",omitempty"`
+	LowWater    *OptionalInteger  `json:",omitempty"`
+	HighWater   *OptionalInteger  `json:",omitempty"`
+	GracePeriod *OptionalDuration `json:",omitempty"`
 }
 
 // ResourceMgr defines configuration options for the libp2p Network Resource Manager
-// <https://github.com/libp2p/go-libp2p-resource-manager#readme>
+// <https://github.com/libp2p/go-libp2p/tree/master/p2p/host/resource-manager#readme>
 type ResourceMgr struct {
 	// Enables the Network Resource Manager feature, default to on.
-	Enabled Flag               `json:",omitempty"`
-	Limits  *rcmgr.LimitConfig `json:",omitempty"`
+	Enabled Flag        `json:",omitempty"`
+	Limits  swarmLimits `json:",omitempty"`
+
+	MaxMemory          *OptionalString  `json:",omitempty"`
+	MaxFileDescriptors *OptionalInteger `json:",omitempty"`
+
 	// A list of multiaddrs that can bypass normal system limits (but are still
 	// limited by the allowlist scope). Convenience config around
-	// https://pkg.go.dev/github.com/libp2p/go-libp2p-resource-manager#Allowlist.Add
+	// https://pkg.go.dev/github.com/libp2p/go-libp2p/p2p/host/resource-manager#Allowlist.Add
 	Allowlist []string `json:",omitempty"`
 }
 

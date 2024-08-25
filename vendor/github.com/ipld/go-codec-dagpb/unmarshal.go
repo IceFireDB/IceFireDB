@@ -3,7 +3,6 @@ package dagpb
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/ipfs/go-cid"
 	ipld "github.com/ipld/go-ipld-prime"
@@ -27,7 +26,7 @@ func Decode(na ipld.NodeAssembler, in io.Reader) error {
 		src = buf.Bytes()
 	} else {
 		var err error
-		src, err = ioutil.ReadAll(in)
+		src, err = io.ReadAll(in)
 		if err != nil {
 			return err
 		}

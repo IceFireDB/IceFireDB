@@ -74,7 +74,7 @@ func (h *HMAC) Write(data []byte) (n int, err error) {
 }
 
 func (h *HMAC) Reset() error {
-	if 1 != C.X_HMAC_Init_ex(h.ctx, nil, 0, nil, nil) {
+	if C.X_HMAC_Init_ex(h.ctx, nil, 0, nil, nil) != 1 {
 		return errors.New("failed to reset HMAC_CTX")
 	}
 	return nil

@@ -18,7 +18,8 @@ var (
 )
 
 func NewInt(value int64) datamodel.Node {
-	return plainInt(value)
+	v := plainInt(value)
+	return &v
 }
 
 // NewUint creates a new uint64-backed Node which will behave as a plain Int

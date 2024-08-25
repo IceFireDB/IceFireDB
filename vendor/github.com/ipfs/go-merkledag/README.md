@@ -3,35 +3,17 @@ go-merkledag
 
 [![](https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square)](http://ipn.io)
 [![](https://img.shields.io/badge/project-IPFS-blue.svg?style=flat-square)](http://ipfs.io/)
-[![](https://img.shields.io/badge/freenode-%23ipfs-blue.svg?style=flat-square)](http://webchat.freenode.net/?channels=%23ipfs)
 [![Coverage Status](https://codecov.io/gh/ipfs/go-merkledag/branch/master/graph/badge.svg)](https://codecov.io/gh/ipfs/go-merkledag/branch/master)
-[![Travis CI](https://travis-ci.org/ipfs/go-merkledag.svg?branch=master)](https://travis-ci.org/ipfs/go-merkledag)
 
 > go-merkledag implements the 'DAGService' interface and adds two ipld node types, Protobuf and Raw 
 
-## Lead Maintainer
+## Status
 
-[Steven Allen](https://github.com/Stebalien)
+❗ This library is maintained, but not actively developed. It will continue to receive fixes and security updates for users that depend on it. However, it may be deprecated in the future and it is recommended that you use alternatives to the functionality in go-merkledag, including:
 
-## Table of Contents
-
-- [TODO](#todo)
-- [Contribute](#contribute)
-- [License](#license)
-
-## TODO
-
-- Pull out dag-pb stuff into go-ipld-pb
-- Pull 'raw nodes' out into go-ipld-raw (maybe main one instead)
-- Move most other logic to go-ipld
-- Make dagservice constructor take a 'blockstore' to avoid the blockservice offline nonsense
-- deprecate this package
-
-## Contribute
-
-PRs are welcome!
-
-Small note: If editing the Readme, please conform to the [standard-readme](https://github.com/RichardLitt/standard-readme) specification.
+* A fork of this library for use by Kubo is being maintained here: [github.com/ipfs/boxo/ipld/merkledag](https://pkg.go.dev/github.com/ipfs/boxo/ipld/merkledag)
+* Working directly with DAG-PB (ProtoNode) should directly use [github.com/ipld/go-codec-dagpb](https://pkg.go.dev/github.com/ipld/go-codec-dagpb) in conjunction with [github.com/ipld/go-ipld-prime](https://pkg.go.dev/github.com/ipld/go-ipld-prime)
+* Traversals / DAG walking should use [github.com/ipld/go-ipld-prime/traversal](https://pkg.go.dev/github.com/ipld/go-ipld-prime/traversal)
 
 ## License
 

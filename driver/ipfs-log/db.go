@@ -66,7 +66,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	}
 
 	// Build host multiaddress
-	hostAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", node.PeerHost.ID().Pretty()))
+	hostAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", node.PeerHost.ID()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create multiaddress: %w", err)
 	}

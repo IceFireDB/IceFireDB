@@ -10,6 +10,8 @@ import (
 )
 
 // NewKeyFromBinary creates a new key from a byte slice.
+//
+// Deprecated: use github.com/ipfs/boxo/datastore/dshelp.NewKeyFromBinary
 func NewKeyFromBinary(rawKey []byte) datastore.Key {
 	buf := make([]byte, 1+base32.RawStdEncoding.EncodedLen(len(rawKey)))
 	buf[0] = '/'
@@ -18,6 +20,8 @@ func NewKeyFromBinary(rawKey []byte) datastore.Key {
 }
 
 // BinaryFromDsKey returns the byte slice corresponding to the given Key.
+//
+// Deprecated: use github.com/ipfs/boxo/datastore/dshelp.BinaryFromDsKey
 func BinaryFromDsKey(k datastore.Key) ([]byte, error) {
 	return base32.RawStdEncoding.DecodeString(k.String()[1:])
 }
@@ -26,11 +30,15 @@ func BinaryFromDsKey(k datastore.Key) ([]byte, error) {
 // If working with Cids, you can call cid.Hash() to obtain
 // the multihash. Note that different CIDs might represent
 // the same multihash.
+//
+// Deprecated: use github.com/ipfs/boxo/datastore/dshelp.MultihashToDsKey
 func MultihashToDsKey(k mh.Multihash) datastore.Key {
 	return NewKeyFromBinary(k)
 }
 
 // DsKeyToMultihash converts a dsKey to the corresponding Multihash.
+//
+// Deprecated: use github.com/ipfs/boxo/datastore/dshelp.DsKeyToMultihash
 func DsKeyToMultihash(dsKey datastore.Key) (mh.Multihash, error) {
 	kb, err := BinaryFromDsKey(dsKey)
 	if err != nil {
@@ -42,6 +50,8 @@ func DsKeyToMultihash(dsKey datastore.Key) (mh.Multihash, error) {
 // DsKeyToCidV1Raw converts the given Key (which should be a raw multihash
 // key) to a Cid V1 of the given type (see
 // https://godoc.org/github.com/ipfs/go-cid#pkg-constants).
+//
+// Deprecated: use github.com/ipfs/boxo/datastore/dshelp.DsKeyToCidV1
 func DsKeyToCidV1(dsKey datastore.Key, codecType uint64) (cid.Cid, error) {
 	hash, err := DsKeyToMultihash(dsKey)
 	if err != nil {

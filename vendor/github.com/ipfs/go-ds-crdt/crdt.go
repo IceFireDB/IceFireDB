@@ -26,8 +26,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	dshelp "github.com/ipfs/boxo/datastore/dshelp"
 	pb "github.com/ipfs/go-ds-crdt/pb"
-	dshelp "github.com/ipfs/go-ipfs-ds-help"
 	"go.uber.org/multierr"
 	"google.golang.org/protobuf/proto"
 
@@ -54,10 +54,6 @@ const (
 var (
 	ErrNoMoreBroadcast = errors.New("receiving blocks aborted since no new blocks will be broadcasted")
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // A Broadcaster provides a way to send (notify) an opaque payload to
 // all replicas and to retrieve payloads broadcasted.
@@ -214,7 +210,7 @@ type dagJob struct {
 // ipfs-lite (https://github.com/hsanjuan/ipfs-lite) as a DAG Service and the
 // included libp2p PubSubBroadcaster as a Broadcaster.
 //
-// The given Datastatore is used to back all CRDT-datastore contents and
+// The given Datastore is used to back all CRDT-datastore contents and
 // accounting information. When using an asynchronous datastore, the user is
 // in charge of calling Sync() regularly. Sync() will persist paths related to
 // the given prefix, but note that if other replicas are modifying the
@@ -297,7 +293,7 @@ func New(
 		"crdt Datastore created. Number of heads: %d. Current max-height: %d. Dirty: %t",
 		len(headList),
 		maxHeight,
-		dstore.isDirty(),
+		dstore.IsDirty(),
 	)
 
 	// sendJobWorker + NumWorkers
@@ -372,7 +368,7 @@ func (store *Datastore) handleNext() {
 				// processed, thus it did not leave a branch
 				// half-processed and there's nothign to
 				// recover.
-				// disabled: store.markDirty()
+				// disabled: store.MarkDirty()
 			}
 		}
 
@@ -467,7 +463,8 @@ func randomizeInterval(d time.Duration) time.Duration {
 	// 30% of the configured interval
 	leeway := (d * 30 / 100)
 	// A random number between -leeway|+leeway
-	randomInterval := time.Duration(rand.Int63n(int64(leeway*2))) - leeway
+	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomInterval := time.Duration(randGen.Int63n(int64(leeway*2))) - leeway
 	return d + randomInterval
 }
 
@@ -501,7 +498,7 @@ func (store *Datastore) repair() {
 			}
 			return
 		case <-timer.C:
-			if !store.isDirty() {
+			if !store.IsDirty() {
 				store.logger.Info("store is marked clean. No need to repair")
 			} else {
 				store.logger.Warn("store is marked dirty. Starting DAG repair operation")
@@ -564,7 +561,7 @@ func (store *Datastore) logStats() {
 				len(heads),
 				height,
 				len(store.jobQueue),
-				store.isDirty(),
+				store.IsDirty(),
 			)
 		case <-store.ctx.Done():
 			ticker.Stop()
@@ -631,7 +628,7 @@ func (store *Datastore) dagWorker() {
 
 		if err != nil {
 			store.logger.Error(err)
-			store.markDirty()
+			store.MarkDirty()
 			job.session.Done()
 			continue
 		}
@@ -639,7 +636,7 @@ func (store *Datastore) dagWorker() {
 			err := store.sendNewJobs(j.session, j.nodeGetter, j.root, j.rootPrio, children)
 			if err != nil {
 				store.logger.Error(err)
-				store.markDirty()
+				store.MarkDirty()
 			}
 			j.session.Done()
 		}(job)
@@ -722,7 +719,7 @@ func (store *Datastore) sendJobWorker() {
 		case <-store.ctx.Done():
 			if len(store.sendJobs) > 0 {
 				// we left something in the queue
-				store.markDirty()
+				store.MarkDirty()
 			}
 			close(store.jobQueue)
 			return
@@ -748,15 +745,17 @@ func (store *Datastore) dirtyKey() ds.Key {
 	return store.namespace.ChildString(dirtyBitKey)
 }
 
-func (store *Datastore) markDirty() {
-	store.logger.Error("marking datastore as dirty")
+// MarkDirty marks the Datastore as dirty.
+func (store *Datastore) MarkDirty() {
+	store.logger.Warn("marking datastore as dirty")
 	err := store.store.Put(store.ctx, store.dirtyKey(), nil)
 	if err != nil {
 		store.logger.Errorf("error setting dirty bit: %s", err)
 	}
 }
 
-func (store *Datastore) isDirty() bool {
+// IsDirty returns whether the datastore is marked dirty.
+func (store *Datastore) IsDirty() bool {
 	ok, err := store.store.Has(store.ctx, store.dirtyKey())
 	if err != nil {
 		store.logger.Errorf("error checking dirty bit: %s", err)
@@ -764,7 +763,8 @@ func (store *Datastore) isDirty() bool {
 	return ok
 }
 
-func (store *Datastore) markClean() {
+// MarkClean removes the dirty mark from the datastore.
+func (store *Datastore) MarkClean() {
 	store.logger.Info("marking datastore as clean")
 	err := store.store.Delete(store.ctx, store.dirtyKey())
 	if err != nil {
@@ -880,7 +880,7 @@ func (store *Datastore) processNode(ng *crdtNodeGetter, root cid.Cid, rootPrio u
 	return children, nil
 }
 
-// repairDAG is used to walk down the chain until a non-processed node is
+// RepairDAG is used to walk down the chain until a non-processed node is
 // found and at that moment, queues it for processing.
 func (store *Datastore) repairDAG() error {
 	start := time.Now()
@@ -986,7 +986,7 @@ func (store *Datastore) repairDAG() error {
 
 	// If we are here we have successfully reprocessed the chain until the
 	// bottom.
-	store.markClean()
+	store.MarkClean()
 	return nil
 }
 
@@ -1023,15 +1023,14 @@ func (store *Datastore) GetSize(ctx context.Context, key ds.Key) (size int, err 
 // Query searches the datastore and returns a query result. This function
 // may return before the query actually runs. To wait for the query:
 //
-//   result, _ := ds.Query(q)
+//	result, _ := ds.Query(q)
 //
-//   // use the channel interface; result may come in at different times
-//   for entry := range result.Next() { ... }
+//	// use the channel interface; result may come in at different times
+//	for entry := range result.Next() { ... }
 //
-//   // or wait for the query to be completely done
-//   entries, _ := result.Rest()
-//   for entry := range entries { ... }
-//
+//	// or wait for the query to be completely done
+//	entries, _ := result.Rest()
+//	for entry := range entries { ... }
 func (store *Datastore) Query(ctx context.Context, q query.Query) (query.Results, error) {
 	qr, err := store.set.Elements(ctx, q)
 	if err != nil {
@@ -1108,7 +1107,7 @@ func (store *Datastore) Sync(ctx context.Context, prefix ds.Key) error {
 func (store *Datastore) Close() error {
 	store.cancel()
 	store.wg.Wait()
-	if store.isDirty() {
+	if store.IsDirty() {
 		store.logger.Warn("datastore is being closed marked as dirty")
 	}
 	return nil
@@ -1257,7 +1256,7 @@ func (store *Datastore) addDAGNode(delta *pb.Delta) (cid.Cid, error) {
 		nd,
 	)
 	if err != nil {
-		store.markDirty() // not sure if this will fix much if this happens.
+		store.MarkDirty() // not sure if this will fix much if this happens.
 		return cid.Undef, errors.Wrap(err, "error processing new block")
 	}
 	if len(children) != 0 {
@@ -1462,6 +1461,26 @@ func (store *Datastore) dotDAGRec(w io.Writer, from cid.Cid, depth uint64, ng *c
 		store.dotDAGRec(w, l.Cid, depth+1, ng, set)
 	}
 	return nil
+}
+
+// Stats wraps internal information about the datastore.
+// Might be expanded in the future.
+type Stats struct {
+	Heads      []cid.Cid
+	MaxHeight  uint64
+	QueuedJobs int
+}
+
+// InternalStats returns internal datastore information like the current heads
+// and max height.
+func (store *Datastore) InternalStats() Stats {
+	heads, height, _ := store.heads.List()
+
+	return Stats{
+		Heads:      heads,
+		MaxHeight:  height,
+		QueuedJobs: len(store.jobQueue),
+	}
 }
 
 type cidSafeSet struct {

@@ -22,6 +22,7 @@ package dig
 
 import (
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -32,12 +33,21 @@ const (
 type group struct {
 	Name    string
 	Flatten bool
+	Soft    bool
 }
 
 type errInvalidGroupOption struct{ Option string }
 
-func (e errInvalidGroupOption) Error() string {
-	return fmt.Sprintf("invalid option %q", e.Option)
+var _ digError = errInvalidGroupOption{}
+
+func (e errInvalidGroupOption) Error() string { return fmt.Sprint(e) }
+
+func (e errInvalidGroupOption) writeMessage(w io.Writer, v string) {
+	fmt.Fprintf(w, "invalid option %q", e.Option)
+}
+
+func (e errInvalidGroupOption) Format(w fmt.State, c rune) {
+	formatError(e, w, c)
 }
 
 func parseGroupString(s string) (group, error) {
@@ -47,6 +57,8 @@ func parseGroupString(s string) (group, error) {
 		switch c {
 		case "flatten":
 			g.Flatten = true
+		case "soft":
+			g.Soft = true
 		default:
 			return g, errInvalidGroupOption{Option: c}
 		}

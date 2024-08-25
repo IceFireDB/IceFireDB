@@ -3,7 +3,6 @@ package files
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -29,7 +28,7 @@ func NewReaderFile(reader io.Reader) File {
 func NewReaderStatFile(reader io.Reader, stat os.FileInfo) File {
 	rc, ok := reader.(io.ReadCloser)
 	if !ok {
-		rc = ioutil.NopCloser(reader)
+		rc = io.NopCloser(reader)
 	}
 
 	return &ReaderFile{"", rc, stat, -1}

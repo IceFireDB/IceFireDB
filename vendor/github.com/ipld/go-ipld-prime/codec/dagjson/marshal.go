@@ -202,54 +202,50 @@ func Marshal(n datamodel.Node, sink shared.TokenSink, options EncodeOptions) err
 		_, err = sink.Step(&tk)
 		return err
 	case datamodel.Kind_Bytes:
+		if !options.EncodeBytes {
+			return fmt.Errorf("cannot marshal IPLD bytes to this codec")
+		}
 		v, err := n.AsBytes()
 		if err != nil {
 			return err
 		}
-		if options.EncodeBytes {
-			// Precisely seven tokens to emit:
-			tk.Type = tok.TMapOpen
-			tk.Length = 1
-			if _, err = sink.Step(&tk); err != nil {
-				return err
-			}
-			tk.Type = tok.TString
-			tk.Str = "/"
-			if _, err = sink.Step(&tk); err != nil {
-				return err
-			}
-			tk.Type = tok.TMapOpen
-			tk.Length = 1
-			if _, err = sink.Step(&tk); err != nil {
-				return err
-			}
-			tk.Type = tok.TString
-			tk.Str = "bytes"
-			if _, err = sink.Step(&tk); err != nil {
-				return err
-			}
-			tk.Str = base64.RawStdEncoding.EncodeToString(v)
-			if _, err = sink.Step(&tk); err != nil {
-				return err
-			}
-			tk.Type = tok.TMapClose
-			if _, err = sink.Step(&tk); err != nil {
-				return err
-			}
-			tk.Type = tok.TMapClose
-			if _, err = sink.Step(&tk); err != nil {
-				return err
-			}
-			return nil
-		} else {
-			tk.Type = tok.TBytes
-			tk.Bytes = v
-			_, err = sink.Step(&tk)
+		// Precisely seven tokens to emit:
+		tk.Type = tok.TMapOpen
+		tk.Length = 1
+		if _, err = sink.Step(&tk); err != nil {
 			return err
 		}
+		tk.Type = tok.TString
+		tk.Str = "/"
+		if _, err = sink.Step(&tk); err != nil {
+			return err
+		}
+		tk.Type = tok.TMapOpen
+		tk.Length = 1
+		if _, err = sink.Step(&tk); err != nil {
+			return err
+		}
+		tk.Type = tok.TString
+		tk.Str = "bytes"
+		if _, err = sink.Step(&tk); err != nil {
+			return err
+		}
+		tk.Str = base64.RawStdEncoding.EncodeToString(v)
+		if _, err = sink.Step(&tk); err != nil {
+			return err
+		}
+		tk.Type = tok.TMapClose
+		if _, err = sink.Step(&tk); err != nil {
+			return err
+		}
+		tk.Type = tok.TMapClose
+		if _, err = sink.Step(&tk); err != nil {
+			return err
+		}
+		return nil
 	case datamodel.Kind_Link:
 		if !options.EncodeLinks {
-			return fmt.Errorf("cannot Marshal ipld links to JSON")
+			return fmt.Errorf("cannot marshal IPLD links to this codec")
 		}
 		v, err := n.AsLink()
 		if err != nil {

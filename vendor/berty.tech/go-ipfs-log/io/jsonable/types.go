@@ -2,6 +2,7 @@ package jsonable
 
 import (
 	"encoding/hex"
+
 	"github.com/ipfs/go-cid"
 
 	"berty.tech/go-ipfs-log/errmsg"
@@ -72,7 +73,7 @@ func (c *IdentitySignature) ToPlain() (*identityprovider.IdentitySignature, erro
 	}, nil
 }
 
-func (e *EntryV0) ToPlain(out iface.IPFSLogEntry, provider identityprovider.Interface, newClock func() iface.IPFSLogLamportClock) error {
+func (e *EntryV0) ToPlain(out iface.IPFSLogEntry, _ identityprovider.Interface, newClock func() iface.IPFSLogLamportClock) error {
 	c := cid.Undef
 
 	if e.Hash != nil {

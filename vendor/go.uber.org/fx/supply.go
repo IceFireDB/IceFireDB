@@ -36,71 +36,80 @@ import (
 //
 // For example, given:
 //
-//  type (
-//  	TypeA struct{}
-//  	TypeB struct{}
-//  	TypeC struct{}
-//  )
+//	type (
+//		TypeA struct{}
+//		TypeB struct{}
+//		TypeC struct{}
+//	)
 //
-//  var a, b, c = &TypeA{}, TypeB{}, &TypeC{}
+//	var a, b, c = &TypeA{}, TypeB{}, &TypeC{}
 //
 // The following two forms are equivalent:
 //
-//  fx.Supply(a, b, fx.Annotated{Target: c})
+//	fx.Supply(a, b, fx.Annotated{Target: c})
 //
-//  fx.Provide(
-//  	func() *TypeA { return a },
-//  	func() TypeB { return b },
-//  	fx.Annotated{Target: func() *TypeC { return c }},
-//  )
+//	fx.Provide(
+//		func() *TypeA { return a },
+//		func() TypeB { return b },
+//		fx.Annotated{Target: func() *TypeC { return c }},
+//	)
 //
 // Supply panics if a value (or annotation target) is an untyped nil or an error.
 //
-// Supply Caveats
+// [Private] can be used to restrict access to supplied values.
+//
+// # Supply Caveats
 //
 // As mentioned above, Supply uses the most specific type of the provided
 // value. For interface values, this refers to the type of the implementation,
 // not the interface. So if you supply an http.Handler, fx.Supply will use the
 // type of the implementation.
 //
-//  var handler http.Handler = http.HandlerFunc(f)
-//  fx.Supply(handler)
+//	var handler http.Handler = http.HandlerFunc(f)
+//	fx.Supply(handler)
 //
 // Is equivalent to,
 //
-//  fx.Provide(func() http.HandlerFunc { return f })
+//	fx.Provide(func() http.HandlerFunc { return f })
 //
 // This is typically NOT what you intended. To supply the handler above as an
 // http.Handler, we need to use the fx.Annotate function with the fx.As
 // annotation.
 //
-//  fx.Supply(
-//  	fx.Annotate(handler, fx.As(new(http.Handler))),
-//  )
+//	fx.Supply(
+//		fx.Annotate(handler, fx.As(new(http.Handler))),
+//	)
 func Supply(values ...interface{}) Option {
-	constructors := make([]interface{}, len(values)) // one function per value
-	types := make([]reflect.Type, len(values))
-	for i, value := range values {
+	constructors := make([]interface{}, 0, len(values))
+	types := make([]reflect.Type, 0, len(values))
+	var private bool
+	for _, value := range values {
+		var (
+			typ  reflect.Type
+			ctor any
+		)
 		switch value := value.(type) {
+		case privateOption:
+			private = true
+			continue
 		case annotated:
-			var typ reflect.Type
 			value.Target, typ = newSupplyConstructor(value.Target)
-			constructors[i] = value
-			types[i] = typ
+			ctor = value
 		case Annotated:
-			var typ reflect.Type
 			value.Target, typ = newSupplyConstructor(value.Target)
-			constructors[i] = value
-			types[i] = typ
+			ctor = value
 		default:
-			constructors[i], types[i] = newSupplyConstructor(value)
+			ctor, typ = newSupplyConstructor(value)
 		}
+		constructors = append(constructors, ctor)
+		types = append(types, typ)
 	}
 
 	return supplyOption{
 		Targets: constructors,
 		Types:   types,
 		Stack:   fxreflect.CallerStack(1, 0),
+		Private: private,
 	}
 }
 
@@ -108,6 +117,7 @@ type supplyOption struct {
 	Targets []interface{}
 	Types   []reflect.Type // type of value produced by constructor[i]
 	Stack   fxreflect.Stack
+	Private bool
 }
 
 func (o supplyOption) apply(m *module) {
@@ -117,6 +127,7 @@ func (o supplyOption) apply(m *module) {
 			Stack:      o.Stack,
 			IsSupply:   true,
 			SupplyType: o.Types[i],
+			Private:    o.Private,
 		})
 	}
 }
