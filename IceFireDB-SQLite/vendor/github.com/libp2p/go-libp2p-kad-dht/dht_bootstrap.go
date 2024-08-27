@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/multiformats/go-multiaddr"
 )
@@ -57,7 +57,10 @@ func GetDefaultBootstrapPeerAddrInfos() []peer.AddrInfo {
 
 // Bootstrap tells the DHT to get into a bootstrapped state satisfying the
 // IpfsRouter interface.
-func (dht *IpfsDHT) Bootstrap(ctx context.Context) error {
+func (dht *IpfsDHT) Bootstrap(ctx context.Context) (err error) {
+	_, end := tracer.Bootstrap(dhtName, ctx)
+	defer func() { end(err) }()
+
 	dht.fixRTIfNeeded()
 	dht.rtRefreshManager.RefreshNoWait()
 	return nil

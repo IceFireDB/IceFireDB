@@ -1,4 +1,4 @@
-// Copyright (c) 2020 The Decred developers
+// Copyright (c) 2020-2023 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -46,6 +46,8 @@ const (
 	//
 	// The group order of the curve per [SECG] is:
 	// 0xffffffff ffffffff ffffffff fffffffe baaedce6 af48a03b bfd25e8c d0364141
+	//
+	// nolint: dupword
 	orderWordZero  uint32 = 0xd0364141
 	orderWordOne   uint32 = 0xbfd25e8c
 	orderWordTwo   uint32 = 0xaf48a03b
@@ -76,6 +78,8 @@ const (
 	//
 	// The half order of the secp256k1 curve group is:
 	// 0x7fffffff ffffffff ffffffff ffffffff 5d576e73 57a4501d dfe92f46 681b20a0
+	//
+	// nolint: dupword
 	halfOrderWordZero  uint32 = 0x681b20a0
 	halfOrderWordOne   uint32 = 0xdfe92f46
 	halfOrderWordTwo   uint32 = 0x57a4501d
@@ -100,7 +104,7 @@ var (
 // arithmetic over the secp256k1 group order. This means all arithmetic is
 // performed modulo:
 //
-//   0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
+//	0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
 //
 // It only implements the arithmetic needed for elliptic curve operations,
 // however, the operations that are not implemented can typically be worked
@@ -172,6 +176,19 @@ func (s *ModNScalar) Zero() {
 	s.n[5] = 0
 	s.n[6] = 0
 	s.n[7] = 0
+}
+
+// IsZeroBit returns 1 when the scalar is equal to zero or 0 otherwise in
+// constant time.
+//
+// Note that a bool is not used here because it is not possible in Go to convert
+// from a bool to numeric value in constant time and many constant-time
+// operations require a numeric value.  See IsZero for the version that returns
+// a bool.
+func (s *ModNScalar) IsZeroBit() uint32 {
+	// The scalar can only be zero if no bits are set in any of the words.
+	bits := s.n[0] | s.n[1] | s.n[2] | s.n[3] | s.n[4] | s.n[5] | s.n[6] | s.n[7]
+	return constantTimeEq(bits, 0)
 }
 
 // IsZero returns whether or not the scalar is equal to zero in constant time.
@@ -351,8 +368,8 @@ func (s *ModNScalar) SetByteSlice(b []byte) bool {
 }
 
 // PutBytesUnchecked unpacks the scalar to a 32-byte big-endian value directly
-// into the passed byte slice in constant time.  The target slice must must have
-// at least 32 bytes available or it will panic.
+// into the passed byte slice in constant time.  The target slice must have at
+// least 32 bytes available or it will panic.
 //
 // There is a similar function, PutBytes, which unpacks the scalar into a
 // 32-byte array directly.  This version is provided since it can be useful to

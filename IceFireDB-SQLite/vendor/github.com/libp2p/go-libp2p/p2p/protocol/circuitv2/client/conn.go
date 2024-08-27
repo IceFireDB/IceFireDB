@@ -5,8 +5,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	tpt "github.com/libp2p/go-libp2p/core/transport"
 
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -79,7 +80,7 @@ func (c *Conn) RemoteMultiaddr() ma.Multiaddr {
 	// TODO: We should be able to do this directly without converting to/from a string.
 	relayAddr, err := ma.NewComponent(
 		ma.ProtocolWithCode(ma.P_P2P).Name,
-		c.stream.Conn().RemotePeer().Pretty(),
+		c.stream.Conn().RemotePeer().String(),
 	)
 	if err != nil {
 		panic(err)
@@ -102,8 +103,8 @@ func (c *Conn) LocalAddr() net.Addr {
 
 func (c *Conn) RemoteAddr() net.Addr {
 	return &NetAddr{
-		Relay:  c.stream.Conn().RemotePeer().Pretty(),
-		Remote: c.remote.ID.Pretty(),
+		Relay:  c.stream.Conn().RemotePeer().String(),
+		Remote: c.remote.ID.String(),
 	}
 }
 
@@ -141,5 +142,22 @@ func (c *Conn) untagHop() {
 	if c.client.hopCount[p] == 0 {
 		c.client.host.ConnManager().UntagPeer(p, "relay-hop-stream")
 		delete(c.client.hopCount, p)
+	}
+}
+
+type capableConnWithStat interface {
+	tpt.CapableConn
+	network.ConnStat
+}
+
+type capableConn struct {
+	capableConnWithStat
+}
+
+var transportName = ma.ProtocolWithCode(ma.P_CIRCUIT).Name
+
+func (c capableConn) ConnState() network.ConnectionState {
+	return network.ConnectionState{
+		Transport: transportName,
 	}
 }

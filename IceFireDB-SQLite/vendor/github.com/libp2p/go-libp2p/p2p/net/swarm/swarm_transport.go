@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/libp2p/go-libp2p-core/transport"
+	"github.com/libp2p/go-libp2p/core/transport"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -19,6 +19,7 @@ func (s *Swarm) TransportForDialing(a ma.Multiaddr) transport.Transport {
 
 	s.transports.RLock()
 	defer s.transports.RUnlock()
+
 	if len(s.transports.m) == 0 {
 		// make sure we're not just shutting down.
 		if s.transports.m != nil {
@@ -26,18 +27,15 @@ func (s *Swarm) TransportForDialing(a ma.Multiaddr) transport.Transport {
 		}
 		return nil
 	}
-
-	for _, p := range protocols {
-		transport, ok := s.transports.m[p.Code]
-		if !ok {
-			continue
-		}
-		if transport.Proxy() {
-			return transport
+	if isRelayAddr(a) {
+		return s.transports.m[ma.P_CIRCUIT]
+	}
+	for _, t := range s.transports.m {
+		if t.CanDial(a) {
+			return t
 		}
 	}
-
-	return s.transports.m[protocols[len(protocols)-1].Code]
+	return nil
 }
 
 // TransportForListening retrieves the appropriate transport for listening on

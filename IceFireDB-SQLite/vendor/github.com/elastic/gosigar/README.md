@@ -1,4 +1,4 @@
-# Go sigar [![Build Status](https://beats-ci.elastic.co/job/Beats/job/gosigar/job/master/badge/icon)](https://beats-ci.elastic.co/job/Beats/job/gosigar/job/master/)
+# Go sigar [![ci](https://github.com/elastic/gosigar/actions/workflows/ci.yml/badge.svg)](https://github.com/elastic/gosigar/actions/workflows/ci.yml)
 
 
 ## Overview

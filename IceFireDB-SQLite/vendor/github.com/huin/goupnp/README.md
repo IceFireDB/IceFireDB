@@ -63,3 +63,14 @@ func init() {
   goupnp.CharsetReaderFault = charset.NewReaderLabel
 }
 ```
+
+## `v2alpha`
+
+The `v2alpha` subdirectory contains experimental work on a version 2 API. The plan is to eventually
+create a `v2` subdirectory with a stable version of the version 2 API. The v1 API will stay where
+it currently is.
+
+> NOTE:
+> 
+> * `v2alpha` will be deleted one day, so don't rely on it always existing.
+> * `v2alpha` will have API breaking changes, even with itself.

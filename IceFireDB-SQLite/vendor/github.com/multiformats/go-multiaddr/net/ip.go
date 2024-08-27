@@ -60,6 +60,9 @@ func IsThinWaist(m ma.Multiaddr) bool {
 // or /ip6zone/<any value>/ip6/<one of the preceding ip6 values>/*
 func IsIPLoopback(m ma.Multiaddr) bool {
 	m = zoneless(m)
+	if m == nil {
+		return false
+	}
 	c, _ := ma.SplitFirst(m)
 	if c == nil {
 		return false
@@ -76,6 +79,9 @@ func IsIPLoopback(m ma.Multiaddr) bool {
 // routable.
 func IsIP6LinkLocal(m ma.Multiaddr) bool {
 	m = zoneless(m)
+	if m == nil {
+		return false
+	}
 	c, _ := ma.SplitFirst(m)
 	if c == nil || c.Protocol().Code != ma.P_IP6 {
 		return false
@@ -115,4 +121,12 @@ func zoneless(m ma.Multiaddr) ma.Multiaddr {
 	} else {
 		return m
 	}
+}
+
+// IsNAT64IPv4ConvertedIPv6Addr returns whether addr is a well-known prefix "64:ff9b::/96" addr
+// used for NAT64 Translation. See RFC 6052
+func IsNAT64IPv4ConvertedIPv6Addr(addr ma.Multiaddr) bool {
+	c, _ := ma.SplitFirst(addr)
+	return c != nil && c.Protocol().Code == ma.P_IP6 &&
+		inAddrRange(c.RawValue(), nat64)
 }

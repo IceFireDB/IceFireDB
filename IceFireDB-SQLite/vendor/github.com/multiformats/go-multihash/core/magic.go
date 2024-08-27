@@ -5,6 +5,9 @@ import "errors"
 // ErrSumNotSupported is returned when the Sum function code is not implemented
 var ErrSumNotSupported = errors.New("no such hash registered")
 
+// ErrLenTooLarge is returned when the hash function cannot produce the requested number of bytes
+var ErrLenTooLarge = errors.New("requested length was too large for digest")
+
 // constants
 const (
 	IDENTITY      = 0x00

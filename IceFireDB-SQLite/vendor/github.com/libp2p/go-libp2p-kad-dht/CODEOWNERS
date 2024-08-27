@@ -1,0 +1,15 @@
+# CODEOWNERS
+
+# default owner is the libp2p team
+*.go @libp2p/go-libp2p-maintainers @guillaumemichel
+/pb/ @libp2p/go-libp2p-maintainers @guillaumemichel
+
+# dual is an application for IPFS
+/dual/ @libp2p/kubo-maintainers @guillaumemichel
+# fullrt is IPFS specific
+/fullrt/ @libp2p/kubo-maintainers @guillaumemichel
+# providers describe the IPFS specific providers
+/providers/ @libp2p/kubo-maintainers @guillaumemichel
+# records are IPFS specific
+/records.go @libp2p/kubo-maintainers @guillaumemichel
+/records_test.go @libp2p/kubo-maintainers @guillaumemichel

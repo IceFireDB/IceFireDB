@@ -76,10 +76,10 @@ func ReadUvarint(r io.ByteReader) (uint64, error) {
 	// released under the BSD License.
 	var x uint64
 	var s uint
-	for i := 0; ; i++ {
+	for s = 0; ; s += 7 {
 		b, err := r.ReadByte()
 		if err != nil {
-			if err == io.EOF && i != 0 {
+			if err == io.EOF && s != 0 {
 				// "eof" will look like a success.
 				// If we've read part of a value, this is not a
 				// success.
@@ -87,7 +87,7 @@ func ReadUvarint(r io.ByteReader) (uint64, error) {
 			}
 			return 0, err
 		}
-		if (i == 8 && b >= 0x80) || i >= MaxLenUvarint63 {
+		if (s == 56 && b >= 0x80) || s >= (7*MaxLenUvarint63) {
 			// this is the 9th and last byte we're willing to read, but it
 			// signals there's more (1 in MSB).
 			// or this is the >= 10th byte, and for some reason we're still here.
@@ -100,7 +100,6 @@ func ReadUvarint(r io.ByteReader) (uint64, error) {
 			return x | uint64(b)<<s, nil
 		}
 		x |= uint64(b&0x7f) << s
-		s += 7
 	}
 }
 

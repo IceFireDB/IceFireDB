@@ -5,10 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 
 	logging "github.com/ipfs/go-log/v2"
 )
@@ -40,6 +41,7 @@ func WithCleanupInterval(t time.Duration) Option {
 type PeerstoreManager struct {
 	pstore   peerstore.Peerstore
 	eventBus event.Bus
+	network  network.Network
 
 	cancel   context.CancelFunc
 	refCount sync.WaitGroup
@@ -48,11 +50,12 @@ type PeerstoreManager struct {
 	cleanupInterval time.Duration
 }
 
-func NewPeerstoreManager(pstore peerstore.Peerstore, eventBus event.Bus, opts ...Option) (*PeerstoreManager, error) {
+func NewPeerstoreManager(pstore peerstore.Peerstore, eventBus event.Bus, network network.Network, opts ...Option) (*PeerstoreManager, error) {
 	m := &PeerstoreManager{
 		pstore:      pstore,
 		gracePeriod: time.Minute,
 		eventBus:    eventBus,
+		network:     network,
 	}
 	for _, opt := range opts {
 		if err := opt(m); err != nil {
@@ -68,7 +71,7 @@ func NewPeerstoreManager(pstore peerstore.Peerstore, eventBus event.Bus, opts ..
 func (m *PeerstoreManager) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
-	sub, err := m.eventBus.Subscribe(&event.EvtPeerConnectednessChanged{})
+	sub, err := m.eventBus.Subscribe(&event.EvtPeerConnectednessChanged{}, eventbus.Name("pstoremanager"))
 	if err != nil {
 		log.Warnf("subscription failed. Peerstore manager not activated. Error: %s", err)
 		return
@@ -100,18 +103,29 @@ func (m *PeerstoreManager) background(ctx context.Context, sub event.Subscriptio
 			ev := e.(event.EvtPeerConnectednessChanged)
 			p := ev.Peer
 			switch ev.Connectedness {
-			case network.NotConnected:
+			case network.Connected, network.Limited:
+				// If we reconnect to the peer before we've cleared the information,
+				// keep it. This is an optimization to keep the disconnected map
+				// small. We still need to check that a peer is actually
+				// disconnected before removing it from the peer store.
+				delete(disconnected, p)
+			default:
 				if _, ok := disconnected[p]; !ok {
 					disconnected[p] = time.Now()
 				}
-			case network.Connected:
-				// If we reconnect to the peer before we've cleared the information, keep it.
-				delete(disconnected, p)
 			}
-		case now := <-ticker.C:
+		case <-ticker.C:
+			now := time.Now()
 			for p, disconnectTime := range disconnected {
 				if disconnectTime.Add(m.gracePeriod).Before(now) {
-					m.pstore.RemovePeer(p)
+					// Check that the peer is actually not connected at this point.
+					// This avoids a race condition where the Connected notification
+					// is processed after this time has fired.
+					switch m.network.Connectedness(p) {
+					case network.Connected, network.Limited:
+					default:
+						m.pstore.RemovePeer(p)
+					}
 					delete(disconnected, p)
 				}
 			}

@@ -122,6 +122,9 @@ func SpawnStructRepresentationMap2(renames map[string]string, implicits map[stri
 func SpawnStructRepresentationTuple() StructRepresentation_Tuple {
 	return StructRepresentation_Tuple{}
 }
+func SpawnStructRepresentationListPairs() StructRepresentation_ListPairs {
+	return StructRepresentation_ListPairs{}
+}
 func SpawnStructRepresentationStringjoin(delim string) StructRepresentation_Stringjoin {
 	return StructRepresentation_Stringjoin{delim}
 }
@@ -137,6 +140,9 @@ func SpawnUnionRepresentationKinded(table map[datamodel.Kind]TypeName) UnionRepr
 }
 func SpawnUnionRepresentationStringprefix(delim string, table map[string]TypeName) UnionRepresentation_Stringprefix {
 	return UnionRepresentation_Stringprefix{delim, table}
+}
+func SpawnUnionRepresentationInline(discriminantKey string, table map[string]TypeName) UnionRepresentation_Inline {
+	return UnionRepresentation_Inline{discriminantKey, table}
 }
 
 func SpawnEnum(name TypeName, members []string, repr EnumRepresentation) *TypeEnum {

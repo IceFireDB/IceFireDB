@@ -21,7 +21,7 @@ var (
 // It can be used directly when loading links into the "any" prototype,
 // or with another chooser layer on top, such as:
 //
-//    prototypeChooser := dagpb.AddSupportToChooser(basicnode.Chooser)
+//	prototypeChooser := dagpb.AddSupportToChooser(basicnode.Chooser)
 func Chooser(_ datamodel.Link, _ linking.LinkContext) (datamodel.NodePrototype, error) {
 	return Prototype.Any, nil
 }

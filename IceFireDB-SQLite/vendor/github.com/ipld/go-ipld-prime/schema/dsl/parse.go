@@ -228,6 +228,35 @@ func (p *parser) consumeString() (string, error) {
 	return tok[1 : len(tok)-1], nil
 }
 
+func (p *parser) consumeStringMap() (map[string]string, error) {
+	result := map[string]string{}
+loop:
+	for {
+		tok, err := p.peekToken()
+		if err != nil {
+			return result, err
+		}
+		switch tok {
+		case "{":
+			p.consumePeeked()
+		case "}":
+			p.consumePeeked()
+			break loop
+		default:
+			key, err := p.consumeName()
+			if err != nil {
+				return result, err
+			}
+			value, err := p.consumeString()
+			if err != nil {
+				return result, err
+			}
+			result[key] = value
+		}
+	}
+	return result, nil
+}
+
 func (p *parser) consumeRequired(tok string) error {
 	got, err := p.consumeToken()
 	if err != nil {
@@ -425,6 +454,22 @@ func (p *parser) typeStruct() (*dmt.TypeDefnStruct, error) {
 		defn.Representation.StructRepresentation_Tuple = &dmt.StructRepresentation_Tuple{}
 		return defn, nil
 		// TODO: support custom fieldorder
+	case "stringjoin":
+		optMap, err := p.consumeStringMap()
+		if err != nil {
+			return nil, err
+		}
+		join, hasJoin := optMap["join"]
+		if !hasJoin {
+			return nil, p.errf("no join value provided for stringjoin repr")
+		}
+		defn.Representation.StructRepresentation_Stringjoin = &dmt.StructRepresentation_Stringjoin{
+			Join: join,
+		}
+		return defn, nil
+	case "listpairs":
+		defn.Representation.StructRepresentation_Listpairs = &dmt.StructRepresentation_Listpairs{}
+		return defn, nil
 	default:
 		return nil, p.errf("unknown struct repr: %q", reprName)
 	}
@@ -436,11 +481,14 @@ func (p *parser) typeNameOrInlineDefn() (dmt.TypeNameOrInlineDefn, error) {
 	if err != nil {
 		return typ, err
 	}
-	if tok == "&" {
-		return typ, p.errf("TODO: links")
-	}
 
 	switch tok {
+	case "&":
+		expectedName, err := p.consumeName()
+		if err != nil {
+			return typ, err
+		}
+		typ.InlineDefn = &dmt.InlineDefn{TypeDefnLink: &dmt.TypeDefnLink{ExpectedType: &expectedName}}
 	case "[":
 		tlist, err := p.typeList()
 		if err != nil {
@@ -513,7 +561,6 @@ func (p *parser) typeMap() (*dmt.TypeDefnMap, error) {
 		return defn, err
 	}
 
-	// TODO: repr
 	return defn, nil
 }
 
@@ -533,13 +580,20 @@ func (p *parser) typeUnion() (*dmt.TypeDefnUnion, error) {
 			return nil, p.errf("expected %q or %q, got %q", "}", "|", tok)
 		}
 		var member dmt.UnionMember
-		name, err := p.consumeName()
+		nameOrInline, err := p.typeNameOrInlineDefn()
 		if err != nil {
 			return nil, err
 		}
-		// TODO: inline defn
-		member.TypeName = &name
 
+		if nameOrInline.TypeName != nil {
+			member.TypeName = nameOrInline.TypeName
+		} else {
+			if nameOrInline.InlineDefn.TypeDefnLink != nil {
+				member.UnionMemberInlineDefn = &dmt.UnionMemberInlineDefn{TypeDefnLink: nameOrInline.InlineDefn.TypeDefnLink}
+			} else {
+				return nil, p.errf("expected a name or inline link, got neither")
+			}
+		}
 		defn.Members = append(defn.Members, member)
 
 		key, err := p.consumeToken()
@@ -573,6 +627,49 @@ func (p *parser) typeUnion() (*dmt.TypeDefnUnion, error) {
 			mapAppend(repr, key, defn.Members[i])
 		}
 		defn.Representation.UnionRepresentation_Kinded = repr
+	case "stringprefix":
+		repr := &dmt.UnionRepresentation_StringPrefix{
+			Prefixes: dmt.Map__String__TypeName{
+				Values: map[string]string{},
+			},
+		}
+		for i, key := range reprKeys {
+			// unquote prefix string
+			if len(key) < 2 || key[0] != '"' || key[len(key)-1] != '"' {
+				return nil, p.errf("invalid stringprefix %q", key)
+			}
+			key = key[1 : len(key)-1]
+
+			// add prefix to prefixes map
+			repr.Prefixes.Keys = append(repr.Prefixes.Keys, key)
+			repr.Prefixes.Values[key] = *defn.Members[i].TypeName
+		}
+		defn.Representation.UnionRepresentation_StringPrefix = repr
+	case "inline":
+		optMap, err := p.consumeStringMap()
+		if err != nil {
+			return nil, err
+		}
+		discriminantKey, hasDiscriminantKey := optMap["discriminantKey"]
+		if !hasDiscriminantKey {
+			return nil, p.errf("no discriminantKey value provided for inline repr")
+		}
+		repr := &dmt.UnionRepresentation_Inline{
+			DiscriminantKey: discriminantKey,
+			DiscriminantTable: dmt.Map__String__TypeName{
+				Values: map[string]string{},
+			},
+		}
+		// TODO: verify member types all have map representation
+		for i, qkey := range reprKeys {
+			key, err := strconv.Unquote(qkey)
+			if err != nil {
+				return nil, fmt.Errorf("invalid discriminant key %q: %w", key, err)
+			}
+			repr.DiscriminantTable.Keys = append(repr.DiscriminantTable.Keys, key)
+			repr.DiscriminantTable.Values[key] = *defn.Members[i].TypeName
+		}
+		defn.Representation.UnionRepresentation_Inline = repr
 	default:
 		return nil, p.errf("TODO: union repr %q", reprName)
 	}

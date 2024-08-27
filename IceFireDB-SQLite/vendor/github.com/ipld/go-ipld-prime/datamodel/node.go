@@ -167,6 +167,21 @@ type Node interface {
 	Prototype() NodePrototype
 }
 
+// UintNode is an optional interface that can be used to represent an Int node
+// that provides access to the full uint64 range.
+//
+// EXPERIMENTAL: this API is experimental and may be changed or removed in a
+// future use. A future iteration may replace this with a BigInt interface to
+// access a larger range of integers that may be enabled by alternative codecs.
+type UintNode interface {
+	Node
+
+	// AsUint returns a uint64 representing the underlying integer if possible.
+	// This may return an error if the Node represents a negative integer that
+	// cannot be represented as a uint64.
+	AsUint() (uint64, error)
+}
+
 // LargeBytesNode is an optional interface extending a Bytes node that allows its
 // contents to be accessed through an io.ReadSeeker instead of a []byte slice. Use of
 // an io.Reader is encouraged, as it allows for streaming large byte slices

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"time"
 
 	query "github.com/ipfs/go-datastore/query"
 )
@@ -103,8 +102,7 @@ type Read interface {
 // capabilities of a `Batch`, but the reverse is NOT true.
 type Batching interface {
 	Datastore
-
-	Batch(ctx context.Context) (Batch, error)
+	BatchingFeature
 }
 
 // ErrBatchUnsupported is returned if the by Batch if the Datastore doesn't
@@ -115,8 +113,7 @@ var ErrBatchUnsupported = errors.New("this datastore does not support batching")
 // which may need checking on-disk data integrity.
 type CheckedDatastore interface {
 	Datastore
-
-	Check(ctx context.Context) error
+	CheckedFeature
 }
 
 // ScrubbedDatastore is an interface that should be implemented by datastores
@@ -124,25 +121,21 @@ type CheckedDatastore interface {
 // error correction.
 type ScrubbedDatastore interface {
 	Datastore
-
-	Scrub(ctx context.Context) error
+	ScrubbedFeature
 }
 
 // GCDatastore is an interface that should be implemented by datastores which
 // don't free disk space by just removing data from them.
 type GCDatastore interface {
 	Datastore
-
-	CollectGarbage(ctx context.Context) error
+	GCFeature
 }
 
 // PersistentDatastore is an interface that should be implemented by datastores
 // which can report disk usage.
 type PersistentDatastore interface {
 	Datastore
-
-	// DiskUsage returns the space used by a datastore, in bytes.
-	DiskUsage(ctx context.Context) (uint64, error)
+	PersistentFeature
 }
 
 // DiskUsage checks if a Datastore is a
@@ -161,13 +154,6 @@ func DiskUsage(ctx context.Context, d Datastore) (uint64, error) {
 type TTLDatastore interface {
 	Datastore
 	TTL
-}
-
-// TTL encapulates the methods that deal with entries with time-to-live.
-type TTL interface {
-	PutWithTTL(ctx context.Context, key Key, value []byte, ttl time.Duration) error
-	SetTTL(ctx context.Context, key Key, ttl time.Duration) error
-	GetExpiration(ctx context.Context, key Key) (time.Time, error)
 }
 
 // Txn extends the Datastore type. Txns allow users to batch queries and
@@ -194,8 +180,7 @@ type Txn interface {
 // support transactions.
 type TxnDatastore interface {
 	Datastore
-
-	NewTransaction(ctx context.Context, readOnly bool) (Txn, error)
+	TxnFeature
 }
 
 // Errors

@@ -4,29 +4,38 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"strings"
+	"sync"
 	"time"
-
-	"github.com/libp2p/go-libp2p-core/peer"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
-	peerstoreImpl "github.com/libp2p/go-libp2p-peerstore"
 
 	lru "github.com/hashicorp/golang-lru/simplelru"
 	ds "github.com/ipfs/go-datastore"
-	autobatch "github.com/ipfs/go-datastore/autobatch"
+	"github.com/ipfs/go-datastore/autobatch"
 	dsq "github.com/ipfs/go-datastore/query"
-	logging "github.com/ipfs/go-log"
-	goprocess "github.com/jbenet/goprocess"
-	goprocessctx "github.com/jbenet/goprocess/context"
-	base32 "github.com/multiformats/go-base32"
+	logging "github.com/ipfs/go-log/v2"
+	"github.com/libp2p/go-libp2p-kad-dht/internal"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	peerstoreImpl "github.com/libp2p/go-libp2p/p2p/host/peerstore"
+	"github.com/multiformats/go-base32"
 )
 
-// ProvidersKeyPrefix is the prefix/namespace for ALL provider record
-// keys stored in the data store.
-const ProvidersKeyPrefix = "/providers/"
+const (
+	// ProvidersKeyPrefix is the prefix/namespace for ALL provider record
+	// keys stored in the data store.
+	ProvidersKeyPrefix = "/providers/"
 
-// ProvideValidity is the default time that a provider record should last
-var ProvideValidity = time.Hour * 24
+	// ProviderAddrTTL is the TTL to keep the multi addresses of provider
+	// peers around. Those addresses are returned alongside provider. After
+	// it expires, the returned records will require an extra lookup, to
+	// find the multiaddress associated with the returned peer id.
+	ProviderAddrTTL = 24 * time.Hour
+)
+
+// ProvideValidity is the default time that a Provider Record should last on DHT
+// This value is also known as Provider Record Expiration Interval.
+var ProvideValidity = time.Hour * 48
 var defaultCleanupInterval = time.Hour
 var lruCacheSize = 256
 var batchBufferSize = 256
@@ -36,6 +45,7 @@ var log = logging.Logger("providers")
 type ProviderStore interface {
 	AddProvider(ctx context.Context, key []byte, prov peer.AddrInfo) error
 	GetProviders(ctx context.Context, key []byte) ([]peer.AddrInfo, error)
+	io.Closer
 }
 
 // ProviderManager adds and pulls providers out of the datastore,
@@ -50,9 +60,12 @@ type ProviderManager struct {
 
 	newprovs chan *addProv
 	getprovs chan *getProv
-	proc     goprocess.Process
 
 	cleanupInterval time.Duration
+
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 var _ ProviderStore = (*ProviderManager)(nil)
@@ -100,7 +113,7 @@ type getProv struct {
 }
 
 // NewProviderManager constructor
-func NewProviderManager(ctx context.Context, local peer.ID, ps peerstore.Peerstore, dstore ds.Batching, opts ...Option) (*ProviderManager, error) {
+func NewProviderManager(local peer.ID, ps peerstore.Peerstore, dstore ds.Batching, opts ...Option) (*ProviderManager, error) {
 	pm := new(ProviderManager)
 	pm.self = local
 	pm.getprovs = make(chan *getProv)
@@ -116,123 +129,130 @@ func NewProviderManager(ctx context.Context, local peer.ID, ps peerstore.Peersto
 	if err := pm.applyOptions(opts...); err != nil {
 		return nil, err
 	}
-	pm.proc = goprocessctx.WithContext(ctx)
-	pm.proc.Go(func(proc goprocess.Process) { pm.run(ctx, proc) })
+	pm.ctx, pm.cancel = context.WithCancel(context.Background())
+	pm.run()
 	return pm, nil
 }
 
-// Process returns the ProviderManager process
-func (pm *ProviderManager) Process() goprocess.Process {
-	return pm.proc
-}
+func (pm *ProviderManager) run() {
+	pm.wg.Add(1)
+	go func() {
+		defer pm.wg.Done()
 
-func (pm *ProviderManager) run(ctx context.Context, proc goprocess.Process) {
-	var (
-		gcQuery    dsq.Results
-		gcQueryRes <-chan dsq.Result
-		gcSkip     map[string]struct{}
-		gcTime     time.Time
-		gcTimer    = time.NewTimer(pm.cleanupInterval)
-	)
+		var gcQuery dsq.Results
+		gcTimer := time.NewTimer(pm.cleanupInterval)
 
-	defer func() {
-		gcTimer.Stop()
-		if gcQuery != nil {
-			// don't really care if this fails.
-			_ = gcQuery.Close()
-		}
-		if err := pm.dstore.Flush(ctx); err != nil {
-			log.Error("failed to flush datastore: ", err)
+		defer func() {
+			gcTimer.Stop()
+			if gcQuery != nil {
+				// don't really care if this fails.
+				_ = gcQuery.Close()
+			}
+			if err := pm.dstore.Flush(context.Background()); err != nil {
+				log.Error("failed to flush datastore: ", err)
+			}
+		}()
+
+		var gcQueryRes <-chan dsq.Result
+		var gcSkip map[string]struct{}
+		var gcTime time.Time
+		for {
+			select {
+			case np := <-pm.newprovs:
+				err := pm.addProv(np.ctx, np.key, np.val)
+				if err != nil {
+					log.Error("error adding new providers: ", err)
+					continue
+				}
+				if gcSkip != nil {
+					// we have an gc, tell it to skip this provider
+					// as we've updated it since the GC started.
+					gcSkip[mkProvKeyFor(np.key, np.val)] = struct{}{}
+				}
+			case gp := <-pm.getprovs:
+				provs, err := pm.getProvidersForKey(gp.ctx, gp.key)
+				if err != nil && err != ds.ErrNotFound {
+					log.Error("error reading providers: ", err)
+				}
+
+				// set the cap so the user can't append to this.
+				gp.resp <- provs[0:len(provs):len(provs)]
+			case res, ok := <-gcQueryRes:
+				if !ok {
+					if err := gcQuery.Close(); err != nil {
+						log.Error("failed to close provider GC query: ", err)
+					}
+					gcTimer.Reset(pm.cleanupInterval)
+
+					// cleanup GC round
+					gcQueryRes = nil
+					gcSkip = nil
+					gcQuery = nil
+					continue
+				}
+				if res.Error != nil {
+					log.Error("got error from GC query: ", res.Error)
+					continue
+				}
+				if _, ok := gcSkip[res.Key]; ok {
+					// We've updated this record since starting the
+					// GC round, skip it.
+					continue
+				}
+
+				// check expiration time
+				t, err := readTimeValue(res.Value)
+				switch {
+				case err != nil:
+					// couldn't parse the time
+					log.Error("parsing providers record from disk: ", err)
+					fallthrough
+				case gcTime.Sub(t) > ProvideValidity:
+					// or expired
+					err = pm.dstore.Delete(pm.ctx, ds.RawKey(res.Key))
+					if err != nil && err != ds.ErrNotFound {
+						log.Error("failed to remove provider record from disk: ", err)
+					}
+				}
+
+			case gcTime = <-gcTimer.C:
+				// You know the wonderful thing about caches? You can
+				// drop them.
+				//
+				// Much faster than GCing.
+				pm.cache.Purge()
+
+				// Now, kick off a GC of the datastore.
+				q, err := pm.dstore.Query(pm.ctx, dsq.Query{
+					Prefix: ProvidersKeyPrefix,
+				})
+				if err != nil {
+					log.Error("provider record GC query failed: ", err)
+					continue
+				}
+				gcQuery = q
+				gcQueryRes = q.Next()
+				gcSkip = make(map[string]struct{})
+			case <-pm.ctx.Done():
+				return
+			}
 		}
 	}()
+}
 
-	for {
-		select {
-		case np := <-pm.newprovs:
-			err := pm.addProv(np.ctx, np.key, np.val)
-			if err != nil {
-				log.Error("error adding new providers: ", err)
-				continue
-			}
-			if gcSkip != nil {
-				// we have an gc, tell it to skip this provider
-				// as we've updated it since the GC started.
-				gcSkip[mkProvKeyFor(np.key, np.val)] = struct{}{}
-			}
-		case gp := <-pm.getprovs:
-			provs, err := pm.getProvidersForKey(gp.ctx, gp.key)
-			if err != nil && err != ds.ErrNotFound {
-				log.Error("error reading providers: ", err)
-			}
-
-			// set the cap so the user can't append to this.
-			gp.resp <- provs[0:len(provs):len(provs)]
-		case res, ok := <-gcQueryRes:
-			if !ok {
-				if err := gcQuery.Close(); err != nil {
-					log.Error("failed to close provider GC query: ", err)
-				}
-				gcTimer.Reset(pm.cleanupInterval)
-
-				// cleanup GC round
-				gcQueryRes = nil
-				gcSkip = nil
-				gcQuery = nil
-				continue
-			}
-			if res.Error != nil {
-				log.Error("got error from GC query: ", res.Error)
-				continue
-			}
-			if _, ok := gcSkip[res.Key]; ok {
-				// We've updated this record since starting the
-				// GC round, skip it.
-				continue
-			}
-
-			// check expiration time
-			t, err := readTimeValue(res.Value)
-			switch {
-			case err != nil:
-				// couldn't parse the time
-				log.Error("parsing providers record from disk: ", err)
-				fallthrough
-			case gcTime.Sub(t) > ProvideValidity:
-				// or expired
-				err = pm.dstore.Delete(ctx, ds.RawKey(res.Key))
-				if err != nil && err != ds.ErrNotFound {
-					log.Error("failed to remove provider record from disk: ", err)
-				}
-			}
-
-		case gcTime = <-gcTimer.C:
-			// You know the wonderful thing about caches? You can
-			// drop them.
-			//
-			// Much faster than GCing.
-			pm.cache.Purge()
-
-			// Now, kick off a GC of the datastore.
-			q, err := pm.dstore.Query(ctx, dsq.Query{
-				Prefix: ProvidersKeyPrefix,
-			})
-			if err != nil {
-				log.Error("provider record GC query failed: ", err)
-				continue
-			}
-			gcQuery = q
-			gcQueryRes = q.Next()
-			gcSkip = make(map[string]struct{})
-		case <-proc.Closing():
-			return
-		}
-	}
+func (pm *ProviderManager) Close() error {
+	pm.cancel()
+	pm.wg.Wait()
+	return nil
 }
 
 // AddProvider adds a provider
 func (pm *ProviderManager) AddProvider(ctx context.Context, k []byte, provInfo peer.AddrInfo) error {
+	ctx, span := internal.StartSpan(ctx, "ProviderManager.AddProvider")
+	defer span.End()
+
 	if provInfo.ID != pm.self { // don't add own addrs.
-		pm.pstore.AddAddrs(provInfo.ID, provInfo.Addrs, peerstore.ProviderAddrTTL)
+		pm.pstore.AddAddrs(provInfo.ID, provInfo.Addrs, ProviderAddrTTL)
 	}
 	prov := &addProv{
 		ctx: ctx,
@@ -278,6 +298,9 @@ func mkProvKey(k []byte) string {
 // GetProviders returns the set of providers for the given key.
 // This method _does not_ copy the set. Do not modify it.
 func (pm *ProviderManager) GetProviders(ctx context.Context, k []byte) ([]peer.AddrInfo, error) {
+	ctx, span := internal.StartSpan(ctx, "ProviderManager.GetProviders")
+	defer span.End()
+
 	gp := &getProv{
 		ctx:  ctx,
 		key:  k,

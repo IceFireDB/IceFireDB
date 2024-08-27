@@ -85,8 +85,9 @@ func (fs *Filters) RemoveLiteral(ipnet net.IPNet) (removed bool) {
 // default is returned.
 //
 // TODO: currently, the last filter to match wins always, but it shouldn't be that way.
-//  Instead, the highest-specific last filter should win; that way more specific filters
-//  override more general ones.
+//
+//	Instead, the highest-specific last filter should win; that way more specific filters
+//	override more general ones.
 func (fs *Filters) AddrBlocked(a Multiaddr) (deny bool) {
 	var (
 		netip net.IP

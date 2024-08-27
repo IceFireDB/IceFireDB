@@ -2,123 +2,61 @@ package libp2pquic
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
 	"sync"
 	"time"
 
-	"golang.org/x/crypto/hkdf"
-
+	"github.com/libp2p/go-libp2p/core/connmgr"
+	ic "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/pnet"
+	tpt "github.com/libp2p/go-libp2p/core/transport"
 	p2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	"github.com/libp2p/go-libp2p/p2p/transport/quicreuse"
 
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	ic "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/pnet"
-	tpt "github.com/libp2p/go-libp2p-core/transport"
-
+	logging "github.com/ipfs/go-log/v2"
 	ma "github.com/multiformats/go-multiaddr"
 	mafmt "github.com/multiformats/go-multiaddr-fmt"
 	manet "github.com/multiformats/go-multiaddr/net"
-
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/lucas-clemente/quic-go"
-	"github.com/minio/sha256-simd"
+	"github.com/quic-go/quic-go"
 )
+
+const ListenOrder = 1
 
 var log = logging.Logger("quic-transport")
 
 var ErrHolePunching = errors.New("hole punching attempted; no active dial")
 
-var quicDialContext = quic.DialContext // so we can mock it in tests
-
 var HolePunchTimeout = 5 * time.Second
 
-var quicConfig = &quic.Config{
-	MaxIncomingStreams:         256,
-	MaxIncomingUniStreams:      -1,             // disable unidirectional streams
-	MaxStreamReceiveWindow:     10 * (1 << 20), // 10 MB
-	MaxConnectionReceiveWindow: 15 * (1 << 20), // 15 MB
-	AcceptToken: func(clientAddr net.Addr, _ *quic.Token) bool {
-		// TODO(#6): require source address validation when under load
-		return true
-	},
-	KeepAlivePeriod: 15 * time.Second,
-	Versions:        []quic.VersionNumber{quic.VersionDraft29, quic.Version1},
-}
-
-const statelessResetKeyInfo = "libp2p quic stateless reset key"
 const errorCodeConnectionGating = 0x47415445 // GATE in ASCII
-
-type connManager struct {
-	reuseUDP4 *reuse
-	reuseUDP6 *reuse
-}
-
-func newConnManager() (*connManager, error) {
-	reuseUDP4 := newReuse()
-	reuseUDP6 := newReuse()
-
-	return &connManager{
-		reuseUDP4: reuseUDP4,
-		reuseUDP6: reuseUDP6,
-	}, nil
-}
-
-func (c *connManager) getReuse(network string) (*reuse, error) {
-	switch network {
-	case "udp4":
-		return c.reuseUDP4, nil
-	case "udp6":
-		return c.reuseUDP6, nil
-	default:
-		return nil, errors.New("invalid network: must be either udp4 or udp6")
-	}
-}
-
-func (c *connManager) Listen(network string, laddr *net.UDPAddr) (*reuseConn, error) {
-	reuse, err := c.getReuse(network)
-	if err != nil {
-		return nil, err
-	}
-	return reuse.Listen(network, laddr)
-}
-
-func (c *connManager) Dial(network string, raddr *net.UDPAddr) (*reuseConn, error) {
-	reuse, err := c.getReuse(network)
-	if err != nil {
-		return nil, err
-	}
-	return reuse.Dial(network, raddr)
-}
-
-func (c *connManager) Close() error {
-	if err := c.reuseUDP6.Close(); err != nil {
-		return err
-	}
-	return c.reuseUDP4.Close()
-}
 
 // The Transport implements the tpt.Transport interface for QUIC connections.
 type transport struct {
-	privKey      ic.PrivKey
-	localPeer    peer.ID
-	identity     *p2ptls.Identity
-	connManager  *connManager
-	serverConfig *quic.Config
-	clientConfig *quic.Config
-	gater        connmgr.ConnectionGater
-	rcmgr        network.ResourceManager
+	privKey     ic.PrivKey
+	localPeer   peer.ID
+	identity    *p2ptls.Identity
+	connManager *quicreuse.ConnManager
+	gater       connmgr.ConnectionGater
+	rcmgr       network.ResourceManager
 
 	holePunchingMx sync.Mutex
 	holePunching   map[holePunchKey]*activeHolePunch
 
+	rndMx sync.Mutex
+	rnd   rand.Rand
+
 	connMx sync.Mutex
 	conns  map[quic.Connection]*conn
+
+	listenersMu sync.Mutex
+	// map of UDPAddr as string to a virtualListeners
+	listeners map[string][]*virtualListener
 }
 
 var _ tpt.Transport = &transport{}
@@ -134,7 +72,7 @@ type activeHolePunch struct {
 }
 
 // NewTransport creates a new QUIC transport
-func NewTransport(key ic.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (tpt.Transport, error) {
+func NewTransport(key ic.PrivKey, connManager *quicreuse.ConnManager, psk pnet.PSK, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) (tpt.Transport, error) {
 	if len(psk) > 0 {
 		log.Error("QUIC doesn't support private networks yet.")
 		return nil, errors.New("QUIC doesn't support private networks yet")
@@ -147,26 +85,12 @@ func NewTransport(key ic.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, r
 	if err != nil {
 		return nil, err
 	}
-	connManager, err := newConnManager()
-	if err != nil {
-		return nil, err
-	}
-	if rcmgr == nil {
-		rcmgr = network.NullResourceManager
-	}
-	config := quicConfig.Clone()
-	keyBytes, err := key.Raw()
-	if err != nil {
-		return nil, err
-	}
-	keyReader := hkdf.New(sha256.New, keyBytes, nil, []byte(statelessResetKeyInfo))
-	config.StatelessResetKey = make([]byte, 32)
-	if _, err := io.ReadFull(keyReader, config.StatelessResetKey); err != nil {
-		return nil, err
-	}
-	config.Tracer = tracer
 
-	tr := &transport{
+	if rcmgr == nil {
+		rcmgr = &network.NullResourceManager{}
+	}
+
+	return &transport{
 		privKey:      key,
 		localPeer:    localPeer,
 		identity:     identity,
@@ -175,30 +99,20 @@ func NewTransport(key ic.PrivKey, psk pnet.PSK, gater connmgr.ConnectionGater, r
 		rcmgr:        rcmgr,
 		conns:        make(map[quic.Connection]*conn),
 		holePunching: make(map[holePunchKey]*activeHolePunch),
-	}
-	config.AllowConnectionWindowIncrease = tr.allowWindowIncrease
-	tr.serverConfig = config
-	tr.clientConfig = config.Clone()
-	return tr, nil
+		rnd:          *rand.New(rand.NewSource(time.Now().UnixNano())),
+
+		listeners: make(map[string][]*virtualListener),
+	}, nil
+}
+
+func (t *transport) ListenOrder() int {
+	return ListenOrder
 }
 
 // Dial dials a new QUIC connection
-func (t *transport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (tpt.CapableConn, error) {
-	netw, host, err := manet.DialArgs(raddr)
-	if err != nil {
-		return nil, err
-	}
-	addr, err := net.ResolveUDPAddr(netw, host)
-	if err != nil {
-		return nil, err
-	}
-	remoteMultiaddr, err := toQuicMultiaddr(addr)
-	if err != nil {
-		return nil, err
-	}
-	tlsConf, keyCh := t.identity.ConfigForPeer(p)
+func (t *transport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (_c tpt.CapableConn, _err error) {
 	if ok, isClient, _ := network.GetSimultaneousConnect(ctx); ok && !isClient {
-		return t.holePunch(ctx, netw, addr, p)
+		return t.holePunch(ctx, raddr, p)
 	}
 
 	scope, err := t.rcmgr.OpenConnection(network.DirOutbound, false, raddr)
@@ -206,21 +120,27 @@ func (t *transport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (tp
 		log.Debugw("resource manager blocked outgoing connection", "peer", p, "addr", raddr, "error", err)
 		return nil, err
 	}
+
+	c, err := t.dialWithScope(ctx, raddr, p, scope)
+	if err != nil {
+		scope.Done()
+		return nil, err
+	}
+	return c, nil
+}
+
+func (t *transport) dialWithScope(ctx context.Context, raddr ma.Multiaddr, p peer.ID, scope network.ConnManagementScope) (tpt.CapableConn, error) {
 	if err := scope.SetPeer(p); err != nil {
 		log.Debugw("resource manager blocked outgoing connection for peer", "peer", p, "addr", raddr, "error", err)
-		scope.Done()
 		return nil, err
 	}
-	pconn, err := t.connManager.Dial(netw, addr)
+
+	tlsConf, keyCh := t.identity.ConfigForPeer(p)
+	pconn, err := t.connManager.DialQUIC(ctx, raddr, tlsConf, t.allowWindowIncrease)
 	if err != nil {
 		return nil, err
 	}
-	qconn, err := quicDialContext(ctx, pconn, addr, host, tlsConf, t.clientConfig)
-	if err != nil {
-		scope.Done()
-		pconn.DecreaseCount()
-		return nil, err
-	}
+
 	// Should be ready by this point, don't block.
 	var remotePubKey ic.PubKey
 	select {
@@ -228,33 +148,30 @@ func (t *transport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (tp
 	default:
 	}
 	if remotePubKey == nil {
-		pconn.DecreaseCount()
-		scope.Done()
+		pconn.CloseWithError(1, "")
 		return nil, errors.New("p2p/transport/quic BUG: expected remote pub key to be set")
 	}
 
-	localMultiaddr, err := toQuicMultiaddr(pconn.LocalAddr())
+	localMultiaddr, err := quicreuse.ToQuicMultiaddr(pconn.LocalAddr(), pconn.ConnectionState().Version)
 	if err != nil {
-		qconn.CloseWithError(0, "")
+		pconn.CloseWithError(1, "")
 		return nil, err
 	}
 	c := &conn{
-		quicConn:        qconn,
-		pconn:           pconn,
+		quicConn:        pconn,
 		transport:       t,
 		scope:           scope,
-		privKey:         t.privKey,
 		localPeer:       t.localPeer,
 		localMultiaddr:  localMultiaddr,
 		remotePubKey:    remotePubKey,
 		remotePeerID:    p,
-		remoteMultiaddr: remoteMultiaddr,
+		remoteMultiaddr: raddr,
 	}
 	if t.gater != nil && !t.gater.InterceptSecured(network.DirOutbound, p, c) {
-		qconn.CloseWithError(errorCodeConnectionGating, "connection gated")
+		pconn.CloseWithError(errorCodeConnectionGating, "connection gated")
 		return nil, fmt.Errorf("secured connection gated")
 	}
-	t.addConn(qconn, c)
+	t.addConn(pconn, c)
 	return c, nil
 }
 
@@ -270,12 +187,20 @@ func (t *transport) removeConn(conn quic.Connection) {
 	t.connMx.Unlock()
 }
 
-func (t *transport) holePunch(ctx context.Context, network string, addr *net.UDPAddr, p peer.ID) (tpt.CapableConn, error) {
-	pconn, err := t.connManager.Dial(network, addr)
+func (t *transport) holePunch(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (tpt.CapableConn, error) {
+	network, saddr, err := manet.DialArgs(raddr)
 	if err != nil {
 		return nil, err
 	}
-	defer pconn.DecreaseCount()
+	addr, err := net.ResolveUDPAddr(network, saddr)
+	if err != nil {
+		return nil, err
+	}
+	tr, err := t.connManager.TransportForDial(network, addr)
+	if err != nil {
+		return nil, err
+	}
+	defer tr.DecreaseCount()
 
 	ctx, cancel := context.WithTimeout(ctx, HolePunchTimeout)
 	defer cancel()
@@ -301,11 +226,14 @@ func (t *transport) holePunch(ctx context.Context, network string, addr *net.UDP
 	var punchErr error
 loop:
 	for i := 0; ; i++ {
-		if _, err := rand.Read(payload); err != nil {
+		t.rndMx.Lock()
+		_, err := t.rnd.Read(payload)
+		t.rndMx.Unlock()
+		if err != nil {
 			punchErr = err
 			break
 		}
-		if _, err := pconn.UDPConn.WriteToUDP(payload, addr); err != nil {
+		if _, err := tr.WriteTo(payload, addr); err != nil {
 			punchErr = err
 			break
 		}
@@ -346,8 +274,8 @@ loop:
 	}
 }
 
-// Don't use mafmt.QUIC as we don't want to dial DNS addresses. Just /ip{4,6}/udp/quic
-var dialMatcher = mafmt.And(mafmt.IP, mafmt.Base(ma.P_UDP), mafmt.Base(ma.P_QUIC))
+// Don't use mafmt.QUIC as we don't want to dial DNS addresses. Just /ip{4,6}/udp/quic-v1
+var dialMatcher = mafmt.And(mafmt.IP, mafmt.Base(ma.P_UDP), mafmt.Base(ma.P_QUIC_V1))
 
 // CanDial determines if we can dial to an address
 func (t *transport) CanDial(addr ma.Multiaddr) bool {
@@ -356,24 +284,65 @@ func (t *transport) CanDial(addr ma.Multiaddr) bool {
 
 // Listen listens for new QUIC connections on the passed multiaddr.
 func (t *transport) Listen(addr ma.Multiaddr) (tpt.Listener, error) {
-	lnet, host, err := manet.DialArgs(addr)
+	var tlsConf tls.Config
+	tlsConf.GetConfigForClient = func(_ *tls.ClientHelloInfo) (*tls.Config, error) {
+		// return a tls.Config that verifies the peer's certificate chain.
+		// Note that since we have no way of associating an incoming QUIC connection with
+		// the peer ID calculated here, we don't actually receive the peer's public key
+		// from the key chan.
+		conf, _ := t.identity.ConfigForPeer("")
+		return conf, nil
+	}
+	tlsConf.NextProtos = []string{"libp2p"}
+	udpAddr, version, err := quicreuse.FromQuicMultiaddr(addr)
 	if err != nil {
 		return nil, err
 	}
-	laddr, err := net.ResolveUDPAddr(lnet, host)
-	if err != nil {
-		return nil, err
+
+	t.listenersMu.Lock()
+	defer t.listenersMu.Unlock()
+	listeners := t.listeners[udpAddr.String()]
+	var underlyingListener *listener
+	var acceptRunner *acceptLoopRunner
+	if len(listeners) != 0 {
+		// We already have an underlying listener, let's use it
+		underlyingListener = listeners[0].listener
+		acceptRunner = listeners[0].acceptRunnner
+		// Make sure our underlying listener is listening on the specified QUIC version
+		if _, ok := underlyingListener.localMultiaddrs[version]; !ok {
+			return nil, fmt.Errorf("can't listen on quic version %v, underlying listener doesn't support it", version)
+		}
+	} else {
+		ln, err := t.connManager.ListenQUIC(addr, &tlsConf, t.allowWindowIncrease)
+		if err != nil {
+			return nil, err
+		}
+		l, err := newListener(ln, t, t.localPeer, t.privKey, t.rcmgr)
+		if err != nil {
+			_ = ln.Close()
+			return nil, err
+		}
+		underlyingListener = &l
+
+		acceptRunner = &acceptLoopRunner{
+			acceptSem: make(chan struct{}, 1),
+			muxer:     make(map[quic.VersionNumber]chan acceptVal),
+		}
 	}
-	conn, err := t.connManager.Listen(lnet, laddr)
-	if err != nil {
-		return nil, err
+
+	l := &virtualListener{
+		listener:      underlyingListener,
+		version:       version,
+		udpAddr:       udpAddr.String(),
+		t:             t,
+		acceptRunnner: acceptRunner,
+		acceptChan:    acceptRunner.AcceptForVersion(version),
 	}
-	ln, err := newListener(conn, t, t.localPeer, t.privKey, t.identity, t.rcmgr)
-	if err != nil {
-		conn.DecreaseCount()
-		return nil, err
-	}
-	return ln, nil
+
+	listeners = append(listeners, l)
+	t.listeners[udpAddr.String()] = listeners
+
+	return l, nil
 }
 
 func (t *transport) allowWindowIncrease(conn quic.Connection, size uint64) bool {
@@ -397,7 +366,7 @@ func (t *transport) Proxy() bool {
 
 // Protocols returns the set of protocols handled by this transport.
 func (t *transport) Protocols() []int {
-	return []int{ma.P_QUIC}
+	return t.connManager.Protocols()
 }
 
 func (t *transport) String() string {
@@ -405,5 +374,32 @@ func (t *transport) String() string {
 }
 
 func (t *transport) Close() error {
-	return t.connManager.Close()
+	return nil
+}
+
+func (t *transport) CloseVirtualListener(l *virtualListener) error {
+	t.listenersMu.Lock()
+	defer t.listenersMu.Unlock()
+
+	var err error
+	listeners := t.listeners[l.udpAddr]
+	if len(listeners) == 1 {
+		// This is the last virtual listener here, so we can close the underlying listener
+		err = l.listener.Close()
+		delete(t.listeners, l.udpAddr)
+		return err
+	}
+
+	for i := 0; i < len(listeners); i++ {
+		// Swap remove
+		if l == listeners[i] {
+			listeners[i] = listeners[len(listeners)-1]
+			listeners = listeners[:len(listeners)-1]
+			t.listeners[l.udpAddr] = listeners
+			break
+		}
+	}
+
+	return nil
+
 }

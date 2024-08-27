@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/routing"
-
-	ci "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-kad-dht/internal"
+	ci "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/routing"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type pubkrs struct {
@@ -18,6 +20,9 @@ type pubkrs struct {
 // GetPublicKey gets the public key when given a Peer ID. It will extract from
 // the Peer ID if inlined or ask the node it belongs to or ask the DHT.
 func (dht *IpfsDHT) GetPublicKey(ctx context.Context, p peer.ID) (ci.PubKey, error) {
+	ctx, span := internal.StartSpan(ctx, "IpfsDHT.GetPublicKey", trace.WithAttributes(attribute.Stringer("PeerID", p)))
+	defer span.End()
+
 	if !dht.enableValues {
 		return nil, routing.ErrNotSupported
 	}

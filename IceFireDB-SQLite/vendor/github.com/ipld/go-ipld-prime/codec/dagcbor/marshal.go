@@ -99,13 +99,22 @@ func marshal(n datamodel.Node, tk *tok.Token, sink shared.TokenSink, options Enc
 		_, err = sink.Step(tk)
 		return err
 	case datamodel.Kind_Int:
-		v, err := n.AsInt()
-		if err != nil {
-			return err
+		if uin, ok := n.(datamodel.UintNode); ok {
+			v, err := uin.AsUint()
+			if err != nil {
+				return err
+			}
+			tk.Type = tok.TUint
+			tk.Uint = v
+		} else {
+			v, err := n.AsInt()
+			if err != nil {
+				return err
+			}
+			tk.Type = tok.TInt
+			tk.Int = v
 		}
-		tk.Type = tok.TInt
-		tk.Int = int64(v)
-		_, err = sink.Step(tk)
+		_, err := sink.Step(tk)
 		return err
 	case datamodel.Kind_Float:
 		v, err := n.AsFloat()
@@ -144,6 +153,9 @@ func marshal(n datamodel.Node, tk *tok.Token, sink shared.TokenSink, options Enc
 		}
 		switch lnk := v.(type) {
 		case cidlink.Link:
+			if !lnk.Cid.Defined() {
+				return fmt.Errorf("encoding undefined CIDs are not supported by this codec")
+			}
 			tk.Type = tok.TBytes
 			tk.Bytes = append([]byte{0}, lnk.Bytes()...)
 			tk.Tagged = true

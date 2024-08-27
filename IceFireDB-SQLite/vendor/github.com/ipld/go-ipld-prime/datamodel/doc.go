@@ -10,5 +10,4 @@
 // 'traversal' provides some ergonomic features for walking around data graphs;
 // any use of schemas will provide a bunch of useful data validation options;
 // or you can make your own function decorators that do what *you* need.
-//
 package datamodel
