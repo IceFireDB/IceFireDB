@@ -20,8 +20,20 @@ jobs:
     - name: Install dependencies
       run: go mod tidy && go mod vendor
 
-    - name: Build
-      run: make
+    - name: Build release for Linux AMD64
+      run: make build-release-linux-amd64
+
+    - name: Build release for Linux ARM64
+      run: make build-release-linux-arm64
+
+    - name: Build release for Linux ARMv5
+      run: make build-release-linux-armv5
+
+    - name: Build release for Linux ARMv6
+      run: make build-release-linux-armv6
+
+    - name: Build release for Linux ARMv7
+      run: make build-release-linux-armv7
 
   build-icefiredb-sqlite:
     runs-on: ubuntu-latest
