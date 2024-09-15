@@ -31,14 +31,13 @@ Based on cutting-edge computer science, the IceFireDB project integrates new ide
 
 The core of IceFireDB architecture is geographically distributed event source and decentralized Log source, with log-level CRDT replication.In order to realize the consistency of replication, IceFireDB provides a stable decentralized networking model, which allows the combination of public networks among different sites. Multiple IceFireDB nodes can be run inside each site, and RAFT network can be formed between nodes, which ensures the data consistency and stable storage within the same site.
 
-![image](./imgs/icefiredb_dc_logs_sync.png)
-
+![image](https://github.com/user-attachments/assets/b706f093-7d71-4253-94b7-0ecb55bfbcef)
 
 # Decentralized database engine
 
 <p align="center">
 <img 
-    src="./imgs/IceFireDB_helps_applications_achieve_data_decentralization.png" 
+    src="https://github.com/user-attachments/assets/cce03ccd-b6e9-427e-a492-51637db04991" 
      alt="icefiredb-bridge">
 </p>
 
@@ -47,9 +46,10 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
 
 <p align="center">
 <img 
-    src="./imgs/Application_architecture_based_on_IceFireDB.png"
+    src="https://github.com/user-attachments/assets/9e35731b-fea1-4e11-88a1-089323a7f2aa"
      alt="project_purpose">
 </p>
+
 
 | Feature                                                                                                    | Status                        |
 |------------------------------------------------------------------------------------------------------------|-------------------------------|
@@ -72,9 +72,11 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
 
 <p align="center">
 <img 
-    src="./imgs/IceFireDB_Architecture_new.png" 
+    src="https://github.com/user-attachments/assets/f127e510-db14-489b-aec4-479688c20e6c" 
      alt="IceFireDB_Architecture">
 </p>
+
+
 
 [**Documentation center**](https://www.icefiredb.xyz/icefiredb_docs/) : https://www.icefiredb.xyz/icefiredb_docs
 
