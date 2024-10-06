@@ -11,7 +11,6 @@ Much of this code is used in other libraries and products, and we do take some c
 (If you're ever wondering about stability of a feature, ask -- or contribute more tests ;))
 
 - [Planned/Upcoming Changes](#planned-upcoming-changes)
-- [Changes on master branch but not yet Released](#unreleased-on-master)
 - [Released Changes Log](#released-changes)
 
 
@@ -20,34 +19,563 @@ Planned/Upcoming Changes
 
 Here are some outlines of changes we intend to make that affect the public API:
 
-- ... the critical list is empty, for now :)
-
-This is not an exhaustive list of planned changes, and does not include any internal changes, new features, performance improvements, and so forth.
-It's purely a list of things you might want to know about as a downstream consumer planning your update cycles.
-
-We will make these changes "soon" (for some definition of "soon").
-They are currently not written on the master branch.
-The definition of "soon" may vary, in service of a goal to sequence any public API changes in a way that's smooth to migrate over, and make those changes appear at an overall bearable chronological frequency.
-Tagged releases will be made when any of these changes land, so you can upgrade intentionally.
-
-
-Unreleased on master
---------------------
-
-Changes here are on the master branch, but not in any tagged release yet.
-When a release tag is made, this block of bullet points will just slide down to the [Released Changes](#released-changes) section.
-
-- _nothing yet :)_
-
+- **IPLD Amend**: is likely to land soon; it implements a more efficient underlying architecture to support IPLD Patch and related features. IPLD Amend adds an interface to allow incremental changes to `Node`s in an efficient way. Whereas IPLD Patch is a protocol for expressing changes. We're still working on figuring out exactly where it fits in the stack and making sure it won't be disruptive but early benchmarks are very promising for both Patch and traversal-based transforms. See https://github.com/ipld/go-ipld-prime/pull/445 for more.
+- **Layered `Node` implementation optimizations**: When layering different implementations of `Node` builders or consumers, having to defer through basicnode types can lead to large inefficiencies of memory and speed. We are looking at ways to improve this situation, including ways to *assemble* layered assemblers. See https://github.com/ipld/go-ipld-prime/issues/443 for discussion and some initial plans.
+- **Selectors**: There have been some recurring wishes to do something about the Selector package layout.  There's no intended or prioritized date for this.  See https://github.com/ipld/go-ipld-prime/issues/236 for more.
+- **Absent / "Not found" values**: There may be some upcoming changes to exactly how "not found" values are handled in order to clarify and standardize the subject.  There's no finalized date for this.  See https://github.com/ipld/go-ipld-prime/issues/360 for more.
 
 Released Changes
 ----------------
+
+### v0.21.0
+
+_2023 August 10_
+
+go-ipld-prime's release policy says that:
+
+> even numbers should be easy upgrades; odd numbers may change things
+
+This release is an odd number, and it does change some minor things.
+
+#### 🛠 Breaking
+
+* **Build**: The minimum version of Go has been bumped from 1.18 to **1.19**.
+* **Dependencies**: The go-cid dependency was upgraded from v0.3.2 to **v0.4.1**. This is a relatively minor change but the introduction of `ErrInvalidCid` wrapping may be breaking for some users.
+* **Selectors**: Remove hard error when a traversal encounters a slice matcher with a node that is not a string or bytes, by @rvagg [#529](https://github.com/ipld/go-ipld-prime/pull/529)
+
+#### 🔦 Features
+
+* **Traversal**: `Preloader` functionality, by @hannahhoward and @rvagg [#452](https://github.com/ipld/go-ipld-prime/pull/452)
+  * See the [traversal](https://pkg.go.dev/github.com/ipld/go-ipld-prime/traversal) package documentation for more information on how a `Preloader` can be used to introduce parallelism into a traversal. The [Lassie](https://github.com/filecoin-project/lassie) project is currently using this functionality to speed up Bitswap block fetching; future releases of go-ipld-prime may include additional functionality being prototyped in Lassie to manage parallelism and caching.
+* **Schemas**: Support `listpairs` struct representation in DSL parsing, by @rvagg [#514](https://github.com/ipld/go-ipld-prime/pull/514)
+* **Schemas**: Support `inline` union representation in DSL parsing, by @rvagg [#527](https://github.com/ipld/go-ipld-prime/pull/527)
+* **Bindnode**: Support `listpairs` struct representation, by @rvagg [#514](https://github.com/ipld/go-ipld-prime/pull/514)
+* **Selectors**: Support negative values for slice matcher's `From` and `To`, by @rvagg [#530](https://github.com/ipld/go-ipld-prime/pull/530)
+  * The slice matcher is currently being used to support byte-range fetching for the [IPFS Trustless Gateway](https://specs.ipfs.tech/http-gateways/trustless-gateway/) specification. Work is ongoing and can be seen in both the [Lassie](https://github.com/filecoin-project/lassie) and [Frisbii](https://github.com/filecoin-project/lassie) projects.
+  * _Please note that this feature is currently considered **experimental** and shoule be used with care and with the expectation that it may change in the near future. Expect a release or two before this feature is considered stable._
+
+#### 🩹 Fixes
+
+* **Traversal**: `StartAtPath` work properly for matching walks, by @rvagg [#500](https://github.com/ipld/go-ipld-prime/pull/500)
+* **Traversal**: `WalkTransforming()` work properly, by @EdSchouten [#516](https://github.com/ipld/go-ipld-prime/pull/516)
+* **Basicnode**: `basic.NewInt()` returns a pointer like other constructors, by @hacdias [#525](https://github.com/ipld/go-ipld-prime/pull/525)
+* **Selectors**: Cache offsets for sequential reads in slice matcher, by @rvagg [#529](https://github.com/ipld/go-ipld-prime/pull/529)
+
+#### 🌟 Thanks!
+
+Thanks to @hacdias and @EdSchouten for their first contributions to go-ipld-prime!
+
+### v0.20.0
+
+go-ipld-prime's release policy says that:
+
+> even numbers should be easy upgrades; odd numbers may change things
+
+As such, v0.20.0 is a relatively minor release with a grab-bag of small improvements and fixes.
+
+_2023 February 11_
+
+Schema errors can now [`errors.Is`](https://pkg.go.dev/errors#Is):
+
+* \[[`61c9ab10d4`](https://github.com/ipld/go-ipld-prime/commit/61c9ab10d4)] - **feat**: support errors.Is for schema errors (Ian Davis) [#476](https://github.com/ipld/go-ipld-prime/pull/476)
+
+Schema DMT (schema/dmt) is now more usable from the outside and has a new `ConcatenateSchemas` function that can be used to combine two schemas into one:
+
+* \[[`db9d8a7512`](https://github.com/ipld/go-ipld-prime/commit/db9d8a7512)] - Export schema/dmt.TypeSystem. (Eric Myhre) [#483](https://github.com/ipld/go-ipld-prime/pull/483)
+* \[[`39818c169a`](https://github.com/ipld/go-ipld-prime/commit/39818c169a)] - Add a SchemaConcatenate operation. (Eric Myhre) [#483](https://github.com/ipld/go-ipld-prime/pull/483)
+* \[[`c68ba53c67`](https://github.com/ipld/go-ipld-prime/commit/c68ba53c67)] - More accurate name for structure that contains easy access to prototypes. (Eric Myhre) [#483](https://github.com/ipld/go-ipld-prime/pull/483)
+* \[[`2ecabf1217`](https://github.com/ipld/go-ipld-prime/commit/2ecabf1217)] - Add several pieces of docs to schema/dmt. (Eric Myhre)
+* \[[`33475f0448`](https://github.com/ipld/go-ipld-prime/commit/33475f0448)] - Fix mispatched package declaration. (Eric Myhre)
+
+The DAG-CBOR codec now has an `DontParseBeyondEnd` option (default `false`) that allows it to parse undelimited streamed objects. This matches the same functionality already in DAG-JSON and should only be used for specialised cases:
+
+* \[[`7b00b1490f`](https://github.com/ipld/go-ipld-prime/commit/7b00b1490f)] - feat(dagcbor): mode to allow parsing undelimited streamed objects (Rod Vagg) [#490](https://github.com/ipld/go-ipld-prime/pull/490)
+
+`datamodel.Copy` got some direct test coverage and will now complain if you try to copy a `nil` node:
+
+* \[[`f4bb2daa27`](https://github.com/ipld/go-ipld-prime/commit/f4bb2daa27)] - fix(datamodel): add tests to Copy, make it complain on nil (Rod Vagg) [#491](https://github.com/ipld/go-ipld-prime/pull/491)
+
+The LinkSystem data loading check will compare links (CIDs) to ensure it loaded what you wanted; this now properly supports the case where your link is a pointer:
+
+* \[[`1fc56b8e7a`](https://github.com/ipld/go-ipld-prime/commit/1fc56b8e7a)] - Fix hash mismatch error on matching link pointer (Masih H. Derkani) [#480](https://github.com/ipld/go-ipld-prime/pull/480)
+
+### v0.19.0
+
+_2022 October 13_
+
+go-ipld-prime's release policy says that:
+
+> even numbers should be easy upgrades; odd numbers may change things
+
+The major change in this release is a bump to Go 1.18.
+
+#### 🛠 Breaking Changes
+
+Update go.mod to Go 1.18.
+
+#### 🔦 Highlights
+
+* **Codecs**: [Correct JSON codec Bytes handling](https://github.com/ipld/go-ipld-prime/pull/472). This change does not impact DAG-JSON, which is the generally recommended codec for JSON output as the JSON codec cannot properly handle Bytes or Links.
+* **Dependencies**:
+  * Update to go-multihash@v0.2.1: https://github.com/multiformats/go-multihash/releases/tag/v0.2.1
+  * Update to go-multicodec@v0.6.0: https://github.com/multiformats/go-multicodec/releases/tag/v0.6.0
+  * Update to go-cid@v0.3.2: https://github.com/ipfs/go-cid/compare/v0.2.0...v0.3.2
+
+### v0.18.0
+
+_2022 August 01_
+
+go-ipld-prime's release policy says that:
+
+> even numbers should be easy upgrades; odd numbers may change things
+
+So, as an even number, this v0.18.0 release should be a smooth ride for upgraders from v0.17.0. We have 3 major feature additions, all focused on [Bindnode](https://pkg.go.dev/github.com/ipld/go-ipld-prime/node/bindnode).
+
+#### 🔦 Highlights
+
+* **Bindnode**: [Custom Go type converters](https://github.com/ipld/go-ipld-prime/pull/414) - Bindnode performs bidirectional mapping of Go types to the IPLD Data Model, and in doing so, it assumes a straightforward mapping of values to their encoded forms. But there are common cases where a Go type doesn't have a straightforward path to serialization, either because the encoded form needs a custom layout, or because bindnode doesn't have enough information to infer a serialization pattern. Custom Go type converters for bindnode allow a user to supply a pair of converter functions for a Go type that dictate how to map that type to an IPLD Data Model kind. See the **[bindnode documentation](https://pkg.go.dev/github.com/ipld/go-ipld-prime/node/bindnode)** for more information.
+* **Bindnode**: [Type registry](https://github.com/ipld/go-ipld-prime/pull/437) - Setting up Go type mappings with Bindnode involves some boilerplate. A basic type registry is now available that takes some of this boilerplate away; giving you a single place to register, and perform conversions to and from Go types, Data Model (`Node`) forms or directly through serialization. See the **[bindnode/registry documentation](https://pkg.go.dev/github.com/ipld/go-ipld-prime/node/bindnode/registry)** for more information.
+* **Bindnode** [Full `uint64` support](https://github.com/ipld/go-ipld-prime/pull/414/commits/87211682cb963ef1c98fa63909f67a8b02d1108c) - the `uint64` support introduced in go-ipld-prime@v0.17.0 has been wired into Bindnode. The Data Model (`Node`) forms expose integers as `int64` values, which is lossy for unsigned 64-bit integers. Bindnode Go types using `uint64` values are now lossless in round-trips through serialization to codecs that support the full range (DAG-CBOR most notably).
+
+You can see all of these new features in action using Filecoin Go types, allowing a mapping between Go types, Data Model (`Node`) forms, and their DAG-CBOR serialized forms with [data-transfer vouchers](https://github.com/filecoin-project/go-fil-markets/pull/713). These features also allow us to interact with the original Go types, without modification, including `big.Int` serialization to `Bytes`, Filecoin `Signature` serialization to a byte-prefix discriminated `Bytes` and more. Since the Go types are unchanged, they can also simultaneously support [cbor-gen](https://github.com/whyrusleeping/cbor-gen) serialization, allowing an easier migration path.
+
+### v0.17.0
+
+_2022 Jun 15_
+
+go-ipld-prime's release policy says that:
+
+> even numbers should be easy upgrades; odd numbers may change things
+
+In that spirit, this v0.17.0 release includes some potentially breaking changes. Although minor, they are marked below and they may lead to behavioral changes in your use of this library.
+
+#### 🛠 Breaking Changes
+
+* **Codecs**:
+  * DAG-CBOR, DAG-JSON: [Error on `cid.Undef` links in dag{json,cbor} encoding](https://github.com/ipld/go-ipld-prime/pull/433) - previously, encoding Link nodes that were empty CIDs (uninitialized zero-value or explicitly `cid.Undef`) would have passed through the DAG-CBOR or DAG-JSON codecs, silently producing erroneous output that wouldn't successfully pass back through a decode. (Rod Vagg)
+* **Bindnode**:
+  * [Panic early if API has been passed ptr-to-ptr](https://github.com/ipld/go-ipld-prime/pull/427) - previous usage of bindnode using pointers-to-pointers may have deferred (or in some cases avoided) panics until deeper usage of the API, this change makes it earlier to make it clear that pointer-to-pointer is not appropriate usage. (Rod Vagg)
+* **Build**:
+  * [Drop Go 1.16.x testing & begin testing Go 1.18.x](https://github.com/ipld/go-ipld-prime/pull/394) (Daniel Martí)
+  * Note also that in this release, the [github.com/ipfs/**go-cid**](https://github.com/ipfs/go-cid) dependency is upgraded from 0.0.4 to 0.2.0 which includes a breaking change with the removal of the `cid.Codecs` and `cid.CodecToStr` maps which may disruptive. See [the go-cid@0.2.0 release page for details](https://github.com/ipfs/go-cid/releases/tag/v0.2.0).
+
+#### 🔦 Highlights
+
+* **Data Model**:
+  * [Introduce `UIntNode` interface, used within DAG-CBOR codec to quietly support full uint64 range](https://github.com/ipld/go-ipld-prime/pull/413) (Rod Vagg)
+* **Bindnode**:
+  * Fuzzing and hardening for production use (Daniel Martí)
+  * Refuse to decode empty union values (Daniel Martí)
+  * [Allow nilable types for IPLD `optional`/`nullable`](https://github.com/ipld/go-ipld-prime/pull/401) (Daniel Martí)
+  * [More helpful error message for common enum value footgun](https://github.com/ipld/go-ipld-prime/pull/430) (Rod Vagg)
+  * [Infer links and `Any` from Go types](https://github.com/ipld/go-ipld-prime/pull/432) (Rod Vagg)
+* **Schemas**:
+  * DMT: Proper checking for unknown union members (Daniel Martí)
+  * DMT: Enum representations must be valid members (Daniel Martí)
+  * DMT: Reject duplicate or missing union representation members (Daniel Martí)
+  * DSL: [Support `stringjoin` struct representation and `stringprefix` union representation](https://github.com/ipld/go-ipld-prime/pull/397) (Eric Evenchick)
+  * DMT, DSL: [Enable inline types](https://github.com/ipld/go-ipld-prime/pull/404) (Rod Vagg)
+* **Patch**:
+  * [Add initial version of IPLD Patch feature](https://github.com/ipld/go-ipld-prime/pull/350) (Eric Myhre) *(helped across the line by mauve and Rod Vagg)*
+* **Codecs**:
+  * DAG-CBOR: [Reject extraneous content after valid (complete) CBOR object](https://github.com/ipld/go-ipld-prime/pull/386) (Rod Vagg)
+  * DAG-CBOR: [add `DecodeOptions.ExperimentalDeterminism`](https://github.com/ipld/go-ipld-prime/pull/390) (currently only checking map sorting order) (Daniel Martí)
+  * Printer: [Fix printing of floats](https://github.com/ipld/go-ipld-prime/pull/412) (Dustin Long)
+  * DAG-JSON: [Add option to not parse beyond end of structure](https://github.com/ipld/go-ipld-prime/pull/435) (Petar Maymounkov)
+* **Build**:
+  * Fix [macOS](https://github.com/ipld/go-ipld-prime/pull/400) and [Windows](https://github.com/ipld/go-ipld-prime/pull/405) testing (Rod Vagg)
+  * [Fix 32-bit build support](https://github.com/ipld/go-ipld-prime/pull/407) (Rod Vagg)
+  * [Make staticcheck and govet happy across codebase](https://github.com/ipld/go-ipld-prime/pull/406) (Rod Vagg)
+  * Enable full [unified-ci](https://github.com/protocol/.github) GitHub Actions suite, including auto-updating (Rod Vagg)
+  * [Enable dependabot, with monthly checks](https://github.com/ipld/go-ipld-prime/pull/417) (and update all dependencies) (Rod Vagg)
+
+Special thanks to **Daniel Martí** for many bindnode improvements and hardening, fuzzing across the library and improvements to the Schema DMT and DSL.
+
+### v0.16.0
+
+_2022 March 09_
+
+- New: `traversal.WalkTransforming` is finally implemented!  (It's been a stub for quite a while.)  This works similarly to the other transform features, but can do more than change to the structure during a single walk.
+- New: Selectors support partial/ranged match on bytes or strings nodes.  (This is also a new feature for Selectors, recently specified.)
+  [[#375](https://github.com/ipld/go-ipld-prime/pull/375); seealso specs in [ipld#184](https://github.com/ipld/ipld/pull/184)]
+- New: there's a `datamodel.LargeBytesNode` interface, which makes it possible to handle "large" blobs of bytes as a `Node`, without necessarily forcing them all into memory at once.  (This is optional; you add the methods to match the interface if your Node implementation supports the feature.)
+  [[#372](https://github.com/ipld/go-ipld-prime/pull/372)]
+	- Slightly more specifically: this interface is `Node` plus a method that returns an `io.ReadSeeker`.  (Pretty standard golang I/O and byte slice management concepts should carry you from there in the usual ways.)
+	- This is a **really big deal** -- for example, this means that an [ADL](https://ipld.io/docs/advanced-data-layouts/) can support reading of arbitrarily large bytes without an issue.  (Hello, transparently readable large sharded blobs!)
+- New: there's a "resume" (or, skipahead) mechanism for traversals and selectors.  Engage it by simply setting the `traversal.Config.StartAtPath` field.
+  [[#358](https://github.com/ipld/go-ipld-prime/pull/358)]
+- New: `dagcbor` now has a `EncodedLength(Node) int` function, which can calculate the expected serial message length without actually encoding.  (The usefulness of this may be situational, but it's there if you want it.)
+- Improved: `bindnode`, yet again, in more ways that can easily be summarized.
+	- Better support for pointers in more places in your golang types.
+	- Many panics either fixed or routed into calmer errors.
+	- Unsigned intergers are now supported in your golang types.
+	- Some fixes for AssignNode working correctly (e.g. at the type or representation level, as appropriate; sometimes previously it would use the type level incorrectly).
+	- Various fixes to handling absent fields correctly.
+	- A `datamodel.Node` can now be used for an `any` field.
+- Fixed: selectors now behave correctly for a recursion clause that just contains a recursion edge immedately.  (It's still not a sensible selector, really, but it's valid.)  Previously this would panic, which was nasty.
+- Fixed: `bindnode` now correctly doesn't include absent fields in the count of length when looking at the representation-level view of structs.
+- Improved: all our batteries-included codecs double check while encoding that the number iterator steps over a map matches its self-reported length.  (This doesn't matter in many cases, but does defend you a little better against a `Node` implementation with a bug, if you happen to be so unlucky.)
+- Improved: miscellaneous performance work in the `schema/*` area.
+
+Thank you to @mvdan, @warpfork, @hannahhoward, @rvagg, @willscott, @arajasek and others
+for all their work that went into making this release (as well as all the point releases in v0.14.x leading up to it) happen.
+
+Finally, please note that we're starting to try out some new (and slightly more formal) governance and review and merge processes.
+Check out https://github.com/ipld/go-ipld-prime/issues/370 for more information.
+The aim is to make things generally more inclusive and involve more contributors!
+This is still experimental and may be subject to change, but if you'd like to have better expectations about who can review and what the process should be like, we hope this will be a step in a helpful direction.
+(Feedback about this experiment welcome!)
+
+
+### v0.14.x
+
+(There were releases `v0.14.1`, `v0.14.2`, `v0.14.3`, and `v0.14.4` -- but all were in rapid succession, very minor, and hitting the same areas; we'll keep the notes brief and condensed.)
+
+- New: Selectors can include clauses for signalling the use of ADLs!
+  [[#301](https://github.com/ipld/go-ipld-prime/pull/301); seealso specs in [ipld#149](https://github.com/ipld/ipld/pull/149)+[ipld#170](https://github.com/ipld/ipld/pull/170)]
+	- Also kindly note that there are expected to be many ways of signalling ADL invocations -- this is only one of them.
+	  See the IPLD website for more on this topic as a whole: https://ipld.io/docs/advanced-data-layouts/signalling/
+- Improved: `bindnode`, in ways more various than can easily be summarized.
+	- The `cidlink.Link` type can be bound to links in the data.
+	- Enums are now supported.
+	- The `any` typekind is now supported.
+- Improved: both the `schema/dmt` and `schema/dsl` packages (and in some cases, the `schema` package itself) continue to be improved and become more complete.
+	- Structs with tuple representation are now supported.
+	- Enums with int representation are now supported.
+	- The `any` typekind is now supported.
+- Changed: the dag-json codec will tolerate padded base64 in bytes content upon read.  It does so silently.  (It is not still possible to emit this kind of serial data with this library; it is noncanonical.)
+  [[#309](https://github.com/ipld/go-ipld-prime/pull/309)]
+- Changed: the cbor and dag-cbor codec will now tolerate CBOR's "undef" token.  It will coerce it to a null token when reading.  Previously, encountering the undef token would result in a parse error.  (It is still not possible to emit this token with this library.)
+  [[#308](https://github.com/ipld/go-ipld-prime/pull/308)]
+- New: the `traversal` package gained a `WalkLocal` function.  This simply does a walk that does not cross any links.
+
+
+### v0.14.0
+
+_2021 November 11_
+
+This release is a smooth-sailing release, and mostly contains new features, quality-of-life improvements,
+and some significant improvements to the completeness and usability of features that have been in development across previous releases.
+There shouldn't be a lot of surprises, and upgrading should be easy.
+
+Some of the biggest improvements include: `bindnode` now supports most IPLD features and is increasingly stable;
+the `schema` system now has functioning `schema/dmt` and `schema/dsl` packages, and can parse schema documents smoothly(!);
+if you haven't seen the `printer` package that first quietly appeared in `v0.12.2`, you should definitely check it out now;
+and we have some new `storage` APIs that might be worth checking out, too.
+There are also many, many other smaller improvements.
+
+See the complete list and further deatils below
+(and don't forget to check out the notes under the other `v0.12.*` headings, if you haven't absorbed those updates already, too!):
+
+- New: `datamodel.Copy`: a helper function to do a shallow copy from one node to another.
+	- You don't often need this, because nodes are supposed to be immutable!
+	  But it still sometimes comes in handy, for example, if you want to change the memory layout you're using by moving data into a different node implementation.
+- Improved: documentation of APIs.  (Especially, for subtler bits like `NodeAssembler.AssignNode`.)
+- New: `datamodel.Link` now requires a `Binary()` function.  In contrast to `Link.String()` (which is supposed to return something printable), `Link.Binary()` should give you the rawest thing possible.  (It's equivalent to `go-cid.CID.KeyString`.)
+- New: **a new storage API**, including one **batteries-included** filesystem storage implementation, and **adapters** to several other different storage APIs.  [[#265](https://github.com/ipld/go-ipld-prime/pull/265), [#279](https://github.com/ipld/go-ipld-prime/pull/279)]
+	- The primary goal of this is the "batteries included" part: using the new `storage/fsstore` package, you should now be able to make simple applications with IPLD and use a simple sharded disk storage system (it'll look vaguely like a `.git/objects` directory), and do it in about five minutes and without pulling in any additional complex dependencies.
+	- If you want to develop new storage systems or make adapters to them: the APIs in `storage` package are designed to be implemented easily.
+		- The `storage` APIs are designed entirely around types found in the golang standard library.  You do not need to import anything in the `storage` package in order to implement its interfaces!
+		- The minimal APIs that a storage system has to implement are _very_ small.  Two functions.  Every additional feature, or optimization that you can offer: those all have their own interfaces, and we use feature-detection on them.  You can implement as much or as little as you like.
+	- As a user of the storage APIs: use the functions in the `storage` package.  Those functions take a storage system as a parameter, and will do feature detection _for you_.
+		- This means you can always write your code to call the APIs you _want_, and the `storage` functions will figure out how to map it onto the storage system that you _have_ (whatever it supports) in the most efficient way it can.
+	- As a user of the `LinkSystem` API: you can ignore most of this!  If you want to use the new `storage` APIs, there are setup methods on `LinkSystem` that will take them as a parameter.  If you have existing code wired up with the previous APIs, it still works too.
+	- As someone who already has code and wonders how to migrate:
+		- If you're using the `linking.Storage*Opener` API: you don't have to do anything.  Those still work too.
+		- If you were using code from other repos like `ipfs/go-ipfs-blockstore` or `ipfs/go-datastore` or so on: those have adapters now in the `storage/*adapter` packages!  You should now be able to use those more easily, with less custom glue code.  (There's also now a migration readme in the repo root: check that out.)
+	- If you would like to ask: "is it fast?" -- yes.  You'll find that the new `storage/fsstore`, our batteries-included filesystem storage system, is comparable (or beating) the `go-ds-flatfs` package that you may have been using in the past.  (More benchmarks and any performance improvement patches will of course be welcome -- but at the very least, there's no reason to hold back on using the new system.)
+- New: `LinkSystem` has some new methods: `LoadRaw` and `LoadPlusRaw` give you the ability to get data model nodes loaded, and _also_ receive the raw binary blobs.
+	- This can be useful if you're building an application that's piping data around to other serial APIs without necessarily transforming it.  (No need to reserialize if that's your journey.)
+- New: a CLI tool has begun development!
+	- ... and almost immediately been removed again, to live in its own repo: check out https://github.com/ipld/go-ipldtool .
+- Improved: many more things about `bindnode`.
+	- `bindnode` now understands `go-cid.CID` fields.
+	- Kinded unions are much more completely supported.
+	- Many TODO panics have gone away, replaced by finished features.
+	- `bindnode` will increasingly check that the golang types you give it can be structurally matched to the schema if you provide one, which gives better errors earlier, and increases the ease and safety of use drastically.
+- Improved: the `schema/dmt` and `schema/dsl` packages are increasingly complete.
+	- There are also now helper functions in the root package which will do the whole journey of "load a file, parse the Schema DSL, compile and typecheck the DMT, and give you the type info in handy golang interfaces", all at once!  Check out `ipld.LoadSchema`!
+- New: there is a codegen feature for `bindnode` which will produce very terse golang structs matching a schema and ready to be bound back to `bindnode`!
+	- This competes with the older `gengo` code generator -- by comparison, the `bindnode` code generator produces much, _much_ less code.  (However, be advised that the performance characteristics are probably also markedly different; and we do not have sufficient benchmarks to comment on this at this time.)
+- Internal: many tests are being ported to `quicktest`.  There should be no external impact to this, but we look forward to removing some of the other test libraries from our dependency tree in the near future.
+- Improved: `printer` now supports links and bytes!
+- Improved: `printer` is now more resilient and works even on relatively misbehaved `Node` implementations, such as those which implement `schema.TypedNode` but then rudely and nonsensically return nil type info.  (We don't expect all code to be resilient against misbehaved `Node` implementations... but for a debug tool in particular?  It's good to have it handle as much as it can.)
+
+
+This, and the last few releases tagged in the `v0.12.*` series, include invaluable contributions from
+@mvdan, @warpfork, @rvagg, @willscott, @masih, @hannahhoward, @aschmahmann, @ribasushi,
+and probably yet more others who have contributed through code and design reviews,
+or by using these libraries and demanding they continue to become better.
+Thanks to each and every one of the people who carry this project forward!
+
+
+### v0.12.3
+
+_2021 September 30_
+
+(This is a minor release; we'll keep the notes brief.)
+
+- Fixed: using `SkipMe` in a traversal now skips only that subtree of nodes, not the remainder of the block!
+  [[#251](https://github.com/ipld/go-ipld-prime/pull/251)]
+- New: `traversal` features now have budgets!  You can set a "budget" value, and watch it monotonically decrement as your operations procede.  This makes it easy to put limits on the amount of work you'll do.
+  [[#260](https://github.com/ipld/go-ipld-prime/pull/260)]
+- New: `traversal` features can be configured to visit links they encounter only once (and ignore them if seen again).
+  [[#252](https://github.com/ipld/go-ipld-prime/pull/252)]
+	- Note that this is not without caveats: this is not merely an optimization; enabling it _may_ produce logically different outcomes, depending on what your selector is.
+	  This is because links are ignored when seen again, even if they're seen for a different _reason_, via a different path, etc.
+- Fixed: a very nasty off-by-one in unions produced by the "gogen" codegen.
+  [[#257](https://github.com/ipld/go-ipld-prime/pull/257)]
+- Improved: the test suites for typed nodes now provide much better coverage (to prevent something like the above from happening again, even in other implementations).
+- New: `schema/dsl`!  This package contains parsers for the IPLD Schema DSL, and produces data structures in `schema/dmt` form.
+- Removed: other misc partially-complete packages.  (This will surely bother no one; it's just cleanup.)
+- Removed: `codec/jst`.  If you were using that, [`jst` has its own repo](https://github.com/warpfork/go-jst/) now.
+- Improved: `traversal` now uses the error wrapping ("`%w`") feature in more places.
+- Changed: `printer` keeps empty maps and lists and strings on a single line.
+- Changed: `schema.TypeName` is now just an alias of `string`.  This may result in somewhat less casting; or, you might not notice it.
+- Improved: the `schema/dmt` package continues to be improved and become more complete.
+	- Some changes also track fixes in the schema spec, upstream.  (Or caused those fixes!)
+- New/Improved: the `schema` package describes several more things which it always should have.  Enums, for example.
+
+
+
+### v0.12.2
+
+_2021 September 8_
+
+(This is a minor release; we'll keep the notes brief.)
+
+- New: the `printer` package has appeared, and aims to provide an information-rich, debug-readable, human-friendly output of data from an IPLD node tree. [[#238](https://github.com/ipld/go-ipld-prime/pull/238/)]
+	- This works for both plain data model data, and for typed data, and annotates type information if present.
+	- Note that this is _not_ a codec: it's specifically _richer_ than that.  Conversely, this printer format is not designed to be parsed back to data model data.  Use a codec for a codec's job; use the printer for debugging and inspection jobs.
+- Fixed/Improved: more things about the `bindnode` system.  (It's still early and improving fast.)
+- Fixed: json codec, cbor codec, and their dag variants all now return ErrUnexpectedEOF in the conditions you'd expect.  (Previously they sometimes just returned EOF, which could be surprising.)
+- Changed/Improved: the `schema/dmt` package is now implemented using `bindnode`, and there's a more complete `Compile()` feature.  (This is still very early, in this tag.  More to come here soon.)
+
+
+
+### v0.12.1
+
+_2021 August 30_
+
+(This is a minor release; we'll keep the notes brief.)
+
+- Fixed/Improved: many things about the `bindnode` system.  (It's still early and improving fast.)
+- Changed: the strings for `schema.TypeKind_*` are lowercase.  (The docs and specs all act this way, and always have; it was a strange error for this code to have titlecase.)
+- New: the root package contains more helper methods for encoding and decoding operations
+
+
+
+### v0.12.0
+
+_2021 August 19_
+
+This release is a momentous one.  It contains a sizable refactor:
+we've extracted some of the most key interfaces to a new package, called `datamodel`!
+
+It's also an even numbered release tag, which we generally use to indicate "upgrading should be smooth sailing".
+Surprisingly, despite the magnitude of the refactor, we mean that, too.
+Golang's "alias" feature has been used _heavily_ for this change process,
+and downstream code that worked on the previous release should continue to work on this release too, without syntactic changes.
+
+Why did we do this?
+
+The root package, `ipld`, is now going to be a place where we can put helpful functions.
+Synthesis functions that put all the pieces of IPLD together for you.
+The functions you're probably looking for; the high-level stuff that gets work done.
+
+Previously, the root package was _guts_: the lowest level interfaces, the more core stuff...
+which was cool to see (arguably), but tended not to be the things you'd want to see _first_ as a new user.
+And because everything _else_ in the world depended on those interface,
+we could never put interesting high-level functions in the same package
+(or if we tried, compilation would fail, because of import cycles)...
+which meant any time we wanted to add helper functions for getting useful work done,
+we'd be stuck cramming them off into subpackages somewhere.
+While this worked, the discoverability for a new user was terribly arduous.
+
+We hope this pivot to how we organize the code helps you find your way through IPLD!
+
+We haven't yet added many of the new helper features to the updated root package.
+Those will come in the very near future.
+(Follow along with commits on the master branch if you want to try the new APIs early!)
+This release is being made just to cover the refactor, before we steam along any further.
+
+Your existing code should continue working without changes because the root `ipld` package
+still contains all the same types -- just as aliases.
+You can choose to update your code to use the types where they've moved to
+(which is mostly the `datamodel` package), or, if you prefer... just leave it as-is.
+Some aliases may be removed over time; if so, they'll be marked with a comment to that effect,
+and there should be plenty of warning and time to change.
+
+In some cases, continuing to use the `ipld` package directly will remain acceptable indefinitely.
+The new intention is that common work should often be possible to do only by
+importing the `ipld` package, and users should only need to dive into
+the more specific subpackages if they been to need direct access to more detailed APIs
+for performance or other reasons.
+
+That's it for the big refactor news.
+
+There's also some sweet new features in bindnode,
+and a few other important fixes to recently introduced features.
+
+In detail:
+
+- Changed: that massive refactor, described above.  Gosh it's big.
+  [[#228](https://github.com/ipld/go-ipld-prime/pull/228)]
+- New: the selectors system is tested against the language-agnostic selector specs, from the IPLD specs+docs repo!
+  [[#231](https://github.com/ipld/go-ipld-prime/pull/231)]
+	- This uses a new fixture format, called [testmark](https://github.com/warpfork/go-testmark#what-is-the-testmark-format), which is managed by a library called [go-testmark](https://pkg.go.dev/github.com/warpfork/go-testmark).
+	- The fixtures are drawn in by a git submodule.  The actual fixture content remains in the [ipld/ipld](https://github.com/ipld/ipld/) repo.
+	- These new tests will be run if you have cloned the git submodule (and of course, by CI).  If you do not clone the submodule that contains the fixtures, the tests will quietly skip.
+	- We hope this will be a template for how to do more testing in the future, while keeping it closely coordinated with specs, and in sync with other implementations of IPLD in other languages!
+- Improved: bindnode: in a variety of ways.
+  [[#226](https://github.com/ipld/go-ipld-prime/pull/226)]
+	- Several error messages are improved.
+	- Kinded unions support complex recipients even for string kinds.  (E.g., putting a struct with stringjoin representation inside a kinded union now works correctly.)
+	- Stringprefix unions now work even with no explicit delimiter.
+	- Please note that bindnode is, and remains, considered experimental.  While we're improving it, it's still something to use at your own risk.
+- Changed/Improved: bindnode: unions are now handled completely differently (and much better).
+  [[#223](https://github.com/ipld/go-ipld-prime/pull/223)]
+	- In short: now they expect a golang struct which has a field for each of the possible members, and each of them should be a pointer.  This is type safe and works reasonably idiomatically in golang.
+	- This is a fairly huge improvement, because it fixes the "bindnode unions force downshift into anonymous types" problem, which was tracked as [issue#210](https://github.com/ipld/go-ipld-prime/issues/210).
+- Fixed: the selector `ExploreRecursive.stopAt` feature now actually... works.  It was completely broken when it was introduced in the last release.  (Tests.  They're important.)
+  [[#229](https://github.com/ipld/go-ipld-prime/pull/229)]
+	- Notice how we've also now got selector tests driven by fixtures appearing in this release.  Hopefully that decreases the odds of something like this happening again.
+
+
+
+### v0.11.0
+
+_2021 August 12_
+
+This release is an odd numbered release, which means it may contain breaking changes.
+
+Unfortunately, the changes here may be particularly, tricky, as well -- for the most part, they're not compile-time detectable.
+They're behavioral changes.  Much more subtle.  Run tests on your systems before accepting these changes.
+Specifically: several codecs now enforce sorting when emitting serial data.
+
+There's also some details of what's changing that makes it milder than it first sounds:
+most of the changes are around codecs becoming *more* spec-compliant.
+So, for example, if you were using another IPLD library that always enforced sorting on e.g. DAG-CBOR,
+you won't be surprised or experience it much like a "change" when using this version of go-ipld-prime, which now also enforces such sorting in that codec.
+
+Also!  At least one huge and awesome new feature: `bindnode`.
+This is a new implementation of `ipld.Node` which can bind to native golang structures using reflection,
+which provides a new and easy-to-use way to move data in and out of golang structures (or traverse them, etc!) with IPLD interfaces and codecs.
+
+See the full change list for details:
+
+- New: some new helpful constructors for making Selectors out of serial forms can now be found in the `traversal/selector/parse` package.
+  [[#199](https://github.com/ipld/go-ipld-prime/pull/199)]
+	- Some constants are also included which show some examples of creating common selectors from JSON.
+- Fixed: cbor, dag-cbor, json, and dag-json codecs now all accept parsing a block that contains just a null token alone.  (Previously, this returned an "unexpected EOF" error, which was silly.)
+  [[#217](https://github.com/ipld/go-ipld-prime/pull/217)]
+- Fixed (upstream): json floats are actually supported.  (You might've had this already, if anything dragged in a newer version of the `refmt` library.  We just make sure to require this ourselves in our `go.mod` file now.)
+  [[#215](https://github.com/ipld/go-ipld-prime/pull/215)]
+- New: Selectors now support some kinds of conditions.  Specifically, `ExploreRecursive` clauses can contain a `stopAt` condition, and the condition system now supports `Condition_IsLink`, which can be used to do an equality check for CIDs.
+  [[#214](https://github.com/ipld/go-ipld-prime/pull/214)]
+- Fixed: in codegen'd types, the `LinkTargetNodePrototype` on links was returning the wrong prototype; now it returns the right one.
+  [[#211](https://github.com/ipld/go-ipld-prime/pull/211)]
+- New: `schema.TypedPrototype` interface, which is like `ipld.NodePrototype` but also has methods for asking `Type() schema.Type` and `Representation() ipld.NodePrototype`, both of which should probably instantly make sense to you.
+  [[#195](https://github.com/ipld/go-ipld-prime/pull/195)]
+- Changed: the dag-json and dag-cbor codecs now apply sorting.
+  [[#203](https://github.com/ipld/go-ipld-prime/pull/203), [#204](https://github.com/ipld/go-ipld-prime/pull/204)]
+	- This means all serial data created with these codecs is sorted as advised by their respective specifications.
+	  Previously, the implementations of these codecs was order-preserving, and emitted data in whatever order the `ipld.Node` yielded it.
+	- There may be new performance costs originating from this sorting.
+	- The codecs do not reject other orderings when parsing serial data.
+	  The `ipld.Node` trees resulting from deserialization will still preserve the serialized order.
+	  However, it has now become impossible to re-encode data in that same preserved order.
+	- If doing your own encoding, there are customization options in `dagcbor.EncodeOptions.MapSortMode` and `dagjson.EncodeOptions.MapSortMode`.
+	  (However, note that these options are not available to you while using any systems that only operate in terms of multicodec codes.)
+	- _Be cautious of this change._  It is now extremely easy to write code which puts data into an `ipld.Node` in memory in one order,
+	  then save and load that data using these codecs, and end up with different data as a result because the sorting changes the order of data.
+	  For some applications, this may not be a problem; for others, it may be surprising.
+	  In particular, mind this carefully in the presense of other order-sensitive logic -- for example,
+	  such as when using Selectors, whose behaviors also depend on ordering of data returned when iterating over an `ipld.Node`.
+- Fixed/Changed: the dag-json codec no longer emits whitespace (!).  It is now spec-compliant.
+  [[#202](https://github.com/ipld/go-ipld-prime/pull/202)]
+	- This means hashes of content produced by dag-json codec will change.  This is unfortunate, but the previous implementation was woefully and wildly out of sync with the spec, and addressing that is a predominating concern.
+- Removed: `fluent/quip` has been dropped.  `fluent/qp` is superior.  `fluent/quip` was too easy to use incorrectly, so we no longer offer it.
+  [[#197](https://github.com/ipld/go-ipld-prime/pull/197)]
+	- This was an experimental package introduced a few releases ago, together with caveats that we may choose to drop it.  The warning was purposeful!
+	  We don't believe that this will be too painful of a change; not many things depended on the `fluent/quip` variant, and those that did should not be difficult to rewrite to `fluent/qp`.
+- New: `node/basic.Chooser` is a function that implements `traversal.LinkTargetNodePrototypeChooser`.  It's a small handy quality-of-life increase if you need to supply such a function, which is common.
+  [[#198](https://github.com/ipld/go-ipld-prime/pull/198)]
+- New: `bindnode`!  **This is a huge feature.**  The beginnings of it may have been visible in v0.10.0, but it's grown into a usable thing we're ready to talk about.
+	- Bindnode lets you write golang types and structures, and "bind" them into being IPLD Nodes and supporting Data Model operations by using golang reflection.
+	- The result of working with `bindnode` is somewhere between using basicnode and using codegen:
+	  it's going to provide some structural constraints (like codegen) and provide moderate performance (it lets you use structs rather than memory-expensive maps; but reflection is still going to be slower than codegen).
+	- However, most importantly, `bindnode` is *nice to use*.  It doesn't have a huge barrier to entry like codegen does.
+	- `bindnode` can be used with _or without_ IPLD Schemas.  For basic golang types, a schema can be inferred automatically.  For more advanced features (e.g. any representation customization), you can provide a Schema.
+	- Please note that though it is now usable, bindnode remains _in development_.  There is not yet any promise that it will be frozen against changes.
+		- In fact, several changes are expected; in particular, be advised there is some sizable change expected around the shape of golang types expected for unions.
+- Improved: tests for behavior of schema typed nodes are now extracted to a package, where they are reusable.
+	- The same tests now cover the `bindnode` implementation, as well as being used in tests of our codegen outputs.
+	- Previously, these tests were already mostly agnostic of implementation, but had been thrown into packages in a way that made them hard to reuse.
+- Improved (or Fixed, depending on your point of view): dag-json codec now supports bytes as per the spec.
+  [[#166](https://github.com/ipld/go-ipld-prime/pull/166),[#216](https://github.com/ipld/go-ipld-prime/pull/216)]
+	- Bytes are encoded in roughly this form: `{"/":{"bytes":"base64data"}}`.
+	- Note: the json codec does _not_ include this behavior; this is behavior specific to dag-json.
+
+
+
+### v0.10.0
+
+_2021 June 02_
+
+v0.10.0 is a mild release, containing _no_ breaking changes, but lots of cool new stuff.  Update at your earliest convenience.
+
+There's a bunch of cool new features in here, some of which are significant power-ups for the ecosystem (e.g. the `NodeReifier` API), so we recommend updating as soon as possible.
+
+There's also some sizable performance improvements available for generated code, so go forth and update your generated code too!
+
+Check out the full feature list:
+
+- New: an `ipld.DeepEqual` method lets you easily compare two `ipld.Node` for equality.  (This is useful in case you have nodes with two different internal implementations, different memory layouts, etc, such that native golang equality would not be semantically correct.)
+  [[#174](https://github.com/ipld/go-ipld-prime/pull/174)]
+- New: the multicodec package exposes a `multicodec.Registry` type, and also some `multicodec.List*` methods.
+  [[#172](https://github.com/ipld/go-ipld-prime/pull/172), [#176](https://github.com/ipld/go-ipld-prime/pull/176)]
+	- Please be cautious of using these `List*` methods.  It's very possible to create race conditions with these, especially if using them on the global default registry instance.
+	  If we detect that these access methods seem to produce a source of bugs and design errors in downstream usage, they will be removed.
+	  Consider doing whatever you're doing by buildling your own registry systems, and attaching whatever semantics your system desires to those systems, rather than shoehorning this intentionally limited system into doing things it isn't made to do.
+- Improved: the dag-json codec now actually supports bytes!
+  (Perhaps surprisingly, this was a relatively recent addition to the dag-json spec.  We've now caught up with it.)
+  [[#166](https://github.com/ipld/go-ipld-prime/pull/166)]
+- Improved: the codegen system now gofmt's the generated code immediately.  You no longer need to do this manually in a separate step.
+  [[#163](https://github.com/ipld/go-ipld-prime/pull/163)]
+- Improved: the codegen system is slightly faster at emitting code (due to use of more buffering during writes).
+  [[#161](https://github.com/ipld/go-ipld-prime/pull/161)]
+- Improved: the codegen system will now avoid pointers in the generated "Maybe" types, if they're known to be small in memory (and thus, reasonable to inline).
+  [[#160](https://github.com/ipld/go-ipld-prime/pull/160)]
+	- This is quite likely to result in performance improvements for most programs, as it decreases the number of small memory allocations done, and amount of time spent on dereferencing, cache misses, etc.
+	  Some workloads demonstrated over 10% speed increases, and 40% decreases in allocation counts.
+	  (Of course, run your own benchmarks; not all workloads are equal.)
+- New: `ipld.LinkSystem` now contains a "reification" hook system.  **This is really cool.**
+	- The center of this is the `ipld.LinkSystem.NodeReifier` field, and the `ipld.NodeReifier` function type.
+	- The `ipld.NodeReifier` function type is simply `func(LinkContext, Node, *LinkSystem) (Node, error)`.
+	- The purpose and intention of this is: you can use this hooking point in order to decide where to engage advanced IPLD features like [ADLs](https://ipld.io/glossary/#adl).
+	  One can use a `NodeReifier` to decide what ADLs to use and when... even when in the middle of a traversal.
+	- For example: one could write a NodeReifier that says "when I'm in a path that ends with '`foosys/*/hamt`', i'm going to try to load that as if it's a HAMT ADL".
+	  With that hook in place, you'd then be able to walks over whole forests of data with `traversal.*` functions, and they would automatically load the relevant ADL for you transparently every time that pattern is encountered, without disrupting or complicating the walk.
+	- In the future, we might begin to offer more structural and declaratively configurable approaches to this, and eventually, attempt to standardize them.
+	  For now: you can build any solution you like using this hook system.  (And we'll probably plug in any future declarative systems via these same hooks, too.)
+	- All this appeared in [#158](https://github.com/ipld/go-ipld-prime/pull/158).
+- New: `ipld.LinkSystem` now contains a boolean flag for `TrustedStorage`.  If set to true, it will cause methods like `Load` to _skip hashing_ when loading content.  **_Do not do this unless you know what you're doing._**
+  [[#149](https://github.com/ipld/go-ipld-prime/pull/149)]
+- New: a json (as opposed to dag-json) codec is now available from this repo.  It does roughly what you'd expect.  (It's like dag-json, but explicitly rejects encoding links and bytes, and correspondingly does not have dag-json's special decoding behaviors that produce those kinds.)
+  [[#152](https://github.com/ipld/go-ipld-prime/pull/152)]
+- New: a cbor (as opposed to dag-cbor) codec is now available from this repo.  Same story as the json codec: it just explicitly doesn't support links (because you should use dag-cbor if you want that).
+  [[#153](https://github.com/ipld/go-ipld-prime/pull/153)]
+
+This contained a ton of contributions from lots of people: especially thanks to @mvdan, @hannahhoward, and @willscott for invaluable contributions.
+
+
 
 ### v0.9.0
 
 _2021 March 15_
 
-v0.9.0 is a pretty significant release, including several neat new convenience features, but most noticiably, significantly reworking how linking works.
+v0.9.0 is a pretty significant release, including several neat new convenience features, but most noticeably, significantly reworking how linking works.
 
 Almost any code that deals with storing and linking data will need some adaptation to handle this release.
 We're sorry about the effort this may require, but it should be worth it.
@@ -65,7 +593,7 @@ in this case there simply weren't enough interesting points in between to be wor
 	- The PR can be found here: https://github.com/ipld/go-ipld-prime/pull/143
 	- `Link.Load` -> `LinkSystem.Load` (or, new: `LinkSystem.Fill`, which lets you control memory allocation more explicitly).
 	- `LinkBuilder.Build` -> `LinkSystem.Store`.
-	- `LinkSystem.ComputeLink` is a new feature that prodices a Link without needing to store the data anywhere.
+	- `LinkSystem.ComputeLink` is a new feature that produces a Link without needing to store the data anywhere.
 	- The `ipld.Loader` function is now most analogous to `ipld.BlockReadOpener`.  You now put it into use by assigning it to a `LinkLoader`'s `StorageReadOpener` field.
 	- The `ipld.Storer` function is now most analogous to `ipld.BlockWriteOpener`.  You now put it into use by assigning it to a `LinkLoader`'s `StorageWriteOpener` field.
 	- 99% of the time, you'll probably start with `linking/cid.DefaultLinkSystem()`.  You can assign to fields of this to customize it further, but it'll get you started with multihashes and multicodecs and all the behavior you expect when working with CIDs.
@@ -75,7 +603,7 @@ in this case there simply weren't enough interesting points in between to be wor
 	- In the _future_, further improvements will come from this: we're now much, much closer to making a bunch of transitive dependencies become optional (especially, various hashers, which currently, whenever you pull in the `linking/cid` package, come due to `go-cid`, and are quite large).  When these improvements land (again, they're not in this release), you'll need to update your applications to import hashers you need if they're not in the golang standard library.  For now: there's no change.
 - Change: multicodec registration is now in the `go-ipld-prime/multicodec` package.
 	- Previously, this registry was in the `linking/cid` package.  These things are now better decoupled.
-	- This wil require packages which register codecs to make some very small updates: e.g. `s/cidlink.RegisterMulticodecDecoder/multicodec.RegisterDecoder/`, and correspondingly, update the package imports at the top of the file.
+	- This will require packages which register codecs to make some very small updates: e.g. `s/cidlink.RegisterMulticodecDecoder/multicodec.RegisterDecoder/`, and correspondingly, update the package imports at the top of the file.
 - New: some pre-made storage options (e.g. satisfying the `ipld.StorageReadOpener` and `ipld.StorageWriteOpener` function interfaces) have appeared!  Find these in the `go-ipld-prime/storage` package.
 	- Currently this only includes a simple in-memory storage option.  This may be useful for testing and examples, but probably not much else :)
 	- These are mostly intended to be illustrative.  You should still expect to find better storage mechanisms in other repos.
@@ -187,9 +715,6 @@ Therefore, we suggest upgrading to this one first, beacuse it's an easy waypoint
 	- The main goal in mind for this is to provide reusable components to make it easier to implement new codecs.  But maybe there will be other uses for this feature too!
 	- These APIs are brand new and are _extremely subject to change_, much more so than any other packages in this repo.  If you work with them at this stage, _do_ expect to need to update your code when things shift.
 
-
-Released Changes
-----------------
 
 ### v0.5.0
 

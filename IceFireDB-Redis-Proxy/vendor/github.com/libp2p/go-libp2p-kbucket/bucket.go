@@ -6,7 +6,7 @@ import (
 	"container/list"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // PeerInfo holds all related information for a peer in the K-Bucket.
@@ -118,15 +118,6 @@ func (b *bucket) remove(id peer.ID) bool {
 		}
 	}
 	return false
-}
-
-func (b *bucket) moveToFront(id peer.ID) {
-
-	for e := b.list.Front(); e != nil; e = e.Next() {
-		if e.Value.(*PeerInfo).Id == id {
-			b.list.MoveToFront(e)
-		}
-	}
 }
 
 func (b *bucket) pushFront(p *PeerInfo) {

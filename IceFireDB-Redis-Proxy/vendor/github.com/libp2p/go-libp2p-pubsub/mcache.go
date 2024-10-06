@@ -3,9 +3,7 @@ package pubsub
 import (
 	"fmt"
 
-	pb "github.com/libp2p/go-libp2p-pubsub/pb"
-
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // NewMessageCache creates a sliding window cache that remembers messages for as
@@ -27,23 +25,25 @@ func NewMessageCache(gossip, history int) *MessageCache {
 		panic(err)
 	}
 	return &MessageCache{
-		msgs:    make(map[string]*pb.Message),
+		msgs:    make(map[string]*Message),
 		peertx:  make(map[string]map[peer.ID]int),
 		history: make([][]CacheEntry, history),
 		gossip:  gossip,
-		msgID:   DefaultMsgIdFn,
+		msgID: func(msg *Message) string {
+			return DefaultMsgIdFn(msg.Message)
+		},
 	}
 }
 
 type MessageCache struct {
-	msgs    map[string]*pb.Message
+	msgs    map[string]*Message
 	peertx  map[string]map[peer.ID]int
 	history [][]CacheEntry
 	gossip  int
-	msgID   MsgIdFunction
+	msgID   func(*Message) string
 }
 
-func (mc *MessageCache) SetMsgIdFn(msgID MsgIdFunction) {
+func (mc *MessageCache) SetMsgIdFn(msgID func(*Message) string) {
 	mc.msgID = msgID
 }
 
@@ -52,18 +52,18 @@ type CacheEntry struct {
 	topic string
 }
 
-func (mc *MessageCache) Put(msg *pb.Message) {
+func (mc *MessageCache) Put(msg *Message) {
 	mid := mc.msgID(msg)
 	mc.msgs[mid] = msg
 	mc.history[0] = append(mc.history[0], CacheEntry{mid: mid, topic: msg.GetTopic()})
 }
 
-func (mc *MessageCache) Get(mid string) (*pb.Message, bool) {
+func (mc *MessageCache) Get(mid string) (*Message, bool) {
 	m, ok := mc.msgs[mid]
 	return m, ok
 }
 
-func (mc *MessageCache) GetForPeer(mid string, p peer.ID) (*pb.Message, int, bool) {
+func (mc *MessageCache) GetForPeer(mid string, p peer.ID) (*Message, int, bool) {
 	m, ok := mc.msgs[mid]
 	if !ok {
 		return nil, 0, false

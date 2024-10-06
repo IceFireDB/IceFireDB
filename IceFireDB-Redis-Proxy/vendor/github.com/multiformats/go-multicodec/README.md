@@ -7,8 +7,14 @@
 ## Table of Contents
 
 - [Install](#install)
+- [Type](#type)
 - [Usage](#usage)
+  - [Importing Code constant](#importing-code-constant)
+  - [Code from string](#code-from-string)
+  - [Code from uint64](#code-from-uint64)
 - [Generator](#generator)
+  - [With old table.csv](#with-old-tablecsv)
+  - [With updated table.csv](#with-updated-tablecsv)
 - [Maintainers](#maintainers)
 - [Contribute](#contribute)
 - [License](#license)
@@ -19,7 +25,18 @@
 
 	go get github.com/multiformats/go-multicodec
 
+
+## Type
+
+`Code` describes an integer reserved in the multicodec table, defined at [multiformats/multicodec/table.csv](https://github.com/multiformats/multicodec/blob/master/table.csv).
+
+```go
+type Code uint64
+```
+
 ## Usage
+
+### Importing Code constant
 
 ```go
 package main
@@ -27,21 +44,53 @@ package main
 import "github.com/multiformats/go-multicodec"
 
 func main() {
-	_ = multicodec.Sha2_256
+	code := multicodec.Sha2_256 // Code
+	name := multicodec.Sha2_256.String()
 }
 ```
 
 The corresponding `name` value for each codec from the [multicodecs table](https://raw.githubusercontent.com/multiformats/multicodec/master/table.csv) can be accessed via its `String` method. For example, `multicodec.Sha2_256.String()` will return `sha2-256`.
 
+### Code from string
+
+```go
+var multicodec.Code code 
+err := code.Set("libp2p-key")
+```
+
+
+### Code from uint64
+
+```go
+rawCode := multicodec.Code(0x55)
+```
+
 ## Generator
+
+### With old table.csv
 
 To generate the constants yourself:
 
-	git clone https://github.com/multiformats/go-multicodec
-	cd go-multicodec
-	go generate
+```console
+$ git clone https://github.com/multiformats/go-multicodec
+$ cd go-multicodec
+$ git submodule init && git submodule update
+$ go generate
+```
 
 Note: You may need to install `stringer` via `go install golang.org/x/tools/cmd/stringer`.
+
+### With updated table.csv
+
+To generate the constants for the latest [table.csv](https://github.com/multiformats/multicodec/blob/master/table.csv):
+
+```console
+$ git clone https://github.com/multiformats/go-multicodec
+$ cd go-multicodec
+$ git submodule init
+$ git submodule update --remote # updates ./multicodec/table.csv to upstream version
+$ go generate
+```
 
 ## Maintainers
 

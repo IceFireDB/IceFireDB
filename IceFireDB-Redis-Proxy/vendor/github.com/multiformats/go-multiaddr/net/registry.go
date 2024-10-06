@@ -44,39 +44,6 @@ func NewCodecMap() *CodecMap {
 	}
 }
 
-// NetCodec is used to identify a network codec, that is, a network type for
-// which we are able to translate multiaddresses into standard Go net.Addr
-// and back.
-//
-// Deprecated: Unfortunately, these mappings aren't one to one. This abstraction
-// assumes that multiple "networks" can map to a single multiaddr protocol but
-// not the reverse. For example, this abstraction supports `tcp6, tcp4, tcp ->
-// /tcp/` really well but doesn't support `ip -> {/ip4/, /ip6/}`.
-//
-// Please use `RegisterFromNetAddr` and `RegisterToNetAddr` directly.
-type NetCodec struct {
-	// NetAddrNetworks is an array of strings that may be returned
-	// by net.Addr.Network() calls on addresses belonging to this type
-	NetAddrNetworks []string
-
-	// ProtocolName is the string value for Multiaddr address keys
-	ProtocolName string
-
-	// ParseNetAddr parses a net.Addr belonging to this type into a multiaddr
-	ParseNetAddr FromNetAddrFunc
-
-	// ConvertMultiaddr converts a multiaddr of this type back into a net.Addr
-	ConvertMultiaddr ToNetAddrFunc
-
-	// Protocol returns the multiaddr protocol struct for this type
-	Protocol ma.Protocol
-}
-
-// RegisterNetCodec adds a new NetCodec to the default codecs.
-func RegisterNetCodec(a *NetCodec) {
-	defaultCodecs.RegisterNetCodec(a)
-}
-
 // RegisterFromNetAddr registers a conversion from net.Addr instances to multiaddrs.
 func RegisterFromNetAddr(from FromNetAddrFunc, networks ...string) {
 	defaultCodecs.RegisterFromNetAddr(from, networks...)
@@ -85,18 +52,6 @@ func RegisterFromNetAddr(from FromNetAddrFunc, networks ...string) {
 // RegisterToNetAddr registers a conversion from multiaddrs to net.Addr instances.
 func RegisterToNetAddr(to ToNetAddrFunc, protocols ...string) {
 	defaultCodecs.RegisterToNetAddr(to, protocols...)
-}
-
-// RegisterNetCodec adds a new NetCodec to the CodecMap. This function is
-// thread safe.
-func (cm *CodecMap) RegisterNetCodec(a *NetCodec) {
-	cm.lk.Lock()
-	defer cm.lk.Unlock()
-	for _, n := range a.NetAddrNetworks {
-		cm.addrParsers[n] = a.ParseNetAddr
-	}
-
-	cm.maddrParsers[a.ProtocolName] = a.ConvertMultiaddr
 }
 
 // RegisterFromNetAddr registers a conversion from net.Addr instances to multiaddrs

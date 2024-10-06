@@ -57,16 +57,16 @@ effective instructions for how one could build a copy of that node, using
 the same implementation details.
 
 By example, if some node `n` was made as a `basicnode.plainString`,
-then `n.Prototype()` will be `basicnode.Prototype__String{}`,
+then `n.Prototype()` will be `basicnode.Prototype.String`,
 and `n.Prototype().NewBuilder().AssignString("xyz")` can be presumed to work.
 
 Note there are also limits to this: if a node was built in a flexible way,
 the prototype it reports later may only report what it is now, and not return
 that same flexibility again.
 By example, if something was made as an "any" -- i.e.,
-via `basicnode.Prototype__Any{}.NewBuilder()`, and then *happened* to be assigned a string value --
+via `basicnode.Prototype.Any.NewBuilder()`, and then *happened* to be assigned a string value --
 the resulting node will still carry a `Prototype()` property that returns
-`Prototype__String` -- **not** `Prototype__Any`.
+`basicnode.Prototype.String` -- **not** `basicnode.Prototype.Any`.
 
 #### NodePrototype meets generic transformation
 
@@ -102,7 +102,7 @@ and might be wrapped with additional rules (such as map key uniqueness, field
 name expectations, etc).
 
 (Note that it's also not an exclusive statement about what `AssignNode(Node)` will
-accept; e.g. in many situations, while a `Prototype__MyStringType` might be the prototype
+accept; e.g. in many situations, while a `Prototype.MyStringType` might be the prototype
 returned, any string kinded node can be used in `AssignNode(Node)` and will be
 appropriately converted.)
 

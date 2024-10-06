@@ -10,7 +10,7 @@
 //
 // A CIDv1 has four parts:
 //
-//     <cidv1> ::= <multibase-prefix><cid-version><multicodec-packed-content-type><multihash-content-address>
+//	<cidv1> ::= <multibase-prefix><cid-version><multicodec-packed-content-type><multihash-content-address>
 //
 // As shown above, the CID implementation relies heavily on Multiformats,
 // particularly Multibase
@@ -22,6 +22,7 @@ package cid
 import (
 	"bytes"
 	"encoding"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,28 +37,53 @@ import (
 // UnsupportedVersionString just holds an error message
 const UnsupportedVersionString = "<unsupported cid version>"
 
+// ErrInvalidCid is an error that indicates that a CID is invalid.
+type ErrInvalidCid struct {
+	Err error
+}
+
+func (e ErrInvalidCid) Error() string {
+	return fmt.Sprintf("invalid cid: %s", e.Err)
+}
+
+func (e ErrInvalidCid) Unwrap() error {
+	return e.Err
+}
+
+func (e ErrInvalidCid) Is(err error) bool {
+	switch err.(type) {
+	case ErrInvalidCid, *ErrInvalidCid:
+		return true
+	default:
+		return false
+	}
+}
+
 var (
 	// ErrCidTooShort means that the cid passed to decode was not long
 	// enough to be a valid Cid
-	ErrCidTooShort = errors.New("cid too short")
+	ErrCidTooShort = ErrInvalidCid{errors.New("cid too short")}
 
 	// ErrInvalidEncoding means that selected encoding is not supported
 	// by this Cid version
 	ErrInvalidEncoding = errors.New("invalid base encoding")
 )
 
-// These are multicodec-packed content types. The should match
-// the codes described in the authoritative document:
-// https://github.com/multiformats/multicodec/blob/master/table.csv
+// Consts below are DEPRECATED and left only for legacy reasons:
+// <https://github.com/ipfs/go-cid/pull/137>
+// Modern code should use consts from go-multicodec instead:
+// <https://github.com/multiformats/go-multicodec>
 const (
-	Raw = 0x55
+	// common ones
+	Raw         = 0x55
+	DagProtobuf = 0x70   // https://ipld.io/docs/codecs/known/dag-pb/
+	DagCBOR     = 0x71   // https://ipld.io/docs/codecs/known/dag-cbor/
+	DagJSON     = 0x0129 // https://ipld.io/docs/codecs/known/dag-json/
+	Libp2pKey   = 0x72   // https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md#peer-ids
 
-	DagProtobuf = 0x70
-	DagCBOR     = 0x71
-	Libp2pKey   = 0x72
-
-	GitRaw = 0x78
-
+	// other
+	GitRaw                = 0x78
+	DagJOSE               = 0x85 // https://ipld.io/specs/codecs/dag-jose/spec/
 	EthBlock              = 0x90
 	EthBlockList          = 0x91
 	EthTxTrie             = 0x92
@@ -79,62 +105,6 @@ const (
 	FilCommitmentSealed   = 0xf102
 )
 
-// Codecs maps the name of a codec to its type
-var Codecs = map[string]uint64{
-	"v0":                      DagProtobuf,
-	"raw":                     Raw,
-	"protobuf":                DagProtobuf,
-	"cbor":                    DagCBOR,
-	"libp2p-key":              Libp2pKey,
-	"git-raw":                 GitRaw,
-	"eth-block":               EthBlock,
-	"eth-block-list":          EthBlockList,
-	"eth-tx-trie":             EthTxTrie,
-	"eth-tx":                  EthTx,
-	"eth-tx-receipt-trie":     EthTxReceiptTrie,
-	"eth-tx-receipt":          EthTxReceipt,
-	"eth-state-trie":          EthStateTrie,
-	"eth-account-snapshot":    EthAccountSnapshot,
-	"eth-storage-trie":        EthStorageTrie,
-	"bitcoin-block":           BitcoinBlock,
-	"bitcoin-tx":              BitcoinTx,
-	"zcash-block":             ZcashBlock,
-	"zcash-tx":                ZcashTx,
-	"decred-block":            DecredBlock,
-	"decred-tx":               DecredTx,
-	"dash-block":              DashBlock,
-	"dash-tx":                 DashTx,
-	"fil-commitment-unsealed": FilCommitmentUnsealed,
-	"fil-commitment-sealed":   FilCommitmentSealed,
-}
-
-// CodecToStr maps the numeric codec to its name
-var CodecToStr = map[uint64]string{
-	Raw:                   "raw",
-	DagProtobuf:           "protobuf",
-	DagCBOR:               "cbor",
-	GitRaw:                "git-raw",
-	EthBlock:              "eth-block",
-	EthBlockList:          "eth-block-list",
-	EthTxTrie:             "eth-tx-trie",
-	EthTx:                 "eth-tx",
-	EthTxReceiptTrie:      "eth-tx-receipt-trie",
-	EthTxReceipt:          "eth-tx-receipt",
-	EthStateTrie:          "eth-state-trie",
-	EthAccountSnapshot:    "eth-account-snapshot",
-	EthStorageTrie:        "eth-storage-trie",
-	BitcoinBlock:          "bitcoin-block",
-	BitcoinTx:             "bitcoin-tx",
-	ZcashBlock:            "zcash-block",
-	ZcashTx:               "zcash-tx",
-	DecredBlock:           "decred-block",
-	DecredTx:              "decred-tx",
-	DashBlock:             "dash-block",
-	DashTx:                "dash-tx",
-	FilCommitmentUnsealed: "fil-commitment-unsealed",
-	FilCommitmentSealed:   "fil-commitment-sealed",
-}
-
 // tryNewCidV0 tries to convert a multihash into a CIDv0 CID and returns an
 // error on failure.
 func tryNewCidV0(mhash mh.Multihash) (Cid, error) {
@@ -142,10 +112,10 @@ func tryNewCidV0(mhash mh.Multihash) (Cid, error) {
 	// incorrectly detect it as CidV1 in the Version() method
 	dec, err := mh.Decode(mhash)
 	if err != nil {
-		return Undef, err
+		return Undef, ErrInvalidCid{err}
 	}
 	if dec.Code != mh.SHA2_256 || dec.Length != 32 {
-		return Undef, fmt.Errorf("invalid hash for cidv0 %d-%d", dec.Code, dec.Length)
+		return Undef, ErrInvalidCid{fmt.Errorf("invalid hash for cidv0 %d-%d", dec.Code, dec.Length)}
 	}
 	return Cid{string(mhash)}, nil
 }
@@ -170,22 +140,32 @@ func NewCidV0(mhash mh.Multihash) Cid {
 // Panics if the multihash is invalid.
 func NewCidV1(codecType uint64, mhash mh.Multihash) Cid {
 	hashlen := len(mhash)
-	// two 8 bytes (max) numbers plus hash
-	buf := make([]byte, 1+varint.UvarintSize(codecType)+hashlen)
-	n := varint.PutUvarint(buf, 1)
-	n += varint.PutUvarint(buf[n:], codecType)
-	cn := copy(buf[n:], mhash)
+
+	// Two 8 bytes (max) numbers plus hash.
+	// We use strings.Builder to only allocate once.
+	var b strings.Builder
+	b.Grow(1 + varint.UvarintSize(codecType) + hashlen)
+
+	b.WriteByte(1)
+
+	var buf [binary.MaxVarintLen64]byte
+	n := varint.PutUvarint(buf[:], codecType)
+	b.Write(buf[:n])
+
+	cn, _ := b.Write(mhash)
 	if cn != hashlen {
 		panic("copy hash length is inconsistent")
 	}
 
-	return Cid{string(buf[:n+hashlen])}
+	return Cid{b.String()}
 }
 
-var _ encoding.BinaryMarshaler = Cid{}
-var _ encoding.BinaryUnmarshaler = (*Cid)(nil)
-var _ encoding.TextMarshaler = Cid{}
-var _ encoding.TextUnmarshaler = (*Cid)(nil)
+var (
+	_ encoding.BinaryMarshaler   = Cid{}
+	_ encoding.BinaryUnmarshaler = (*Cid)(nil)
+	_ encoding.TextMarshaler     = Cid{}
+	_ encoding.TextUnmarshaler   = (*Cid)(nil)
+)
 
 // Cid represents a self-describing content addressed
 // identifier. It is formed by a Version, a Codec (which indicates
@@ -219,14 +199,23 @@ func Parse(v interface{}) (Cid, error) {
 	case Cid:
 		return v2, nil
 	default:
-		return Undef, fmt.Errorf("can't parse %+v as Cid", v2)
+		return Undef, ErrInvalidCid{fmt.Errorf("can't parse %+v as Cid", v2)}
 	}
+}
+
+// MustParse calls Parse but will panic on error.
+func MustParse(v interface{}) Cid {
+	c, err := Parse(v)
+	if err != nil {
+		panic(err)
+	}
+	return c
 }
 
 // Decode parses a Cid-encoded string and returns a Cid object.
 // For CidV1, a Cid-encoded string is primarily a multibase string:
 //
-//     <multibase-type-code><base-encoded-string>
+//	<multibase-type-code><base-encoded-string>
 //
 // The base-encoded string represents a:
 //
@@ -243,7 +232,7 @@ func Decode(v string) (Cid, error) {
 	if len(v) == 46 && v[:2] == "Qm" {
 		hash, err := mh.FromB58String(v)
 		if err != nil {
-			return Undef, err
+			return Undef, ErrInvalidCid{err}
 		}
 
 		return tryNewCidV0(hash)
@@ -251,7 +240,7 @@ func Decode(v string) (Cid, error) {
 
 	_, data, err := mbase.Decode(v)
 	if err != nil {
-		return Undef, err
+		return Undef, ErrInvalidCid{err}
 	}
 
 	return Cast(data)
@@ -273,7 +262,7 @@ func ExtractEncoding(v string) (mbase.Encoding, error) {
 	// check encoding is valid
 	_, err := mbase.NewEncoder(encoding)
 	if err != nil {
-		return -1, err
+		return -1, ErrInvalidCid{err}
 	}
 
 	return encoding, nil
@@ -282,7 +271,7 @@ func ExtractEncoding(v string) (mbase.Encoding, error) {
 // Cast takes a Cid data slice, parses it and returns a Cid.
 // For CidV1, the data buffer is in the form:
 //
-//     <version><codec-type><multihash>
+//	<version><codec-type><multihash>
 //
 // CidV0 are also supported. In particular, data buffers starting
 // with length 34 bytes, which starts with bytes [18,32...] are considered
@@ -293,11 +282,11 @@ func ExtractEncoding(v string) (mbase.Encoding, error) {
 func Cast(data []byte) (Cid, error) {
 	nr, c, err := CidFromBytes(data)
 	if err != nil {
-		return Undef, err
+		return Undef, ErrInvalidCid{err}
 	}
 
 	if nr != len(data) {
-		return Undef, fmt.Errorf("trailing bytes in data buffer passed to cid Cast")
+		return Undef, ErrInvalidCid{fmt.Errorf("trailing bytes in data buffer passed to cid Cast")}
 	}
 
 	return c, nil
@@ -411,7 +400,13 @@ func (c Cid) Hash() mh.Multihash {
 // Bytes returns the byte representation of a Cid.
 // The output of bytes can be parsed back into a Cid
 // with Cast().
+//
+// If c.Defined() == false, it return a nil slice and may not
+// be parsable with Cast().
 func (c Cid) Bytes() []byte {
+	if !c.Defined() {
+		return nil
+	}
 	return []byte(c.str)
 }
 
@@ -461,7 +456,7 @@ func (c Cid) Equals(o Cid) bool {
 // UnmarshalJSON parses the JSON representation of a Cid.
 func (c *Cid) UnmarshalJSON(b []byte) error {
 	if len(b) < 2 {
-		return fmt.Errorf("invalid cid json blob")
+		return ErrInvalidCid{fmt.Errorf("invalid cid json blob")}
 	}
 	obj := struct {
 		CidTarget string `json:"/"`
@@ -469,7 +464,7 @@ func (c *Cid) UnmarshalJSON(b []byte) error {
 	objptr := &obj
 	err := json.Unmarshal(b, &objptr)
 	if err != nil {
-		return err
+		return ErrInvalidCid{err}
 	}
 	if objptr == nil {
 		*c = Cid{}
@@ -477,12 +472,12 @@ func (c *Cid) UnmarshalJSON(b []byte) error {
 	}
 
 	if obj.CidTarget == "" {
-		return fmt.Errorf("cid was incorrectly formatted")
+		return ErrInvalidCid{fmt.Errorf("cid was incorrectly formatted")}
 	}
 
 	out, err := Decode(obj.CidTarget)
 	if err != nil {
-		return err
+		return ErrInvalidCid{err}
 	}
 
 	*c = out
@@ -492,7 +487,7 @@ func (c *Cid) UnmarshalJSON(b []byte) error {
 
 // MarshalJSON procudes a JSON representation of a Cid, which looks as follows:
 //
-//    { "/": "<cid-string>" }
+//	{ "/": "<cid-string>" }
 //
 // Note that this formatting comes from the IPLD specification
 // (https://github.com/ipld/specs/tree/master/ipld)
@@ -549,7 +544,8 @@ func (c Cid) Prefix() Prefix {
 // and the Multihash length. It does not contains
 // any actual content information.
 // NOTE: The use -1 in MhLength to mean default length is deprecated,
-//   use the V0Builder or V1Builder structures instead
+//
+//	use the V0Builder or V1Builder structures instead
 type Prefix struct {
 	Version  uint64
 	Codec    uint64
@@ -561,19 +557,19 @@ type Prefix struct {
 // and return a newly constructed Cid with the resulting multihash.
 func (p Prefix) Sum(data []byte) (Cid, error) {
 	length := p.MhLength
-	if p.MhType == mh.ID {
+	if p.MhType == mh.IDENTITY {
 		length = -1
 	}
 
 	if p.Version == 0 && (p.MhType != mh.SHA2_256 ||
 		(p.MhLength != 32 && p.MhLength != -1)) {
 
-		return Undef, fmt.Errorf("invalid v0 prefix")
+		return Undef, ErrInvalidCid{fmt.Errorf("invalid v0 prefix")}
 	}
 
 	hash, err := mh.Sum(data, p.MhType, length)
 	if err != nil {
-		return Undef, err
+		return Undef, ErrInvalidCid{err}
 	}
 
 	switch p.Version {
@@ -582,13 +578,13 @@ func (p Prefix) Sum(data []byte) (Cid, error) {
 	case 1:
 		return NewCidV1(p.Codec, hash), nil
 	default:
-		return Undef, fmt.Errorf("invalid cid version")
+		return Undef, ErrInvalidCid{fmt.Errorf("invalid cid version")}
 	}
 }
 
 // Bytes returns a byte representation of a Prefix. It looks like:
 //
-//     <version><codec><mh-type><mh-length>
+//	<version><codec><mh-type><mh-length>
 func (p Prefix) Bytes() []byte {
 	size := varint.UvarintSize(p.Version)
 	size += varint.UvarintSize(p.Codec)
@@ -612,22 +608,22 @@ func PrefixFromBytes(buf []byte) (Prefix, error) {
 	r := bytes.NewReader(buf)
 	vers, err := varint.ReadUvarint(r)
 	if err != nil {
-		return Prefix{}, err
+		return Prefix{}, ErrInvalidCid{err}
 	}
 
 	codec, err := varint.ReadUvarint(r)
 	if err != nil {
-		return Prefix{}, err
+		return Prefix{}, ErrInvalidCid{err}
 	}
 
 	mhtype, err := varint.ReadUvarint(r)
 	if err != nil {
-		return Prefix{}, err
+		return Prefix{}, ErrInvalidCid{err}
 	}
 
 	mhlen, err := varint.ReadUvarint(r)
 	if err != nil {
-		return Prefix{}, err
+		return Prefix{}, ErrInvalidCid{err}
 	}
 
 	return Prefix{
@@ -641,12 +637,12 @@ func PrefixFromBytes(buf []byte) (Prefix, error) {
 func CidFromBytes(data []byte) (int, Cid, error) {
 	if len(data) > 2 && data[0] == mh.SHA2_256 && data[1] == 32 {
 		if len(data) < 34 {
-			return 0, Undef, fmt.Errorf("not enough bytes for cid v0")
+			return 0, Undef, ErrInvalidCid{fmt.Errorf("not enough bytes for cid v0")}
 		}
 
 		h, err := mh.Cast(data[:34])
 		if err != nil {
-			return 0, Undef, err
+			return 0, Undef, ErrInvalidCid{err}
 		}
 
 		return 34, Cid{string(h)}, nil
@@ -654,24 +650,168 @@ func CidFromBytes(data []byte) (int, Cid, error) {
 
 	vers, n, err := varint.FromUvarint(data)
 	if err != nil {
-		return 0, Undef, err
+		return 0, Undef, ErrInvalidCid{err}
 	}
 
 	if vers != 1 {
-		return 0, Undef, fmt.Errorf("expected 1 as the cid version number, got: %d", vers)
+		return 0, Undef, ErrInvalidCid{fmt.Errorf("expected 1 as the cid version number, got: %d", vers)}
 	}
 
 	_, cn, err := varint.FromUvarint(data[n:])
 	if err != nil {
-		return 0, Undef, err
+		return 0, Undef, ErrInvalidCid{err}
 	}
 
 	mhnr, _, err := mh.MHFromBytes(data[n+cn:])
 	if err != nil {
-		return 0, Undef, err
+		return 0, Undef, ErrInvalidCid{err}
 	}
 
 	l := n + cn + mhnr
 
 	return l, Cid{string(data[0:l])}, nil
+}
+
+func toBufByteReader(r io.Reader, dst []byte) *bufByteReader {
+	// If the reader already implements ByteReader, use it directly.
+	// Otherwise, use a fallback that does 1-byte Reads.
+	if br, ok := r.(io.ByteReader); ok {
+		return &bufByteReader{direct: br, dst: dst}
+	}
+	return &bufByteReader{fallback: r, dst: dst}
+}
+
+type bufByteReader struct {
+	direct   io.ByteReader
+	fallback io.Reader
+
+	dst []byte
+}
+
+func (r *bufByteReader) ReadByte() (byte, error) {
+	// The underlying reader has ReadByte; use it.
+	if br := r.direct; br != nil {
+		b, err := br.ReadByte()
+		if err != nil {
+			return 0, err
+		}
+		r.dst = append(r.dst, b)
+		return b, nil
+	}
+
+	// Fall back to a one-byte Read.
+	// TODO: consider reading straight into dst,
+	// once we have benchmarks and if they prove that to be faster.
+	var p [1]byte
+	if _, err := io.ReadFull(r.fallback, p[:]); err != nil {
+		return 0, err
+	}
+	r.dst = append(r.dst, p[0])
+	return p[0], nil
+}
+
+// CidFromReader reads a precise number of bytes for a CID from a given reader.
+// It returns the number of bytes read, the CID, and any error encountered.
+// The number of bytes read is accurate even if a non-nil error is returned.
+//
+// It's recommended to supply a reader that buffers and implements io.ByteReader,
+// as CidFromReader has to do many single-byte reads to decode varints.
+// If the argument only implements io.Reader, single-byte Read calls are used instead.
+//
+// If the Reader is found to yield zero bytes, an io.EOF error is returned directly, in all
+// other error cases, an ErrInvalidCid, wrapping the original error, is returned.
+func CidFromReader(r io.Reader) (int, Cid, error) {
+	// 64 bytes is enough for any CIDv0,
+	// and it's enough for most CIDv1s in practice.
+	// If the digest is too long, we'll allocate more.
+	br := toBufByteReader(r, make([]byte, 0, 64))
+
+	// We read the first varint, to tell if this is a CIDv0 or a CIDv1.
+	// The varint package wants a io.ByteReader, so we must wrap our io.Reader.
+	vers, err := varint.ReadUvarint(br)
+	if err != nil {
+		if err == io.EOF {
+			// First-byte read in ReadUvarint errors with io.EOF, so reader has no data.
+			// Subsequent reads with an EOF will return io.ErrUnexpectedEOF and be wrapped here.
+			return 0, Undef, err
+		}
+		return len(br.dst), Undef, ErrInvalidCid{err}
+	}
+
+	// If we have a CIDv0, read the rest of the bytes and cast the buffer.
+	if vers == mh.SHA2_256 {
+		if n, err := io.ReadFull(r, br.dst[1:34]); err != nil {
+			return len(br.dst) + n, Undef, ErrInvalidCid{err}
+		}
+
+		br.dst = br.dst[:34]
+		h, err := mh.Cast(br.dst)
+		if err != nil {
+			return len(br.dst), Undef, ErrInvalidCid{err}
+		}
+
+		return len(br.dst), Cid{string(h)}, nil
+	}
+
+	if vers != 1 {
+		return len(br.dst), Undef, ErrInvalidCid{fmt.Errorf("expected 1 as the cid version number, got: %d", vers)}
+	}
+
+	// CID block encoding multicodec.
+	_, err = varint.ReadUvarint(br)
+	if err != nil {
+		return len(br.dst), Undef, ErrInvalidCid{err}
+	}
+
+	// We could replace most of the code below with go-multihash's ReadMultihash.
+	// Note that it would save code, but prevent reusing buffers.
+	// Plus, we already have a ByteReader now.
+	mhStart := len(br.dst)
+
+	// Multihash hash function code.
+	_, err = varint.ReadUvarint(br)
+	if err != nil {
+		return len(br.dst), Undef, ErrInvalidCid{err}
+	}
+
+	// Multihash digest length.
+	mhl, err := varint.ReadUvarint(br)
+	if err != nil {
+		return len(br.dst), Undef, ErrInvalidCid{err}
+	}
+
+	// Refuse to make large allocations to prevent OOMs due to bugs.
+	const maxDigestAlloc = 32 << 20 // 32MiB
+	if mhl > maxDigestAlloc {
+		return len(br.dst), Undef, ErrInvalidCid{fmt.Errorf("refusing to allocate %d bytes for a digest", mhl)}
+	}
+
+	// Fine to convert mhl to int, given maxDigestAlloc.
+	prefixLength := len(br.dst)
+	cidLength := prefixLength + int(mhl)
+	if cidLength > cap(br.dst) {
+		// If the multihash digest doesn't fit in our initial 64 bytes,
+		// efficiently extend the slice via append+make.
+		br.dst = append(br.dst, make([]byte, cidLength-len(br.dst))...)
+	} else {
+		// The multihash digest fits inside our buffer,
+		// so just extend its capacity.
+		br.dst = br.dst[:cidLength]
+	}
+
+	if n, err := io.ReadFull(r, br.dst[prefixLength:cidLength]); err != nil {
+		// We can't use len(br.dst) here,
+		// as we've only read n bytes past prefixLength.
+		return prefixLength + n, Undef, ErrInvalidCid{err}
+	}
+
+	// This simply ensures the multihash is valid.
+	// TODO: consider removing this bit, as it's probably redundant;
+	// for now, it helps ensure consistency with CidFromBytes.
+	_, _, err = mh.MHFromBytes(br.dst[mhStart:])
+	if err != nil {
+		return len(br.dst), Undef, ErrInvalidCid{err}
+	}
+
+	return len(br.dst), Cid{string(br.dst)}, nil
 }

@@ -50,18 +50,6 @@ func (fs *Filters) find(ipnet net.IPNet) (int, *filterEntry) {
 	return -1, nil
 }
 
-// AddDialFilter adds a deny rule to this Filters set. Hosts
-// matching the given net.IPNet filter will be denied, unless
-// another rule is added which states that they should be accepted.
-//
-// No effort is made to prevent duplication of filters, or to simplify
-// the filters list.
-//
-// Deprecated: Use AddFilter().
-func (fs *Filters) AddDialFilter(f *net.IPNet) {
-	fs.AddFilter(*f, ActionDeny)
-}
-
 // AddFilter adds a rule to the Filters set, enforcing the desired action for
 // the provided IPNet mask.
 func (fs *Filters) AddFilter(ipnet net.IPNet, action Action) {
@@ -73,15 +61,6 @@ func (fs *Filters) AddFilter(ipnet net.IPNet, action Action) {
 	} else {
 		fs.filters = append(fs.filters, &filterEntry{ipnet, action})
 	}
-}
-
-// RemoveLiteral removes the first filter associated with the supplied IPNet,
-// returning whether something was removed or not. It makes no distinction
-// between whether the rule is an accept or a deny.
-//
-// Deprecated: use RemoveLiteral() instead.
-func (fs *Filters) Remove(ipnet *net.IPNet) (removed bool) {
-	return fs.RemoveLiteral(*ipnet)
 }
 
 // RemoveLiteral removes the first filter associated with the supplied IPNet,
@@ -106,8 +85,9 @@ func (fs *Filters) RemoveLiteral(ipnet net.IPNet) (removed bool) {
 // default is returned.
 //
 // TODO: currently, the last filter to match wins always, but it shouldn't be that way.
-//  Instead, the highest-specific last filter should win; that way more specific filters
-//  override more general ones.
+//
+//	Instead, the highest-specific last filter should win; that way more specific filters
+//	override more general ones.
 func (fs *Filters) AddrBlocked(a Multiaddr) (deny bool) {
 	var (
 		netip net.IP
@@ -142,20 +122,6 @@ func (fs *Filters) AddrBlocked(a Multiaddr) (deny bool) {
 	}
 
 	return action == ActionDeny
-}
-
-// Filters returns the list of DENY net.IPNet masks. For backwards compatibility.
-//
-// A copy of the filters is made prior to returning, so the inner state is not exposed.
-//
-// Deprecated: Use FiltersForAction().
-func (fs *Filters) Filters() (result []*net.IPNet) {
-	ffa := fs.FiltersForAction(ActionDeny)
-	for _, res := range ffa {
-		res := res // allocate a new copy
-		result = append(result, &res)
-	}
-	return result
 }
 
 func (fs *Filters) ActionForFilter(ipnet net.IPNet) (action Action, ok bool) {

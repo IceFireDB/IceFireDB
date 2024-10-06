@@ -3,38 +3,68 @@ package pubsub
 import (
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 )
 
-// Generic event tracer interface
+// EventTracer is a generic event tracer interface.
+// This is a high level tracing interface which delivers tracing events, as defined by the protobuf
+// schema in pb/trace.proto.
 type EventTracer interface {
 	Trace(evt *pb.TraceEvent)
 }
 
-// internal interface for score tracing
-type internalTracer interface {
+// RawTracer is a low level tracing interface that allows an application to trace the internal
+// operation of the pubsub subsystem.
+//
+// Note that the tracers are invoked synchronously, which means that application tracers must
+// take care to not block or modify arguments.
+//
+// Warning: this interface is not fixed, we may be adding new methods as necessitated by the system
+// in the future.
+type RawTracer interface {
+	// AddPeer is invoked when a new peer is added.
 	AddPeer(p peer.ID, proto protocol.ID)
+	// RemovePeer is invoked when a peer is removed.
 	RemovePeer(p peer.ID)
+	// Join is invoked when a new topic is joined
 	Join(topic string)
+	// Leave is invoked when a topic is abandoned
 	Leave(topic string)
+	// Graft is invoked when a new peer is grafted on the mesh (gossipsub)
 	Graft(p peer.ID, topic string)
+	// Prune is invoked when a peer is pruned from the message (gossipsub)
 	Prune(p peer.ID, topic string)
+	// ValidateMessage is invoked when a message first enters the validation pipeline.
 	ValidateMessage(msg *Message)
+	// DeliverMessage is invoked when a message is delivered
 	DeliverMessage(msg *Message)
+	// RejectMessage is invoked when a message is Rejected or Ignored.
+	// The reason argument can be one of the named strings Reject*.
 	RejectMessage(msg *Message, reason string)
+	// DuplicateMessage is invoked when a duplicate message is dropped.
 	DuplicateMessage(msg *Message)
+	// ThrottlePeer is invoked when a peer is throttled by the peer gater.
 	ThrottlePeer(p peer.ID)
+	// RecvRPC is invoked when an incoming RPC is received.
+	RecvRPC(rpc *RPC)
+	// SendRPC is invoked when a RPC is sent.
+	SendRPC(rpc *RPC, p peer.ID)
+	// DropRPC is invoked when an outbound RPC is dropped, typically because of a queue full.
+	DropRPC(rpc *RPC, p peer.ID)
+	// UndeliverableMessage is invoked when the consumer of Subscribe is not reading messages fast enough and
+	// the pressure release mechanism trigger, dropping messages.
+	UndeliverableMessage(msg *Message)
 }
 
 // pubsub tracer details
 type pubsubTracer struct {
-	tracer   EventTracer
-	internal []internalTracer
-	pid      peer.ID
-	msgID    MsgIdFunction
+	tracer EventTracer
+	raw    []RawTracer
+	pid    peer.ID
+	idGen  *msgIDGenerator
 }
 
 func (t *pubsubTracer) PublishMessage(msg *Message) {
@@ -52,7 +82,7 @@ func (t *pubsubTracer) PublishMessage(msg *Message) {
 		PeerID:    []byte(t.pid),
 		Timestamp: &now,
 		PublishMessage: &pb.TraceEvent_PublishMessage{
-			MessageID: []byte(t.msgID(msg.Message)),
+			MessageID: []byte(t.idGen.ID(msg)),
 			Topic:     msg.Message.Topic,
 		},
 	}
@@ -66,7 +96,7 @@ func (t *pubsubTracer) ValidateMessage(msg *Message) {
 	}
 
 	if msg.ReceivedFrom != t.pid {
-		for _, tr := range t.internal {
+		for _, tr := range t.raw {
 			tr.ValidateMessage(msg)
 		}
 	}
@@ -78,7 +108,7 @@ func (t *pubsubTracer) RejectMessage(msg *Message, reason string) {
 	}
 
 	if msg.ReceivedFrom != t.pid {
-		for _, tr := range t.internal {
+		for _, tr := range t.raw {
 			tr.RejectMessage(msg, reason)
 		}
 	}
@@ -93,7 +123,7 @@ func (t *pubsubTracer) RejectMessage(msg *Message, reason string) {
 		PeerID:    []byte(t.pid),
 		Timestamp: &now,
 		RejectMessage: &pb.TraceEvent_RejectMessage{
-			MessageID:    []byte(t.msgID(msg.Message)),
+			MessageID:    []byte(t.idGen.ID(msg)),
 			ReceivedFrom: []byte(msg.ReceivedFrom),
 			Reason:       &reason,
 			Topic:        msg.Topic,
@@ -109,7 +139,7 @@ func (t *pubsubTracer) DuplicateMessage(msg *Message) {
 	}
 
 	if msg.ReceivedFrom != t.pid {
-		for _, tr := range t.internal {
+		for _, tr := range t.raw {
 			tr.DuplicateMessage(msg)
 		}
 	}
@@ -124,7 +154,7 @@ func (t *pubsubTracer) DuplicateMessage(msg *Message) {
 		PeerID:    []byte(t.pid),
 		Timestamp: &now,
 		DuplicateMessage: &pb.TraceEvent_DuplicateMessage{
-			MessageID:    []byte(t.msgID(msg.Message)),
+			MessageID:    []byte(t.idGen.ID(msg)),
 			ReceivedFrom: []byte(msg.ReceivedFrom),
 			Topic:        msg.Topic,
 		},
@@ -139,7 +169,7 @@ func (t *pubsubTracer) DeliverMessage(msg *Message) {
 	}
 
 	if msg.ReceivedFrom != t.pid {
-		for _, tr := range t.internal {
+		for _, tr := range t.raw {
 			tr.DeliverMessage(msg)
 		}
 	}
@@ -154,7 +184,7 @@ func (t *pubsubTracer) DeliverMessage(msg *Message) {
 		PeerID:    []byte(t.pid),
 		Timestamp: &now,
 		DeliverMessage: &pb.TraceEvent_DeliverMessage{
-			MessageID:    []byte(t.msgID(msg.Message)),
+			MessageID:    []byte(t.idGen.ID(msg)),
 			Topic:        msg.Topic,
 			ReceivedFrom: []byte(msg.ReceivedFrom),
 		},
@@ -168,7 +198,7 @@ func (t *pubsubTracer) AddPeer(p peer.ID, proto protocol.ID) {
 		return
 	}
 
-	for _, tr := range t.internal {
+	for _, tr := range t.raw {
 		tr.AddPeer(p, proto)
 	}
 
@@ -196,7 +226,7 @@ func (t *pubsubTracer) RemovePeer(p peer.ID) {
 		return
 	}
 
-	for _, tr := range t.internal {
+	for _, tr := range t.raw {
 		tr.RemovePeer(p)
 	}
 
@@ -222,6 +252,10 @@ func (t *pubsubTracer) RecvRPC(rpc *RPC) {
 		return
 	}
 
+	for _, tr := range t.raw {
+		tr.RecvRPC(rpc)
+	}
+
 	if t.tracer == nil {
 		return
 	}
@@ -243,6 +277,10 @@ func (t *pubsubTracer) RecvRPC(rpc *RPC) {
 func (t *pubsubTracer) SendRPC(rpc *RPC, p peer.ID) {
 	if t == nil {
 		return
+	}
+
+	for _, tr := range t.raw {
+		tr.SendRPC(rpc, p)
 	}
 
 	if t.tracer == nil {
@@ -268,6 +306,10 @@ func (t *pubsubTracer) DropRPC(rpc *RPC, p peer.ID) {
 		return
 	}
 
+	for _, tr := range t.raw {
+		tr.DropRPC(rpc, p)
+	}
+
 	if t.tracer == nil {
 		return
 	}
@@ -286,13 +328,23 @@ func (t *pubsubTracer) DropRPC(rpc *RPC, p peer.ID) {
 	t.tracer.Trace(evt)
 }
 
+func (t *pubsubTracer) UndeliverableMessage(msg *Message) {
+	if t == nil {
+		return
+	}
+
+	for _, tr := range t.raw {
+		tr.UndeliverableMessage(msg)
+	}
+}
+
 func (t *pubsubTracer) traceRPCMeta(rpc *RPC) *pb.TraceEvent_RPCMeta {
 	rpcMeta := new(pb.TraceEvent_RPCMeta)
 
 	var msgs []*pb.TraceEvent_MessageMeta
 	for _, m := range rpc.Publish {
 		msgs = append(msgs, &pb.TraceEvent_MessageMeta{
-			MessageID: []byte(t.msgID(m)),
+			MessageID: []byte(t.idGen.RawID(m)),
 			Topic:     m.Topic,
 		})
 	}
@@ -350,11 +402,23 @@ func (t *pubsubTracer) traceRPCMeta(rpc *RPC) *pb.TraceEvent_RPCMeta {
 			})
 		}
 
+		var idontwant []*pb.TraceEvent_ControlIDontWantMeta
+		for _, ctl := range rpc.Control.Idontwant {
+			var mids [][]byte
+			for _, mid := range ctl.MessageIDs {
+				mids = append(mids, []byte(mid))
+			}
+			idontwant = append(idontwant, &pb.TraceEvent_ControlIDontWantMeta{
+				MessageIDs: mids,
+			})
+		}
+
 		rpcMeta.Control = &pb.TraceEvent_ControlMeta{
-			Ihave: ihave,
-			Iwant: iwant,
-			Graft: graft,
-			Prune: prune,
+			Ihave:     ihave,
+			Iwant:     iwant,
+			Graft:     graft,
+			Prune:     prune,
+			Idontwant: idontwant,
 		}
 	}
 
@@ -366,7 +430,7 @@ func (t *pubsubTracer) Join(topic string) {
 		return
 	}
 
-	for _, tr := range t.internal {
+	for _, tr := range t.raw {
 		tr.Join(topic)
 	}
 
@@ -392,7 +456,7 @@ func (t *pubsubTracer) Leave(topic string) {
 		return
 	}
 
-	for _, tr := range t.internal {
+	for _, tr := range t.raw {
 		tr.Leave(topic)
 	}
 
@@ -418,7 +482,7 @@ func (t *pubsubTracer) Graft(p peer.ID, topic string) {
 		return
 	}
 
-	for _, tr := range t.internal {
+	for _, tr := range t.raw {
 		tr.Graft(p, topic)
 	}
 
@@ -445,7 +509,7 @@ func (t *pubsubTracer) Prune(p peer.ID, topic string) {
 		return
 	}
 
-	for _, tr := range t.internal {
+	for _, tr := range t.raw {
 		tr.Prune(p, topic)
 	}
 
@@ -472,7 +536,7 @@ func (t *pubsubTracer) ThrottlePeer(p peer.ID) {
 		return
 	}
 
-	for _, tr := range t.internal {
+	for _, tr := range t.raw {
 		tr.ThrottlePeer(p)
 	}
 }

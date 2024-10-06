@@ -29,10 +29,10 @@ type NAT interface {
 	GetInternalAddress() (addr net.IP, err error)
 
 	// AddPortMapping maps a port on the local host to an external port.
-	AddPortMapping(protocol string, internalPort int, description string, timeout time.Duration) (mappedExternalPort int, err error)
+	AddPortMapping(ctx context.Context, protocol string, internalPort int, description string, timeout time.Duration) (mappedExternalPort int, err error)
 
 	// DeletePortMapping removes a port mapping.
-	DeletePortMapping(protocol string, internalPort int) (err error)
+	DeletePortMapping(ctx context.Context, protocol string, internalPort int) (err error)
 }
 
 // DiscoverNATs returns all NATs discovered in the network.
@@ -85,10 +85,7 @@ func DiscoverNATs(ctx context.Context) <-chan NAT {
 }
 
 // DiscoverGateway attempts to find a gateway device.
-func DiscoverGateway() (NAT, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
+func DiscoverGateway(ctx context.Context) (NAT, error) {
 	var nats []NAT
 	for nat := range DiscoverNATs(ctx) {
 		nats = append(nats, nat)
@@ -121,7 +118,8 @@ func DiscoverGateway() (NAT, error) {
 	return bestNAT, nil
 }
 
+var random = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 func randomPort() int {
-	rand.Seed(time.Now().UnixNano())
-	return rand.Intn(math.MaxUint16-10000) + 10000
+	return random.Intn(math.MaxUint16-10000) + 10000
 }

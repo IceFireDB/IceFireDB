@@ -1,8 +1,7 @@
-//
 // Adapted from gogo/protobuf to use multiformats/go-varint for
 // efficient, interoperable length-prefixing.
 //
-// Protocol Buffers for Go with Gadgets
+// # Protocol Buffers for Go with Gadgets
 //
 // Copyright (c) 2013, The GoGo Authors. All rights reserved.
 // http://github.com/gogo/protobuf
@@ -11,9 +10,11 @@
 // modification, are permitted provided that the following conditions are
 // met:
 //
-//     * Redistributions of source code must retain the above copyright
+//   - Redistributions of source code must retain the above copyright
+//
 // notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
+//   - Redistributions in binary form must reproduce the above
+//
 // copyright notice, this list of conditions and the following disclaimer
 // in the documentation and/or other materials provided with the
 // distribution.
@@ -29,12 +30,14 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
 package protoio
 
 import (
 	"bufio"
+	"fmt"
 	"io"
+	"os"
+	"runtime/debug"
 
 	"github.com/gogo/protobuf/proto"
 
@@ -56,7 +59,14 @@ func NewDelimitedReader(r io.Reader, maxSize int) ReadCloser {
 	return &uvarintReader{bufio.NewReader(r), nil, maxSize, closer}
 }
 
-func (ur *uvarintReader) ReadMsg(msg proto.Message) error {
+func (ur *uvarintReader) ReadMsg(msg proto.Message) (err error) {
+	defer func() {
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "caught panic: %s\n%s\n", rerr, debug.Stack())
+			err = fmt.Errorf("panic reading message: %s", rerr)
+		}
+	}()
+
 	length64, err := varint.ReadUvarint(ur.r)
 	if err != nil {
 		return err

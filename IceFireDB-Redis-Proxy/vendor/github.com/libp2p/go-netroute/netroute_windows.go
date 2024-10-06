@@ -1,4 +1,4 @@
-// +build windows
+//go:build windows
 
 package netroute
 
@@ -14,8 +14,6 @@ import (
 	"unsafe"
 
 	"github.com/google/gopacket/routing"
-	sockaddrconv "github.com/libp2p/go-sockaddr"
-	sockaddrnet "github.com/libp2p/go-sockaddr/net"
 	"golang.org/x/sys/windows"
 )
 
@@ -53,8 +51,8 @@ type mib_row2 struct {
 }
 
 func callBestRoute(source, dest net.IP) (*mib_row2, net.IP, error) {
-	sourceAddr, _, _ := sockaddrconv.SockaddrToAny(sockaddrnet.IPAndZoneToSockaddr(source, ""))
-	destAddr, _, _ := sockaddrconv.SockaddrToAny(sockaddrnet.IPAndZoneToSockaddr(dest, ""))
+	sourceAddr, _, _ := sockaddrToAny(ipAndZoneToSockaddr(source, ""))
+	destAddr, _, _ := sockaddrToAny(ipAndZoneToSockaddr(dest, ""))
 	bestRoute := make([]byte, 512)
 	bestSource := make([]byte, 116)
 
@@ -80,7 +78,7 @@ func callBestRoute(source, dest net.IP) (*mib_row2, net.IP, error) {
 	copyInto(bestSourceRaw.Addr.Data[:], bestSource[2:16])
 	copyInto(bestSourceRaw.Pad[:], bestSource[16:])
 	addr, _ := bestSourceRaw.Sockaddr()
-	bestSrc, _ := sockaddrnet.SockaddrToIPAndZone(addr)
+	bestSrc, _ := sockaddrToIPAndZone(addr)
 
 	return route, bestSrc, nil
 }
@@ -195,12 +193,18 @@ func getIface(index uint32) *net.Interface {
 		return nil
 	}
 
+	physAddrLen := int(ifRow.PhysAddrLen)
+	if len(ifRow.PhysAddr) < physAddrLen && physAddrLen >= 0 {
+		physAddrLen = len(ifRow.PhysAddr)
+	}
+	physAddr := ifRow.PhysAddr[:physAddrLen]
+
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil
 	}
 	for _, iface := range ifaces {
-		if bytes.Equal(iface.HardwareAddr, ifRow.PhysAddr[:]) {
+		if bytes.Equal(iface.HardwareAddr, physAddr) {
 			return &iface
 		}
 	}
@@ -227,7 +231,7 @@ func (r *winRouter) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	nextHop, _ := sockaddrnet.SockaddrToIPAndZone(addr)
+	nextHop, _ := sockaddrToIPAndZone(addr)
 
 	return iface, nextHop, pref, nil
 }
