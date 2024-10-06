@@ -1,4 +1,4 @@
-// +build !plan9,!windows,!wasm
+//go:build !plan9 && !windows && !wasm && !freebsd
 
 package reuseport
 
@@ -8,18 +8,16 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func Control(network, address string, c syscall.RawConn) error {
-	var err error
-	c.Control(func(fd uintptr) {
+func Control(network, address string, c syscall.RawConn) (err error) {
+	controlErr := c.Control(func(fd uintptr) {
 		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
 		if err != nil {
 			return
 		}
-
 		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
-		if err != nil {
-			return
-		}
 	})
-	return err
+	if controlErr != nil {
+		err = controlErr
+	}
+	return
 }

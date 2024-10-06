@@ -2,203 +2,311 @@ package pubsub
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"io"
 	"math/rand"
 	"sort"
 	"time"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/libp2p/go-libp2p-core/record"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/core/record"
+	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 )
 
 const (
 	// GossipSubID_v10 is the protocol ID for version 1.0.0 of the GossipSub protocol.
-	// It is advertised along with GossipSubID_v11 for backwards compatibility.
+	// It is advertised along with GossipSubID_v11 and GossipSubID_v12 for backwards compatibility.
 	GossipSubID_v10 = protocol.ID("/meshsub/1.0.0")
 
 	// GossipSubID_v11 is the protocol ID for version 1.1.0 of the GossipSub protocol.
+	// It is advertised along with GossipSubID_v12 for backwards compatibility.
 	// See the spec for details about how v1.1.0 compares to v1.0.0:
 	// https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.1.md
 	GossipSubID_v11 = protocol.ID("/meshsub/1.1.0")
+
+	// GossipSubID_v12 is the protocol ID for version 1.2.0 of the GossipSub protocol.
+	// See the spec for details about how v1.2.0 compares to v1.1.0:
+	// https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.2.md
+	GossipSubID_v12 = protocol.ID("/meshsub/1.2.0")
 )
 
+// Defines the default gossipsub parameters.
 var (
+	GossipSubD                                = 6
+	GossipSubDlo                              = 5
+	GossipSubDhi                              = 12
+	GossipSubDscore                           = 4
+	GossipSubDout                             = 2
+	GossipSubHistoryLength                    = 5
+	GossipSubHistoryGossip                    = 3
+	GossipSubDlazy                            = 6
+	GossipSubGossipFactor                     = 0.25
+	GossipSubGossipRetransmission             = 3
+	GossipSubHeartbeatInitialDelay            = 100 * time.Millisecond
+	GossipSubHeartbeatInterval                = 1 * time.Second
+	GossipSubFanoutTTL                        = 60 * time.Second
+	GossipSubPrunePeers                       = 16
+	GossipSubPruneBackoff                     = time.Minute
+	GossipSubUnsubscribeBackoff               = 10 * time.Second
+	GossipSubConnectors                       = 8
+	GossipSubMaxPendingConnections            = 128
+	GossipSubConnectionTimeout                = 30 * time.Second
+	GossipSubDirectConnectTicks        uint64 = 300
+	GossipSubDirectConnectInitialDelay        = time.Second
+	GossipSubOpportunisticGraftTicks   uint64 = 60
+	GossipSubOpportunisticGraftPeers          = 2
+	GossipSubGraftFloodThreshold              = 10 * time.Second
+	GossipSubMaxIHaveLength                   = 5000
+	GossipSubMaxIHaveMessages                 = 10
+	GossipSubMaxIDontWantMessages             = 1000
+	GossipSubIWantFollowupTime                = 3 * time.Second
+	GossipSubIDontWantMessageThreshold        = 1024 // 1KB
+	GossipSubIDontWantMessageTTL              = 3    // 3 heartbeats
+)
+
+type checksum struct {
+	payload [32]byte
+	length  uint8
+}
+
+// GossipSubParams defines all the gossipsub specific parameters.
+type GossipSubParams struct {
 	// overlay parameters.
 
-	// GossipSubD sets the optimal degree for a GossipSub topic mesh. For example, if GossipSubD == 6,
+	// D sets the optimal degree for a GossipSub topic mesh. For example, if D == 6,
 	// each peer will want to have about six peers in their mesh for each topic they're subscribed to.
-	// GossipSubD should be set somewhere between GossipSubDlo and GossipSubDhi.
-	GossipSubD = 6
+	// D should be set somewhere between Dlo and Dhi.
+	D int
 
-	// GossipSubDlo sets the lower bound on the number of peers we keep in a GossipSub topic mesh.
-	// If we have fewer than GossipSubDlo peers, we will attempt to graft some more into the mesh at
+	// Dlo sets the lower bound on the number of peers we keep in a GossipSub topic mesh.
+	// If we have fewer than Dlo peers, we will attempt to graft some more into the mesh at
 	// the next heartbeat.
-	GossipSubDlo = 5
+	Dlo int
 
-	// GossipSubDhi sets the upper bound on the number of peers we keep in a GossipSub topic mesh.
-	// If we have more than GossipSubDhi peers, we will select some to prune from the mesh at the next heartbeat.
-	GossipSubDhi = 12
+	// Dhi sets the upper bound on the number of peers we keep in a GossipSub topic mesh.
+	// If we have more than Dhi peers, we will select some to prune from the mesh at the next heartbeat.
+	Dhi int
 
-	// GossipSubDscore affects how peers are selected when pruning a mesh due to over subscription.
-	// At least GossipSubDscore of the retained peers will be high-scoring, while the remainder are
+	// Dscore affects how peers are selected when pruning a mesh due to over subscription.
+	// At least Dscore of the retained peers will be high-scoring, while the remainder are
 	// chosen randomly.
-	GossipSubDscore = 4
+	Dscore int
 
-	// GossipSubDout sets the quota for the number of outbound connections to maintain in a topic mesh.
+	// Dout sets the quota for the number of outbound connections to maintain in a topic mesh.
 	// When the mesh is pruned due to over subscription, we make sure that we have outbound connections
-	// to at least GossipSubDout of the survivor peers. This prevents sybil attackers from overwhelming
+	// to at least Dout of the survivor peers. This prevents sybil attackers from overwhelming
 	// our mesh with incoming connections.
 	//
-	// GossipSubDout must be set below GossipSubDlo, and must not exceed GossipSubD / 2.
-	GossipSubDout = 2
+	// Dout must be set below Dlo, and must not exceed D / 2.
+	Dout int
 
 	// gossip parameters
 
-	// GossipSubHistoryLength controls the size of the message cache used for gossip.
-	// The message cache will remember messages for GossipSubHistoryLength heartbeats.
-	GossipSubHistoryLength = 5
+	// HistoryLength controls the size of the message cache used for gossip.
+	// The message cache will remember messages for HistoryLength heartbeats.
+	HistoryLength int
 
-	// GossipSubHistoryGossip controls how many cached message ids we will advertise in
+	// HistoryGossip controls how many cached message ids we will advertise in
 	// IHAVE gossip messages. When asked for our seen message IDs, we will return
-	// only those from the most recent GossipSubHistoryGossip heartbeats. The slack between
-	// GossipSubHistoryGossip and GossipSubHistoryLength allows us to avoid advertising messages
+	// only those from the most recent HistoryGossip heartbeats. The slack between
+	// HistoryGossip and HistoryLength allows us to avoid advertising messages
 	// that will be expired by the time they're requested.
 	//
-	// GossipSubHistoryGossip must be less than or equal to GossipSubHistoryLength to
+	// HistoryGossip must be less than or equal to HistoryLength to
 	// avoid a runtime panic.
-	GossipSubHistoryGossip = 3
+	HistoryGossip int
 
-	// GossipSubDlazy affects how many peers we will emit gossip to at each heartbeat.
-	// We will send gossip to at least GossipSubDlazy peers outside our mesh. The actual
-	// number may be more, depending on GossipSubGossipFactor and how many peers we're
+	// Dlazy affects how many peers we will emit gossip to at each heartbeat.
+	// We will send gossip to at least Dlazy peers outside our mesh. The actual
+	// number may be more, depending on GossipFactor and how many peers we're
 	// connected to.
-	GossipSubDlazy = 6
+	Dlazy int
 
-	// GossipSubGossipFactor affects how many peers we will emit gossip to at each heartbeat.
-	// We will send gossip to GossipSubGossipFactor * (total number of non-mesh peers), or
-	// GossipSubDlazy, whichever is greater.
-	GossipSubGossipFactor = 0.25
+	// GossipFactor affects how many peers we will emit gossip to at each heartbeat.
+	// We will send gossip to GossipFactor * (total number of non-mesh peers), or
+	// Dlazy, whichever is greater.
+	GossipFactor float64
 
-	// GossipSubGossipRetransmission controls how many times we will allow a peer to request
+	// GossipRetransmission controls how many times we will allow a peer to request
 	// the same message id through IWANT gossip before we start ignoring them. This is designed
 	// to prevent peers from spamming us with requests and wasting our resources.
-	GossipSubGossipRetransmission = 3
+	GossipRetransmission int
 
 	// heartbeat interval
 
-	// GossipSubHeartbeatInitialDelay is the short delay before the heartbeat timer begins
+	// HeartbeatInitialDelay is the short delay before the heartbeat timer begins
 	// after the router is initialized.
-	GossipSubHeartbeatInitialDelay = 100 * time.Millisecond
+	HeartbeatInitialDelay time.Duration
 
-	// GossipSubHeartbeatInterval controls the time between heartbeats.
-	GossipSubHeartbeatInterval = 1 * time.Second
+	// HeartbeatInterval controls the time between heartbeats.
+	HeartbeatInterval time.Duration
 
-	// GossipSubFanoutTTL controls how long we keep track of the fanout state. If it's been
-	// GossipSubFanoutTTL since we've published to a topic that we're not subscribed to,
+	// SlowHeartbeatWarning is the duration threshold for heartbeat processing before emitting
+	// a warning; this would be indicative of an overloaded peer.
+	SlowHeartbeatWarning float64
+
+	// FanoutTTL controls how long we keep track of the fanout state. If it's been
+	// FanoutTTL since we've published to a topic that we're not subscribed to,
 	// we'll delete the fanout map for that topic.
-	GossipSubFanoutTTL = 60 * time.Second
+	FanoutTTL time.Duration
 
-	// GossipSubPrunePeers controls the number of peers to include in prune Peer eXchange.
+	// PrunePeers controls the number of peers to include in prune Peer eXchange.
 	// When we prune a peer that's eligible for PX (has a good score, etc), we will try to
-	// send them signed peer records for up to GossipSubPrunePeers other peers that we
+	// send them signed peer records for up to PrunePeers other peers that we
 	// know of.
-	GossipSubPrunePeers = 16
+	PrunePeers int
 
-	// GossipSubPruneBackoff controls the backoff time for pruned peers. This is how long
+	// PruneBackoff controls the backoff time for pruned peers. This is how long
 	// a peer must wait before attempting to graft into our mesh again after being pruned.
-	// When pruning a peer, we send them our value of GossipSubPruneBackoff so they know
+	// When pruning a peer, we send them our value of PruneBackoff so they know
 	// the minimum time to wait. Peers running older versions may not send a backoff time,
-	// so if we receive a prune message without one, we will wait at least GossipSubPruneBackoff
+	// so if we receive a prune message without one, we will wait at least PruneBackoff
 	// before attempting to re-graft.
-	GossipSubPruneBackoff = time.Minute
+	PruneBackoff time.Duration
 
-	// GossipSubConnectors controls the number of active connection attempts for peers obtained through PX.
-	GossipSubConnectors = 8
+	// UnsubscribeBackoff controls the backoff time to use when unsuscribing
+	// from a topic. A peer should not resubscribe to this topic before this
+	// duration.
+	UnsubscribeBackoff time.Duration
 
-	// GossipSubMaxPendingConnections sets the maximum number of pending connections for peers attempted through px.
-	GossipSubMaxPendingConnections = 128
+	// Connectors controls the number of active connection attempts for peers obtained through PX.
+	Connectors int
 
-	// GossipSubConnectionTimeout controls the timeout for connection attempts.
-	GossipSubConnectionTimeout = 30 * time.Second
+	// MaxPendingConnections sets the maximum number of pending connections for peers attempted through px.
+	MaxPendingConnections int
 
-	// GossipSubDirectConnectTicks is the number of heartbeat ticks for attempting to reconnect direct peers
+	// ConnectionTimeout controls the timeout for connection attempts.
+	ConnectionTimeout time.Duration
+
+	// DirectConnectTicks is the number of heartbeat ticks for attempting to reconnect direct peers
 	// that are not currently connected.
-	GossipSubDirectConnectTicks uint64 = 300
+	DirectConnectTicks uint64
 
-	// GossipSubDirectConnectInitialDelay is the initial delay before opening connections to direct peers
-	GossipSubDirectConnectInitialDelay = time.Second
+	// DirectConnectInitialDelay is the initial delay before opening connections to direct peers
+	DirectConnectInitialDelay time.Duration
 
-	// GossipSubOpportunisticGraftTicks is the number of heartbeat ticks for attempting to improve the mesh
-	// with opportunistic grafting. Every GossipSubOpportunisticGraftTicks we will attempt to select some
+	// OpportunisticGraftTicks is the number of heartbeat ticks for attempting to improve the mesh
+	// with opportunistic grafting. Every OpportunisticGraftTicks we will attempt to select some
 	// high-scoring mesh peers to replace lower-scoring ones, if the median score of our mesh peers falls
 	// below a threshold (see https://godoc.org/github.com/libp2p/go-libp2p-pubsub#PeerScoreThresholds).
-	GossipSubOpportunisticGraftTicks uint64 = 60
+	OpportunisticGraftTicks uint64
 
-	// GossipSubOpportunisticGraftPeers is the number of peers to opportunistically graft.
-	GossipSubOpportunisticGraftPeers = 2
+	// OpportunisticGraftPeers is the number of peers to opportunistically graft.
+	OpportunisticGraftPeers int
 
-	// If a GRAFT comes before GossipSubGraftFloodThreshold has elapsed since the last PRUNE,
+	// If a GRAFT comes before GraftFloodThreshold has elapsed since the last PRUNE,
 	// then there is an extra score penalty applied to the peer through P7.
-	GossipSubGraftFloodThreshold = 10 * time.Second
+	GraftFloodThreshold time.Duration
 
-	// GossipSubMaxIHaveLength is the maximum number of messages to include in an IHAVE message.
+	// MaxIHaveLength is the maximum number of messages to include in an IHAVE message.
 	// Also controls the maximum number of IHAVE ids we will accept and request with IWANT from a
 	// peer within a heartbeat, to protect from IHAVE floods. You should adjust this value from the
-	// default if your system is pushing more than 5000 messages in GossipSubHistoryGossip heartbeats;
+	// default if your system is pushing more than 5000 messages in HistoryGossip heartbeats;
 	// with the defaults this is 1666 messages/s.
-	GossipSubMaxIHaveLength = 5000
+	MaxIHaveLength int
 
-	// GossipSubMaxIHaveMessages is the maximum number of IHAVE messages to accept from a peer within a heartbeat.
-	GossipSubMaxIHaveMessages = 10
+	// MaxIHaveMessages is the maximum number of IHAVE messages to accept from a peer within a heartbeat.
+	MaxIHaveMessages int
+
+	// MaxIDontWantMessages is the maximum number of IDONTWANT messages to accept from a peer within a heartbeat.
+	MaxIDontWantMessages int
 
 	// Time to wait for a message requested through IWANT following an IHAVE advertisement.
 	// If the message is not received within this window, a broken promise is declared and
 	// the router may apply bahavioural penalties.
-	GossipSubIWantFollowupTime = 3 * time.Second
-)
+	IWantFollowupTime time.Duration
 
-// NewGossipSub returns a new PubSub object using GossipSubRouter as the router.
+	// IDONTWANT is only sent for messages larger than the threshold. This should be greater than
+	// D_high * the size of the message id. Otherwise, the attacker can do the amplication attack by sending
+	// small messages while the receiver replies back with larger IDONTWANT messages.
+	IDontWantMessageThreshold int
+
+	// IDONTWANT is cleared when it's older than the TTL.
+	IDontWantMessageTTL int
+}
+
+// NewGossipSub returns a new PubSub object using the default GossipSubRouter as the router.
 func NewGossipSub(ctx context.Context, h host.Host, opts ...Option) (*PubSub, error) {
-	rt := &GossipSubRouter{
-		peers:    make(map[peer.ID]protocol.ID),
-		mesh:     make(map[string]map[peer.ID]struct{}),
-		fanout:   make(map[string]map[peer.ID]struct{}),
-		lastpub:  make(map[string]int64),
-		gossip:   make(map[peer.ID][]*pb.ControlIHave),
-		control:  make(map[peer.ID]*pb.ControlMessage),
-		backoff:  make(map[string]map[peer.ID]time.Time),
-		peerhave: make(map[peer.ID]int),
-		iasked:   make(map[peer.ID]int),
-		outbound: make(map[peer.ID]bool),
-		connect:  make(chan connectInfo, GossipSubMaxPendingConnections),
-		mcache:   NewMessageCache(GossipSubHistoryGossip, GossipSubHistoryLength),
+	rt := DefaultGossipSubRouter(h)
+	opts = append(opts, WithRawTracer(rt.tagTracer))
+	return NewGossipSubWithRouter(ctx, h, rt, opts...)
+}
 
-		// these are configured per router to allow variation in tests
-		D:      GossipSubD,
-		Dlo:    GossipSubDlo,
-		Dhi:    GossipSubDhi,
-		Dscore: GossipSubDscore,
-		Dout:   GossipSubDout,
-		Dlazy:  GossipSubDlazy,
-
-		// these must be pulled in to resolve races in tests... sigh.
-		directConnectTicks:      GossipSubDirectConnectTicks,
-		opportunisticGraftTicks: GossipSubOpportunisticGraftTicks,
-
-		fanoutTTL: GossipSubFanoutTTL,
-
-		tagTracer: newTagTracer(h.ConnManager()),
-	}
-
-	// use the withInternalTracer option to hook up the tag tracer
-	opts = append(opts, withInternalTracer(rt.tagTracer))
+// NewGossipSubWithRouter returns a new PubSub object using the given router.
+func NewGossipSubWithRouter(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option) (*PubSub, error) {
 	return NewPubSub(ctx, h, rt, opts...)
+}
+
+// DefaultGossipSubRouter returns a new GossipSubRouter with default parameters.
+func DefaultGossipSubRouter(h host.Host) *GossipSubRouter {
+	params := DefaultGossipSubParams()
+	return &GossipSubRouter{
+		peers:        make(map[peer.ID]protocol.ID),
+		mesh:         make(map[string]map[peer.ID]struct{}),
+		fanout:       make(map[string]map[peer.ID]struct{}),
+		lastpub:      make(map[string]int64),
+		gossip:       make(map[peer.ID][]*pb.ControlIHave),
+		control:      make(map[peer.ID]*pb.ControlMessage),
+		backoff:      make(map[string]map[peer.ID]time.Time),
+		peerhave:     make(map[peer.ID]int),
+		peerdontwant: make(map[peer.ID]int),
+		unwanted:     make(map[peer.ID]map[checksum]int),
+		iasked:       make(map[peer.ID]int),
+		outbound:     make(map[peer.ID]bool),
+		connect:      make(chan connectInfo, params.MaxPendingConnections),
+		cab:          pstoremem.NewAddrBook(),
+		mcache:       NewMessageCache(params.HistoryGossip, params.HistoryLength),
+		protos:       GossipSubDefaultProtocols,
+		feature:      GossipSubDefaultFeatures,
+		tagTracer:    newTagTracer(h.ConnManager()),
+		params:       params,
+	}
+}
+
+// DefaultGossipSubParams returns the default gossip sub parameters
+// as a config.
+func DefaultGossipSubParams() GossipSubParams {
+	return GossipSubParams{
+		D:                         GossipSubD,
+		Dlo:                       GossipSubDlo,
+		Dhi:                       GossipSubDhi,
+		Dscore:                    GossipSubDscore,
+		Dout:                      GossipSubDout,
+		HistoryLength:             GossipSubHistoryLength,
+		HistoryGossip:             GossipSubHistoryGossip,
+		Dlazy:                     GossipSubDlazy,
+		GossipFactor:              GossipSubGossipFactor,
+		GossipRetransmission:      GossipSubGossipRetransmission,
+		HeartbeatInitialDelay:     GossipSubHeartbeatInitialDelay,
+		HeartbeatInterval:         GossipSubHeartbeatInterval,
+		FanoutTTL:                 GossipSubFanoutTTL,
+		PrunePeers:                GossipSubPrunePeers,
+		PruneBackoff:              GossipSubPruneBackoff,
+		UnsubscribeBackoff:        GossipSubUnsubscribeBackoff,
+		Connectors:                GossipSubConnectors,
+		MaxPendingConnections:     GossipSubMaxPendingConnections,
+		ConnectionTimeout:         GossipSubConnectionTimeout,
+		DirectConnectTicks:        GossipSubDirectConnectTicks,
+		DirectConnectInitialDelay: GossipSubDirectConnectInitialDelay,
+		OpportunisticGraftTicks:   GossipSubOpportunisticGraftTicks,
+		OpportunisticGraftPeers:   GossipSubOpportunisticGraftPeers,
+		GraftFloodThreshold:       GossipSubGraftFloodThreshold,
+		MaxIHaveLength:            GossipSubMaxIHaveLength,
+		MaxIHaveMessages:          GossipSubMaxIHaveMessages,
+		MaxIDontWantMessages:      GossipSubMaxIDontWantMessages,
+		IWantFollowupTime:         GossipSubIWantFollowupTime,
+		IDontWantMessageThreshold: GossipSubIDontWantMessageThreshold,
+		IDontWantMessageTTL:       GossipSubIDontWantMessageTTL,
+		SlowHeartbeatWarning:      0.1,
+	}
 }
 
 // WithPeerScore is a gossipsub router option that enables peer scoring.
@@ -232,12 +340,12 @@ func WithPeerScore(params *PeerScoreParams, thresholds *PeerScoreThresholds) Opt
 
 		// hook the tracer
 		if ps.tracer != nil {
-			ps.tracer.internal = append(ps.tracer.internal, gs.score, gs.gossipTracer)
+			ps.tracer.raw = append(ps.tracer.raw, gs.score, gs.gossipTracer)
 		} else {
 			ps.tracer = &pubsubTracer{
-				internal: []internalTracer{gs.score, gs.gossipTracer},
-				pid:      ps.host.ID(),
-				msgID:    ps.msgID,
+				raw:   []RawTracer{gs.score, gs.gossipTracer},
+				pid:   ps.host.ID(),
+				idGen: ps.idGen,
 			}
 		}
 
@@ -315,7 +423,24 @@ func WithDirectConnectTicks(t uint64) Option {
 		if !ok {
 			return fmt.Errorf("pubsub router is not gossipsub")
 		}
-		gs.directConnectTicks = t
+		gs.params.DirectConnectTicks = t
+		return nil
+	}
+}
+
+// WithGossipSubParams is a gossip sub router option that allows a custom
+// config to be set when instantiating the gossipsub router.
+func WithGossipSubParams(cfg GossipSubParams) Option {
+	return func(ps *PubSub) error {
+		gs, ok := ps.rt.(*GossipSubRouter)
+		if !ok {
+			return fmt.Errorf("pubsub router is not gossipsub")
+		}
+		// Overwrite current config and associated variables in the router.
+		gs.params = cfg
+		gs.connect = make(chan connectInfo, cfg.MaxPendingConnections)
+		gs.mcache = NewMessageCache(cfg.HistoryGossip, cfg.HistoryLength)
+
 		return nil
 	}
 }
@@ -328,19 +453,25 @@ func WithDirectConnectTicks(t uint64) Option {
 // is the fanout map. Fanout peer lists are expired if we don't publish any
 // messages to their topic for GossipSubFanoutTTL.
 type GossipSubRouter struct {
-	p        *PubSub
-	peers    map[peer.ID]protocol.ID          // peer protocols
-	direct   map[peer.ID]struct{}             // direct peers
-	mesh     map[string]map[peer.ID]struct{}  // topic meshes
-	fanout   map[string]map[peer.ID]struct{}  // topic fanout
-	lastpub  map[string]int64                 // last publish time for fanout topics
-	gossip   map[peer.ID][]*pb.ControlIHave   // pending gossip
-	control  map[peer.ID]*pb.ControlMessage   // pending control messages
-	peerhave map[peer.ID]int                  // number of IHAVEs received from peer in the last heartbeat
-	iasked   map[peer.ID]int                  // number of messages we have asked from peer in the last heartbeat
-	outbound map[peer.ID]bool                 // connection direction cache, marks peers with outbound connections
-	backoff  map[string]map[peer.ID]time.Time // prune backoff
-	connect  chan connectInfo                 // px connection requests
+	p            *PubSub
+	peers        map[peer.ID]protocol.ID          // peer protocols
+	direct       map[peer.ID]struct{}             // direct peers
+	mesh         map[string]map[peer.ID]struct{}  // topic meshes
+	fanout       map[string]map[peer.ID]struct{}  // topic fanout
+	lastpub      map[string]int64                 // last publish time for fanout topics
+	gossip       map[peer.ID][]*pb.ControlIHave   // pending gossip
+	control      map[peer.ID]*pb.ControlMessage   // pending control messages
+	peerhave     map[peer.ID]int                  // number of IHAVEs received from peer in the last heartbeat
+	peerdontwant map[peer.ID]int                  // number of IDONTWANTs received from peer in the last heartbeat
+	unwanted     map[peer.ID]map[checksum]int     // TTL of the message ids peers don't want
+	iasked       map[peer.ID]int                  // number of messages we have asked from peer in the last heartbeat
+	outbound     map[peer.ID]bool                 // connection direction cache, marks peers with outbound connections
+	backoff      map[string]map[peer.ID]time.Time // prune backoff
+	connect      chan connectInfo                 // px connection requests
+	cab          peerstore.AddrBook
+
+	protos  []protocol.ID
+	feature GossipSubFeatureTest
 
 	mcache       *MessageCache
 	tracer       *pubsubTracer
@@ -348,6 +479,9 @@ type GossipSubRouter struct {
 	gossipTracer *gossipTracer
 	tagTracer    *tagTracer
 	gate         *peerGater
+
+	// config for gossipsub parameters
+	params GossipSubParams
 
 	// whether PX is enabled; this should be enabled in bootstrappers and other well connected/trusted
 	// nodes.
@@ -378,19 +512,6 @@ type GossipSubRouter struct {
 	// number of heartbeats since the beginning of time; this allows us to amortize some resource
 	// clean up -- eg backoff clean up.
 	heartbeatTicks uint64
-
-	// overly parameter "constants"
-	// these are pulled from their global value or else the race detector is angry on travis
-	// it also allows us to change them per peer in tests, which is a plus
-	D, Dlo, Dhi, Dscore, Dout, Dlazy int
-
-	// tick "constants" for triggering direct connect and opportunistic grafting
-	// these are pulled from their global value or else the race detector is angry on travis
-	directConnectTicks, opportunisticGraftTicks uint64
-
-	// fanout expiry ttl "constant"
-	// this is pulled from its global value or else the race detector is angry on travis
-	fanoutTTL time.Duration
 }
 
 type connectInfo struct {
@@ -399,7 +520,7 @@ type connectInfo struct {
 }
 
 func (gs *GossipSubRouter) Protocols() []protocol.ID {
-	return []protocol.ID{GossipSubID_v11, GossipSubID_v10, FloodSubID}
+	return gs.protos
 }
 
 func (gs *GossipSubRouter) Attach(p *PubSub) {
@@ -416,26 +537,76 @@ func (gs *GossipSubRouter) Attach(p *PubSub) {
 	gs.tagTracer.Start(gs)
 
 	// start using the same msg ID function as PubSub for caching messages.
-	gs.mcache.SetMsgIdFn(p.msgID)
+	gs.mcache.SetMsgIdFn(p.idGen.ID)
 
 	// start the heartbeat
 	go gs.heartbeatTimer()
 
 	// start the PX connectors
-	for i := 0; i < GossipSubConnectors; i++ {
+	for i := 0; i < gs.params.Connectors; i++ {
 		go gs.connector()
 	}
+
+	// Manage our address book from events emitted by libp2p
+	go gs.manageAddrBook()
 
 	// connect to direct peers
 	if len(gs.direct) > 0 {
 		go func() {
-			if GossipSubDirectConnectInitialDelay > 0 {
-				time.Sleep(GossipSubDirectConnectInitialDelay)
+			if gs.params.DirectConnectInitialDelay > 0 {
+				time.Sleep(gs.params.DirectConnectInitialDelay)
 			}
 			for p := range gs.direct {
 				gs.connect <- connectInfo{p: p}
 			}
 		}()
+	}
+}
+
+func (gs *GossipSubRouter) manageAddrBook() {
+	sub, err := gs.p.host.EventBus().Subscribe([]interface{}{
+		&event.EvtPeerIdentificationCompleted{},
+		&event.EvtPeerConnectednessChanged{},
+	})
+	if err != nil {
+		log.Errorf("failed to subscribe to peer identification events: %v", err)
+		return
+	}
+	defer sub.Close()
+
+	for {
+		select {
+		case <-gs.p.ctx.Done():
+			cabCloser, ok := gs.cab.(io.Closer)
+			if ok {
+				errClose := cabCloser.Close()
+				if errClose != nil {
+					log.Warnf("failed to close addr book: %v", errClose)
+				}
+			}
+			return
+		case ev := <-sub.Out():
+			switch ev := ev.(type) {
+			case event.EvtPeerIdentificationCompleted:
+				if ev.SignedPeerRecord != nil {
+					cab, ok := peerstore.GetCertifiedAddrBook(gs.cab)
+					if ok {
+						ttl := peerstore.RecentlyConnectedAddrTTL
+						if gs.p.host.Network().Connectedness(ev.Peer) == network.Connected {
+							ttl = peerstore.ConnectedAddrTTL
+						}
+						_, err := cab.ConsumePeerRecord(ev.SignedPeerRecord, ttl)
+						if err != nil {
+							log.Warnf("failed to consume signed peer record: %v", err)
+						}
+					}
+				}
+			case event.EvtPeerConnectednessChanged:
+				if ev.Connectedness != network.Connected {
+					gs.cab.UpdateAddrs(ev.Peer, peerstore.ConnectedAddrTTL, peerstore.RecentlyConnectedAddrTTL)
+				}
+			}
+		}
 	}
 }
 
@@ -449,7 +620,13 @@ func (gs *GossipSubRouter) AddPeer(p peer.ID, proto protocol.ID) {
 	conns := gs.p.host.Network().ConnsToPeer(p)
 loop:
 	for _, c := range conns {
-		if c.Stat().Direction == network.DirOutbound {
+		stat := c.Stat()
+
+		if stat.Limited {
+			continue
+		}
+
+		if stat.Direction == network.DirOutbound {
 			// only count the connection if it has a pubsub stream
 			for _, s := range c.GetStreams() {
 				if s.Protocol() == proto {
@@ -487,7 +664,7 @@ func (gs *GossipSubRouter) EnoughPeers(topic string, suggested int) bool {
 	fsPeers, gsPeers := 0, 0
 	// floodsub peers
 	for p := range tmap {
-		if gs.peers[p] == FloodSubID {
+		if !gs.feature(GossipSubFeatureMesh, gs.peers[p]) {
 			fsPeers++
 		}
 	}
@@ -496,10 +673,10 @@ func (gs *GossipSubRouter) EnoughPeers(topic string, suggested int) bool {
 	gsPeers = len(gs.mesh[topic])
 
 	if suggested == 0 {
-		suggested = gs.Dlo
+		suggested = gs.params.Dlo
 	}
 
-	if fsPeers+gsPeers >= suggested || gsPeers >= gs.Dhi {
+	if fsPeers+gsPeers >= suggested || gsPeers >= gs.params.Dhi {
 		return true
 	}
 
@@ -519,6 +696,36 @@ func (gs *GossipSubRouter) AcceptFrom(p peer.ID) AcceptStatus {
 	return gs.gate.AcceptFrom(p)
 }
 
+// PreValidation sends the IDONTWANT control messages to all the mesh
+// peers. They need to be sent right before the validation because they
+// should be seen by the peers as soon as possible.
+func (gs *GossipSubRouter) PreValidation(msgs []*Message) {
+	tmids := make(map[string][]string)
+	for _, msg := range msgs {
+		if len(msg.GetData()) < gs.params.IDontWantMessageThreshold {
+			continue
+		}
+		topic := msg.GetTopic()
+		tmids[topic] = append(tmids[topic], gs.p.idGen.ID(msg))
+	}
+	for topic, mids := range tmids {
+		if len(mids) == 0 {
+			continue
+		}
+		// shuffle the messages got from the RPC envelope
+		shuffleStrings(mids)
+		// send IDONTWANT to all the mesh peers
+		for p := range gs.mesh[topic] {
+			// send to only peers that support IDONTWANT
+			if gs.feature(GossipSubFeatureIdontwant, gs.peers[p]) {
+				idontwant := []*pb.ControlIDontWant{{MessageIDs: mids}}
+				out := rpcWithControl(nil, nil, nil, nil, nil, idontwant)
+				gs.sendRPC(p, out, true)
+			}
+		}
+	}
+}
+
 func (gs *GossipSubRouter) HandleRPC(rpc *RPC) {
 	ctl := rpc.GetControl()
 	if ctl == nil {
@@ -529,13 +736,14 @@ func (gs *GossipSubRouter) HandleRPC(rpc *RPC) {
 	ihave := gs.handleIWant(rpc.from, ctl)
 	prune := gs.handleGraft(rpc.from, ctl)
 	gs.handlePrune(rpc.from, ctl)
+	gs.handleIDontWant(rpc.from, ctl)
 
 	if len(iwant) == 0 && len(ihave) == 0 && len(prune) == 0 {
 		return
 	}
 
-	out := rpcWithControl(ihave, nil, iwant, nil, prune)
-	gs.sendRPC(rpc.from, out)
+	out := rpcWithControl(ihave, nil, iwant, nil, prune, nil)
+	gs.sendRPC(rpc.from, out, false)
 }
 
 func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.ControlIWant {
@@ -548,12 +756,11 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 
 	// IHAVE flood protection
 	gs.peerhave[p]++
-	if gs.peerhave[p] > GossipSubMaxIHaveMessages {
+	if gs.peerhave[p] > gs.params.MaxIHaveMessages {
 		log.Debugf("IHAVE: peer %s has advertised too many times (%d) within this heartbeat interval; ignoring", p, gs.peerhave[p])
 		return nil
 	}
-
-	if gs.iasked[p] >= GossipSubMaxIHaveLength {
+	if gs.iasked[p] >= gs.params.MaxIHaveLength {
 		log.Debugf("IHAVE: peer %s has already advertised too many messages (%d); ignoring", p, gs.iasked[p])
 		return nil
 	}
@@ -566,7 +773,18 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 			continue
 		}
 
-		for _, mid := range ihave.GetMessageIDs() {
+		if !gs.p.peerFilter(p, topic) {
+			continue
+		}
+
+	checkIwantMsgsLoop:
+		for msgIdx, mid := range ihave.GetMessageIDs() {
+			// prevent remote peer from sending too many msg_ids on a single IHAVE message
+			if msgIdx >= gs.params.MaxIHaveLength {
+				log.Debugf("IHAVE: peer %s has sent IHAVE on topic %s with too many messages (%d); ignoring remaining msgs", p, topic, len(ihave.MessageIDs))
+				break checkIwantMsgsLoop
+			}
+
 			if gs.p.seenMessage(mid) {
 				continue
 			}
@@ -579,8 +797,8 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 	}
 
 	iask := len(iwant)
-	if iask+gs.iasked[p] > GossipSubMaxIHaveLength {
-		iask = GossipSubMaxIHaveLength - gs.iasked[p]
+	if iask+gs.iasked[p] > gs.params.MaxIHaveLength {
+		iask = gs.params.MaxIHaveLength - gs.iasked[p]
 	}
 
 	log.Debugf("IHAVE: Asking for %d out of %d messages from %s", iask, len(iwant), p)
@@ -599,7 +817,7 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 
 	gs.gossipTracer.AddPromise(p, iwantlst)
 
-	return []*pb.ControlIWant{&pb.ControlIWant{MessageIDs: iwantlst}}
+	return []*pb.ControlIWant{{MessageIDs: iwantlst}}
 }
 
 func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.Message {
@@ -618,12 +836,16 @@ func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.
 				continue
 			}
 
-			if count > GossipSubGossipRetransmission {
+			if !gs.p.peerFilter(p, msg.GetTopic()) {
+				continue
+			}
+
+			if count > gs.params.GossipRetransmission {
 				log.Debugf("IWANT: Peer %s has asked for message %s too many times; ignoring request", p, mid)
 				continue
 			}
 
-			ihave[mid] = msg
+			ihave[mid] = msg.Message
 		}
 	}
 
@@ -650,6 +872,11 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 
 	for _, graft := range ctl.GetGraft() {
 		topic := graft.GetTopicID()
+
+		if !gs.p.peerFilter(p, topic) {
+			continue
+		}
+
 		peers, ok := gs.mesh[topic]
 		if !ok {
 			// don't do PX when there is an unknown topic to avoid leaking our peers
@@ -684,13 +911,13 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 			// no PX
 			doPX = false
 			// check the flood cutoff -- is the GRAFT coming too fast?
-			floodCutoff := expire.Add(GossipSubGraftFloodThreshold - GossipSubPruneBackoff)
+			floodCutoff := expire.Add(gs.params.GraftFloodThreshold - gs.params.PruneBackoff)
 			if now.Before(floodCutoff) {
 				// extra penalty
 				gs.score.AddPenalty(p, 1)
 			}
 			// refresh the backoff
-			gs.addBackoff(p, topic)
+			gs.addBackoff(p, topic, false)
 			prune = append(prune, topic)
 			continue
 		}
@@ -704,16 +931,16 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 			// but we won't PX to them
 			doPX = false
 			// add/refresh backoff so that we don't reGRAFT too early even if the score decays back up
-			gs.addBackoff(p, topic)
+			gs.addBackoff(p, topic, false)
 			continue
 		}
 
 		// check the number of mesh peers; if it is at (or over) Dhi, we only accept grafts
 		// from peers with outbound connections; this is a defensive check to restrict potential
 		// mesh takeover attacks combined with love bombing
-		if len(peers) >= gs.Dhi && !gs.outbound[p] {
+		if len(peers) >= gs.params.Dhi && !gs.outbound[p] {
 			prune = append(prune, topic)
-			gs.addBackoff(p, topic)
+			gs.addBackoff(p, topic, false)
 			continue
 		}
 
@@ -728,7 +955,7 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 
 	cprune := make([]*pb.ControlPrune, 0, len(prune))
 	for _, topic := range prune {
-		cprune = append(cprune, gs.makePrune(p, topic, doPX))
+		cprune = append(cprune, gs.makePrune(p, topic, doPX, false))
 	}
 
 	return cprune
@@ -752,7 +979,7 @@ func (gs *GossipSubRouter) handlePrune(p peer.ID, ctl *pb.ControlMessage) {
 		if backoff > 0 {
 			gs.doAddBackoff(p, topic, time.Duration(backoff)*time.Second)
 		} else {
-			gs.addBackoff(p, topic)
+			gs.addBackoff(p, topic, false)
 		}
 
 		px := prune.GetPeers()
@@ -768,8 +995,32 @@ func (gs *GossipSubRouter) handlePrune(p peer.ID, ctl *pb.ControlMessage) {
 	}
 }
 
-func (gs *GossipSubRouter) addBackoff(p peer.ID, topic string) {
-	gs.doAddBackoff(p, topic, GossipSubPruneBackoff)
+func (gs *GossipSubRouter) handleIDontWant(p peer.ID, ctl *pb.ControlMessage) {
+	if gs.unwanted[p] == nil {
+		gs.unwanted[p] = make(map[checksum]int)
+	}
+
+	// IDONTWANT flood protection
+	if gs.peerdontwant[p] >= gs.params.MaxIDontWantMessages {
+		log.Debugf("IDONWANT: peer %s has advertised too many times (%d) within this heartbeat interval; ignoring", p, gs.peerdontwant[p])
+		return
+	}
+	gs.peerdontwant[p]++
+
+	// Remember all the unwanted message ids
+	for _, idontwant := range ctl.GetIdontwant() {
+		for _, mid := range idontwant.GetMessageIDs() {
+			gs.unwanted[p][computeChecksum(mid)] = gs.params.IDontWantMessageTTL
+		}
+	}
+}
+
+func (gs *GossipSubRouter) addBackoff(p peer.ID, topic string, isUnsubscribe bool) {
+	backoff := gs.params.PruneBackoff
+	if isUnsubscribe {
+		backoff = gs.params.UnsubscribeBackoff
+	}
+	gs.doAddBackoff(p, topic, backoff)
 }
 
 func (gs *GossipSubRouter) doAddBackoff(p peer.ID, topic string, interval time.Duration) {
@@ -785,9 +1036,9 @@ func (gs *GossipSubRouter) doAddBackoff(p peer.ID, topic string, interval time.D
 }
 
 func (gs *GossipSubRouter) pxConnect(peers []*pb.PeerInfo) {
-	if len(peers) > GossipSubPrunePeers {
+	if len(peers) > gs.params.PrunePeers {
 		shufflePeerInfo(peers)
-		peers = peers[:GossipSubPrunePeers]
+		peers = peers[:gs.params.PrunePeers]
 	}
 
 	toconnect := make([]connectInfo, 0, len(peers))
@@ -832,7 +1083,6 @@ func (gs *GossipSubRouter) pxConnect(peers []*pb.PeerInfo) {
 		case gs.connect <- ci:
 		default:
 			log.Debugf("ignoring peer connection attempt; too many pending connections")
-			break
 		}
 	}
 }
@@ -846,7 +1096,7 @@ func (gs *GossipSubRouter) connector() {
 			}
 
 			log.Debugf("connecting to %s", ci.p)
-			cab, ok := peerstore.GetCertifiedAddrBook(gs.p.host.Peerstore())
+			cab, ok := peerstore.GetCertifiedAddrBook(gs.cab)
 			if ok && ci.spr != nil {
 				_, err := cab.ConsumePeerRecord(ci.spr, peerstore.TempAddrTTL)
 				if err != nil {
@@ -854,8 +1104,8 @@ func (gs *GossipSubRouter) connector() {
 				}
 			}
 
-			ctx, cancel := context.WithTimeout(gs.p.ctx, GossipSubConnectionTimeout)
-			err := gs.p.host.Connect(ctx, peer.AddrInfo{ID: ci.p})
+			ctx, cancel := context.WithTimeout(gs.p.ctx, gs.params.ConnectionTimeout)
+			err := gs.p.host.Connect(ctx, peer.AddrInfo{ID: ci.p, Addrs: gs.cab.Addrs(ci.p)})
 			cancel()
 			if err != nil {
 				log.Debugf("error connecting to %s: %s", ci.p, err)
@@ -868,7 +1118,7 @@ func (gs *GossipSubRouter) connector() {
 }
 
 func (gs *GossipSubRouter) Publish(msg *Message) {
-	gs.mcache.Put(msg.Message)
+	gs.mcache.Put(msg)
 
 	from := msg.ReceivedFrom
 	topic := msg.GetTopic()
@@ -899,7 +1149,7 @@ func (gs *GossipSubRouter) Publish(msg *Message) {
 
 		// floodsub peers
 		for p := range tmap {
-			if gs.peers[p] == FloodSubID && gs.score.Score(p) >= gs.publishThreshold {
+			if !gs.feature(GossipSubFeatureMesh, gs.peers[p]) && gs.score.Score(p) >= gs.publishThreshold {
 				tosend[p] = struct{}{}
 			}
 		}
@@ -911,7 +1161,7 @@ func (gs *GossipSubRouter) Publish(msg *Message) {
 			gmap, ok = gs.fanout[topic]
 			if !ok || len(gmap) == 0 {
 				// we don't have any, pick some with score above the publish threshold
-				peers := gs.getPeers(topic, gs.D, func(p peer.ID) bool {
+				peers := gs.getPeers(topic, gs.params.D, func(p peer.ID) bool {
 					_, direct := gs.direct[p]
 					return !direct && gs.score.Score(p) >= gs.publishThreshold
 				})
@@ -925,6 +1175,12 @@ func (gs *GossipSubRouter) Publish(msg *Message) {
 		}
 
 		for p := range gmap {
+			mid := gs.p.idGen.ID(msg)
+			// Check if it has already received an IDONTWANT for the message.
+			// If so, don't send it to the peer
+			if _, ok := gs.unwanted[p][computeChecksum(mid)]; ok {
+				continue
+			}
 			tosend[p] = struct{}{}
 		}
 	}
@@ -935,7 +1191,7 @@ func (gs *GossipSubRouter) Publish(msg *Message) {
 			continue
 		}
 
-		gs.sendRPC(pid, out)
+		gs.sendRPC(pid, out, false)
 	}
 }
 
@@ -950,21 +1206,25 @@ func (gs *GossipSubRouter) Join(topic string) {
 
 	gmap, ok = gs.fanout[topic]
 	if ok {
+		backoff := gs.backoff[topic]
 		// these peers have a score above the publish threshold, which may be negative
 		// so drop the ones with a negative score
 		for p := range gmap {
-			if gs.score.Score(p) < 0 {
+			_, doBackOff := backoff[p]
+			if gs.score.Score(p) < 0 || doBackOff {
 				delete(gmap, p)
 			}
 		}
 
-		if len(gmap) < gs.D {
+		if len(gmap) < gs.params.D {
 			// we need more peers; eager, as this would get fixed in the next heartbeat
-			more := gs.getPeers(topic, gs.D-len(gmap), func(p peer.ID) bool {
-				// filter our current peers, direct peers, and peers with negative scores
+			more := gs.getPeers(topic, gs.params.D-len(gmap), func(p peer.ID) bool {
+				// filter our current peers, direct peers, peers we are backing off, and
+				// peers with negative scores
 				_, inMesh := gmap[p]
 				_, direct := gs.direct[p]
-				return !inMesh && !direct && gs.score.Score(p) >= 0
+				_, doBackOff := backoff[p]
+				return !inMesh && !direct && !doBackOff && gs.score.Score(p) >= 0
 			})
 			for _, p := range more {
 				gmap[p] = struct{}{}
@@ -974,10 +1234,12 @@ func (gs *GossipSubRouter) Join(topic string) {
 		delete(gs.fanout, topic)
 		delete(gs.lastpub, topic)
 	} else {
-		peers := gs.getPeers(topic, gs.D, func(p peer.ID) bool {
-			// filter direct peers and peers with negative score
+		backoff := gs.backoff[topic]
+		peers := gs.getPeers(topic, gs.params.D, func(p peer.ID) bool {
+			// filter direct peers, peers we are backing off and peers with negative score
 			_, direct := gs.direct[p]
-			return !direct && gs.score.Score(p) >= 0
+			_, doBackOff := backoff[p]
+			return !direct && !doBackOff && gs.score.Score(p) >= 0
 		})
 		gmap = peerListToMap(peers)
 		gs.mesh[topic] = gmap
@@ -1004,23 +1266,27 @@ func (gs *GossipSubRouter) Leave(topic string) {
 	for p := range gmap {
 		log.Debugf("LEAVE: Remove mesh link to %s in %s", p, topic)
 		gs.tracer.Prune(p, topic)
-		gs.sendPrune(p, topic)
+		gs.sendPrune(p, topic, true)
+		// Add a backoff to this peer to prevent us from eagerly
+		// re-grafting this peer into our mesh if we rejoin this
+		// topic before the backoff period ends.
+		gs.addBackoff(p, topic, true)
 	}
 }
 
 func (gs *GossipSubRouter) sendGraft(p peer.ID, topic string) {
-	graft := []*pb.ControlGraft{&pb.ControlGraft{TopicID: &topic}}
-	out := rpcWithControl(nil, nil, nil, graft, nil)
-	gs.sendRPC(p, out)
+	graft := []*pb.ControlGraft{{TopicID: &topic}}
+	out := rpcWithControl(nil, nil, nil, graft, nil, nil)
+	gs.sendRPC(p, out, false)
 }
 
-func (gs *GossipSubRouter) sendPrune(p peer.ID, topic string) {
-	prune := []*pb.ControlPrune{gs.makePrune(p, topic, gs.doPX)}
-	out := rpcWithControl(nil, nil, nil, nil, prune)
-	gs.sendRPC(p, out)
+func (gs *GossipSubRouter) sendPrune(p peer.ID, topic string, isUnsubscribe bool) {
+	prune := []*pb.ControlPrune{gs.makePrune(p, topic, gs.doPX, isUnsubscribe)}
+	out := rpcWithControl(nil, nil, nil, nil, prune, nil)
+	gs.sendRPC(p, out, false)
 }
 
-func (gs *GossipSubRouter) sendRPC(p peer.ID, out *RPC) {
+func (gs *GossipSubRouter) sendRPC(p peer.ID, out *RPC, urgent bool) {
 	// do we own the RPC?
 	own := false
 
@@ -1044,31 +1310,31 @@ func (gs *GossipSubRouter) sendRPC(p peer.ID, out *RPC) {
 		delete(gs.gossip, p)
 	}
 
-	mch, ok := gs.p.peers[p]
+	q, ok := gs.p.peers[p]
 	if !ok {
 		return
 	}
 
 	// If we're below the max message size, go ahead and send
 	if out.Size() < gs.p.maxMessageSize {
-		gs.doSendRPC(out, p, mch)
+		gs.doSendRPC(out, p, q, urgent)
 		return
 	}
 
-	// If we're too big, fragment into multiple RPCs and send each sequentially
-	outRPCs, err := fragmentRPC(out, gs.p.maxMessageSize)
-	if err != nil {
-		gs.doDropRPC(out, p, fmt.Sprintf("unable to fragment RPC: %s", err))
-		return
-	}
-
+	// Potentially split the RPC into multiple RPCs that are below the max message size
+	outRPCs := appendOrMergeRPC(nil, gs.p.maxMessageSize, *out)
 	for _, rpc := range outRPCs {
-		gs.doSendRPC(rpc, p, mch)
+		if rpc.Size() > gs.p.maxMessageSize {
+			// This should only happen if a single message/control is above the maxMessageSize.
+			gs.doDropRPC(out, p, fmt.Sprintf("Dropping oversized RPC. Size: %d, limit: %d. (Over by %d bytes)", rpc.Size(), gs.p.maxMessageSize, rpc.Size()-gs.p.maxMessageSize))
+			continue
+		}
+		gs.doSendRPC(rpc, p, q, urgent)
 	}
 }
 
 func (gs *GossipSubRouter) doDropRPC(rpc *RPC, p peer.ID, reason string) {
-	log.Debugf("dropping message to peer %s: %s", p.Pretty(), reason)
+	log.Debugf("dropping message to peer %s: %s", p, reason)
 	gs.tracer.DropRPC(rpc, p)
 	// push control messages that need to be retried
 	ctl := rpc.GetControl()
@@ -1077,140 +1343,160 @@ func (gs *GossipSubRouter) doDropRPC(rpc *RPC, p peer.ID, reason string) {
 	}
 }
 
-func (gs *GossipSubRouter) doSendRPC(rpc *RPC, p peer.ID, mch chan *RPC) {
-	select {
-	case mch <- rpc:
-		gs.tracer.SendRPC(rpc, p)
-	default:
+func (gs *GossipSubRouter) doSendRPC(rpc *RPC, p peer.ID, q *rpcQueue, urgent bool) {
+	var err error
+	if urgent {
+		err = q.UrgentPush(rpc, false)
+	} else {
+		err = q.Push(rpc, false)
+	}
+	if err != nil {
 		gs.doDropRPC(rpc, p, "queue full")
+		return
 	}
+	gs.tracer.SendRPC(rpc, p)
 }
 
-func fragmentRPC(rpc *RPC, limit int) ([]*RPC, error) {
-	if rpc.Size() < limit {
-		return []*RPC{rpc}, nil
+// appendOrMergeRPC appends the given RPCs to the slice, merging them if possible.
+// If any elem is too large to fit in a single RPC, it will be split into multiple RPCs.
+// If an RPC is too large and can't be split further (e.g. Message data is
+// bigger than the RPC limit), then it will be returned as an oversized RPC.
+// The caller should filter out oversized RPCs.
+func appendOrMergeRPC(slice []*RPC, limit int, elems ...RPC) []*RPC {
+	if len(elems) == 0 {
+		return slice
 	}
 
-	c := (rpc.Size() / limit) + 1
-	rpcs := make([]*RPC, 1, c)
-	rpcs[0] = &RPC{RPC: pb.RPC{}, from: rpc.from}
+	if len(slice) == 0 && len(elems) == 1 && elems[0].Size() < limit {
+		// Fast path: no merging needed and only one element
+		return append(slice, &elems[0])
+	}
 
-	// outRPC returns the current RPC message if it will fit sizeToAdd more bytes
-	// otherwise, it will create a new RPC message and add it to the list.
-	// if withCtl is true, the returned message will have a non-nil empty Control message.
-	outRPC := func(sizeToAdd int, withCtl bool) *RPC {
-		current := rpcs[len(rpcs)-1]
-		// check if we can fit the new data, plus an extra byte for the protobuf field tag
-		if current.Size()+sizeToAdd+1 < limit {
-			if withCtl && current.Control == nil {
-				current.Control = &pb.ControlMessage{}
+	out := slice
+	if len(out) == 0 {
+		out = append(out, &RPC{RPC: pb.RPC{}})
+		out[0].from = elems[0].from
+	}
+
+	for _, elem := range elems {
+		lastRPC := out[len(out)-1]
+
+		// Merge/Append publish messages
+		// TODO: Never merge messages. The current behavior is the same as the
+		// old behavior. In the future let's not merge messages. Since,
+		// it may increase message latency.
+		for _, msg := range elem.GetPublish() {
+			if lastRPC.Publish = append(lastRPC.Publish, msg); lastRPC.Size() > limit {
+				lastRPC.Publish = lastRPC.Publish[:len(lastRPC.Publish)-1]
+				lastRPC = &RPC{RPC: pb.RPC{}, from: elem.from}
+				lastRPC.Publish = append(lastRPC.Publish, msg)
+				out = append(out, lastRPC)
 			}
-			return current
 		}
-		var ctl *pb.ControlMessage
-		if withCtl {
-			ctl = &pb.ControlMessage{}
+
+		// Merge/Append Subscriptions
+		for _, sub := range elem.GetSubscriptions() {
+			if lastRPC.Subscriptions = append(lastRPC.Subscriptions, sub); lastRPC.Size() > limit {
+				lastRPC.Subscriptions = lastRPC.Subscriptions[:len(lastRPC.Subscriptions)-1]
+				lastRPC = &RPC{RPC: pb.RPC{}, from: elem.from}
+				lastRPC.Subscriptions = append(lastRPC.Subscriptions, sub)
+				out = append(out, lastRPC)
+			}
 		}
-		next := &RPC{RPC: pb.RPC{Control: ctl}, from: rpc.from}
-		rpcs = append(rpcs, next)
-		return next
+
+		// Merge/Append Control messages
+		if ctl := elem.GetControl(); ctl != nil {
+			if lastRPC.Control == nil {
+				lastRPC.Control = &pb.ControlMessage{}
+				if lastRPC.Size() > limit {
+					lastRPC.Control = nil
+					lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{}}, from: elem.from}
+					out = append(out, lastRPC)
+				}
+			}
+
+			for _, graft := range ctl.GetGraft() {
+				if lastRPC.Control.Graft = append(lastRPC.Control.Graft, graft); lastRPC.Size() > limit {
+					lastRPC.Control.Graft = lastRPC.Control.Graft[:len(lastRPC.Control.Graft)-1]
+					lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{}}, from: elem.from}
+					lastRPC.Control.Graft = append(lastRPC.Control.Graft, graft)
+					out = append(out, lastRPC)
+				}
+			}
+
+			for _, prune := range ctl.GetPrune() {
+				if lastRPC.Control.Prune = append(lastRPC.Control.Prune, prune); lastRPC.Size() > limit {
+					lastRPC.Control.Prune = lastRPC.Control.Prune[:len(lastRPC.Control.Prune)-1]
+					lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{}}, from: elem.from}
+					lastRPC.Control.Prune = append(lastRPC.Control.Prune, prune)
+					out = append(out, lastRPC)
+				}
+			}
+
+			for _, iwant := range ctl.GetIwant() {
+				if len(lastRPC.Control.Iwant) == 0 {
+					// Initialize with a single IWANT.
+					// For IWANTs we don't need more than a single one,
+					// since there are no topic IDs here.
+					newIWant := &pb.ControlIWant{}
+					if lastRPC.Control.Iwant = append(lastRPC.Control.Iwant, newIWant); lastRPC.Size() > limit {
+						lastRPC.Control.Iwant = lastRPC.Control.Iwant[:len(lastRPC.Control.Iwant)-1]
+						lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{
+							Iwant: []*pb.ControlIWant{newIWant},
+						}}, from: elem.from}
+						out = append(out, lastRPC)
+					}
+				}
+				for _, msgID := range iwant.GetMessageIDs() {
+					if lastRPC.Control.Iwant[0].MessageIDs = append(lastRPC.Control.Iwant[0].MessageIDs, msgID); lastRPC.Size() > limit {
+						lastRPC.Control.Iwant[0].MessageIDs = lastRPC.Control.Iwant[0].MessageIDs[:len(lastRPC.Control.Iwant[0].MessageIDs)-1]
+						lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{
+							Iwant: []*pb.ControlIWant{{MessageIDs: []string{msgID}}},
+						}}, from: elem.from}
+						out = append(out, lastRPC)
+					}
+				}
+			}
+
+			for _, ihave := range ctl.GetIhave() {
+				if len(lastRPC.Control.Ihave) == 0 ||
+					lastRPC.Control.Ihave[len(lastRPC.Control.Ihave)-1].TopicID != ihave.TopicID {
+					// Start a new IHAVE if we are referencing a new topic ID
+					newIhave := &pb.ControlIHave{TopicID: ihave.TopicID}
+					if lastRPC.Control.Ihave = append(lastRPC.Control.Ihave, newIhave); lastRPC.Size() > limit {
+						lastRPC.Control.Ihave = lastRPC.Control.Ihave[:len(lastRPC.Control.Ihave)-1]
+						lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{
+							Ihave: []*pb.ControlIHave{newIhave},
+						}}, from: elem.from}
+						out = append(out, lastRPC)
+					}
+				}
+				for _, msgID := range ihave.GetMessageIDs() {
+					lastIHave := lastRPC.Control.Ihave[len(lastRPC.Control.Ihave)-1]
+					if lastIHave.MessageIDs = append(lastIHave.MessageIDs, msgID); lastRPC.Size() > limit {
+						lastIHave.MessageIDs = lastIHave.MessageIDs[:len(lastIHave.MessageIDs)-1]
+						lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{
+							Ihave: []*pb.ControlIHave{{TopicID: ihave.TopicID, MessageIDs: []string{msgID}}},
+						}}, from: elem.from}
+						out = append(out, lastRPC)
+					}
+				}
+			}
+		}
 	}
 
-	for _, msg := range rpc.GetPublish() {
-		s := msg.Size()
-		// if an individual message is too large, we can't fragment it and have to fail entirely
-		if s > limit {
-			return nil, fmt.Errorf("message with len=%d exceeds limit %d", s, limit)
-		}
-		out := outRPC(s, false)
-		out.Publish = append(out.Publish, msg)
-	}
-
-	for _, sub := range rpc.GetSubscriptions() {
-		out := outRPC(sub.Size(), false)
-		out.Subscriptions = append(out.Subscriptions, sub)
-	}
-
-	ctl := rpc.GetControl()
-	if ctl == nil {
-		// if there were no control messages, we're done
-		return rpcs, nil
-	}
-	// if all the control messages fit into one RPC, we just add it to the end and return
-	ctlOut := &RPC{RPC: pb.RPC{Control: ctl}, from: rpc.from}
-	if ctlOut.Size() < limit {
-		rpcs = append(rpcs, ctlOut)
-		return rpcs, nil
-	}
-
-	// we need to split up the control messages into multiple RPCs
-	for _, graft := range ctl.Graft {
-		out := outRPC(graft.Size(), true)
-		out.Control.Graft = append(out.Control.Graft, graft)
-	}
-	for _, prune := range ctl.Prune {
-		out := outRPC(prune.Size(), true)
-		out.Control.Prune = append(out.Control.Prune, prune)
-	}
-
-	// An individual IWANT or IHAVE message could be larger than the limit if we have
-	// a lot of message IDs. fragmentMessageIds will split them into buckets that
-	// fit within the limit, with some overhead for the control messages themselves
-	for _, iwant := range ctl.Iwant {
-		const protobufOverhead = 6
-		idBuckets := fragmentMessageIds(iwant.MessageIDs, limit-protobufOverhead)
-		for _, ids := range idBuckets {
-			iwant := &pb.ControlIWant{MessageIDs: ids}
-			out := outRPC(iwant.Size(), true)
-			out.Control.Iwant = append(out.Control.Iwant, iwant)
-		}
-	}
-	for _, ihave := range ctl.Ihave {
-		const protobufOverhead = 6
-		idBuckets := fragmentMessageIds(ihave.MessageIDs, limit-protobufOverhead)
-		for _, ids := range idBuckets {
-			ihave := &pb.ControlIHave{MessageIDs: ids}
-			out := outRPC(ihave.Size(), true)
-			out.Control.Ihave = append(out.Control.Ihave, ihave)
-		}
-	}
-	return rpcs, nil
-}
-
-func fragmentMessageIds(msgIds []string, limit int) [][]string {
-	// account for two bytes of protobuf overhead per array element
-	const protobufOverhead = 2
-
-	out := [][]string{{}}
-	var currentBucket int
-	var bucketLen int
-	for i := 0; i < len(msgIds); i++ {
-		size := len(msgIds[i]) + protobufOverhead
-		if size > limit {
-			// pathological case where a single message ID exceeds the limit.
-			log.Warnf("message ID length %d exceeds limit %d, removing from outgoing gossip", size, limit)
-			continue
-		}
-		bucketLen += size
-		if bucketLen > limit {
-			out = append(out, []string{})
-			currentBucket++
-			bucketLen = size
-		}
-		out[currentBucket] = append(out[currentBucket], msgIds[i])
-	}
 	return out
 }
 
 func (gs *GossipSubRouter) heartbeatTimer() {
-	time.Sleep(GossipSubHeartbeatInitialDelay)
+	time.Sleep(gs.params.HeartbeatInitialDelay)
 	select {
 	case gs.p.eval <- gs.heartbeat:
 	case <-gs.p.ctx.Done():
 		return
 	}
 
-	ticker := time.NewTicker(GossipSubHeartbeatInterval)
+	ticker := time.NewTicker(gs.params.HeartbeatInterval)
 	defer ticker.Stop()
 
 	for {
@@ -1228,7 +1514,15 @@ func (gs *GossipSubRouter) heartbeatTimer() {
 }
 
 func (gs *GossipSubRouter) heartbeat() {
-	defer log.EventBegin(gs.p.ctx, "heartbeat").Done()
+	start := time.Now()
+	defer func() {
+		if gs.params.SlowHeartbeatWarning > 0 {
+			slowWarning := time.Duration(gs.params.SlowHeartbeatWarning * float64(gs.params.HeartbeatInterval))
+			if dt := time.Since(start); dt > slowWarning {
+				log.Warnw("slow heartbeat", "took", dt)
+			}
+		}
+	}()
 
 	gs.heartbeatTicks++
 
@@ -1241,6 +1535,9 @@ func (gs *GossipSubRouter) heartbeat() {
 
 	// clean up iasked counters
 	gs.clearIHaveCounters()
+
+	// clean up IDONTWANT counters
+	gs.clearIDontWantCounters()
 
 	// apply IWANT request penalties
 	gs.applyIwantPenalties()
@@ -1264,7 +1561,7 @@ func (gs *GossipSubRouter) heartbeat() {
 		prunePeer := func(p peer.ID) {
 			gs.tracer.Prune(p, topic)
 			delete(peers, p)
-			gs.addBackoff(p, topic)
+			gs.addBackoff(p, topic, false)
 			topics := toprune[p]
 			toprune[p] = append(topics, topic)
 		}
@@ -1287,9 +1584,9 @@ func (gs *GossipSubRouter) heartbeat() {
 		}
 
 		// do we have enough peers?
-		if l := len(peers); l < gs.Dlo {
+		if l := len(peers); l < gs.params.Dlo {
 			backoff := gs.backoff[topic]
-			ineed := gs.D - l
+			ineed := gs.params.D - l
 			plst := gs.getPeers(topic, ineed, func(p peer.ID) bool {
 				// filter our current and direct peers, peers we are backing off, and peers with negative score
 				_, inMesh := peers[p]
@@ -1304,7 +1601,7 @@ func (gs *GossipSubRouter) heartbeat() {
 		}
 
 		// do we have too many peers?
-		if len(peers) > gs.Dhi {
+		if len(peers) > gs.params.Dhi {
 			plst := peerMapToList(peers)
 
 			// sort by score (but shuffle first for the case we don't use the score)
@@ -1315,18 +1612,18 @@ func (gs *GossipSubRouter) heartbeat() {
 
 			// We keep the first D_score peers by score and the remaining up to D randomly
 			// under the constraint that we keep D_out peers in the mesh (if we have that many)
-			shufflePeers(plst[gs.Dscore:])
+			shufflePeers(plst[gs.params.Dscore:])
 
 			// count the outbound peers we are keeping
 			outbound := 0
-			for _, p := range plst[:gs.D] {
+			for _, p := range plst[:gs.params.D] {
 				if gs.outbound[p] {
 					outbound++
 				}
 			}
 
 			// if it's less than D_out, bubble up some outbound peers from the random selection
-			if outbound < gs.Dout {
+			if outbound < gs.params.Dout {
 				rotate := func(i int) {
 					// rotate the plst to the right and put the ith peer in the front
 					p := plst[i]
@@ -1339,7 +1636,7 @@ func (gs *GossipSubRouter) heartbeat() {
 				// first bubble up all outbound peers already in the selection to the front
 				if outbound > 0 {
 					ihave := outbound
-					for i := 1; i < gs.D && ihave > 0; i++ {
+					for i := 1; i < gs.params.D && ihave > 0; i++ {
 						p := plst[i]
 						if gs.outbound[p] {
 							rotate(i)
@@ -1349,8 +1646,8 @@ func (gs *GossipSubRouter) heartbeat() {
 				}
 
 				// now bubble up enough outbound peers outside the selection to the front
-				ineed := gs.Dout - outbound
-				for i := gs.D; i < len(plst) && ineed > 0; i++ {
+				ineed := gs.params.Dout - outbound
+				for i := gs.params.D; i < len(plst) && ineed > 0; i++ {
 					p := plst[i]
 					if gs.outbound[p] {
 						rotate(i)
@@ -1360,14 +1657,14 @@ func (gs *GossipSubRouter) heartbeat() {
 			}
 
 			// prune the excess peers
-			for _, p := range plst[gs.D:] {
+			for _, p := range plst[gs.params.D:] {
 				log.Debugf("HEARTBEAT: Remove mesh link to %s in %s", p, topic)
 				prunePeer(p)
 			}
 		}
 
 		// do we have enough outboud peers?
-		if len(peers) >= gs.Dlo {
+		if len(peers) >= gs.params.Dlo {
 			// count the outbound peers we have
 			outbound := 0
 			for p := range peers {
@@ -1377,8 +1674,8 @@ func (gs *GossipSubRouter) heartbeat() {
 			}
 
 			// if it's less than D_out, select some peers with outbound connections and graft them
-			if outbound < gs.Dout {
-				ineed := gs.Dout - outbound
+			if outbound < gs.params.Dout {
+				ineed := gs.params.Dout - outbound
 				backoff := gs.backoff[topic]
 				plst := gs.getPeers(topic, ineed, func(p peer.ID) bool {
 					// filter our current and direct peers, peers we are backing off, and peers with negative score
@@ -1395,7 +1692,7 @@ func (gs *GossipSubRouter) heartbeat() {
 		}
 
 		// should we try to improve the mesh with opportunistic grafting?
-		if gs.heartbeatTicks%gs.opportunisticGraftTicks == 0 && len(peers) > 1 {
+		if gs.heartbeatTicks%gs.params.OpportunisticGraftTicks == 0 && len(peers) > 1 {
 			// Opportunistic grafting works as follows: we check the median score of peers in the
 			// mesh; if this score is below the opportunisticGraftThreshold, we select a few peers at
 			// random with score over the median.
@@ -1414,7 +1711,7 @@ func (gs *GossipSubRouter) heartbeat() {
 			// if the median score is below the threshold, select a better peer (if any) and GRAFT
 			if medianScore < gs.opportunisticGraftThreshold {
 				backoff := gs.backoff[topic]
-				plst = gs.getPeers(topic, GossipSubOpportunisticGraftPeers, func(p peer.ID) bool {
+				plst = gs.getPeers(topic, gs.params.OpportunisticGraftPeers, func(p peer.ID) bool {
 					_, inMesh := peers[p]
 					_, doBackoff := backoff[p]
 					_, direct := gs.direct[p]
@@ -1436,7 +1733,7 @@ func (gs *GossipSubRouter) heartbeat() {
 	// expire fanout for topics we haven't published to in a while
 	now := time.Now().UnixNano()
 	for topic, lastpub := range gs.lastpub {
-		if lastpub+int64(gs.fanoutTTL) < now {
+		if lastpub+int64(gs.params.FanoutTTL) < now {
 			delete(gs.fanout, topic)
 			delete(gs.lastpub, topic)
 		}
@@ -1453,8 +1750,8 @@ func (gs *GossipSubRouter) heartbeat() {
 		}
 
 		// do we need more peers?
-		if len(peers) < gs.D {
-			ineed := gs.D - len(peers)
+		if len(peers) < gs.params.D {
+			ineed := gs.params.D - len(peers)
 			plst := gs.getPeers(topic, ineed, func(p peer.ID) bool {
 				// filter our current and direct peers and peers with score above the publish threshold
 				_, inFanout := peers[p]
@@ -1494,6 +1791,23 @@ func (gs *GossipSubRouter) clearIHaveCounters() {
 	}
 }
 
+func (gs *GossipSubRouter) clearIDontWantCounters() {
+	if len(gs.peerdontwant) > 0 {
+		// throw away the old map and make a new one
+		gs.peerdontwant = make(map[peer.ID]int)
+	}
+
+	// decrement TTLs of all the IDONTWANTs and delete it from the cache when it reaches zero
+	for _, mids := range gs.unwanted {
+		for mid := range mids {
+			mids[mid]--
+			if mids[mid] == 0 {
+				delete(mids, mid)
+			}
+		}
+	}
+}
+
 func (gs *GossipSubRouter) applyIwantPenalties() {
 	for p, count := range gs.gossipTracer.GetBrokenPromises() {
 		log.Infof("peer %s didn't follow up in %d IWANT requests; adding penalty", p, count)
@@ -1525,7 +1839,7 @@ func (gs *GossipSubRouter) clearBackoff() {
 func (gs *GossipSubRouter) directConnect() {
 	// we donly do this every some ticks to allow pending connections to complete and account
 	// for restarts/downtime
-	if gs.heartbeatTicks%gs.directConnectTicks != 0 {
+	if gs.heartbeatTicks%gs.params.DirectConnectTicks != 0 {
 		return
 	}
 
@@ -1564,24 +1878,23 @@ func (gs *GossipSubRouter) sendGraftPrune(tograft, toprune map[peer.ID][]string,
 			delete(toprune, p)
 			prune = make([]*pb.ControlPrune, 0, len(pruning))
 			for _, topic := range pruning {
-				prune = append(prune, gs.makePrune(p, topic, gs.doPX && !noPX[p]))
+				prune = append(prune, gs.makePrune(p, topic, gs.doPX && !noPX[p], false))
 			}
 		}
 
-		out := rpcWithControl(nil, nil, nil, graft, prune)
-		gs.sendRPC(p, out)
+		out := rpcWithControl(nil, nil, nil, graft, prune, nil)
+		gs.sendRPC(p, out, false)
 	}
 
 	for p, topics := range toprune {
 		prune := make([]*pb.ControlPrune, 0, len(topics))
 		for _, topic := range topics {
-			prune = append(prune, gs.makePrune(p, topic, gs.doPX && !noPX[p]))
+			prune = append(prune, gs.makePrune(p, topic, gs.doPX && !noPX[p], false))
 		}
 
-		out := rpcWithControl(nil, nil, nil, nil, prune)
-		gs.sendRPC(p, out)
+		out := rpcWithControl(nil, nil, nil, nil, prune, nil)
+		gs.sendRPC(p, out, false)
 	}
-
 }
 
 // emitGossip emits IHAVE gossip advertising items in the message cache window
@@ -1596,7 +1909,7 @@ func (gs *GossipSubRouter) emitGossip(topic string, exclude map[peer.ID]struct{}
 	shuffleStrings(mids)
 
 	// if we are emitting more than GossipSubMaxIHaveLength mids, truncate the list
-	if len(mids) > GossipSubMaxIHaveLength {
+	if len(mids) > gs.params.MaxIHaveLength {
 		// we do the truncation (with shuffling) per peer below
 		log.Debugf("too many messages for gossip; will truncate IHAVE list (%d messages)", len(mids))
 	}
@@ -1609,13 +1922,13 @@ func (gs *GossipSubRouter) emitGossip(topic string, exclude map[peer.ID]struct{}
 	for p := range gs.p.topics[topic] {
 		_, inExclude := exclude[p]
 		_, direct := gs.direct[p]
-		if !inExclude && !direct && (gs.peers[p] == GossipSubID_v10 || gs.peers[p] == GossipSubID_v11) && gs.score.Score(p) >= gs.gossipThreshold {
+		if !inExclude && !direct && gs.feature(GossipSubFeatureMesh, gs.peers[p]) && gs.score.Score(p) >= gs.gossipThreshold {
 			peers = append(peers, p)
 		}
 	}
 
-	target := gs.Dlazy
-	factor := int(GossipSubGossipFactor * float64(len(peers)))
+	target := gs.params.Dlazy
+	factor := int(gs.params.GossipFactor * float64(len(peers)))
 	if factor > target {
 		target = factor
 	}
@@ -1630,11 +1943,11 @@ func (gs *GossipSubRouter) emitGossip(topic string, exclude map[peer.ID]struct{}
 	// Emit the IHAVE gossip to the selected peers.
 	for _, p := range peers {
 		peerMids := mids
-		if len(mids) > GossipSubMaxIHaveLength {
+		if len(mids) > gs.params.MaxIHaveLength {
 			// we do this per peer so that we emit a different set for each peer.
 			// we have enough redundancy in the system that this will significantly increase the message
 			// coverage when we do truncate.
-			peerMids = make([]string, GossipSubMaxIHaveLength)
+			peerMids = make([]string, gs.params.MaxIHaveLength)
 			shuffleStrings(mids)
 			copy(peerMids, mids)
 		}
@@ -1646,15 +1959,15 @@ func (gs *GossipSubRouter) flush() {
 	// send gossip first, which will also piggyback pending control
 	for p, ihave := range gs.gossip {
 		delete(gs.gossip, p)
-		out := rpcWithControl(nil, ihave, nil, nil, nil)
-		gs.sendRPC(p, out)
+		out := rpcWithControl(nil, ihave, nil, nil, nil, nil)
+		gs.sendRPC(p, out, false)
 	}
 
 	// send the remaining control messages that wasn't merged with gossip
 	for p, ctl := range gs.control {
 		delete(gs.control, p)
-		out := rpcWithControl(nil, nil, nil, ctl.Graft, ctl.Prune)
-		gs.sendRPC(p, out)
+		out := rpcWithControl(nil, nil, nil, ctl.Graft, ctl.Prune, nil)
+		gs.sendRPC(p, out, false)
 	}
 }
 
@@ -1675,9 +1988,10 @@ func (gs *GossipSubRouter) piggybackGossip(p peer.ID, out *RPC, ihave []*pb.Cont
 }
 
 func (gs *GossipSubRouter) pushControl(p peer.ID, ctl *pb.ControlMessage) {
-	// remove IHAVE/IWANT from control message, gossip is not retried
+	// remove IHAVE/IWANT/IDONTWANT from control message, gossip is not retried
 	ctl.Ihave = nil
 	ctl.Iwant = nil
+	ctl.Idontwant = nil
 	if ctl.Graft != nil || ctl.Prune != nil {
 		gs.control[p] = ctl
 	}
@@ -1731,21 +2045,25 @@ func (gs *GossipSubRouter) piggybackControl(p peer.ID, out *RPC, ctl *pb.Control
 	}
 }
 
-func (gs *GossipSubRouter) makePrune(p peer.ID, topic string, doPX bool) *pb.ControlPrune {
-	if gs.peers[p] == GossipSubID_v10 {
+func (gs *GossipSubRouter) makePrune(p peer.ID, topic string, doPX bool, isUnsubscribe bool) *pb.ControlPrune {
+	if !gs.feature(GossipSubFeaturePX, gs.peers[p]) {
 		// GossipSub v1.0 -- no peer exchange, the peer won't be able to parse it anyway
 		return &pb.ControlPrune{TopicID: &topic}
 	}
 
-	backoff := uint64(GossipSubPruneBackoff / time.Second)
+	backoff := uint64(gs.params.PruneBackoff / time.Second)
+	if isUnsubscribe {
+		backoff = uint64(gs.params.UnsubscribeBackoff / time.Second)
+	}
+
 	var px []*pb.PeerInfo
 	if doPX {
 		// select peers for Peer eXchange
-		peers := gs.getPeers(topic, GossipSubPrunePeers, func(xp peer.ID) bool {
+		peers := gs.getPeers(topic, gs.params.PrunePeers, func(xp peer.ID) bool {
 			return p != xp && gs.score.Score(xp) >= 0
 		})
 
-		cab, ok := peerstore.GetCertifiedAddrBook(gs.p.host.Peerstore())
+		cab, ok := peerstore.GetCertifiedAddrBook(gs.cab)
 		px = make([]*pb.PeerInfo, 0, len(peers))
 		for _, p := range peers {
 			// see if we have a signed peer record to send back; if we don't, just send
@@ -1777,7 +2095,7 @@ func (gs *GossipSubRouter) getPeers(topic string, count int, filter func(peer.ID
 
 	peers := make([]peer.ID, 0, len(tmap))
 	for p := range tmap {
-		if (gs.peers[p] == GossipSubID_v10 || gs.peers[p] == GossipSubID_v11) && filter(p) {
+		if gs.feature(GossipSubFeatureMesh, gs.peers[p]) && filter(p) && gs.p.peerFilter(p, topic) {
 			peers = append(peers, p)
 		}
 	}
@@ -1789,6 +2107,14 @@ func (gs *GossipSubRouter) getPeers(topic string, count int, filter func(peer.ID
 	}
 
 	return peers
+}
+
+// WithDefaultTagTracer returns the tag tracer of the GossipSubRouter as a PubSub option.
+// This is useful for cases where the GossipSubRouter is instantiated externally, and is
+// injected into the GossipSub constructor as a dependency. This allows the tag tracer to be
+// also injected into the GossipSub constructor as a PubSub option dependency.
+func (gs *GossipSubRouter) WithDefaultTagTracer() Option {
+	return WithRawTracer(gs.tagTracer)
 }
 
 func peerListToMap(peers []peer.ID) map[peer.ID]struct{} {
@@ -1826,4 +2152,14 @@ func shuffleStrings(lst []string) {
 		j := rand.Intn(i + 1)
 		lst[i], lst[j] = lst[j], lst[i]
 	}
+}
+
+func computeChecksum(mid string) checksum {
+	var cs checksum
+	if len(mid) > 32 || len(mid) == 0 {
+		cs.payload = sha256.Sum256([]byte(mid))
+	} else {
+		cs.length = uint8(copy(cs.payload[:], mid))
+	}
+	return cs
 }

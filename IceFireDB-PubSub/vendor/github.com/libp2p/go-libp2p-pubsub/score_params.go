@@ -3,13 +3,17 @@ package pubsub
 import (
 	"fmt"
 	"math"
+	"net"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type PeerScoreThresholds struct {
-	// GossipThreshold is the score threshold below which gossip propagation is supressed;
+	// whether it is allowed to just set some params and not all of them.
+	SkipAtomicValidation bool
+
+	// GossipThreshold is the score threshold below which gossip propagation is suppressed;
 	// should be negative.
 	GossipThreshold float64
 
@@ -17,8 +21,8 @@ type PeerScoreThresholds struct {
 	// publishing (also applies to fanout and floodsub peers); should be negative and <= GossipThreshold.
 	PublishThreshold float64
 
-	// GraylistThreshold is the score threshold below which message processing is supressed altogether,
-	// implementing an effective graylist according to peer score; should be negative and <= PublisThreshold.
+	// GraylistThreshold is the score threshold below which message processing is suppressed altogether,
+	// implementing an effective gray list according to peer score; should be negative and <= PublishThreshold.
 	GraylistThreshold float64
 
 	// AcceptPXThreshold is the score threshold below which PX will be ignored; this should be positive
@@ -31,25 +35,38 @@ type PeerScoreThresholds struct {
 }
 
 func (p *PeerScoreThresholds) validate() error {
-	if p.GossipThreshold > 0 {
-		return fmt.Errorf("invalid gossip threshold; it must be <= 0")
+
+	if !p.SkipAtomicValidation || p.PublishThreshold != 0 || p.GossipThreshold != 0 || p.GraylistThreshold != 0 {
+		if p.GossipThreshold > 0 || isInvalidNumber(p.GossipThreshold) {
+			return fmt.Errorf("invalid gossip threshold; it must be <= 0 and a valid number")
+		}
+		if p.PublishThreshold > 0 || p.PublishThreshold > p.GossipThreshold || isInvalidNumber(p.PublishThreshold) {
+			return fmt.Errorf("invalid publish threshold; it must be <= 0 and <= gossip threshold and a valid number")
+		}
+		if p.GraylistThreshold > 0 || p.GraylistThreshold > p.PublishThreshold || isInvalidNumber(p.GraylistThreshold) {
+			return fmt.Errorf("invalid graylist threshold; it must be <= 0 and <= publish threshold and a valid number")
+		}
 	}
-	if p.PublishThreshold > 0 || p.PublishThreshold > p.GossipThreshold {
-		return fmt.Errorf("invalid publish threshold; it must be <= 0 and <= gossip threshold")
+
+	if !p.SkipAtomicValidation || p.AcceptPXThreshold != 0 {
+		if p.AcceptPXThreshold < 0 || isInvalidNumber(p.AcceptPXThreshold) {
+			return fmt.Errorf("invalid accept PX threshold; it must be >= 0 and a valid number")
+		}
 	}
-	if p.GraylistThreshold > 0 || p.GraylistThreshold > p.PublishThreshold {
-		return fmt.Errorf("invalid graylist threshold; it must be <= 0 and <= publish threshold")
+
+	if !p.SkipAtomicValidation || p.OpportunisticGraftThreshold != 0 {
+		if p.OpportunisticGraftThreshold < 0 || isInvalidNumber(p.OpportunisticGraftThreshold) {
+			return fmt.Errorf("invalid opportunistic grafting threshold; it must be >= 0 and a valid number")
+		}
 	}
-	if p.AcceptPXThreshold < 0 {
-		return fmt.Errorf("invalid accept PX threshold; it must be >= 0")
-	}
-	if p.OpportunisticGraftThreshold < 0 {
-		return fmt.Errorf("invalid opportunistic grafting threshold; it must be >= 0")
-	}
+
 	return nil
 }
 
 type PeerScoreParams struct {
+	// whether it is allowed to just set some params and not all of them.
+	SkipAtomicValidation bool
+
 	// Score parameters per topic.
 	Topics map[string]*TopicScoreParams
 
@@ -71,7 +88,7 @@ type PeerScoreParams struct {
 	//       thus disabling the IP colocation penalty.
 	IPColocationFactorWeight    float64
 	IPColocationFactorThreshold int
-	IPColocationFactorWhitelist map[string]struct{}
+	IPColocationFactorWhitelist []*net.IPNet
 
 	// P7: behavioural pattern penalties.
 	// This parameter has an associated counter which tracks misbehaviour as detected by the
@@ -92,15 +109,21 @@ type PeerScoreParams struct {
 
 	// time to remember counters for a disconnected peer.
 	RetainScore time.Duration
+
+	// time to remember a message delivery for. Default to global TimeCacheDuration if 0.
+	SeenMsgTTL time.Duration
 }
 
 type TopicScoreParams struct {
+	// whether it is allowed to just set some params and not all of them.
+	SkipAtomicValidation bool
+
 	// The weight of the topic.
 	TopicWeight float64
 
 	// P1: time in the mesh
-	// This is the time the peer has ben grafted in the mesh.
-	// The value of of the parameter is the time/TimeInMeshQuantum, capped by TimeInMeshCap
+	// This is the time the peer has been grafted in the mesh.
+	// The value of the parameter is the time/TimeInMeshQuantum, capped by TimeInMeshCap.
 	// The weight of the parameter MUST be positive (or zero to disable).
 	TimeInMeshWeight  float64
 	TimeInMeshQuantum time.Duration
@@ -120,7 +143,7 @@ type TopicScoreParams struct {
 	// when validation succeeds.
 	// This window accounts for the minimum time before a hostile mesh peer trying to game the score
 	// could replay back a valid message we just sent them.
-	// It effectively tracks first and near-first deliveries, ie a message seen from a mesh peer
+	// It effectively tracks first and near-first deliveries, i.e., a message seen from a mesh peer
 	// before we have forwarded it to them.
 	// The parameter has an associated counter, decaying with MeshMessageDeliveriesDecay.
 	// If the counter exceeds the threshold, its value is 0.
@@ -155,41 +178,55 @@ func (p *PeerScoreParams) validate() error {
 		}
 	}
 
-	// check that the topic score is 0 or something positive
-	if p.TopicScoreCap < 0 {
-		return fmt.Errorf("invalid topic score cap; must be positive (or 0 for no cap)")
+	if !p.SkipAtomicValidation || p.TopicScoreCap != 0 {
+		// check that the topic score is 0 or something positive
+		if p.TopicScoreCap < 0 || isInvalidNumber(p.TopicScoreCap) {
+			return fmt.Errorf("invalid topic score cap; must be positive (or 0 for no cap) and a valid number")
+		}
 	}
 
 	// check that we have an app specific score; the weight can be anything (but expected positive)
 	if p.AppSpecificScore == nil {
-		return fmt.Errorf("missing application specific score function")
+		if p.SkipAtomicValidation {
+			p.AppSpecificScore = func(p peer.ID) float64 {
+				return 0
+			}
+		} else {
+			return fmt.Errorf("missing application specific score function")
+		}
 	}
 
-	// check the IP colocation factor
-	if p.IPColocationFactorWeight > 0 {
-		return fmt.Errorf("invalid IPColocationFactorWeight; must be negative (or 0 to disable)")
-	}
-	if p.IPColocationFactorWeight != 0 && p.IPColocationFactorThreshold < 1 {
-		return fmt.Errorf("invalid IPColocationFactorThreshold; must be at least 1")
+	if !p.SkipAtomicValidation || p.IPColocationFactorWeight != 0 {
+		// check the IP collocation factor
+		if p.IPColocationFactorWeight > 0 || isInvalidNumber(p.IPColocationFactorWeight) {
+			return fmt.Errorf("invalid IPColocationFactorWeight; must be negative (or 0 to disable) and a valid number")
+		}
+		if p.IPColocationFactorWeight != 0 && p.IPColocationFactorThreshold < 1 {
+			return fmt.Errorf("invalid IPColocationFactorThreshold; must be at least 1")
+		}
 	}
 
 	// check the behaviour penalty
-	if p.BehaviourPenaltyWeight > 0 {
-		return fmt.Errorf("invalid BehaviourPenaltyWeight; must be negative (or 0 to disable)")
-	}
-	if p.BehaviourPenaltyWeight != 0 && (p.BehaviourPenaltyDecay <= 0 || p.BehaviourPenaltyDecay >= 1) {
-		return fmt.Errorf("invalid BehaviourPenaltyDecay; must be between 0 and 1")
-	}
-	if p.BehaviourPenaltyThreshold < 0 {
-		return fmt.Errorf("invalid BehaviourPenaltyThreshold; must be >= 0")
+	if !p.SkipAtomicValidation || p.BehaviourPenaltyWeight != 0 || p.BehaviourPenaltyThreshold != 0 {
+		if p.BehaviourPenaltyWeight > 0 || isInvalidNumber(p.BehaviourPenaltyWeight) {
+			return fmt.Errorf("invalid BehaviourPenaltyWeight; must be negative (or 0 to disable) and a valid number")
+		}
+		if p.BehaviourPenaltyWeight != 0 && (p.BehaviourPenaltyDecay <= 0 || p.BehaviourPenaltyDecay >= 1 || isInvalidNumber(p.BehaviourPenaltyDecay)) {
+			return fmt.Errorf("invalid BehaviourPenaltyDecay; must be between 0 and 1")
+		}
+		if p.BehaviourPenaltyThreshold < 0 || isInvalidNumber(p.BehaviourPenaltyThreshold) {
+			return fmt.Errorf("invalid BehaviourPenaltyThreshold; must be >= 0 and a valid number")
+		}
 	}
 
 	// check the decay parameters
-	if p.DecayInterval < time.Second {
-		return fmt.Errorf("invalid DecayInterval; must be at least 1s")
-	}
-	if p.DecayToZero <= 0 || p.DecayToZero >= 1 {
-		return fmt.Errorf("invalid DecayToZero; must be between 0 and 1")
+	if !p.SkipAtomicValidation || p.DecayInterval != 0 || p.DecayToZero != 0 {
+		if p.DecayInterval < time.Second {
+			return fmt.Errorf("invalid DecayInterval; must be at least 1s")
+		}
+		if p.DecayToZero <= 0 || p.DecayToZero >= 1 || isInvalidNumber(p.DecayToZero) {
+			return fmt.Errorf("invalid DecayToZero; must be between 0 and 1")
+		}
 	}
 
 	// no need to check the score retention; a value of 0 means that we don't retain scores
@@ -198,47 +235,115 @@ func (p *PeerScoreParams) validate() error {
 
 func (p *TopicScoreParams) validate() error {
 	// make sure we have a sane topic weight
-	if p.TopicWeight < 0 {
-		return fmt.Errorf("invalid topic weight; must be >= 0")
+	if p.TopicWeight < 0 || isInvalidNumber(p.TopicWeight) {
+		return fmt.Errorf("invalid topic weight; must be >= 0 and a valid number")
 	}
 
 	// check P1
+	if err := p.validateTimeInMeshParams(); err != nil {
+		return err
+	}
+
+	// check P2
+	if err := p.validateMessageDeliveryParams(); err != nil {
+		return err
+	}
+	// check P3
+	if err := p.validateMeshMessageDeliveryParams(); err != nil {
+		return err
+	}
+
+	// check P3b
+	if err := p.validateMessageFailurePenaltyParams(); err != nil {
+		return err
+	}
+
+	// check P4
+	if err := p.validateInvalidMessageDeliveryParams(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *TopicScoreParams) validateTimeInMeshParams() error {
+	if p.SkipAtomicValidation {
+		// in non-atomic mode, parameters at their zero values are dismissed from validation.
+		if p.TimeInMeshWeight == 0 && p.TimeInMeshQuantum == 0 && p.TimeInMeshCap == 0 {
+			return nil
+		}
+	}
+
+	// either atomic validation mode, or some parameters have been set a value,
+	// hence, proceed with normal validation of all related parameters in this context.
+
 	if p.TimeInMeshQuantum == 0 {
 		return fmt.Errorf("invalid TimeInMeshQuantum; must be non zero")
 	}
-	if p.TimeInMeshWeight < 0 {
-		return fmt.Errorf("invalid TimeInMeshWeight; must be positive (or 0 to disable)")
+	if p.TimeInMeshWeight < 0 || isInvalidNumber(p.TimeInMeshWeight) {
+		return fmt.Errorf("invalid TimeInMeshWeight; must be positive (or 0 to disable) and a valid number")
 	}
 	if p.TimeInMeshWeight != 0 && p.TimeInMeshQuantum <= 0 {
 		return fmt.Errorf("invalid TimeInMeshQuantum; must be positive")
 	}
-	if p.TimeInMeshWeight != 0 && p.TimeInMeshCap <= 0 {
-		return fmt.Errorf("invalid TimeInMeshCap; must be positive")
+	if p.TimeInMeshWeight != 0 && (p.TimeInMeshCap <= 0 || isInvalidNumber(p.TimeInMeshCap)) {
+		return fmt.Errorf("invalid TimeInMeshCap; must be positive and a valid number")
 	}
 
-	// check P2
-	if p.FirstMessageDeliveriesWeight < 0 {
-		return fmt.Errorf("invallid FirstMessageDeliveriesWeight; must be positive (or 0 to disable)")
+	return nil
+}
+
+func (p *TopicScoreParams) validateMessageDeliveryParams() error {
+	if p.SkipAtomicValidation {
+		// in non-atomic mode, parameters at their zero values are dismissed from validation.
+		if p.FirstMessageDeliveriesWeight == 0 && p.FirstMessageDeliveriesCap == 0 && p.FirstMessageDeliveriesDecay == 0 {
+			return nil
+		}
 	}
-	if p.FirstMessageDeliveriesWeight != 0 && (p.FirstMessageDeliveriesDecay <= 0 || p.FirstMessageDeliveriesDecay >= 1) {
+
+	// either atomic validation mode, or some parameters have been set a value,
+	// hence, proceed with normal validation of all related parameters in this context.
+
+	if p.FirstMessageDeliveriesWeight < 0 || isInvalidNumber(p.FirstMessageDeliveriesWeight) {
+		return fmt.Errorf("invallid FirstMessageDeliveriesWeight; must be positive (or 0 to disable) and a valid number")
+	}
+	if p.FirstMessageDeliveriesWeight != 0 && (p.FirstMessageDeliveriesDecay <= 0 || p.FirstMessageDeliveriesDecay >= 1 || isInvalidNumber(p.FirstMessageDeliveriesDecay)) {
 		return fmt.Errorf("invalid FirstMessageDeliveriesDecay; must be between 0 and 1")
 	}
-	if p.FirstMessageDeliveriesWeight != 0 && p.FirstMessageDeliveriesCap <= 0 {
-		return fmt.Errorf("invalid FirstMessageDeliveriesCap; must be positive")
+	if p.FirstMessageDeliveriesWeight != 0 && (p.FirstMessageDeliveriesCap <= 0 || isInvalidNumber(p.FirstMessageDeliveriesCap)) {
+		return fmt.Errorf("invalid FirstMessageDeliveriesCap; must be positive and a valid number")
 	}
 
-	// check P3
-	if p.MeshMessageDeliveriesWeight > 0 {
-		return fmt.Errorf("invalid MeshMessageDeliveriesWeight; must be negative (or 0 to disable)")
+	return nil
+}
+
+func (p *TopicScoreParams) validateMeshMessageDeliveryParams() error {
+	if p.SkipAtomicValidation {
+		// in non-atomic mode, parameters at their zero values are dismissed from validation.
+		if p.MeshMessageDeliveriesWeight == 0 &&
+			p.MeshMessageDeliveriesCap == 0 &&
+			p.MeshMessageDeliveriesDecay == 0 &&
+			p.MeshMessageDeliveriesThreshold == 0 &&
+			p.MeshMessageDeliveriesWindow == 0 &&
+			p.MeshMessageDeliveriesActivation == 0 {
+			return nil
+		}
 	}
-	if p.MeshMessageDeliveriesWeight != 0 && (p.MeshMessageDeliveriesDecay <= 0 || p.MeshMessageDeliveriesDecay >= 1) {
+
+	// either atomic validation mode, or some parameters have been set a value,
+	// hence, proceed with normal validation of all related parameters in this context.
+
+	if p.MeshMessageDeliveriesWeight > 0 || isInvalidNumber(p.MeshMessageDeliveriesWeight) {
+		return fmt.Errorf("invalid MeshMessageDeliveriesWeight; must be negative (or 0 to disable) and a valid number")
+	}
+	if p.MeshMessageDeliveriesWeight != 0 && (p.MeshMessageDeliveriesDecay <= 0 || p.MeshMessageDeliveriesDecay >= 1 || isInvalidNumber(p.MeshMessageDeliveriesDecay)) {
 		return fmt.Errorf("invalid MeshMessageDeliveriesDecay; must be between 0 and 1")
 	}
-	if p.MeshMessageDeliveriesWeight != 0 && p.MeshMessageDeliveriesCap <= 0 {
-		return fmt.Errorf("invalid MeshMessageDeliveriesCap; must be positive")
+	if p.MeshMessageDeliveriesWeight != 0 && (p.MeshMessageDeliveriesCap <= 0 || isInvalidNumber(p.MeshMessageDeliveriesCap)) {
+		return fmt.Errorf("invalid MeshMessageDeliveriesCap; must be positive and a valid number")
 	}
-	if p.MeshMessageDeliveriesWeight != 0 && p.MeshMessageDeliveriesThreshold <= 0 {
-		return fmt.Errorf("invalid MeshMessageDeliveriesThreshold; must be positive")
+	if p.MeshMessageDeliveriesWeight != 0 && (p.MeshMessageDeliveriesThreshold <= 0 || isInvalidNumber(p.MeshMessageDeliveriesThreshold)) {
+		return fmt.Errorf("invalid MeshMessageDeliveriesThreshold; must be positive and a valid number")
 	}
 	if p.MeshMessageDeliveriesWindow < 0 {
 		return fmt.Errorf("invalid MeshMessageDeliveriesWindow; must be non-negative")
@@ -247,19 +352,45 @@ func (p *TopicScoreParams) validate() error {
 		return fmt.Errorf("invalid MeshMessageDeliveriesActivation; must be at least 1s")
 	}
 
-	// check P3b
-	if p.MeshFailurePenaltyWeight > 0 {
-		return fmt.Errorf("invalid MeshFailurePenaltyWeight; must be negative (or 0 to disable)")
+	return nil
+}
+
+func (p *TopicScoreParams) validateMessageFailurePenaltyParams() error {
+	if p.SkipAtomicValidation {
+		// in selective mode, parameters at their zero values are dismissed from validation.
+		if p.MeshFailurePenaltyDecay == 0 && p.MeshFailurePenaltyWeight == 0 {
+			return nil
+		}
 	}
-	if p.MeshFailurePenaltyWeight != 0 && (p.MeshFailurePenaltyDecay <= 0 || p.MeshFailurePenaltyDecay >= 1) {
+
+	// either atomic validation mode, or some parameters have been set a value,
+	// hence, proceed with normal validation of all related parameters in this context.
+
+	if p.MeshFailurePenaltyWeight > 0 || isInvalidNumber(p.MeshFailurePenaltyWeight) {
+		return fmt.Errorf("invalid MeshFailurePenaltyWeight; must be negative (or 0 to disable) and a valid number")
+	}
+	if p.MeshFailurePenaltyWeight != 0 && (isInvalidNumber(p.MeshFailurePenaltyDecay) || p.MeshFailurePenaltyDecay <= 0 || p.MeshFailurePenaltyDecay >= 1) {
 		return fmt.Errorf("invalid MeshFailurePenaltyDecay; must be between 0 and 1")
 	}
 
-	// check P4
-	if p.InvalidMessageDeliveriesWeight > 0 {
-		return fmt.Errorf("invalid InvalidMessageDeliveriesWeight; must be negative (or 0 to disable)")
+	return nil
+}
+
+func (p *TopicScoreParams) validateInvalidMessageDeliveryParams() error {
+	if p.SkipAtomicValidation {
+		// in selective mode, parameters at their zero values are dismissed from validation.
+		if p.InvalidMessageDeliveriesDecay == 0 && p.InvalidMessageDeliveriesWeight == 0 {
+			return nil
+		}
 	}
-	if p.InvalidMessageDeliveriesDecay <= 0 || p.InvalidMessageDeliveriesDecay >= 1 {
+
+	// either atomic validation mode, or some parameters have been set a value,
+	// hence, proceed with normal validation of all related parameters in this context.
+
+	if p.InvalidMessageDeliveriesWeight > 0 || isInvalidNumber(p.InvalidMessageDeliveriesWeight) {
+		return fmt.Errorf("invalid InvalidMessageDeliveriesWeight; must be negative (or 0 to disable) and a valid number")
+	}
+	if p.InvalidMessageDeliveriesDecay <= 0 || p.InvalidMessageDeliveriesDecay >= 1 || isInvalidNumber(p.InvalidMessageDeliveriesDecay) {
 		return fmt.Errorf("invalid InvalidMessageDeliveriesDecay; must be between 0 and 1")
 	}
 
@@ -277,10 +408,16 @@ func ScoreParameterDecay(decay time.Duration) float64 {
 	return ScoreParameterDecayWithBase(decay, DefaultDecayInterval, DefaultDecayToZero)
 }
 
-// ScoreParameterDecay computes the decay factor for a parameter using base as the DecayInterval
+// ScoreParameterDecayWithBase computes the decay factor for a parameter using base as the DecayInterval
 func ScoreParameterDecayWithBase(decay time.Duration, base time.Duration, decayToZero float64) float64 {
 	// the decay is linear, so after n ticks the value is factor^n
 	// so factor^n = decayToZero => factor = decayToZero^(1/n)
 	ticks := float64(decay / base)
 	return math.Pow(decayToZero, 1/ticks)
+}
+
+// checks whether the provided floating-point number is `Not a Number`
+// or an infinite number.
+func isInvalidNumber(num float64) bool {
+	return math.IsNaN(num) || math.IsInf(num, 0)
 }

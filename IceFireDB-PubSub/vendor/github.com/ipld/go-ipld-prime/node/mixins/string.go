@@ -1,7 +1,7 @@
 package mixins
 
 import (
-	ipld "github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/datamodel"
 )
 
 // String can be embedded in a struct to provide all the methods that
@@ -19,25 +19,25 @@ type String struct {
 	TypeName string
 }
 
-func (String) Kind() ipld.Kind {
-	return ipld.Kind_String
+func (String) Kind() datamodel.Kind {
+	return datamodel.Kind_String
 }
-func (x String) LookupByString(string) (ipld.Node, error) {
-	return nil, ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "LookupByString", AppropriateKind: ipld.KindSet_JustMap, ActualKind: ipld.Kind_String}
+func (x String) LookupByString(string) (datamodel.Node, error) {
+	return nil, datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "LookupByString", AppropriateKind: datamodel.KindSet_JustMap, ActualKind: datamodel.Kind_String}
 }
-func (x String) LookupByNode(key ipld.Node) (ipld.Node, error) {
-	return nil, ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "LookupByNode", AppropriateKind: ipld.KindSet_JustMap, ActualKind: ipld.Kind_String}
+func (x String) LookupByNode(key datamodel.Node) (datamodel.Node, error) {
+	return nil, datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "LookupByNode", AppropriateKind: datamodel.KindSet_JustMap, ActualKind: datamodel.Kind_String}
 }
-func (x String) LookupByIndex(idx int64) (ipld.Node, error) {
-	return nil, ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "LookupByIndex", AppropriateKind: ipld.KindSet_JustList, ActualKind: ipld.Kind_String}
+func (x String) LookupByIndex(idx int64) (datamodel.Node, error) {
+	return nil, datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "LookupByIndex", AppropriateKind: datamodel.KindSet_JustList, ActualKind: datamodel.Kind_String}
 }
-func (x String) LookupBySegment(ipld.PathSegment) (ipld.Node, error) {
-	return nil, ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "LookupBySegment", AppropriateKind: ipld.KindSet_Recursive, ActualKind: ipld.Kind_String}
+func (x String) LookupBySegment(datamodel.PathSegment) (datamodel.Node, error) {
+	return nil, datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "LookupBySegment", AppropriateKind: datamodel.KindSet_Recursive, ActualKind: datamodel.Kind_String}
 }
-func (String) MapIterator() ipld.MapIterator {
+func (String) MapIterator() datamodel.MapIterator {
 	return nil
 }
-func (String) ListIterator() ipld.ListIterator {
+func (String) ListIterator() datamodel.ListIterator {
 	return nil
 }
 func (String) Length() int64 {
@@ -50,19 +50,19 @@ func (String) IsNull() bool {
 	return false
 }
 func (x String) AsBool() (bool, error) {
-	return false, ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "AsBool", AppropriateKind: ipld.KindSet_JustBool, ActualKind: ipld.Kind_String}
+	return false, datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "AsBool", AppropriateKind: datamodel.KindSet_JustBool, ActualKind: datamodel.Kind_String}
 }
 func (x String) AsInt() (int64, error) {
-	return 0, ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "AsInt", AppropriateKind: ipld.KindSet_JustInt, ActualKind: ipld.Kind_String}
+	return 0, datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "AsInt", AppropriateKind: datamodel.KindSet_JustInt, ActualKind: datamodel.Kind_String}
 }
 func (x String) AsFloat() (float64, error) {
-	return 0, ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "AsFloat", AppropriateKind: ipld.KindSet_JustFloat, ActualKind: ipld.Kind_String}
+	return 0, datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "AsFloat", AppropriateKind: datamodel.KindSet_JustFloat, ActualKind: datamodel.Kind_String}
 }
 func (x String) AsBytes() ([]byte, error) {
-	return nil, ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "AsBytes", AppropriateKind: ipld.KindSet_JustBytes, ActualKind: ipld.Kind_String}
+	return nil, datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "AsBytes", AppropriateKind: datamodel.KindSet_JustBytes, ActualKind: datamodel.Kind_String}
 }
-func (x String) AsLink() (ipld.Link, error) {
-	return nil, ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "AsLink", AppropriateKind: ipld.KindSet_JustLink, ActualKind: ipld.Kind_String}
+func (x String) AsLink() (datamodel.Link, error) {
+	return nil, datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "AsLink", AppropriateKind: datamodel.KindSet_JustLink, ActualKind: datamodel.Kind_String}
 }
 
 // StringAssembler has similar purpose as String, but for (you guessed it)
@@ -71,27 +71,27 @@ type StringAssembler struct {
 	TypeName string
 }
 
-func (x StringAssembler) BeginMap(sizeHint int64) (ipld.MapAssembler, error) {
-	return nil, ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "BeginMap", AppropriateKind: ipld.KindSet_JustMap, ActualKind: ipld.Kind_String}
+func (x StringAssembler) BeginMap(sizeHint int64) (datamodel.MapAssembler, error) {
+	return nil, datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "BeginMap", AppropriateKind: datamodel.KindSet_JustMap, ActualKind: datamodel.Kind_String}
 }
-func (x StringAssembler) BeginList(sizeHint int64) (ipld.ListAssembler, error) {
-	return nil, ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "BeginList", AppropriateKind: ipld.KindSet_JustList, ActualKind: ipld.Kind_String}
+func (x StringAssembler) BeginList(sizeHint int64) (datamodel.ListAssembler, error) {
+	return nil, datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "BeginList", AppropriateKind: datamodel.KindSet_JustList, ActualKind: datamodel.Kind_String}
 }
 func (x StringAssembler) AssignNull() error {
-	return ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "AssignNull", AppropriateKind: ipld.KindSet_JustNull, ActualKind: ipld.Kind_String}
+	return datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "AssignNull", AppropriateKind: datamodel.KindSet_JustNull, ActualKind: datamodel.Kind_String}
 }
 func (x StringAssembler) AssignBool(bool) error {
-	return ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "AssignBool", AppropriateKind: ipld.KindSet_JustBool, ActualKind: ipld.Kind_String}
+	return datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "AssignBool", AppropriateKind: datamodel.KindSet_JustBool, ActualKind: datamodel.Kind_String}
 }
 func (x StringAssembler) AssignInt(int64) error {
-	return ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "AssignInt", AppropriateKind: ipld.KindSet_JustInt, ActualKind: ipld.Kind_String}
+	return datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "AssignInt", AppropriateKind: datamodel.KindSet_JustInt, ActualKind: datamodel.Kind_String}
 }
 func (x StringAssembler) AssignFloat(float64) error {
-	return ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "AssignFloat", AppropriateKind: ipld.KindSet_JustFloat, ActualKind: ipld.Kind_String}
+	return datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "AssignFloat", AppropriateKind: datamodel.KindSet_JustFloat, ActualKind: datamodel.Kind_String}
 }
 func (x StringAssembler) AssignBytes([]byte) error {
-	return ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "AssignBytes", AppropriateKind: ipld.KindSet_JustBytes, ActualKind: ipld.Kind_String}
+	return datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "AssignBytes", AppropriateKind: datamodel.KindSet_JustBytes, ActualKind: datamodel.Kind_String}
 }
-func (x StringAssembler) AssignLink(ipld.Link) error {
-	return ipld.ErrWrongKind{TypeName: x.TypeName, MethodName: "AssignLink", AppropriateKind: ipld.KindSet_JustLink, ActualKind: ipld.Kind_String}
+func (x StringAssembler) AssignLink(datamodel.Link) error {
+	return datamodel.ErrWrongKind{TypeName: x.TypeName, MethodName: "AssignLink", AppropriateKind: datamodel.KindSet_JustLink, ActualKind: datamodel.Kind_String}
 }

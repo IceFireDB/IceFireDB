@@ -1,7 +1,9 @@
 package goupnp
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"net/url"
 
 	"github.com/huin/goupnp/soap"
@@ -17,14 +19,15 @@ type ServiceClient struct {
 	RootDevice *RootDevice
 	Location   *url.URL
 	Service    *Service
+	localAddr  net.IP
 }
 
-// NewServiceClients discovers services, and returns clients for them. err will
+// NewServiceClientsCtx discovers services, and returns clients for them. err will
 // report any error with the discovery process (blocking any device/service
 // discovery), errors reports errors on a per-root-device basis.
-func NewServiceClients(searchTarget string) (clients []ServiceClient, errors []error, err error) {
+func NewServiceClientsCtx(ctx context.Context, searchTarget string) (clients []ServiceClient, errors []error, err error) {
 	var maybeRootDevices []MaybeRootDevice
-	if maybeRootDevices, err = DiscoverDevices(searchTarget); err != nil {
+	if maybeRootDevices, err = DiscoverDevicesCtx(ctx, searchTarget); err != nil {
 		return
 	}
 
@@ -36,7 +39,7 @@ func NewServiceClients(searchTarget string) (clients []ServiceClient, errors []e
 			continue
 		}
 
-		deviceClients, err := NewServiceClientsFromRootDevice(maybeRootDevice.Root, maybeRootDevice.Location, searchTarget)
+		deviceClients, err := newServiceClientsFromRootDevice(maybeRootDevice.Root, maybeRootDevice.Location, searchTarget, maybeRootDevice.LocalAddr)
 		if err != nil {
 			errors = append(errors, err)
 			continue
@@ -47,20 +50,41 @@ func NewServiceClients(searchTarget string) (clients []ServiceClient, errors []e
 	return
 }
 
-// NewServiceClientsByURL creates client(s) for the given service URN, for a
+// NewServiceClients is the legacy version of NewServiceClientsCtx, but uses
+// context.Background() as the context.
+func NewServiceClients(searchTarget string) (clients []ServiceClient, errors []error, err error) {
+	return NewServiceClientsCtx(context.Background(), searchTarget)
+}
+
+// NewServiceClientsByURLCtx creates client(s) for the given service URN, for a
 // root device at the given URL.
-func NewServiceClientsByURL(loc *url.URL, searchTarget string) ([]ServiceClient, error) {
-	rootDevice, err := DeviceByURL(loc)
+func NewServiceClientsByURLCtx(ctx context.Context, loc *url.URL, searchTarget string) ([]ServiceClient, error) {
+	rootDevice, err := DeviceByURLCtx(ctx, loc)
 	if err != nil {
 		return nil, err
 	}
 	return NewServiceClientsFromRootDevice(rootDevice, loc, searchTarget)
 }
 
+// NewServiceClientsByURL is the legacy version of NewServiceClientsByURLCtx, but uses
+// context.Background() as the context.
+func NewServiceClientsByURL(loc *url.URL, searchTarget string) ([]ServiceClient, error) {
+	return NewServiceClientsByURLCtx(context.Background(), loc, searchTarget)
+}
+
 // NewServiceClientsFromDevice creates client(s) for the given service URN, in
 // a given root device. The loc parameter is simply assigned to the
 // Location attribute of the returned ServiceClient(s).
 func NewServiceClientsFromRootDevice(rootDevice *RootDevice, loc *url.URL, searchTarget string) ([]ServiceClient, error) {
+	return newServiceClientsFromRootDevice(rootDevice, loc, searchTarget, nil)
+}
+
+func newServiceClientsFromRootDevice(
+	rootDevice *RootDevice,
+	loc *url.URL,
+	searchTarget string,
+	lAddr net.IP,
+) ([]ServiceClient, error) {
 	device := &rootDevice.Device
 	srvs := device.FindService(searchTarget)
 	if len(srvs) == 0 {
@@ -75,6 +99,7 @@ func NewServiceClientsFromRootDevice(rootDevice *RootDevice, loc *url.URL, searc
 			RootDevice: rootDevice,
 			Location:   loc,
 			Service:    srv,
+			localAddr:  lAddr,
 		})
 	}
 	return clients, nil
@@ -85,4 +110,9 @@ func NewServiceClientsFromRootDevice(rootDevice *RootDevice, loc *url.URL, searc
 // wrapping type.
 func (client *ServiceClient) GetServiceClient() *ServiceClient {
 	return client
+}
+
+// LocalAddr returns the address from which the device was discovered (if known - otherwise empty).
+func (client *ServiceClient) LocalAddr() net.IP {
+	return client.localAddr
 }

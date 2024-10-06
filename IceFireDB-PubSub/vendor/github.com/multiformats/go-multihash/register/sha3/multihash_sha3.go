@@ -1,15 +1,15 @@
 /*
-	This package has no purpose except to perform registration of multihashes.
+This package has no purpose except to perform registration of multihashes.
 
-	It is meant to be used as a side-effecting import, e.g.
+It is meant to be used as a side-effecting import, e.g.
 
-		import (
-			_ "github.com/multiformats/go-multihash/register/sha3"
-		)
+	import (
+		_ "github.com/multiformats/go-multihash/register/sha3"
+	)
 
-	This package registers several multihashes for the sha3 family.
-	This also includes some functions known as "shake" and "keccak",
-	since they share much of their implementation and come in the same repos.
+This package registers several multihashes for the sha3 family.
+This also includes some functions known as "shake" and "keccak",
+since they share much of their implementation and come in the same repos.
 */
 package sha3
 
@@ -18,7 +18,7 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	"github.com/multiformats/go-multihash/core"
+	multihash "github.com/multiformats/go-multihash/core"
 )
 
 func init() {

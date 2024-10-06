@@ -3,6 +3,7 @@ package httpu
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -12,12 +13,50 @@ import (
 	"time"
 )
 
+// ClientInterface is the general interface provided to perform HTTP-over-UDP
+// requests.
+type ClientInterface interface {
+	// Do performs a request. The timeout is how long to wait for before returning
+	// the responses that were received. An error is only returned for failing to
+	// send the request. Failures in receipt simply do not add to the resulting
+	// responses.
+	Do(
+		req *http.Request,
+		timeout time.Duration,
+		numSends int,
+	) ([]*http.Response, error)
+}
+
+// ClientInterfaceCtx is the equivalent of ClientInterface, except with methods
+// taking a context.Context parameter.
+type ClientInterfaceCtx interface {
+	// DoWithContext performs a request. If the input request has a
+	// deadline, then that value will be used as the timeout for how long
+	// to wait before returning the responses that were received. If the
+	// request's context is canceled, this method will return immediately.
+	//
+	// If the request's context is never canceled, and does not have a
+	// deadline, then this function WILL NEVER RETURN. You MUST set an
+	// appropriate deadline on the context, or otherwise cancel it when you
+	// want to finish an operation.
+	//
+	// An error is only returned for failing to send the request. Failures
+	// in receipt simply do not add to the resulting responses.
+	DoWithContext(
+		req *http.Request,
+		numSends int,
+	) ([]*http.Response, error)
+}
+
 // HTTPUClient is a client for dealing with HTTPU (HTTP over UDP). Its typical
 // function is for HTTPMU, and particularly SSDP.
 type HTTPUClient struct {
 	connLock sync.Mutex // Protects use of conn.
 	conn     net.PacketConn
 }
+
+var _ ClientInterface = &HTTPUClient{}
+var _ ClientInterfaceCtx = &HTTPUClient{}
 
 // NewHTTPUClient creates a new HTTPUClient, opening up a new UDP socket for the
 // purpose.
@@ -51,14 +90,34 @@ func (httpu *HTTPUClient) Close() error {
 	return httpu.conn.Close()
 }
 
-// Do performs a request. The timeout is how long to wait for before returning
-// the responses that were received. An error is only returned for failing to
-// send the request. Failures in receipt simply do not add to the resulting
-// responses.
+// Do implements ClientInterface.Do.
 //
 // Note that at present only one concurrent connection will happen per
 // HTTPUClient.
-func (httpu *HTTPUClient) Do(req *http.Request, timeout time.Duration, numSends int) ([]*http.Response, error) {
+func (httpu *HTTPUClient) Do(
+	req *http.Request,
+	timeout time.Duration,
+	numSends int,
+) ([]*http.Response, error) {
+	ctx := req.Context()
+	if timeout > 0 {
+		var cancel func()
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+		req = req.WithContext(ctx)
+	}
+
+	return httpu.DoWithContext(req, numSends)
+}
+
+// DoWithContext implements ClientInterfaceCtx.DoWithContext.
+//
+// Make sure to read the documentation on the ClientInterfaceCtx interface
+// regarding cancellation!
+func (httpu *HTTPUClient) DoWithContext(
+	req *http.Request,
+	numSends int,
+) ([]*http.Response, error) {
 	httpu.connLock.Lock()
 	defer httpu.connLock.Unlock()
 
@@ -84,9 +143,27 @@ func (httpu *HTTPUClient) Do(req *http.Request, timeout time.Duration, numSends 
 	if err != nil {
 		return nil, err
 	}
-	if err = httpu.conn.SetDeadline(time.Now().Add(timeout)); err != nil {
-		return nil, err
+
+	// Handle context deadline/timeout
+	ctx := req.Context()
+	deadline, ok := ctx.Deadline()
+	if ok {
+		if err = httpu.conn.SetDeadline(deadline); err != nil {
+			return nil, err
+		}
 	}
+
+	// Handle context cancelation
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-ctx.Done():
+			// if context is cancelled, stop any connections by setting time in the past.
+			httpu.conn.SetDeadline(time.Now().Add(-time.Second))
+		case <-done:
+		}
+	}()
 
 	// Send request.
 	for i := 0; i < numSends; i++ {
@@ -126,9 +203,16 @@ func (httpu *HTTPUClient) Do(req *http.Request, timeout time.Duration, numSends 
 			continue
 		}
 
+		// Set the related local address used to discover the device.
+		if a, ok := httpu.conn.LocalAddr().(*net.UDPAddr); ok {
+			response.Header.Add(LocalAddressHeader, a.IP.String())
+		}
+
 		responses = append(responses, response)
 	}
 
 	// Timeout reached - return discovered responses.
 	return responses, nil
 }
+
+const LocalAddressHeader = "goupnp-local-address"

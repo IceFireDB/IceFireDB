@@ -39,6 +39,7 @@ var (
 	SentRequests           = stats.Int64("libp2p.io/dht/kad/sent_requests", "Total number of requests sent per RPC", stats.UnitDimensionless)
 	SentRequestErrors      = stats.Int64("libp2p.io/dht/kad/sent_request_errors", "Total number of errors for requests sent per RPC", stats.UnitDimensionless)
 	SentBytes              = stats.Int64("libp2p.io/dht/kad/sent_bytes", "Total sent bytes per RPC", stats.UnitBytes)
+	NetworkSize            = stats.Int64("libp2p.io/dht/kad/network_size", "Network size estimation", stats.UnitDimensionless)
 )
 
 // Views
@@ -93,6 +94,11 @@ var (
 		TagKeys:     []tag.Key{KeyMessageType, KeyPeerID, KeyInstanceID},
 		Aggregation: defaultBytesDistribution,
 	}
+	NetworkSizeView = &view.View{
+		Measure:     NetworkSize,
+		TagKeys:     []tag.Key{KeyPeerID, KeyInstanceID},
+		Aggregation: view.Count(),
+	}
 )
 
 // DefaultViews with all views in it.
@@ -107,4 +113,5 @@ var DefaultViews = []*view.View{
 	SentRequestsView,
 	SentRequestErrorsView,
 	SentBytesView,
+	NetworkSizeView,
 }

@@ -16,6 +16,14 @@ type MutexDatastore struct {
 	child ds.Datastore
 }
 
+var _ ds.Datastore = (*MutexDatastore)(nil)
+var _ ds.Batching = (*MutexDatastore)(nil)
+var _ ds.Shim = (*MutexDatastore)(nil)
+var _ ds.PersistentDatastore = (*MutexDatastore)(nil)
+var _ ds.CheckedDatastore = (*MutexDatastore)(nil)
+var _ ds.ScrubbedDatastore = (*MutexDatastore)(nil)
+var _ ds.GCDatastore = (*MutexDatastore)(nil)
+
 // MutexWrap constructs a datastore with a coarse lock around the entire
 // datastore, for every single operation.
 func MutexWrap(d ds.Datastore) *MutexDatastore {
@@ -128,6 +136,8 @@ type syncBatch struct {
 	batch ds.Batch
 	mds   *MutexDatastore
 }
+
+var _ ds.Batch = (*syncBatch)(nil)
 
 func (b *syncBatch) Put(ctx context.Context, key ds.Key, val []byte) error {
 	b.mds.Lock()

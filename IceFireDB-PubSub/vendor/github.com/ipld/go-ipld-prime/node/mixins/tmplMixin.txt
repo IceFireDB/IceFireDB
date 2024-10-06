@@ -5,7 +5,7 @@
 package mixins
 
 import (
-	ipld "github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/datamodel"
 )
 
 // @Kind@ can be embedded in a struct to provide all the methods that

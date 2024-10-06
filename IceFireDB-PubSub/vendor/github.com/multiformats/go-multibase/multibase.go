@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"unicode/utf8"
 
 	b58 "github.com/mr-tron/base58/base58"
 	b32 "github.com/multiformats/go-base32"
@@ -38,31 +39,33 @@ const (
 	Base64url         = 'u'
 	Base64pad         = 'M'
 	Base64urlPad      = 'U'
+	Base256Emoji      = '🚀'
 )
 
 // EncodingToStr is a map of the supported encoding, unsupported encoding
 // specified in standard are left out
 var EncodingToStr = map[Encoding]string{
-	0x00: "identity",
-	'0':  "base2",
-	'f':  "base16",
-	'F':  "base16upper",
-	'b':  "base32",
-	'B':  "base32upper",
-	'c':  "base32pad",
-	'C':  "base32padupper",
-	'v':  "base32hex",
-	'V':  "base32hexupper",
-	't':  "base32hexpad",
-	'T':  "base32hexpadupper",
-	'k':  "base36",
-	'K':  "base36upper",
-	'z':  "base58btc",
-	'Z':  "base58flickr",
-	'm':  "base64",
-	'u':  "base64url",
-	'M':  "base64pad",
-	'U':  "base64urlpad",
+	0x00:         "identity",
+	'0':          "base2",
+	'f':          "base16",
+	'F':          "base16upper",
+	'b':          "base32",
+	'B':          "base32upper",
+	'c':          "base32pad",
+	'C':          "base32padupper",
+	'v':          "base32hex",
+	'V':          "base32hexupper",
+	't':          "base32hexpad",
+	'T':          "base32hexpadupper",
+	'k':          "base36",
+	'K':          "base36upper",
+	'z':          "base58btc",
+	'Z':          "base58flickr",
+	'm':          "base64",
+	'u':          "base64url",
+	'M':          "base64pad",
+	'U':          "base64urlpad",
+	Base256Emoji: "base256emoji",
 }
 
 var Encodings = map[string]Encoding{}
@@ -84,7 +87,7 @@ func Encode(base Encoding, data []byte) (string, error) {
 	switch base {
 	case Identity:
 		// 0x00 inside a string is OK in golang and causes no problems with the length calculation.
-		return string(Identity) + string(data), nil
+		return string(rune(Identity)) + string(data), nil
 	case Base2:
 		return string(Base2) + binaryEncodeToString(data), nil
 	case Base16:
@@ -123,6 +126,8 @@ func Encode(base Encoding, data []byte) (string, error) {
 		return string(Base64url) + base64.RawURLEncoding.EncodeToString(data), nil
 	case Base64:
 		return string(Base64) + base64.RawStdEncoding.EncodeToString(data), nil
+	case Base256Emoji:
+		return string(Base256Emoji) + base256emojiEncode(data), nil
 	default:
 		return "", ErrUnsupportedEncoding
 	}
@@ -135,7 +140,8 @@ func Decode(data string) (Encoding, []byte, error) {
 		return 0, nil, fmt.Errorf("cannot decode multibase for zero length string")
 	}
 
-	enc := Encoding(data[0])
+	r, _ := utf8.DecodeRuneInString(data)
+	enc := Encoding(r)
 
 	switch enc {
 	case Identity:
@@ -179,6 +185,9 @@ func Decode(data string) (Encoding, []byte, error) {
 	case Base64url:
 		bytes, err := base64.RawURLEncoding.DecodeString(data[1:])
 		return Base64url, bytes, err
+	case Base256Emoji:
+		bytes, err := base256emojiDecode(data[4:])
+		return Base256Emoji, bytes, err
 	default:
 		return -1, nil, ErrUnsupportedEncoding
 	}

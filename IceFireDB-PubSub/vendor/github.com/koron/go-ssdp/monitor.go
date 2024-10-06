@@ -3,11 +3,15 @@ package ssdp
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"sync"
+
+	"github.com/koron/go-ssdp/internal/multicast"
+	"github.com/koron/go-ssdp/internal/ssdplog"
 )
 
 // Monitor monitors SSDP's alive and byebye messages.
@@ -16,17 +20,17 @@ type Monitor struct {
 	Bye    ByeHandler
 	Search SearchHandler
 
-	conn *multicastConn
+	conn *multicast.Conn
 	wg   sync.WaitGroup
 }
 
 // Start starts to monitor SSDP messages.
 func (m *Monitor) Start() error {
-	conn, err := multicastListen(recvAddrIPv4)
+	conn, err := multicast.Listen(multicast.RecvAddrResolver)
 	if err != nil {
 		return err
 	}
-	logf("monitoring on %s", conn.LocalAddr().String())
+	ssdplog.Printf("monitoring on %s", conn.LocalAddr().String())
 	m.conn = conn
 	m.wg.Add(1)
 	go func() {
@@ -37,13 +41,14 @@ func (m *Monitor) Start() error {
 }
 
 func (m *Monitor) serve() error {
-	err := m.conn.readPackets(0, func(addr net.Addr, data []byte) error {
+	// TODO: update listening interfaces of m.conn
+	err := m.conn.ReadPackets(0, func(addr net.Addr, data []byte) error {
 		msg := make([]byte, len(data))
 		copy(msg, data)
 		go m.handleRaw(addr, msg)
 		return nil
 	})
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 	return nil
@@ -52,7 +57,6 @@ func (m *Monitor) serve() error {
 func (m *Monitor) handleRaw(addr net.Addr, raw []byte) error {
 	// Add newline to workaround buggy SSDP responses
 	if !bytes.HasSuffix(raw, endOfHeader) {
-		// FIXME: https://github.com/koron/go-ssdp/issues/10
 		raw = bytes.Join([][]byte{raw, endOfHeader}, nil)
 	}
 	if bytes.HasPrefix(raw, []byte("M-SEARCH ")) {
@@ -62,7 +66,7 @@ func (m *Monitor) handleRaw(addr net.Addr, raw []byte) error {
 		return m.handleNotify(addr, raw)
 	}
 	n := bytes.Index(raw, []byte("\r\n"))
-	logf("unexpected method: %q", string(raw[:n]))
+	ssdplog.Printf("unexpected method: %q", string(raw[:n]))
 	return nil
 }
 

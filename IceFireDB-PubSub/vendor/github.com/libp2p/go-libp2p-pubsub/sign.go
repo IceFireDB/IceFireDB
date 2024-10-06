@@ -5,8 +5,8 @@ import (
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // MessageSignaturePolicy describes if signatures are produced, expected, and/or verified.
@@ -123,7 +123,7 @@ func signMessage(pid peer.ID, key crypto.PrivKey, m *pb.Message) error {
 
 	pk, _ := pid.ExtractPublicKey()
 	if pk == nil {
-		pubk, err := key.GetPublic().Bytes()
+		pubk, err := crypto.MarshalPublicKey(key.GetPublic())
 		if err != nil {
 			return err
 		}

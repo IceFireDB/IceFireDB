@@ -3,7 +3,7 @@ package providers
 import (
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // A providerSet has the list of providers and the time that they were added

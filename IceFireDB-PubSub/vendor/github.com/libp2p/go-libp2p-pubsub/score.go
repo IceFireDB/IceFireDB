@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 
 	manet "github.com/multiformats/go-multiaddr/net"
 )
@@ -26,6 +26,9 @@ type peerStats struct {
 
 	// IP tracking; store as string for easy processing
 	ips []string
+
+	// IP whitelisting cache
+	ipWhitelist map[string]bool
 
 	// behavioural pattern penalties (applied by the router)
 	behaviourPenalty float64
@@ -73,7 +76,7 @@ type peerScore struct {
 	// message delivery tracking
 	deliveries *messageDeliveries
 
-	msgID MsgIdFunction
+	idGen *msgIDGenerator
 	host  host.Host
 
 	// debugging inspection
@@ -82,9 +85,11 @@ type peerScore struct {
 	inspectPeriod time.Duration
 }
 
-var _ internalTracer = (*peerScore)(nil)
+var _ RawTracer = (*peerScore)(nil)
 
 type messageDeliveries struct {
+	seenMsgTTL time.Duration
+
 	records map[string]*deliveryRecord
 
 	// queue for cleaning up old delivery records
@@ -114,8 +119,10 @@ const (
 	deliveryThrottled        // we can't tell if it is valid because validation throttled
 )
 
-type PeerScoreInspectFn = func(map[peer.ID]float64)
-type ExtendedPeerScoreInspectFn = func(map[peer.ID]*PeerScoreSnapshot)
+type (
+	PeerScoreInspectFn         = func(map[peer.ID]float64)
+	ExtendedPeerScoreInspectFn = func(map[peer.ID]*PeerScoreSnapshot)
+)
 
 type PeerScoreSnapshot struct {
 	Score              float64
@@ -136,10 +143,11 @@ type TopicScoreSnapshot struct {
 // When this option is enabled, the supplied function will be invoked periodically to allow
 // the application to inspect or dump the scores for connected peers.
 // The supplied function can have one of two signatures:
-//  - PeerScoreInspectFn, which takes a map of peer IDs to score.
-//  - ExtendedPeerScoreInspectFn, which takes a map of peer IDs to
-//    PeerScoreSnapshots and allows inspection of individual score
-//    components for debugging peer scoring.
+//   - PeerScoreInspectFn, which takes a map of peer IDs to score.
+//   - ExtendedPeerScoreInspectFn, which takes a map of peer IDs to
+//     PeerScoreSnapshots and allows inspection of individual score
+//     components for debugging peer scoring.
+//
 // This option must be passed _after_ the WithPeerScore option.
 func WithPeerScoreInspect(inspect interface{}, period time.Duration) Option {
 	return func(ps *PubSub) error {
@@ -173,12 +181,16 @@ func WithPeerScoreInspect(inspect interface{}, period time.Duration) Option {
 
 // implementation
 func newPeerScore(params *PeerScoreParams) *peerScore {
+	seenMsgTTL := params.SeenMsgTTL
+	if seenMsgTTL == 0 {
+		seenMsgTTL = TimeCacheDuration
+	}
 	return &peerScore{
 		params:     params,
 		peerStats:  make(map[peer.ID]*peerStats),
 		peerIPs:    make(map[string]map[peer.ID]struct{}),
-		deliveries: &messageDeliveries{records: make(map[string]*deliveryRecord)},
-		msgID:      DefaultMsgIdFn,
+		deliveries: &messageDeliveries{seenMsgTTL: seenMsgTTL, records: make(map[string]*deliveryRecord)},
+		idGen:      newMsgIdGenerator(),
 	}
 }
 
@@ -234,7 +246,7 @@ func (ps *peerScore) Start(gs *GossipSubRouter) {
 		return
 	}
 
-	ps.msgID = gs.p.msgID
+	ps.idGen = gs.p.idGen
 	ps.host = gs.p.host
 	go ps.background(gs.p.ctx)
 }
@@ -336,10 +348,29 @@ func (ps *peerScore) ipColocationFactor(p peer.ID) float64 {
 	}
 
 	var result float64
+loop:
 	for _, ip := range pstats.ips {
-		_, whitelisted := ps.params.IPColocationFactorWhitelist[ip]
-		if whitelisted {
-			continue
+		if len(ps.params.IPColocationFactorWhitelist) > 0 {
+			if pstats.ipWhitelist == nil {
+				pstats.ipWhitelist = make(map[string]bool)
+			}
+
+			whitelisted, ok := pstats.ipWhitelist[ip]
+			if !ok {
+				ipObj := net.ParseIP(ip)
+				for _, ipNet := range ps.params.IPColocationFactorWhitelist {
+					if ipNet.Contains(ipObj) {
+						pstats.ipWhitelist[ip] = true
+						continue loop
+					}
+				}
+
+				pstats.ipWhitelist[ip] = false
+			}
+
+			if whitelisted {
+				continue loop
+			}
 		}
 
 		// P6 has a cliff (IPColocationFactorThreshold); it's only applied iff
@@ -665,7 +696,7 @@ func (ps *peerScore) ValidateMessage(msg *Message) {
 
 	// the pubsub subsystem is beginning validation; create a record to track time in
 	// the validation pipeline with an accurate firstSeen time.
-	_ = ps.deliveries.getRecord(ps.msgID(msg.Message))
+	_ = ps.deliveries.getRecord(ps.idGen.ID(msg))
 }
 
 func (ps *peerScore) DeliverMessage(msg *Message) {
@@ -674,11 +705,11 @@ func (ps *peerScore) DeliverMessage(msg *Message) {
 
 	ps.markFirstMessageDelivery(msg.ReceivedFrom, msg)
 
-	drec := ps.deliveries.getRecord(ps.msgID(msg.Message))
+	drec := ps.deliveries.getRecord(ps.idGen.ID(msg))
 
 	// defensive check that this is the first delivery trace -- delivery status should be unknown
 	if drec.status != deliveryUnknown {
-		log.Debugf("unexpected delivery trace: message from %s was first seen %s ago and has delivery status %d", msg.ReceivedFrom, time.Now().Sub(drec.firstSeen), drec.status)
+		log.Debugf("unexpected delivery trace: message from %s was first seen %s ago and has delivery status %d", msg.ReceivedFrom, time.Since(drec.firstSeen), drec.status)
 		return
 	}
 
@@ -700,48 +731,48 @@ func (ps *peerScore) RejectMessage(msg *Message, reason string) {
 
 	switch reason {
 	// we don't track those messages, but we penalize the peer as they are clearly invalid
-	case rejectMissingSignature:
+	case RejectMissingSignature:
 		fallthrough
-	case rejectInvalidSignature:
+	case RejectInvalidSignature:
 		fallthrough
-	case rejectUnexpectedSignature:
+	case RejectUnexpectedSignature:
 		fallthrough
-	case rejectUnexpectedAuthInfo:
+	case RejectUnexpectedAuthInfo:
 		fallthrough
-	case rejectSelfOrigin:
+	case RejectSelfOrigin:
 		ps.markInvalidMessageDelivery(msg.ReceivedFrom, msg)
 		return
 
 		// we ignore those messages, so do nothing.
-	case rejectBlacklstedPeer:
+	case RejectBlacklstedPeer:
 		fallthrough
-	case rejectBlacklistedSource:
+	case RejectBlacklistedSource:
 		return
 
-	case rejectValidationQueueFull:
+	case RejectValidationQueueFull:
 		// the message was rejected before it entered the validation pipeline;
 		// we don't know if this message has a valid signature, and thus we also don't know if
 		// it has a valid message ID; all we can do is ignore it.
 		return
 	}
 
-	drec := ps.deliveries.getRecord(ps.msgID(msg.Message))
+	drec := ps.deliveries.getRecord(ps.idGen.ID(msg))
 
 	// defensive check that this is the first rejection trace -- delivery status should be unknown
 	if drec.status != deliveryUnknown {
-		log.Debugf("unexpected rejection trace: message from %s was first seen %s ago and has delivery status %d", msg.ReceivedFrom, time.Now().Sub(drec.firstSeen), drec.status)
+		log.Debugf("unexpected rejection trace: message from %s was first seen %s ago and has delivery status %d", msg.ReceivedFrom, time.Since(drec.firstSeen), drec.status)
 		return
 	}
 
 	switch reason {
-	case rejectValidationThrottled:
+	case RejectValidationThrottled:
 		// if we reject with "validation throttled" we don't penalize the peer(s) that forward it
 		// because we don't know if it was valid.
 		drec.status = deliveryThrottled
 		// release the delivery time tracking map to free some memory early
 		drec.peers = nil
 		return
-	case rejectValidationIgnored:
+	case RejectValidationIgnored:
 		// we were explicitly instructed by the validator to ignore the message but not penalize
 		// the peer
 		drec.status = deliveryIgnored
@@ -765,7 +796,7 @@ func (ps *peerScore) DuplicateMessage(msg *Message) {
 	ps.Lock()
 	defer ps.Unlock()
 
-	drec := ps.deliveries.getRecord(ps.msgID(msg.Message))
+	drec := ps.deliveries.getRecord(ps.idGen.ID(msg))
 
 	_, ok := drec.peers[msg.ReceivedFrom]
 	if ok {
@@ -797,6 +828,14 @@ func (ps *peerScore) DuplicateMessage(msg *Message) {
 
 func (ps *peerScore) ThrottlePeer(p peer.ID) {}
 
+func (ps *peerScore) RecvRPC(rpc *RPC) {}
+
+func (ps *peerScore) SendRPC(rpc *RPC, p peer.ID) {}
+
+func (ps *peerScore) DropRPC(rpc *RPC, p peer.ID) {}
+
+func (ps *peerScore) UndeliverableMessage(msg *Message) {}
+
 // message delivery records
 func (d *messageDeliveries) getRecord(id string) *deliveryRecord {
 	rec, ok := d.records[id]
@@ -809,7 +848,7 @@ func (d *messageDeliveries) getRecord(id string) *deliveryRecord {
 	rec = &deliveryRecord{peers: make(map[peer.ID]struct{}), firstSeen: now}
 	d.records[id] = rec
 
-	entry := &deliveryEntry{id: id, expire: now.Add(TimeCacheDuration)}
+	entry := &deliveryEntry{id: id, expire: now.Add(d.seenMsgTTL)}
 	if d.tail != nil {
 		d.tail.next = entry
 		d.tail = entry
@@ -951,6 +990,11 @@ func (ps *peerScore) getIPs(p peer.ID) []string {
 	conns := ps.host.Network().ConnsToPeer(p)
 	res := make([]string, 0, 1)
 	for _, c := range conns {
+		if c.Stat().Limited {
+			// ignore transient
+			continue
+		}
+
 		remote := c.RemoteMultiaddr()
 		ip, err := manet.ToIP(remote)
 		if err != nil {
