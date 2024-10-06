@@ -7,8 +7,14 @@
 ## Table of Contents
 
 - [Install](#install)
+- [Type](#type)
 - [Usage](#usage)
+  - [Importing Code constant](#importing-code-constant)
+  - [Code from string](#code-from-string)
+  - [Code from uint64](#code-from-uint64)
 - [Generator](#generator)
+  - [With old table.csv](#with-old-tablecsv)
+  - [With updated table.csv](#with-updated-tablecsv)
 - [Maintainers](#maintainers)
 - [Contribute](#contribute)
 - [License](#license)
@@ -61,14 +67,30 @@ rawCode := multicodec.Code(0x55)
 
 ## Generator
 
+### With old table.csv
+
 To generate the constants yourself:
 
-	git clone https://github.com/multiformats/go-multicodec
-	cd go-multicodec
-	git submodule init && git submodule update
-	go generate
+```console
+$ git clone https://github.com/multiformats/go-multicodec
+$ cd go-multicodec
+$ git submodule init && git submodule update
+$ go generate
+```
 
 Note: You may need to install `stringer` via `go install golang.org/x/tools/cmd/stringer`.
+
+### With updated table.csv
+
+To generate the constants for the latest [table.csv](https://github.com/multiformats/multicodec/blob/master/table.csv):
+
+```console
+$ git clone https://github.com/multiformats/go-multicodec
+$ cd go-multicodec
+$ git submodule init
+$ git submodule update --remote # updates ./multicodec/table.csv to upstream version
+$ go generate
+```
 
 ## Maintainers
 

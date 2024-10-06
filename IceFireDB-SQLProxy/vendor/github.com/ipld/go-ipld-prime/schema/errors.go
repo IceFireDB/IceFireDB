@@ -48,6 +48,13 @@ func (e ErrUnmatchable) Reasonf(format string, a ...interface{}) ErrUnmatchable 
 	return ErrUnmatchable{e.TypeName, fmt.Errorf(format, a...)}
 }
 
+// Is provides support for Go's standard errors.Is function so that
+// errors.Is(yourError, ErrUnmatchable) may be used to match the type of error.
+func (e ErrUnmatchable) Is(err error) bool {
+	_, ok := err.(ErrUnmatchable)
+	return ok
+}
+
 // ErrMissingRequiredField is returned when calling 'Finish' on a NodeAssembler
 // for a Struct that has not has all required fields set.
 type ErrMissingRequiredField struct {
@@ -56,6 +63,13 @@ type ErrMissingRequiredField struct {
 
 func (e ErrMissingRequiredField) Error() string {
 	return "missing required fields: " + strings.Join(e.Missing, ",")
+}
+
+// Is provides support for Go's standard errors.Is function so that
+// errors.Is(yourError, ErrMissingRequiredField) may be used to match the type of error.
+func (e ErrMissingRequiredField) Is(err error) bool {
+	_, ok := err.(ErrMissingRequiredField)
+	return ok
 }
 
 // ErrInvalidKey indicates a key is invalid for some reason.
@@ -87,6 +101,13 @@ func (e ErrInvalidKey) Error() string {
 	}
 }
 
+// Is provides support for Go's standard errors.Is function so that
+// errors.Is(yourError, ErrInvalidKey) may be used to match the type of error.
+func (e ErrInvalidKey) Is(err error) bool {
+	_, ok := err.(ErrInvalidKey)
+	return ok
+}
+
 // ErrNoSuchField may be returned from lookup functions on the Node
 // interface when a field is requested which doesn't exist,
 // or from assigning data into on a MapAssembler for a struct
@@ -104,6 +125,13 @@ func (e ErrNoSuchField) Error() string {
 		return fmt.Sprintf("no such field: {typeinfomissing}.%s", e.Field)
 	}
 	return fmt.Sprintf("no such field: %s.%s", e.Type.Name(), e.Field)
+}
+
+// Is provides support for Go's standard errors.Is function so that
+// errors.Is(yourError, ErrNoSuchField) may be used to match the type of error.
+func (e ErrNoSuchField) Is(err error) bool {
+	_, ok := err.(ErrNoSuchField)
+	return ok
 }
 
 // ErrNotUnionStructure means data was fed into a union assembler that can't match the union.
@@ -125,4 +153,11 @@ type ErrNotUnionStructure struct {
 
 func (e ErrNotUnionStructure) Error() string {
 	return fmt.Sprintf("cannot match schema: union structure constraints for %s caused rejection: %s", e.TypeName, e.Detail)
+}
+
+// Is provides support for Go's standard errors.Is function so that
+// errors.Is(yourError, ErrNotUnionStructure) may be used to match the type of error.
+func (e ErrNotUnionStructure) Is(err error) bool {
+	_, ok := err.(ErrNotUnionStructure)
+	return ok
 }

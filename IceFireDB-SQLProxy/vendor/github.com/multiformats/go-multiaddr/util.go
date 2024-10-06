@@ -27,16 +27,14 @@ func Join(ms ...Multiaddr) Multiaddr {
 	}
 
 	length := 0
-	bs := make([][]byte, len(ms))
-	for i, m := range ms {
-		bs[i] = m.Bytes()
-		length += len(bs[i])
+	for _, m := range ms {
+		length += len(m.Bytes())
 	}
 
 	bidx := 0
 	b := make([]byte, length)
-	for _, mb := range bs {
-		bidx += copy(b[bidx:], mb)
+	for _, mb := range ms {
+		bidx += copy(b[bidx:], mb.Bytes())
 	}
 	return &multiaddr{bytes: b}
 }
@@ -159,6 +157,7 @@ func SplitFunc(m Multiaddr, cb func(Component) bool) (Multiaddr, Multiaddr) {
 // ForEach walks over the multiaddr, component by component.
 //
 // This function iterates over components *by value* to avoid allocating.
+// Return true to continue iteration, false to stop.
 func ForEach(m Multiaddr, cb func(c Component) bool) {
 	// Shortcut if we already have a component
 	if c, ok := m.(*Component); ok {

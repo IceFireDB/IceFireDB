@@ -11,17 +11,17 @@ type TypeName = string
 //
 // Specifically,
 //
-// 	TypeBool
-// 	TypeString
-// 	TypeBytes
-// 	TypeInt
-// 	TypeFloat
-// 	TypeMap
-// 	TypeList
-// 	TypeLink
-// 	TypeUnion
-// 	TypeStruct
-// 	TypeEnum
+//	TypeBool
+//	TypeString
+//	TypeBytes
+//	TypeInt
+//	TypeFloat
+//	TypeMap
+//	TypeList
+//	TypeLink
+//	TypeUnion
+//	TypeStruct
+//	TypeEnum
 //
 // are all of the kinds of Type.
 //
@@ -185,11 +185,15 @@ type UnionRepresentation_Keyed struct {
 type UnionRepresentation_Kinded struct {
 	table map[datamodel.Kind]TypeName
 }
+
+//lint:ignore U1000 implementation TODO
 type UnionRepresentation_Envelope struct {
 	discriminantKey string
 	contentKey      string
 	table           map[string]TypeName // key is user-defined freetext
 }
+
+//lint:ignore U1000 implementation TODO
 type UnionRepresentation_Inline struct {
 	discriminantKey string
 	table           map[string]TypeName // key is user-defined freetext
@@ -220,6 +224,7 @@ type StructRepresentation interface{ _StructRepresentation() }
 
 func (StructRepresentation_Map) _StructRepresentation()         {}
 func (StructRepresentation_Tuple) _StructRepresentation()       {}
+func (StructRepresentation_ListPairs) _StructRepresentation()   {}
 func (StructRepresentation_StringPairs) _StructRepresentation() {}
 func (StructRepresentation_Stringjoin) _StructRepresentation()  {}
 
@@ -228,6 +233,9 @@ type StructRepresentation_Map struct {
 	implicits map[string]ImplicitValue
 }
 type StructRepresentation_Tuple struct{}
+type StructRepresentation_ListPairs struct{}
+
+//lint:ignore U1000 implementation TODO
 type StructRepresentation_StringPairs struct{ sep1, sep2 string }
 type StructRepresentation_Stringjoin struct{ sep string }
 

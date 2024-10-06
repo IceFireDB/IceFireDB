@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"sync"
 )
 
 const (
@@ -73,20 +74,25 @@ func (srv *Server) Serve(l net.PacketConn) error {
 	if srv.MaxMessageBytes != 0 {
 		maxMessageBytes = srv.MaxMessageBytes
 	}
+
+	bufPool := &sync.Pool{
+		New: func() interface{} {
+			return make([]byte, maxMessageBytes)
+		},
+	}
 	for {
-		buf := make([]byte, maxMessageBytes)
+		buf := bufPool.Get().([]byte)
 		n, peerAddr, err := l.ReadFrom(buf)
 		if err != nil {
 			return err
 		}
-		buf = buf[:n]
-
-		go func(buf []byte, peerAddr net.Addr) {
+		go func() {
+			defer bufPool.Put(buf)
 			// At least one router's UPnP implementation has added a trailing space
 			// after "HTTP/1.1" - trim it.
-			buf = trailingWhitespaceRx.ReplaceAllLiteral(buf, crlf)
+			reqBuf := trailingWhitespaceRx.ReplaceAllLiteral(buf[:n], crlf)
 
-			req, err := http.ReadRequest(bufio.NewReader(bytes.NewBuffer(buf)))
+			req, err := http.ReadRequest(bufio.NewReader(bytes.NewBuffer(reqBuf)))
 			if err != nil {
 				log.Printf("httpu: Failed to parse request: %v", err)
 				return
@@ -94,7 +100,7 @@ func (srv *Server) Serve(l net.PacketConn) error {
 			req.RemoteAddr = peerAddr.String()
 			srv.Handler.ServeMessage(req)
 			// No need to call req.Body.Close - underlying reader is bytes.Buffer.
-		}(buf, peerAddr)
+		}()
 	}
 }
 

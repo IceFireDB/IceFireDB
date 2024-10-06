@@ -3,39 +3,44 @@ package multiaddr
 // You **MUST** register your multicodecs with
 // https://github.com/multiformats/multicodec before adding them here.
 const (
-	P_IP4               = 0x0004
-	P_TCP               = 0x0006
-	P_DNS               = 0x0035 // 4 or 6
-	P_DNS4              = 0x0036
-	P_DNS6              = 0x0037
-	P_DNSADDR           = 0x0038
-	P_UDP               = 0x0111
-	P_DCCP              = 0x0021
-	P_IP6               = 0x0029
-	P_IP6ZONE           = 0x002A
-	P_IPCIDR            = 0x002B
-	P_QUIC              = 0x01CC
-	P_WEBTRANSPORT      = 0x01D1
-	P_CERTHASH          = 0x01D2
-	P_SCTP              = 0x0084
-	P_CIRCUIT           = 0x0122
-	P_UDT               = 0x012D
-	P_UTP               = 0x012E
-	P_UNIX              = 0x0190
-	P_P2P               = 0x01A5
-	P_IPFS              = 0x01A5 // alias for backwards compatibility
-	P_HTTP              = 0x01E0
-	P_HTTPS             = 0x01BB // deprecated alias for /tls/http
-	P_ONION             = 0x01BC // also for backwards compatibility
-	P_ONION3            = 0x01BD
-	P_GARLIC64          = 0x01BE
-	P_GARLIC32          = 0x01BF
-	P_P2P_WEBRTC_DIRECT = 0x0114
-	P_TLS               = 0x01c0
-	P_NOISE             = 0x01c6
-	P_WS                = 0x01DD
-	P_WSS               = 0x01DE // deprecated alias for /tls/ws
-	P_PLAINTEXTV2       = 0x706c61
+	P_IP4               = 4
+	P_TCP               = 6
+	P_DNS               = 53 // 4 or 6
+	P_DNS4              = 54
+	P_DNS6              = 55
+	P_DNSADDR           = 56
+	P_UDP               = 273
+	P_DCCP              = 33
+	P_IP6               = 41
+	P_IP6ZONE           = 42
+	P_IPCIDR            = 43
+	P_QUIC              = 460
+	P_QUIC_V1           = 461
+	P_WEBTRANSPORT      = 465
+	P_CERTHASH          = 466
+	P_SCTP              = 132
+	P_CIRCUIT           = 290
+	P_UDT               = 301
+	P_UTP               = 302
+	P_UNIX              = 400
+	P_P2P               = 421
+	P_IPFS              = P_P2P // alias for backwards compatibility
+	P_HTTP              = 480
+	P_HTTP_PATH         = 481
+	P_HTTPS             = 443 // deprecated alias for /tls/http
+	P_ONION             = 444 // also for backwards compatibility
+	P_ONION3            = 445
+	P_GARLIC64          = 446
+	P_GARLIC32          = 447
+	P_P2P_WEBRTC_DIRECT = 276 // Deprecated. use webrtc-direct instead
+	P_TLS               = 448
+	P_SNI               = 449
+	P_NOISE             = 454
+	P_WS                = 477
+	P_WSS               = 478 // deprecated alias for /tls/ws
+	P_PLAINTEXTV2       = 7367777
+	P_WEBRTC_DIRECT     = 280
+	P_WEBRTC            = 281
 )
 
 var (
@@ -180,6 +185,11 @@ var (
 		Code:  P_QUIC,
 		VCode: CodeToVarint(P_QUIC),
 	}
+	protoQUICV1 = Protocol{
+		Name:  "quic-v1",
+		Code:  P_QUIC_V1,
+		VCode: CodeToVarint(P_QUIC_V1),
+	}
 	protoWEBTRANSPORT = Protocol{
 		Name:  "webtransport",
 		Code:  P_WEBTRANSPORT,
@@ -196,6 +206,13 @@ var (
 		Name:  "http",
 		Code:  P_HTTP,
 		VCode: CodeToVarint(P_HTTP),
+	}
+	protoHTTPPath = Protocol{
+		Name:       "http-path",
+		Code:       P_HTTP_PATH,
+		VCode:      CodeToVarint(P_HTTP_PATH),
+		Size:       LengthPrefixedVarSize,
+		Transcoder: TranscoderHTTPPath,
 	}
 	protoHTTPS = Protocol{
 		Name:  "https",
@@ -227,6 +244,13 @@ var (
 		Code:  P_TLS,
 		VCode: CodeToVarint(P_TLS),
 	}
+	protoSNI = Protocol{
+		Name:       "sni",
+		Size:       LengthPrefixedVarSize,
+		Code:       P_SNI,
+		VCode:      CodeToVarint(P_SNI),
+		Transcoder: TranscoderDns,
+	}
 	protoNOISE = Protocol{
 		Name:  "noise",
 		Code:  P_NOISE,
@@ -246,6 +270,16 @@ var (
 		Name:  "wss",
 		Code:  P_WSS,
 		VCode: CodeToVarint(P_WSS),
+	}
+	protoWebRTCDirect = Protocol{
+		Name:  "webrtc-direct",
+		Code:  P_WEBRTC_DIRECT,
+		VCode: CodeToVarint(P_WEBRTC_DIRECT),
+	}
+	protoWebRTC = Protocol{
+		Name:  "webrtc",
+		Code:  P_WEBRTC,
+		VCode: CodeToVarint(P_WEBRTC),
 	}
 )
 
@@ -271,18 +305,23 @@ func init() {
 		protoUTP,
 		protoUDT,
 		protoQUIC,
+		protoQUICV1,
 		protoWEBTRANSPORT,
 		protoCERTHASH,
 		protoHTTP,
+		protoHTTPPath,
 		protoHTTPS,
 		protoP2P,
 		protoUNIX,
 		protoP2P_WEBRTC_DIRECT,
 		protoTLS,
+		protoSNI,
 		protoNOISE,
 		protoWS,
 		protoWSS,
 		protoPlaintextV2,
+		protoWebRTCDirect,
+		protoWebRTC,
 	} {
 		if err := AddProtocol(p); err != nil {
 			panic(err)

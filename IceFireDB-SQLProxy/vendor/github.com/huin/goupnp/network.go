@@ -10,14 +10,14 @@ import (
 // httpuClient creates a HTTPU client that multiplexes to all multicast-capable
 // IPv4 addresses on the host. Returns a function to clean up once the client is
 // no longer required.
-func httpuClient() (httpu.ClientInterface, func(), error) {
+func httpuClient() (httpu.ClientInterfaceCtx, func(), error) {
 	addrs, err := localIPv4MCastAddrs()
 	if err != nil {
 		return nil, nil, ctxError(err, "requesting host IPv4 addresses")
 	}
 
 	closers := make([]io.Closer, 0, len(addrs))
-	delegates := make([]httpu.ClientInterface, 0, len(addrs))
+	delegates := make([]httpu.ClientInterfaceCtx, 0, len(addrs))
 	for _, addr := range addrs {
 		c, err := httpu.NewHTTPUClientAddr(addr)
 		if err != nil {
@@ -34,7 +34,7 @@ func httpuClient() (httpu.ClientInterface, func(), error) {
 		}
 	}
 
-	return httpu.NewMultiClient(delegates), closer, nil
+	return httpu.NewMultiClientCtx(delegates), closer, nil
 }
 
 // localIPv2MCastAddrs returns the set of IPv4 addresses on multicast-able

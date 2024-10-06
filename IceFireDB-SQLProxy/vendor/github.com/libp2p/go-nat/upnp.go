@@ -14,9 +14,7 @@ import (
 	"github.com/koron/go-ssdp"
 )
 
-var (
-	_ NAT = (*upnp_NAT)(nil)
-)
+var _ NAT = (*upnp_NAT)(nil)
 
 func discoverUPNP_IG1(ctx context.Context) <-chan NAT {
 	res := make(chan NAT)
@@ -24,7 +22,7 @@ func discoverUPNP_IG1(ctx context.Context) <-chan NAT {
 		defer close(res)
 
 		// find devices
-		devs, err := goupnp.DiscoverDevices(internetgateway1.URN_WANConnectionDevice_1)
+		devs, err := goupnp.DiscoverDevicesCtx(ctx, internetgateway1.URN_WANConnectionDevice_1)
 		if err != nil {
 			return
 		}
@@ -45,7 +43,7 @@ func discoverUPNP_IG1(ctx context.Context) <-chan NAT {
 						RootDevice: dev.Root,
 						Service:    srv,
 					}}
-					_, isNat, err := client.GetNATRSIPStatus()
+					_, isNat, err := client.GetNATRSIPStatusCtx(ctx)
 					if err == nil && isNat {
 						select {
 						case res <- &upnp_NAT{client, make(map[int]int), "UPNP (IG1-IP1)", dev.Root}:
@@ -59,7 +57,7 @@ func discoverUPNP_IG1(ctx context.Context) <-chan NAT {
 						RootDevice: dev.Root,
 						Service:    srv,
 					}}
-					_, isNat, err := client.GetNATRSIPStatus()
+					_, isNat, err := client.GetNATRSIPStatusCtx(ctx)
 					if err == nil && isNat {
 						select {
 						case res <- &upnp_NAT{client, make(map[int]int), "UPNP (IG1-PPP1)", dev.Root}:
@@ -81,7 +79,7 @@ func discoverUPNP_IG2(ctx context.Context) <-chan NAT {
 		defer close(res)
 
 		// find devices
-		devs, err := goupnp.DiscoverDevices(internetgateway2.URN_WANConnectionDevice_2)
+		devs, err := goupnp.DiscoverDevicesCtx(ctx, internetgateway2.URN_WANConnectionDevice_2)
 		if err != nil {
 			return
 		}
@@ -102,7 +100,7 @@ func discoverUPNP_IG2(ctx context.Context) <-chan NAT {
 						RootDevice: dev.Root,
 						Service:    srv,
 					}}
-					_, isNat, err := client.GetNATRSIPStatus()
+					_, isNat, err := client.GetNATRSIPStatusCtx(ctx)
 					if err == nil && isNat {
 						select {
 						case res <- &upnp_NAT{client, make(map[int]int), "UPNP (IG2-IP1)", dev.Root}:
@@ -116,7 +114,7 @@ func discoverUPNP_IG2(ctx context.Context) <-chan NAT {
 						RootDevice: dev.Root,
 						Service:    srv,
 					}}
-					_, isNat, err := client.GetNATRSIPStatus()
+					_, isNat, err := client.GetNATRSIPStatusCtx(ctx)
 					if err == nil && isNat {
 						select {
 						case res <- &upnp_NAT{client, make(map[int]int), "UPNP (IG2-IP2)", dev.Root}:
@@ -130,7 +128,7 @@ func discoverUPNP_IG2(ctx context.Context) <-chan NAT {
 						RootDevice: dev.Root,
 						Service:    srv,
 					}}
-					_, isNat, err := client.GetNATRSIPStatus()
+					_, isNat, err := client.GetNATRSIPStatusCtx(ctx)
 					if err == nil && isNat {
 						select {
 						case res <- &upnp_NAT{client, make(map[int]int), "UPNP (IG2-PPP1)", dev.Root}:
@@ -167,7 +165,7 @@ func discoverUPNP_GenIGDev(ctx context.Context) <-chan NAT {
 		if err != nil {
 			return
 		}
-		RootDevice, err := goupnp.DeviceByURL(DeviceURL)
+		RootDevice, err := goupnp.DeviceByURLCtx(ctx, DeviceURL)
 		if err != nil {
 			return
 		}
@@ -183,7 +181,7 @@ func discoverUPNP_GenIGDev(ctx context.Context) <-chan NAT {
 					RootDevice: RootDevice,
 					Service:    srv,
 				}}
-				_, isNat, err := client.GetNATRSIPStatus()
+				_, isNat, err := client.GetNATRSIPStatusCtx(ctx)
 				if err == nil && isNat {
 					select {
 					case res <- &upnp_NAT{client, make(map[int]int), "UPNP (IG1-IP1)", RootDevice}:
@@ -197,7 +195,7 @@ func discoverUPNP_GenIGDev(ctx context.Context) <-chan NAT {
 					RootDevice: RootDevice,
 					Service:    srv,
 				}}
-				_, isNat, err := client.GetNATRSIPStatus()
+				_, isNat, err := client.GetNATRSIPStatusCtx(ctx)
 				if err == nil && isNat {
 					select {
 					case res <- &upnp_NAT{client, make(map[int]int), "UPNP (IG1-PPP1)", RootDevice}:
@@ -213,8 +211,8 @@ func discoverUPNP_GenIGDev(ctx context.Context) <-chan NAT {
 
 type upnp_NAT_Client interface {
 	GetExternalIPAddress() (string, error)
-	AddPortMapping(string, uint16, string, uint16, string, bool, string, uint32) error
-	DeletePortMapping(string, uint16, string) error
+	AddPortMappingCtx(context.Context, string, uint16, string, uint16, string, bool, string, uint32) error
+	DeletePortMappingCtx(context.Context, string, uint16, string) error
 }
 
 type upnp_NAT struct {
@@ -249,7 +247,7 @@ func mapProtocol(s string) string {
 	}
 }
 
-func (u *upnp_NAT) AddPortMapping(protocol string, internalPort int, description string, timeout time.Duration) (int, error) {
+func (u *upnp_NAT) AddPortMapping(ctx context.Context, protocol string, internalPort int, description string, timeout time.Duration) (int, error) {
 	ip, err := u.GetInternalAddress()
 	if err != nil {
 		return 0, nil
@@ -258,7 +256,7 @@ func (u *upnp_NAT) AddPortMapping(protocol string, internalPort int, description
 	timeoutInSeconds := uint32(timeout / time.Second)
 
 	if externalPort := u.ports[internalPort]; externalPort > 0 {
-		err = u.c.AddPortMapping("", uint16(externalPort), mapProtocol(protocol), uint16(internalPort), ip.String(), true, description, timeoutInSeconds)
+		err = u.c.AddPortMappingCtx(ctx, "", uint16(externalPort), mapProtocol(protocol), uint16(internalPort), ip.String(), true, description, timeoutInSeconds)
 		if err == nil {
 			return externalPort, nil
 		}
@@ -266,7 +264,7 @@ func (u *upnp_NAT) AddPortMapping(protocol string, internalPort int, description
 
 	for i := 0; i < 3; i++ {
 		externalPort := randomPort()
-		err = u.c.AddPortMapping("", uint16(externalPort), mapProtocol(protocol), uint16(internalPort), ip.String(), true, description, timeoutInSeconds)
+		err = u.c.AddPortMappingCtx(ctx, "", uint16(externalPort), mapProtocol(protocol), uint16(internalPort), ip.String(), true, description, timeoutInSeconds)
 		if err == nil {
 			u.ports[internalPort] = externalPort
 			return externalPort, nil
@@ -276,10 +274,10 @@ func (u *upnp_NAT) AddPortMapping(protocol string, internalPort int, description
 	return 0, err
 }
 
-func (u *upnp_NAT) DeletePortMapping(protocol string, internalPort int) error {
+func (u *upnp_NAT) DeletePortMapping(ctx context.Context, protocol string, internalPort int) error {
 	if externalPort := u.ports[internalPort]; externalPort > 0 {
 		delete(u.ports, internalPort)
-		return u.c.DeletePortMapping("", uint16(externalPort), mapProtocol(protocol))
+		return u.c.DeletePortMappingCtx(ctx, "", uint16(externalPort), mapProtocol(protocol))
 	}
 
 	return nil

@@ -1,7 +1,6 @@
 // A stub routing table conformant interface for js/wasm environments.
 
 //go:build js && wasm
-// +build js,wasm
 
 package netroute
 

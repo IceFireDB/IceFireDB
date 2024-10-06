@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // Represents the default fallback room and user names
 // if they aren't provided when the app is started
-const defaultclient = "client"
+const defaultclient = "icefiredb-sqlproxy-pubsub-client"
 const defaulttopic = "icefiredb-sqlproxy-pubsub"
 
 // A structure that represents a PubSub Chat Room
@@ -65,7 +65,7 @@ func (c chatlog) String() string {
 func JoinPubSub(p2phost *P2P, clientName string, topicName string) (*PubSub, error) {
 
 	// Create a PubSub topic with the room name
-	topic, err := p2phost.PubSub.Join(fmt.Sprintf("icefiredb-sqlproxy-pub-sub-p2p-%s", topicName))
+	topic, err := p2phost.PubSub.Join(fmt.Sprintf("icefiredb-sqlite-pub-sub-p2p-%s", topicName))
 	// Check the error
 	if err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ func (cr *PubSub) PubLoop() {
 			// Create a ChatMessage
 			m := chatmessage{
 				Message:    message,
-				SenderID:   cr.selfid.Pretty(),
+				SenderID:   cr.selfid.String(),
 				SenderName: cr.ClientName,
 			}
 

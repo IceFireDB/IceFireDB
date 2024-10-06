@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 const (
@@ -43,7 +43,6 @@ func newBackoff(ctx context.Context, sizeThreshold int, cleanupInterval time.Dur
 		info:        make(map[peer.ID]*backoffHistory),
 	}
 
-	rand.Seed(time.Now().UnixNano()) // used for jitter
 	go b.cleanupLoop(ctx)
 
 	return b

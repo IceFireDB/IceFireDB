@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
+## [0.14.3]
+
+### Fixed
+
+- darwin: Fix checkptr error in `(*Mem).Get` for Go 1.22.
+
 ## [0.14.2]
 
 ### Fixed
@@ -196,7 +202,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `ProcStatus.PPID` value is wrong on Windows. [#55](https://github.com/elastic/gosigar/pull/55)
 - Fixed `ProcStatus.Username` error on Windows XP [#56](https://github.com/elastic/gosigar/pull/56)
 
-[Unreleased]: https://github.com/elastic/gosigar/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/elastic/gosigar/compare/v0.14.3...HEAD
+[0.14.3]: https://github.com/elastic/gosigar/releases/tag/v0.14.3
+[0.14.2]: https://github.com/elastic/gosigar/releases/tag/v0.14.2
 [0.14.1]: https://github.com/elastic/gosigar/releases/tag/v0.14.1
 [0.14.0]: https://github.com/elastic/gosigar/releases/tag/v0.14.0
 [0.13.0]: https://github.com/elastic/gosigar/releases/tag/v0.13.0

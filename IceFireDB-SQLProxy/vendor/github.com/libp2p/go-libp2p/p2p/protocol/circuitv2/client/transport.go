@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/libp2p/go-libp2p-core/network"
-
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/transport"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/transport"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -51,20 +50,32 @@ var _ io.Closer = (*Client)(nil)
 
 func (c *Client) Dial(ctx context.Context, a ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
 	connScope, err := c.host.Network().ResourceManager().OpenConnection(network.DirOutbound, false, a)
+
 	if err != nil {
 		return nil, err
 	}
-	if err := connScope.SetPeer(p); err != nil {
+	conn, err := c.dialAndUpgrade(ctx, a, p, connScope)
+	if err != nil {
 		connScope.Done()
+		return nil, err
+	}
+	return conn, nil
+}
+
+func (c *Client) dialAndUpgrade(ctx context.Context, a ma.Multiaddr, p peer.ID, connScope network.ConnManagementScope) (transport.CapableConn, error) {
+	if err := connScope.SetPeer(p); err != nil {
 		return nil, err
 	}
 	conn, err := c.dial(ctx, a, p)
 	if err != nil {
-		connScope.Done()
 		return nil, err
 	}
 	conn.tagHop()
-	return c.upgrader.Upgrade(ctx, c, conn, network.DirOutbound, p, connScope)
+	cc, err := c.upgrader.Upgrade(ctx, c, conn, network.DirOutbound, p, connScope)
+	if err != nil {
+		return nil, err
+	}
+	return capableConn{cc.(capableConnWithStat)}, nil
 }
 
 func (c *Client) CanDial(addr ma.Multiaddr) bool {

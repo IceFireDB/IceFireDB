@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/discovery"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/libp2p/go-libp2p/core/discovery"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/routing"
 
 	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
@@ -31,7 +31,7 @@ func (d *RoutingDiscovery) Advertise(ctx context.Context, ns string, opts ...dis
 
 	ttl := options.Ttl
 	if ttl == 0 || ttl > 3*time.Hour {
-		// the DHT provider record validity is 24hrs, but it is recommnded to republish at least every 6hrs
+		// the DHT provider record validity is 24hrs, but it is recommended to republish at least every 6hrs
 		// we go one step further and republish every 3hrs
 		ttl = 3 * time.Hour
 	}
@@ -56,15 +56,12 @@ func (d *RoutingDiscovery) Advertise(ctx context.Context, ns string, opts ...dis
 }
 
 func (d *RoutingDiscovery) FindPeers(ctx context.Context, ns string, opts ...discovery.Option) (<-chan peer.AddrInfo, error) {
-	var options discovery.Options
+	options := discovery.Options{
+		Limit: 100, // default limit if not specified in options
+	}
 	err := options.Apply(opts...)
 	if err != nil {
 		return nil, err
-	}
-
-	limit := options.Limit
-	if limit == 0 {
-		limit = 100 // that's just arbitrary, but FindProvidersAsync needs a count
 	}
 
 	cid, err := nsToCid(ns)
@@ -72,7 +69,7 @@ func (d *RoutingDiscovery) FindPeers(ctx context.Context, ns string, opts ...dis
 		return nil, err
 	}
 
-	return d.FindProvidersAsync(ctx, cid, limit), nil
+	return d.FindProvidersAsync(ctx, cid, options.Limit), nil
 }
 
 func nsToCid(ns string) (cid.Cid, error) {

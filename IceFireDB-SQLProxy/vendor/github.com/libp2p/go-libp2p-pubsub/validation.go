@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 const (
@@ -70,7 +70,10 @@ type validation struct {
 	// mx protects the validator map
 	mx sync.Mutex
 	// topicVals tracks per topic validators
-	topicVals map[string]*topicVal
+	topicVals map[string]*validatorImpl
+
+	// defaultVals tracks default validators applicable to all topics
+	defaultVals []*validatorImpl
 
 	// validateQ is the front-end to the validation pipeline
 	validateQ chan *validateReq
@@ -84,13 +87,13 @@ type validation struct {
 
 // validation requests
 type validateReq struct {
-	vals []*topicVal
+	vals []*validatorImpl
 	src  peer.ID
 	msg  *Message
 }
 
 // representation of topic validators
-type topicVal struct {
+type validatorImpl struct {
 	topic            string
 	validate         ValidatorEx
 	validateTimeout  time.Duration
@@ -117,7 +120,7 @@ type rmValReq struct {
 // newValidation creates a new validation pipeline
 func newValidation() *validation {
 	return &validation{
-		topicVals:        make(map[string]*topicVal),
+		topicVals:        make(map[string]*validatorImpl),
 		validateQ:        make(chan *validateReq, defaultValidateQueueSize),
 		validateThrottle: make(chan struct{}, defaultValidateThrottle),
 		validateWorkers:  runtime.NumCPU(),
@@ -136,10 +139,16 @@ func (v *validation) Start(p *PubSub) {
 
 // AddValidator adds a new validator
 func (v *validation) AddValidator(req *addValReq) {
+	val, err := v.makeValidator(req)
+	if err != nil {
+		req.resp <- err
+		return
+	}
+
 	v.mx.Lock()
 	defer v.mx.Unlock()
 
-	topic := req.topic
+	topic := val.topic
 
 	_, ok := v.topicVals[topic]
 	if ok {
@@ -147,6 +156,11 @@ func (v *validation) AddValidator(req *addValReq) {
 		return
 	}
 
+	v.topicVals[topic] = val
+	req.resp <- nil
+}
+
+func (v *validation) makeValidator(req *addValReq) (*validatorImpl, error) {
 	makeValidatorEx := func(v Validator) ValidatorEx {
 		return func(ctx context.Context, p peer.ID, msg *Message) ValidationResult {
 			if v(ctx, p, msg) {
@@ -170,12 +184,15 @@ func (v *validation) AddValidator(req *addValReq) {
 		validator = v
 
 	default:
-		req.resp <- fmt.Errorf("unknown validator type for topic %s; must be an instance of Validator or ValidatorEx", topic)
-		return
+		topic := req.topic
+		if req.topic == "" {
+			topic = "(default)"
+		}
+		return nil, fmt.Errorf("unknown validator type for topic %s; must be an instance of Validator or ValidatorEx", topic)
 	}
 
-	val := &topicVal{
-		topic:            topic,
+	val := &validatorImpl{
+		topic:            req.topic,
 		validate:         validator,
 		validateTimeout:  0,
 		validateThrottle: make(chan struct{}, defaultValidateConcurrency),
@@ -190,8 +207,7 @@ func (v *validation) AddValidator(req *addValReq) {
 		val.validateThrottle = make(chan struct{}, req.throttle)
 	}
 
-	v.topicVals[topic] = val
-	req.resp <- nil
+	return val, nil
 }
 
 // RemoveValidator removes an existing validator
@@ -244,18 +260,21 @@ func (v *validation) Push(src peer.ID, msg *Message) bool {
 }
 
 // getValidators returns all validators that apply to a given message
-func (v *validation) getValidators(msg *Message) []*topicVal {
+func (v *validation) getValidators(msg *Message) []*validatorImpl {
 	v.mx.Lock()
 	defer v.mx.Unlock()
+
+	var vals []*validatorImpl
+	vals = append(vals, v.defaultVals...)
 
 	topic := msg.GetTopic()
 
 	val, ok := v.topicVals[topic]
 	if !ok {
-		return nil
+		return vals
 	}
 
-	return []*topicVal{val}
+	return append(vals, val)
 }
 
 // validateWorker is an active goroutine performing inline validation
@@ -271,7 +290,7 @@ func (v *validation) validateWorker() {
 }
 
 // validate performs validation and only sends the message if all validators succeed
-func (v *validation) validate(vals []*topicVal, src peer.ID, msg *Message, synchronous bool) error {
+func (v *validation) validate(vals []*validatorImpl, src peer.ID, msg *Message, synchronous bool) error {
 	// If signature verification is enabled, but signing is disabled,
 	// the Signature is required to be nil upon receiving the message in PubSub.pushMsg.
 	if msg.Signature != nil {
@@ -292,7 +311,7 @@ func (v *validation) validate(vals []*topicVal, src peer.ID, msg *Message, synch
 		v.tracer.ValidateMessage(msg)
 	}
 
-	var inline, async []*topicVal
+	var inline, async []*validatorImpl
 	for _, val := range vals {
 		if val.validateInline || synchronous {
 			inline = append(inline, val)
@@ -360,7 +379,7 @@ func (v *validation) validateSignature(msg *Message) bool {
 	return true
 }
 
-func (v *validation) doValidateTopic(vals []*topicVal, src peer.ID, msg *Message, r ValidationResult) {
+func (v *validation) doValidateTopic(vals []*validatorImpl, src peer.ID, msg *Message, r ValidationResult) {
 	result := v.validateTopic(vals, src, msg)
 
 	if result == ValidationAccept && r != ValidationAccept {
@@ -388,7 +407,7 @@ func (v *validation) doValidateTopic(vals []*topicVal, src peer.ID, msg *Message
 	}
 }
 
-func (v *validation) validateTopic(vals []*topicVal, src peer.ID, msg *Message) ValidationResult {
+func (v *validation) validateTopic(vals []*validatorImpl, src peer.ID, msg *Message) ValidationResult {
 	if len(vals) == 1 {
 		return v.validateSingleTopic(vals[0], src, msg)
 	}
@@ -404,7 +423,7 @@ func (v *validation) validateTopic(vals []*topicVal, src peer.ID, msg *Message) 
 
 		select {
 		case val.validateThrottle <- struct{}{}:
-			go func(val *topicVal) {
+			go func(val *validatorImpl) {
 				rch <- val.validateMsg(ctx, src, msg)
 				<-val.validateThrottle
 			}(val)
@@ -438,7 +457,7 @@ loop:
 }
 
 // fast path for single topic validation that avoids the extra goroutine
-func (v *validation) validateSingleTopic(val *topicVal, src peer.ID, msg *Message) ValidationResult {
+func (v *validation) validateSingleTopic(val *validatorImpl, src peer.ID, msg *Message) ValidationResult {
 	select {
 	case val.validateThrottle <- struct{}{}:
 		res := val.validateMsg(v.p.ctx, src, msg)
@@ -451,7 +470,7 @@ func (v *validation) validateSingleTopic(val *topicVal, src peer.ID, msg *Messag
 	}
 }
 
-func (val *topicVal) validateMsg(ctx context.Context, src peer.ID, msg *Message) ValidationResult {
+func (val *validatorImpl) validateMsg(ctx context.Context, src peer.ID, msg *Message) ValidationResult {
 	start := time.Now()
 	defer func() {
 		log.Debugf("validation done; took %s", time.Since(start))
@@ -478,7 +497,32 @@ func (val *topicVal) validateMsg(ctx context.Context, src peer.ID, msg *Message)
 	}
 }
 
-/// Options
+// / Options
+// WithDefaultValidator adds a validator that applies to all topics by default; it can be used
+// more than once and add multiple validators. Having a defult validator does not inhibit registering
+// a per topic validator.
+func WithDefaultValidator(val interface{}, opts ...ValidatorOpt) Option {
+	return func(ps *PubSub) error {
+		addVal := &addValReq{
+			validate: val,
+		}
+
+		for _, opt := range opts {
+			err := opt(addVal)
+			if err != nil {
+				return err
+			}
+		}
+
+		val, err := ps.val.makeValidator(addVal)
+		if err != nil {
+			return err
+		}
+
+		ps.val.defaultVals = append(ps.val.defaultVals, val)
+		return nil
+	}
+}
 
 // WithValidateQueueSize sets the buffer of validate queue. Defaults to 32.
 // When queue is full, validation is throttled and new messages are dropped.

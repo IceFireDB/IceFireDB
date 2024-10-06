@@ -93,6 +93,9 @@ func validateBytes(b []byte) (err error) {
 		if len(b) < size || size < 0 {
 			return fmt.Errorf("invalid value for size %d", len(b))
 		}
+		if p.Path && len(b) != size {
+			return fmt.Errorf("invalid size of component for path protocol %d: expected %d", size, len(b))
+		}
 
 		err = p.Transcoder.ValidateBytes(b[:size])
 		if err != nil {

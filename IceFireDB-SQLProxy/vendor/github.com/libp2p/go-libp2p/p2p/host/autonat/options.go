@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 )
 
 // config holds configurable options for the autonat subsystem.
@@ -17,6 +17,7 @@ type config struct {
 	dialer            network.Network
 	forceReachability bool
 	reachability      network.Reachability
+	metricsTracer     MetricsTracer
 
 	// client
 	bootDelay          time.Duration
@@ -90,9 +91,9 @@ func UsingAddresses(addrFunc AddrFunc) Option {
 	}
 }
 
-// WithSchedule configures how agressively probes will be made to verify the
+// WithSchedule configures how aggressively probes will be made to verify the
 // address of the host. retryInterval indicates how often probes should be made
-// when the host lacks confident about its address, while refresh interval
+// when the host lacks confidence about its address, while refreshInterval
 // is the schedule of periodic probes when the host believes it knows its
 // steady-state reachability.
 func WithSchedule(retryInterval, refreshInterval time.Duration) Option {
@@ -139,6 +140,14 @@ func WithThrottling(amount int, interval time.Duration) Option {
 func WithPeerThrottling(amount int) Option {
 	return func(c *config) error {
 		c.throttlePeerMax = amount
+		return nil
+	}
+}
+
+// WithMetricsTracer uses mt to track autonat metrics
+func WithMetricsTracer(mt MetricsTracer) Option {
+	return func(c *config) error {
+		c.metricsTracer = mt
 		return nil
 	}
 }

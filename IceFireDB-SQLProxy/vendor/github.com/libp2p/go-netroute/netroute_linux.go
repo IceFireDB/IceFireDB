@@ -5,7 +5,6 @@
 // tree.
 
 //go:build linux
-// +build linux
 
 // Generate a local routing table structure following the code at
 // https://github.com/google/gopacket/blob/master/routing/routing.go

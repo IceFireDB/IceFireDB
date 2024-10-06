@@ -40,7 +40,7 @@ type Link interface {
 	// the golang string type is used for immutability and for ease of use as a map key.
 	// As with the String method, the returned value may not elide any parts of the hash.
 	//
-	// Note that there is still no contract that the returned value be able to be parsed back into a Link value;
+	// Note that there is still no contract that the returned value should be parsable back into a Link value;
 	// not even in the case of `lnk.Prototype().BuildLink(lnk.Binary()[:])`.
 	// This is because the value returned by this method may contain data that the LinkPrototype would also restate.
 	// (For a concrete example: if using CIDs, this method will return a binary string that includes
