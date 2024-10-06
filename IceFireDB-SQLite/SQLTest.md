@@ -70,5 +70,3 @@ UPDATE `maps` SET value='bbbbbbb' WHERE id=2;
 ```sql
 DELETE FROM `maps` WHERE id=3;
 ```
-
-## 
