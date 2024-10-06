@@ -1,5 +1,4 @@
 //go:build !linux && !freebsd && !netbsd && !openbsd && !dragonfly && !windows
-// +build !linux,!freebsd,!netbsd,!openbsd,!dragonfly,!windows
 
 package files
 

@@ -24,7 +24,7 @@ github.com/AndreasBriese/bbloom
 ## explicit; go 1.21
 github.com/IceFireDB/icefiredb-crdt-kv/kv
 github.com/IceFireDB/icefiredb-crdt-kv/pkg/p2p
-# github.com/IceFireDB/icefiredb-ipfs-log v0.3.0
+# github.com/IceFireDB/icefiredb-ipfs-log v0.4.0
 ## explicit; go 1.22
 github.com/IceFireDB/icefiredb-ipfs-log
 github.com/IceFireDB/icefiredb-ipfs-log/cache
@@ -342,8 +342,8 @@ github.com/ipfs-shipyard/nopfs/ipfs
 # github.com/ipfs/bbloom v0.0.4
 ## explicit; go 1.12
 github.com/ipfs/bbloom
-# github.com/ipfs/boxo v0.22.1-0.20240821001902-3cd3857b046c
-## explicit; go 1.21
+# github.com/ipfs/boxo v0.23.0
+## explicit; go 1.22
 github.com/ipfs/boxo/bitswap
 github.com/ipfs/boxo/bitswap/client
 github.com/ipfs/boxo/bitswap/client/internal
@@ -533,8 +533,8 @@ github.com/ipfs/go-metrics-interface
 github.com/ipfs/go-peertaskqueue
 github.com/ipfs/go-peertaskqueue/peertask
 github.com/ipfs/go-peertaskqueue/peertracker
-# github.com/ipfs/go-unixfsnode v1.9.0
-## explicit; go 1.20
+# github.com/ipfs/go-unixfsnode v1.9.1
+## explicit; go 1.22
 github.com/ipfs/go-unixfsnode
 github.com/ipfs/go-unixfsnode/data
 github.com/ipfs/go-unixfsnode/directory
@@ -545,7 +545,7 @@ github.com/ipfs/go-unixfsnode/utils
 # github.com/ipfs/go-verifcid v0.0.3
 ## explicit; go 1.19
 github.com/ipfs/go-verifcid
-# github.com/ipfs/kubo v0.30.0-rc1
+# github.com/ipfs/kubo v0.30.0
 ## explicit; go 1.22
 github.com/ipfs/kubo
 github.com/ipfs/kubo/blocks/blockstoreutil
@@ -680,14 +680,11 @@ github.com/libp2p/go-cidranger/net
 # github.com/libp2p/go-doh-resolver v0.4.0
 ## explicit; go 1.16
 github.com/libp2p/go-doh-resolver
-# github.com/libp2p/go-eventbus v0.2.1
-## explicit; go 1.12
-github.com/libp2p/go-eventbus
 # github.com/libp2p/go-flow-metrics v0.1.0
 ## explicit; go 1.17
 github.com/libp2p/go-flow-metrics
-# github.com/libp2p/go-libp2p v0.36.2
-## explicit; go 1.21
+# github.com/libp2p/go-libp2p v0.36.3
+## explicit; go 1.22
 github.com/libp2p/go-libp2p
 github.com/libp2p/go-libp2p/config
 github.com/libp2p/go-libp2p/core
@@ -767,13 +764,10 @@ github.com/libp2p/go-libp2p-asn-util
 ## explicit; go 1.17
 github.com/libp2p/go-libp2p-core/crypto
 github.com/libp2p/go-libp2p-core/crypto/pb
-github.com/libp2p/go-libp2p-core/event
 github.com/libp2p/go-libp2p-core/internal/catch
 github.com/libp2p/go-libp2p-core/metrics
-github.com/libp2p/go-libp2p-core/network
 github.com/libp2p/go-libp2p-core/peer
 github.com/libp2p/go-libp2p-core/peer/pb
-github.com/libp2p/go-libp2p-core/peerstore
 github.com/libp2p/go-libp2p-core/protocol
 github.com/libp2p/go-libp2p-core/record
 github.com/libp2p/go-libp2p-core/record/pb

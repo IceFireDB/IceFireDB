@@ -7,7 +7,7 @@ toolchain go1.22.3
 require (
 	berty.tech/go-ipfs-log v1.10.2 // indirect
 	github.com/IceFireDB/icefiredb-crdt-kv v0.2.0
-	github.com/IceFireDB/icefiredb-ipfs-log v0.3.0
+	github.com/IceFireDB/icefiredb-ipfs-log v0.4.0
 	github.com/armon/go-metrics v0.3.6 // indirect
 	github.com/aws/aws-sdk-go v1.55.5
 	github.com/cenkalti/backoff/v4 v4.3.0
@@ -104,7 +104,7 @@ require (
 	github.com/ipfs-shipyard/nopfs v0.0.12 // indirect
 	github.com/ipfs-shipyard/nopfs/ipfs v0.13.2-0.20231027223058-cde3b5ba964c // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
-	github.com/ipfs/boxo v0.22.1-0.20240821001902-3cd3857b046c // indirect
+	github.com/ipfs/boxo v0.23.0 // indirect
 	github.com/ipfs/go-bitfield v1.1.0 // indirect
 	github.com/ipfs/go-block-format v0.2.0 // indirect
 	github.com/ipfs/go-blockservice v0.5.2 // indirect
@@ -133,9 +133,9 @@ require (
 	github.com/ipfs/go-merkledag v0.11.0 // indirect
 	github.com/ipfs/go-metrics-interface v0.0.1 // indirect
 	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
-	github.com/ipfs/go-unixfsnode v1.9.0 // indirect
+	github.com/ipfs/go-unixfsnode v1.9.1 // indirect
 	github.com/ipfs/go-verifcid v0.0.3 // indirect
-	github.com/ipfs/kubo v0.30.0-rc1 // indirect
+	github.com/ipfs/kubo v0.30.0 // indirect
 	github.com/ipld/go-car v0.6.2 // indirect
 	github.com/ipld/go-car/v2 v2.13.1 // indirect
 	github.com/ipld/go-codec-dagpb v1.6.0 // indirect
@@ -150,9 +150,8 @@ require (
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
 	github.com/libp2p/go-doh-resolver v0.4.0 // indirect
-	github.com/libp2p/go-eventbus v0.2.1 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
-	github.com/libp2p/go-libp2p v0.36.2 // indirect
+	github.com/libp2p/go-libp2p v0.36.3 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.4.1 // indirect
 	github.com/libp2p/go-libp2p-core v0.19.1 // indirect
 	github.com/libp2p/go-libp2p-kad-dht v0.26.1 // indirect

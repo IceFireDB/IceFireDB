@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -216,8 +217,7 @@ type Engine struct {
 	activeGauge metrics.Gauge
 
 	// used to ensure metrics are reported each fixed number of operation
-	metricsLock         sync.Mutex
-	metricUpdateCounter int
+	metricUpdateCounter atomic.Uint32
 
 	taskComparator TaskComparator
 
@@ -449,11 +449,7 @@ func newEngine(
 }
 
 func (e *Engine) updateMetrics() {
-	e.metricsLock.Lock()
-	c := e.metricUpdateCounter
-	e.metricUpdateCounter++
-	e.metricsLock.Unlock()
-
+	c := e.metricUpdateCounter.Add(1)
 	if c%100 == 0 {
 		stats := e.peerRequestQueue.Stats()
 		e.activeGauge.Set(float64(stats.NumActive))
@@ -693,7 +689,7 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 		return true
 	}
 
-	// Get block sizes
+	// Get block sizes for unique CIDs.
 	wantKs := cid.NewSet()
 	for _, entry := range wants {
 		wantKs.Add(entry.Cid)
@@ -975,6 +971,7 @@ func (e *Engine) NotifyNewBlocks(blks []blocks.Block) {
 	var work bool
 	for _, b := range blks {
 		k := b.Cid()
+		blockSize := blockSizes[k]
 
 		e.lock.RLock()
 		peers := e.peerLedger.Peers(k)
@@ -983,7 +980,6 @@ func (e *Engine) NotifyNewBlocks(blks []blocks.Block) {
 		for _, entry := range peers {
 			work = true
 
-			blockSize := blockSizes[k]
 			isWantBlock := e.sendAsBlock(entry.WantType, blockSize)
 
 			entrySize := blockSize
