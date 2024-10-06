@@ -54,7 +54,7 @@ func isRelayAddr(a ma.Multiaddr) bool {
 func isDNSAddr(a ma.Multiaddr) bool {
 	if first, _ := ma.SplitFirst(a); first != nil {
 		switch first.Protocol().Code {
-		case ma.P_DNS4, ma.P_DNS6, ma.P_DNSADDR:
+		case ma.P_DNS, ma.P_DNS4, ma.P_DNS6, ma.P_DNSADDR:
 			return true
 		}
 	}
@@ -104,8 +104,8 @@ func addrKeyAndPort(a ma.Multiaddr) (string, int) {
 
 // clean up addrsplosion
 // the following heuristic is used:
-// - for each base address/protocol combination, if there are multiple ports advertised then
-//   only accept the default port if present.
+//   - for each base address/protocol combination, if there are multiple ports advertised then
+//     only accept the default port if present.
 //   - If the default port is not present, we check for non-standard ports by tracking
 //     private port bindings if present.
 //   - If there is no default or private port binding, then we can't infer the correct

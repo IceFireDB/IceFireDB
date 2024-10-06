@@ -8,7 +8,7 @@ import (
 	pool "github.com/libp2p/go-buffer-pool"
 )
 
-//  ErrMsgTooLarge is returned when the message length is exessive
+// ErrMsgTooLarge is returned when the message length is exessive
 var ErrMsgTooLarge = errors.New("message too large")
 
 const (

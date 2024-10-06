@@ -5,7 +5,6 @@
 // tree.
 
 //go:build darwin || dragonfly || freebsd || netbsd || openbsd
-// +build darwin dragonfly freebsd netbsd openbsd
 
 // This is a BSD import for the routing structure initially found in
 // https://github.com/google/gopacket/blob/master/routing/routing.go

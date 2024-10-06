@@ -48,7 +48,7 @@ func (lp LinkPrototype) BuildLink(hashsum []byte) datamodel.Link {
 	p := lp.Prefix
 
 	length := p.MhLength
-	if p.MhType == multihash.ID {
+	if p.MhType == multihash.IDENTITY {
 		length = -1
 	}
 	if p.Version == 0 && (p.MhType != multihash.SHA2_256 ||

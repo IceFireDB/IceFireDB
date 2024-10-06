@@ -1,4 +1,4 @@
-// package kbucket implements a kademlia 'k-bucket' routing table.
+// Package kbucket implements a kademlia 'k-bucket' routing table.
 package kbucket
 
 import (
@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 
 	"github.com/libp2p/go-libp2p-kbucket/peerdiversity"
 
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 )
 
 var log = logging.Logger("table")
@@ -72,8 +72,12 @@ func NewRoutingTable(bucketsize int, localID ID, latency time.Duration, m peerst
 
 		cplRefreshedAt: make(map[uint]time.Time),
 
-		PeerRemoved: func(peer.ID) {},
-		PeerAdded:   func(peer.ID) {},
+		PeerRemoved: func(p peer.ID) {
+			log.Debugw("peer removed", "peer", p)
+		},
+		PeerAdded: func(p peer.ID) {
+			log.Debugw("peer added", "peer", p)
+		},
 
 		usefulnessGracePeriod: usefulnessGracePeriod,
 
@@ -92,7 +96,7 @@ func (rt *RoutingTable) Close() error {
 	return nil
 }
 
-// NPeersForCPL returns the number of peers we have for a given Cpl
+// NPeersForCpl returns the number of peers we have for a given Cpl
 func (rt *RoutingTable) NPeersForCpl(cpl uint) int {
 	rt.tabLock.RLock()
 	defer rt.tabLock.RUnlock()
@@ -112,6 +116,55 @@ func (rt *RoutingTable) NPeersForCpl(cpl uint) int {
 	}
 }
 
+// UsefulNewPeer verifies whether the given peer.ID would be a good fit for the
+// routing table. It returns true if the peer isn't in the routing table yet, if
+// the bucket corresponding to peer.ID isn't full, if it contains replaceable
+// peers or if it is the last bucket and adding a peer would unfold it.
+func (rt *RoutingTable) UsefulNewPeer(p peer.ID) bool {
+	rt.tabLock.RLock()
+	defer rt.tabLock.RUnlock()
+
+	// bucket corresponding to p
+	bucketID := rt.bucketIdForPeer(p)
+	bucket := rt.buckets[bucketID]
+
+	if bucket.getPeer(p) != nil {
+		// peer already exists in the routing table, so it isn't useful
+		return false
+	}
+
+	// bucket isn't full
+	if bucket.len() < rt.bucketsize {
+		return true
+	}
+
+	// bucket is full, check if it contains replaceable peers
+	for e := bucket.list.Front(); e != nil; e = e.Next() {
+		peer := e.Value.(*PeerInfo)
+		if peer.replaceable {
+			// at least 1 peer is replaceable
+			return true
+		}
+	}
+
+	// the last bucket potentially contains peer ids with different CPL,
+	// and can be split in 2 buckets if needed
+	if bucketID == len(rt.buckets)-1 {
+		peers := bucket.peers()
+		cpl := CommonPrefixLen(rt.local, ConvertPeerID(p))
+		for _, peer := range peers {
+			// if at least 2 peers have a different CPL, the new peer is
+			// useful and will trigger a bucket split
+			if CommonPrefixLen(rt.local, peer.dhtId) != cpl {
+				return true
+			}
+		}
+	}
+
+	// the appropriate bucket is full of non replaceable peers
+	return false
+}
+
 // TryAddPeer tries to add a peer to the Routing table.
 // If the peer ALREADY exists in the Routing Table and has been queried before, this call is a no-op.
 // If the peer ALREADY exists in the Routing Table but hasn't been queried before, we set it's LastUsefulAt value to
@@ -127,7 +180,7 @@ func (rt *RoutingTable) NPeersForCpl(cpl uint) int {
 // whose LastSuccessfulOutboundQuery is above the maximum allowed threshold in that bucket with the new peer.
 // If no such peer exists in that bucket, we do NOT add the peer to the Routing Table and return error "ErrPeerRejectedNoCapacity".
 
-// It returns a boolean value set to true if the peer was newly added to the Routing Table, false otherwise.
+// TryAddPeer returns a boolean value set to true if the peer was newly added to the Routing Table, false otherwise.
 // It also returns any error that occurred while adding the peer to the Routing Table. If the error is not nil,
 // the boolean value will ALWAYS be false i.e. the peer wont be added to the Routing Table it it's not already there.
 //
@@ -151,11 +204,11 @@ func (rt *RoutingTable) addPeer(p peer.ID, queryPeer bool, isReplaceable bool) (
 	}
 
 	// peer already exists in the Routing Table.
-	if peer := bucket.getPeer(p); peer != nil {
+	if peerInfo := bucket.getPeer(p); peerInfo != nil {
 		// if we're querying the peer first time after adding it, let's give it a
 		// usefulness bump. This will ONLY happen once.
-		if peer.LastUsefulAt.IsZero() && queryPeer {
-			peer.LastUsefulAt = lastUsefulAt
+		if peerInfo.LastUsefulAt.IsZero() && queryPeer {
+			peerInfo.LastUsefulAt = lastUsefulAt
 		}
 		return false, nil
 	}
@@ -220,19 +273,24 @@ func (rt *RoutingTable) addPeer(p peer.ID, queryPeer bool, isReplaceable bool) (
 	})
 
 	if replaceablePeer != nil && replaceablePeer.replaceable {
-		// let's evict it and add the new peer
-		if rt.removePeer(replaceablePeer.Id) {
-			bucket.pushFront(&PeerInfo{
-				Id:                            p,
-				LastUsefulAt:                  lastUsefulAt,
-				LastSuccessfulOutboundQueryAt: now,
-				AddedAt:                       now,
-				dhtId:                         ConvertPeerID(p),
-				replaceable:                   isReplaceable,
-			})
-			rt.PeerAdded(p)
-			return true, nil
-		}
+		// we found a replaceable peer, let's replace it with the new peer.
+
+		// add new peer to the bucket. needs to happen before we remove the replaceable peer
+		// as if the bucket size is 1, we will end up removing the only peer, and deleting
+		// the bucket.
+		bucket.pushFront(&PeerInfo{
+			Id:                            p,
+			LastUsefulAt:                  lastUsefulAt,
+			LastSuccessfulOutboundQueryAt: now,
+			AddedAt:                       now,
+			dhtId:                         ConvertPeerID(p),
+			replaceable:                   isReplaceable,
+		})
+		rt.PeerAdded(p)
+
+		// remove the replaceable peer
+		rt.removePeer(replaceablePeer.Id)
+		return true, nil
 	}
 
 	// we weren't able to find place for the peer, remove it from the filter state.
@@ -264,14 +322,12 @@ func (rt *RoutingTable) GetPeerInfos() []PeerInfo {
 
 	var pis []PeerInfo
 	for _, b := range rt.buckets {
-		for _, p := range b.peers() {
-			pis = append(pis, p)
-		}
+		pis = append(pis, b.peers()...)
 	}
 	return pis
 }
 
-// UpdateLastSuccessfulOutboundQuery updates the LastSuccessfulOutboundQueryAt time of the peer.
+// UpdateLastSuccessfulOutboundQueryAt updates the LastSuccessfulOutboundQueryAt time of the peer.
 // Returns true if the update was successful, false otherwise.
 func (rt *RoutingTable) UpdateLastSuccessfulOutboundQueryAt(p peer.ID, t time.Time) bool {
 	rt.tabLock.Lock()
@@ -477,7 +533,7 @@ func (rt *RoutingTable) Print() {
 
 		for e := b.list.Front(); e != nil; e = e.Next() {
 			p := e.Value.(*PeerInfo).Id
-			fmt.Printf("\t\t- %s %s\n", p.Pretty(), rt.metrics.LatencyEWMA(p).String())
+			fmt.Printf("\t\t- %s %s\n", p.String(), rt.metrics.LatencyEWMA(p).String())
 		}
 	}
 	rt.tabLock.RUnlock()

@@ -2,6 +2,7 @@ package bindnode
 
 import (
 	"fmt"
+	"go/token"
 	"reflect"
 	"strings"
 
@@ -38,7 +39,12 @@ type seenEntry struct {
 	schemaType schema.Type
 }
 
-func verifyCompatibility(seen map[seenEntry]bool, goType reflect.Type, schemaType schema.Type) {
+// verifyCompatibility is the primary way we check that the schema type(s)
+// matches the Go type(s); so we do this before we can proceed operating on it.
+// verifyCompatibility doesn't return an error, it panics—the errors here are
+// not runtime errors, they're programmer errors because your schema doesn't
+// match your Go type
+func verifyCompatibility(cfg config, seen map[seenEntry]bool, goType reflect.Type, schemaType schema.Type) {
 	// TODO(mvdan): support **T as well?
 	if goType.Kind() == reflect.Ptr {
 		goType = goType.Elem()
@@ -65,30 +71,51 @@ func verifyCompatibility(seen map[seenEntry]bool, goType reflect.Type, schemaTyp
 	}
 	switch schemaType := schemaType.(type) {
 	case *schema.TypeBool:
-		if goType.Kind() != reflect.Bool {
+		if customConverter := cfg.converterForType(goType); customConverter != nil {
+			if customConverter.kind != schema.TypeKind_Bool {
+				doPanic("kind mismatch; custom converter for type is not for Bool")
+			}
+		} else if goType.Kind() != reflect.Bool {
 			doPanic("kind mismatch; need boolean")
 		}
 	case *schema.TypeInt:
-		if kind := goType.Kind(); !kindInt[kind] && !kindUint[kind] {
+		if customConverter := cfg.converterForType(goType); customConverter != nil {
+			if customConverter.kind != schema.TypeKind_Int {
+				doPanic("kind mismatch; custom converter for type is not for Int")
+			}
+		} else if kind := goType.Kind(); !kindInt[kind] && !kindUint[kind] {
 			doPanic("kind mismatch; need integer")
 		}
 	case *schema.TypeFloat:
-		switch goType.Kind() {
-		case reflect.Float32, reflect.Float64:
-		default:
-			doPanic("kind mismatch; need float")
+		if customConverter := cfg.converterForType(goType); customConverter != nil {
+			if customConverter.kind != schema.TypeKind_Float {
+				doPanic("kind mismatch; custom converter for type is not for Float")
+			}
+		} else {
+			switch goType.Kind() {
+			case reflect.Float32, reflect.Float64:
+			default:
+				doPanic("kind mismatch; need float")
+			}
 		}
 	case *schema.TypeString:
 		// TODO: allow []byte?
-		if goType.Kind() != reflect.String {
+		if customConverter := cfg.converterForType(goType); customConverter != nil {
+			if customConverter.kind != schema.TypeKind_String {
+				doPanic("kind mismatch; custom converter for type is not for String")
+			}
+		} else if goType.Kind() != reflect.String {
 			doPanic("kind mismatch; need string")
 		}
 	case *schema.TypeBytes:
 		// TODO: allow string?
-		if goType.Kind() != reflect.Slice {
+		if customConverter := cfg.converterForType(goType); customConverter != nil {
+			if customConverter.kind != schema.TypeKind_Bytes {
+				doPanic("kind mismatch; custom converter for type is not for Bytes")
+			}
+		} else if goType.Kind() != reflect.Slice {
 			doPanic("kind mismatch; need slice of bytes")
-		}
-		if goType.Elem().Kind() != reflect.Uint8 {
+		} else if goType.Elem().Kind() != reflect.Uint8 {
 			doPanic("kind mismatch; need slice of bytes")
 		}
 	case *schema.TypeEnum:
@@ -107,12 +134,13 @@ func verifyCompatibility(seen map[seenEntry]bool, goType reflect.Type, schemaTyp
 		}
 		goType = goType.Elem()
 		if schemaType.ValueIsNullable() {
-			if goType.Kind() != reflect.Ptr {
-				doPanic("nullable types must be pointers")
+			if ptr, nilable := ptrOrNilable(goType.Kind()); !nilable {
+				doPanic("nullable types must be nilable")
+			} else if ptr {
+				goType = goType.Elem()
 			}
-			goType = goType.Elem()
 		}
-		verifyCompatibility(seen, goType, schemaType.ValueType())
+		verifyCompatibility(cfg, seen, goType, schemaType.ValueType())
 	case *schema.TypeMap:
 		//	struct {
 		//		Keys   []K
@@ -129,23 +157,24 @@ func verifyCompatibility(seen map[seenEntry]bool, goType reflect.Type, schemaTyp
 		if fieldKeys.Type.Kind() != reflect.Slice {
 			doPanic("kind mismatch; need struct{Keys []K; Values map[K]V}")
 		}
-		verifyCompatibility(seen, fieldKeys.Type.Elem(), schemaType.KeyType())
+		verifyCompatibility(cfg, seen, fieldKeys.Type.Elem(), schemaType.KeyType())
 
 		fieldValues := goType.Field(1)
 		if fieldValues.Type.Kind() != reflect.Map {
 			doPanic("kind mismatch; need struct{Keys []K; Values map[K]V}")
 		}
 		keyType := fieldValues.Type.Key()
-		verifyCompatibility(seen, keyType, schemaType.KeyType())
+		verifyCompatibility(cfg, seen, keyType, schemaType.KeyType())
 
 		elemType := fieldValues.Type.Elem()
 		if schemaType.ValueIsNullable() {
-			if elemType.Kind() != reflect.Ptr {
-				doPanic("nullable types must be pointers")
+			if ptr, nilable := ptrOrNilable(elemType.Kind()); !nilable {
+				doPanic("nullable types must be nilable")
+			} else if ptr {
+				elemType = elemType.Elem()
 			}
-			elemType = elemType.Elem()
 		}
-		verifyCompatibility(seen, elemType, schemaType.ValueType())
+		verifyCompatibility(cfg, seen, elemType, schemaType.ValueType())
 	case *schema.TypeStruct:
 		if goType.Kind() != reflect.Struct {
 			doPanic("kind mismatch; need struct")
@@ -158,20 +187,36 @@ func verifyCompatibility(seen map[seenEntry]bool, goType reflect.Type, schemaTyp
 		for i, schemaField := range schemaFields {
 			schemaType := schemaField.Type()
 			goType := goType.Field(i).Type
-			// TODO: allow "is nilable" to some degree?
-			if schemaField.IsNullable() {
+			switch {
+			case schemaField.IsOptional() && schemaField.IsNullable():
+				// TODO: https://github.com/ipld/go-ipld-prime/issues/340 will
+				// help here, to avoid the double pointer. We can't use nilable
+				// but non-pointer types because that's just one "nil" state.
+				// TODO: deal with custom converters in this case
 				if goType.Kind() != reflect.Ptr {
-					doPanic("nullable types must be pointers")
+					doPanic("optional and nullable fields must use double pointers (**)")
 				}
 				goType = goType.Elem()
-			}
-			if schemaField.IsOptional() {
 				if goType.Kind() != reflect.Ptr {
-					doPanic("optional types must be pointers")
+					doPanic("optional and nullable fields must use double pointers (**)")
 				}
 				goType = goType.Elem()
+			case schemaField.IsOptional():
+				if ptr, nilable := ptrOrNilable(goType.Kind()); !nilable {
+					doPanic("optional fields must be nilable")
+				} else if ptr {
+					goType = goType.Elem()
+				}
+			case schemaField.IsNullable():
+				if ptr, nilable := ptrOrNilable(goType.Kind()); !nilable {
+					if customConverter := cfg.converterForType(goType); customConverter == nil {
+						doPanic("nullable fields must be nilable")
+					}
+				} else if ptr {
+					goType = goType.Elem()
+				}
 			}
-			verifyCompatibility(seen, goType, schemaType)
+			verifyCompatibility(cfg, seen, goType, schemaType)
 		}
 	case *schema.TypeUnion:
 		if goType.Kind() != reflect.Struct {
@@ -185,19 +230,27 @@ func verifyCompatibility(seen map[seenEntry]bool, goType reflect.Type, schemaTyp
 
 		for i, schemaType := range schemaMembers {
 			goType := goType.Field(i).Type
-			if goType.Kind() != reflect.Ptr {
-				doPanic("union members must be pointers")
+			if ptr, nilable := ptrOrNilable(goType.Kind()); !nilable {
+				doPanic("union members must be nilable")
+			} else if ptr {
+				goType = goType.Elem()
 			}
-			goType = goType.Elem()
-			verifyCompatibility(seen, goType, schemaType)
+			verifyCompatibility(cfg, seen, goType, schemaType)
 		}
 	case *schema.TypeLink:
-		if goType != goTypeLink && goType != goTypeCidLink && goType != goTypeCid {
+		if customConverter := cfg.converterForType(goType); customConverter != nil {
+			if customConverter.kind != schema.TypeKind_Link {
+				doPanic("kind mismatch; custom converter for type is not for Link")
+			}
+		} else if goType != goTypeLink && goType != goTypeCidLink && goType != goTypeCid {
 			doPanic("links in Go must be datamodel.Link, cidlink.Link, or cid.Cid")
 		}
 	case *schema.TypeAny:
-		// TODO: support some other option for Any, such as deferred decode
-		if goType != goTypeNode {
+		if customConverter := cfg.converterForType(goType); customConverter != nil {
+			if customConverter.kind != schema.TypeKind_Any {
+				doPanic("kind mismatch; custom converter for type is not for Any")
+			}
+		} else if goType != goTypeNode {
 			doPanic("Any in Go must be datamodel.Node")
 		}
 	default:
@@ -205,7 +258,42 @@ func verifyCompatibility(seen map[seenEntry]bool, goType reflect.Type, schemaTyp
 	}
 }
 
-func inferGoType(typ schema.Type) reflect.Type {
+func ptrOrNilable(kind reflect.Kind) (ptr, nilable bool) {
+	switch kind {
+	case reflect.Ptr:
+		return true, true
+	case reflect.Interface, reflect.Map, reflect.Slice:
+		return false, true
+	default:
+		return false, false
+	}
+}
+
+// If we recurse past a large number of levels, we're mostly stuck in a loop.
+// Prevent burning CPU or causing OOM crashes.
+// If a user really wrote an IPLD schema or Go type with such deep nesting,
+// it's likely they are trying to abuse the system as well.
+const maxRecursionLevel = 1 << 10
+
+type inferredStatus int
+
+const (
+	_ inferredStatus = iota
+	inferringInProcess
+	inferringDone
+)
+
+// inferGoType can build a Go type given a schema
+func inferGoType(typ schema.Type, status map[schema.TypeName]inferredStatus, level int) reflect.Type {
+	if level > maxRecursionLevel {
+		panic(fmt.Sprintf("inferGoType: refusing to recurse past %d levels", maxRecursionLevel))
+	}
+	name := typ.Name()
+	if status[name] == inferringInProcess {
+		panic("bindnode: inferring Go types from cyclic schemas is not supported since Go reflection does not support creating named types")
+	}
+	status[name] = inferringInProcess
+	defer func() { status[name] = inferringDone }()
 	switch typ := typ.(type) {
 	case *schema.TypeBool:
 		return goTypeBool
@@ -221,7 +309,7 @@ func inferGoType(typ schema.Type) reflect.Type {
 		fields := typ.Fields()
 		fieldsGo := make([]reflect.StructField, len(fields))
 		for i, field := range fields {
-			ftypGo := inferGoType(field.Type())
+			ftypGo := inferGoType(field.Type(), status, level+1)
 			if field.IsNullable() {
 				ftypGo = reflect.PtrTo(ftypGo)
 			}
@@ -235,8 +323,8 @@ func inferGoType(typ schema.Type) reflect.Type {
 		}
 		return reflect.StructOf(fieldsGo)
 	case *schema.TypeMap:
-		ktyp := inferGoType(typ.KeyType())
-		vtyp := inferGoType(typ.ValueType())
+		ktyp := inferGoType(typ.KeyType(), status, level+1)
+		vtyp := inferGoType(typ.ValueType(), status, level+1)
 		if typ.ValueIsNullable() {
 			vtyp = reflect.PtrTo(vtyp)
 		}
@@ -261,7 +349,7 @@ func inferGoType(typ schema.Type) reflect.Type {
 		}
 		return reflect.StructOf(fieldsGo)
 	case *schema.TypeList:
-		etyp := inferGoType(typ.ValueType())
+		etyp := inferGoType(typ.ValueType(), status, level+1)
 		if typ.ValueIsNullable() {
 			etyp = reflect.PtrTo(etyp)
 		}
@@ -275,7 +363,7 @@ func inferGoType(typ schema.Type) reflect.Type {
 		members := typ.Members()
 		fieldsGo := make([]reflect.StructField, len(members))
 		for i, ftyp := range members {
-			ftypGo := inferGoType(ftyp)
+			ftypGo := inferGoType(ftyp, status, level+1)
 			fieldsGo[i] = reflect.StructField{
 				Name: fieldNameFromSchema(ftyp.Name()),
 				Type: reflect.PtrTo(ftypGo),
@@ -289,13 +377,19 @@ func inferGoType(typ schema.Type) reflect.Type {
 		return goTypeString
 	case *schema.TypeAny:
 		return goTypeNode
+	case nil:
+		panic("bindnode: unexpected nil schema.Type")
 	}
 	panic(fmt.Sprintf("%T", typ))
 }
 
 // from IPLD Schema field names like "foo" to Go field names like "Foo".
 func fieldNameFromSchema(name string) string {
-	return strings.Title(name)
+	fieldName := strings.Title(name) //lint:ignore SA1019 cases.Title doesn't work for this
+	if !token.IsIdentifier(fieldName) {
+		panic(fmt.Sprintf("bindnode: inferred field name %q is not a valid Go identifier", fieldName))
+	}
+	return fieldName
 }
 
 var defaultTypeSystem schema.TypeSystem
@@ -319,8 +413,11 @@ func init() {
 // TODO: we should probably avoid re-spawning the same types if the TypeSystem
 // has them, and test that that works as expected
 
-func inferSchema(typ reflect.Type) schema.Type {
-	// TODO: support Link and Any
+// inferSchema can build a schema from a Go type
+func inferSchema(typ reflect.Type, level int) schema.Type {
+	if level > maxRecursionLevel {
+		panic(fmt.Sprintf("inferSchema: refusing to recurse past %d levels", maxRecursionLevel))
+	}
 	switch typ.Kind() {
 	case reflect.Bool:
 		return schemaTypeBool
@@ -331,11 +428,17 @@ func inferSchema(typ reflect.Type) schema.Type {
 	case reflect.String:
 		return schemaTypeString
 	case reflect.Struct:
+		// these types must match exactly since we need symmetry of being able to
+		// get the values an also assign values to them
+		if typ == goTypeCid || typ == goTypeCidLink {
+			return schemaTypeLink
+		}
+
 		fieldsSchema := make([]schema.StructField, typ.NumField())
 		for i := range fieldsSchema {
 			field := typ.Field(i)
 			ftyp := field.Type
-			ftypSchema := inferSchema(ftyp)
+			ftypSchema := inferSchema(ftyp, level+1)
 			fieldsSchema[i] = schema.SpawnStructField(
 				field.Name, // TODO: allow configuring the name with tags
 				ftypSchema.Name(),
@@ -358,13 +461,11 @@ func inferSchema(typ reflect.Type) schema.Type {
 			return schemaTypeBytes
 		}
 
-		etyp := typ.Elem()
 		nullable := false
-		if etyp.Kind() == reflect.Ptr {
-			etyp = etyp.Elem()
+		if typ.Elem().Kind() == reflect.Ptr {
 			nullable = true
 		}
-		etypSchema := inferSchema(typ.Elem())
+		etypSchema := inferSchema(typ.Elem(), level+1)
 		name := typ.Name()
 		if name == "" {
 			name = "List_" + etypSchema.Name()
@@ -372,8 +473,18 @@ func inferSchema(typ reflect.Type) schema.Type {
 		typSchema := schema.SpawnList(name, etypSchema.Name(), nullable)
 		defaultTypeSystem.Accumulate(typSchema)
 		return typSchema
+	case reflect.Interface:
+		// these types must match exactly since we need symmetry of being able to
+		// get the values an also assign values to them
+		if typ == goTypeLink {
+			return schemaTypeLink
+		}
+		if typ == goTypeNode {
+			return schemaTypeAny
+		}
+		panic("bindnode: unable to infer from interface")
 	}
-	panic(fmt.Sprintf("%s", typ.Kind()))
+	panic(fmt.Sprintf("bindnode: unable to infer from type %s", typ.Kind().String()))
 }
 
 // There are currently 27 reflect.Kind iota values,

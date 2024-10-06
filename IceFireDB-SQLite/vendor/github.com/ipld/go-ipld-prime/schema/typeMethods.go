@@ -55,6 +55,8 @@ func (t TypeStruct) RepresentationBehavior() datamodel.Kind {
 		return datamodel.Kind_Map
 	case StructRepresentation_Tuple:
 		return datamodel.Kind_List
+	case StructRepresentation_ListPairs:
+		return datamodel.Kind_List
 	case StructRepresentation_StringPairs:
 		return datamodel.Kind_String
 	case StructRepresentation_Stringjoin:

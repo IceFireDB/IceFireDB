@@ -3,7 +3,7 @@ package pubsub
 import (
 	"fmt"
 
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // GossipSubFeatureTest is a feature test function; it takes a feature and a protocol ID and
@@ -18,18 +18,22 @@ const (
 	GossipSubFeatureMesh = iota
 	// Protocol supports Peer eXchange on prune -- gossipsub-v1.1 compatible
 	GossipSubFeaturePX
+	// Protocol supports IDONTWANT -- gossipsub-v1.2 compatible
+	GossipSubFeatureIdontwant
 )
 
 // GossipSubDefaultProtocols is the default gossipsub router protocol list
-var GossipSubDefaultProtocols = []protocol.ID{GossipSubID_v11, GossipSubID_v10, FloodSubID}
+var GossipSubDefaultProtocols = []protocol.ID{GossipSubID_v12, GossipSubID_v11, GossipSubID_v10, FloodSubID}
 
 // GossipSubDefaultFeatures is the feature test function for the default gossipsub protocols
 func GossipSubDefaultFeatures(feat GossipSubFeature, proto protocol.ID) bool {
 	switch feat {
 	case GossipSubFeatureMesh:
-		return proto == GossipSubID_v11 || proto == GossipSubID_v10
+		return proto == GossipSubID_v12 || proto == GossipSubID_v11 || proto == GossipSubID_v10
 	case GossipSubFeaturePX:
-		return proto == GossipSubID_v11
+		return proto == GossipSubID_v12 || proto == GossipSubID_v11
+	case GossipSubFeatureIdontwant:
+		return proto == GossipSubID_v12
 	default:
 		return false
 	}

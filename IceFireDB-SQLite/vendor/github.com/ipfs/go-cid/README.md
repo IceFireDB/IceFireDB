@@ -69,7 +69,7 @@ import (
 // Create a cid manually by specifying the 'prefix' parameters
 pref := cid.Prefix{
 	Version: 1,
-	Codec: mc.Raw,
+	Codec: uint64(mc.Raw),
 	MhType: mh.SHA2_256,
 	MhLength: -1, // default length
 }

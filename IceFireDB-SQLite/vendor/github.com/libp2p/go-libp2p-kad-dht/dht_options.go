@@ -5,15 +5,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	dhtcfg "github.com/libp2p/go-libp2p-kad-dht/internal/config"
+	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 	"github.com/libp2p/go-libp2p-kad-dht/providers"
-
 	"github.com/libp2p/go-libp2p-kbucket/peerdiversity"
 	record "github.com/libp2p/go-libp2p-record"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 
 	ds "github.com/ipfs/go-datastore"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 // ModeOpt describes what mode the dht should operate in
@@ -65,9 +67,9 @@ func RoutingTableRefreshQueryTimeout(timeout time.Duration) Option {
 // RoutingTableRefreshPeriod sets the period for refreshing buckets in the
 // routing table. The DHT will refresh buckets every period by:
 //
-// 1. First searching for nearby peers to figure out how many buckets we should try to fill.
-// 1. Then searching for a random key in each bucket that hasn't been queried in
-//    the last refresh period.
+//  1. First searching for nearby peers to figure out how many buckets we should try to fill.
+//  1. Then searching for a random key in each bucket that hasn't been queried in
+//     the last refresh period.
 func RoutingTableRefreshPeriod(period time.Duration) Option {
 	return func(c *dhtcfg.Config) error {
 		c.RoutingTable.RefreshInterval = period
@@ -194,6 +196,15 @@ func Resiliency(beta int) Option {
 	}
 }
 
+// LookupInterval configures maximal number of go routines that can be used to
+// perform a lookup check operation, before adding a new node to the routing table.
+func LookupCheckConcurrency(n int) Option {
+	return func(c *dhtcfg.Config) error {
+		c.LookupCheckConcurrency = n
+		return nil
+	}
+}
+
 // MaxRecordAge specifies the maximum time that any node will hold onto a record ("PutValue record")
 // from the time its received. This does not apply to any other forms of validity that
 // the record may contain.
@@ -306,6 +317,53 @@ func disableFixLowPeersRoutine(t *testing.T) Option {
 func forceAddressUpdateProcessing(t *testing.T) Option {
 	return func(c *dhtcfg.Config) error {
 		c.TestAddressUpdateProcessing = true
+		return nil
+	}
+}
+
+// EnableOptimisticProvide enables an optimization that skips the last hops of the provide process.
+// This works by using the network size estimator (which uses the keyspace density of queries)
+// to optimistically send ADD_PROVIDER requests when we most likely have found the last hop.
+// It will also run some ADD_PROVIDER requests asynchronously in the background after returning,
+// this allows to optimistically return earlier if some threshold number of RPCs have succeeded.
+// The number of background/in-flight queries can be configured with the OptimisticProvideJobsPoolSize
+// option.
+//
+// EXPERIMENTAL: This is an experimental option and might be removed in the future. Use at your own risk.
+func EnableOptimisticProvide() Option {
+	return func(c *dhtcfg.Config) error {
+		c.EnableOptimisticProvide = true
+		return nil
+	}
+}
+
+// OptimisticProvideJobsPoolSize allows to configure the asynchronicity limit for in-flight ADD_PROVIDER RPCs.
+// It makes sense to set it to a multiple of optProvReturnRatio * BucketSize. Check the description of
+// EnableOptimisticProvide for more details.
+//
+// EXPERIMENTAL: This is an experimental option and might be removed in the future. Use at your own risk.
+func OptimisticProvideJobsPoolSize(size int) Option {
+	return func(c *dhtcfg.Config) error {
+		c.OptimisticProvideJobsPoolSize = size
+		return nil
+	}
+}
+
+// AddressFilter allows to configure the address filtering function.
+// This function is run before addresses are added to the peerstore.
+// It is most useful to avoid adding localhost / local addresses.
+func AddressFilter(f func([]ma.Multiaddr) []ma.Multiaddr) Option {
+	return func(c *dhtcfg.Config) error {
+		c.AddressFilter = f
+		return nil
+	}
+}
+
+// WithCustomMessageSender configures the pb.MessageSender of the IpfsDHT to use the
+// custom implementation of the pb.MessageSender
+func WithCustomMessageSender(messageSenderBuilder func(h host.Host, protos []protocol.ID) pb.MessageSenderWithDisconnect) Option {
+	return func(c *dhtcfg.Config) error {
+		c.MsgSenderBuilder = messageSenderBuilder
 		return nil
 	}
 }

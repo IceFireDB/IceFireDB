@@ -35,7 +35,6 @@ import (
 // You should probably use the string values of the PathSegment as map keys.
 // (This has the additional bonus of hitting a special fastpath that the golang
 // built-in maps have specifically for plain string keys.)
-//
 type PathSegment struct {
 	/*
 		A quick implementation note about the Go compiler and "union" semantics:

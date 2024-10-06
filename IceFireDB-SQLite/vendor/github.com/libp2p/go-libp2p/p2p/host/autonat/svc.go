@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/libp2p/go-libp2p/p2p/host/autonat/pb"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/p2p/host/autonat/pb"
 
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-msgio/pbio"
 
-	"github.com/libp2p/go-msgio/protoio"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -68,24 +68,24 @@ func (as *autoNATService) handleStream(s network.Stream) {
 	defer s.Close()
 
 	pid := s.Conn().RemotePeer()
-	log.Debugf("New stream from %s", pid.Pretty())
+	log.Debugf("New stream from %s", pid)
 
-	r := protoio.NewDelimitedReader(s, maxMsgSize)
-	w := protoio.NewDelimitedWriter(s)
+	r := pbio.NewDelimitedReader(s, maxMsgSize)
+	w := pbio.NewDelimitedWriter(s)
 
 	var req pb.Message
 	var res pb.Message
 
 	err := r.ReadMsg(&req)
 	if err != nil {
-		log.Debugf("Error reading message from %s: %s", pid.Pretty(), err.Error())
+		log.Debugf("Error reading message from %s: %s", pid, err.Error())
 		s.Reset()
 		return
 	}
 
 	t := req.GetType()
 	if t != pb.Message_DIAL {
-		log.Debugf("Unexpected message from %s: %s (%d)", pid.Pretty(), t.String(), t)
+		log.Debugf("Unexpected message from %s: %s (%d)", pid, t.String(), t)
 		s.Reset()
 		return
 	}
@@ -96,9 +96,12 @@ func (as *autoNATService) handleStream(s network.Stream) {
 
 	err = w.WriteMsg(&res)
 	if err != nil {
-		log.Debugf("Error writing response to %s: %s", pid.Pretty(), err.Error())
+		log.Debugf("Error writing response to %s: %s", pid, err.Error())
 		s.Reset()
 		return
+	}
+	if as.config.metricsTracer != nil {
+		as.config.metricsTracer.OutgoingDialResponse(res.GetDialResponse().GetStatus())
 	}
 }
 
@@ -126,6 +129,9 @@ func (as *autoNATService) handleDial(p peer.ID, obsaddr ma.Multiaddr, mpi *pb.Me
 	// need to know their public IP address, and it needs to be different from our public IP
 	// address.
 	if as.config.dialPolicy.skipDial(obsaddr) {
+		if as.config.metricsTracer != nil {
+			as.config.metricsTracer.OutgoingDialRefused(dial_blocked)
+		}
 		// Note: versions < v0.20.0 return Message_E_DIAL_ERROR here, thus we can not rely on this error code.
 		return newDialResponseError(pb.Message_E_DIAL_REFUSED, "refusing to dial peer with blocked observed address")
 	}
@@ -188,6 +194,9 @@ func (as *autoNATService) handleDial(p peer.ID, obsaddr ma.Multiaddr, mpi *pb.Me
 	}
 
 	if len(addrs) == 0 {
+		if as.config.metricsTracer != nil {
+			as.config.metricsTracer.OutgoingDialRefused(no_valid_address)
+		}
 		// Note: versions < v0.20.0 return Message_E_DIAL_ERROR here, thus we can not rely on this error code.
 		return newDialResponseError(pb.Message_E_DIAL_REFUSED, "no dialable addresses")
 	}
@@ -202,6 +211,9 @@ func (as *autoNATService) doDial(pi peer.AddrInfo) *pb.Message_DialResponse {
 	if count >= as.config.throttlePeerMax || (as.config.throttleGlobalMax > 0 &&
 		as.globalReqs >= as.config.throttleGlobalMax) {
 		as.mx.Unlock()
+		if as.config.metricsTracer != nil {
+			as.config.metricsTracer.OutgoingDialRefused(rate_limited)
+		}
 		return newDialResponseError(pb.Message_E_DIAL_REFUSED, "too many dials")
 	}
 	as.reqs[pi.ID] = count + 1
@@ -222,7 +234,7 @@ func (as *autoNATService) doDial(pi peer.AddrInfo) *pb.Message_DialResponse {
 
 	conn, err := as.config.dialer.DialPeer(ctx, pi.ID)
 	if err != nil {
-		log.Debugf("error dialing %s: %s", pi.ID.Pretty(), err.Error())
+		log.Debugf("error dialing %s: %s", pi.ID, err.Error())
 		// wait for the context to timeout to avoid leaking timing information
 		// this renders the service ineffective as a port scanner
 		<-ctx.Done()
@@ -259,6 +271,11 @@ func (as *autoNATService) Disable() {
 		as.instance = nil
 		<-as.backgroundRunning
 	}
+}
+
+func (as *autoNATService) Close() error {
+	as.Disable()
+	return as.config.dialer.Close()
 }
 
 func (as *autoNATService) background(ctx context.Context) {

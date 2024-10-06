@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/jackpal/go-nat-pmp"
+	natpmp "github.com/jackpal/go-nat-pmp"
 )
 
 var (
@@ -95,7 +95,7 @@ func (n *natpmpNAT) GetExternalAddress() (addr net.IP, err error) {
 	return net.IPv4(d[0], d[1], d[2], d[3]), nil
 }
 
-func (n *natpmpNAT) AddPortMapping(protocol string, internalPort int, description string, timeout time.Duration) (int, error) {
+func (n *natpmpNAT) AddPortMapping(_ context.Context, protocol string, internalPort int, _ string, timeout time.Duration) (int, error) {
 	var (
 		err error
 	)
@@ -122,7 +122,7 @@ func (n *natpmpNAT) AddPortMapping(protocol string, internalPort int, descriptio
 	return 0, err
 }
 
-func (n *natpmpNAT) DeletePortMapping(protocol string, internalPort int) (err error) {
+func (n *natpmpNAT) DeletePortMapping(_ context.Context, _ string, internalPort int) (err error) {
 	delete(n.ports, internalPort)
 	return nil
 }

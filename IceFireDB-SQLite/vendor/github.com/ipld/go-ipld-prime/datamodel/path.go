@@ -213,6 +213,14 @@ func (p Path) Last() PathSegment {
 	return p.segments[len(p.segments)-1]
 }
 
+// Pop returns a path with all segments except the last.
+func (p Path) Pop() Path {
+	if len(p.segments) < 1 {
+		return Path{}
+	}
+	return Path{p.segments[0 : len(p.segments)-1]}
+}
+
 // Shift returns the first segment of the path together with the remaining path after that first segment.
 // If applied to a zero-length path, it returns an empty segment and the same zero-length path.
 func (p Path) Shift() (PathSegment, Path) {

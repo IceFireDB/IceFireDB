@@ -1,13 +1,13 @@
 /*
-	This package has no purpose except to perform registration of multihashes.
+This package has no purpose except to perform registration of multihashes.
 
-	It is meant to be used as a side-effecting import, e.g.
+It is meant to be used as a side-effecting import, e.g.
 
-		import (
-			_ "github.com/multiformats/go-multihash/register/murmur3"
-		)
+	import (
+		_ "github.com/multiformats/go-multihash/register/murmur3"
+	)
 
-	This package registers multihashes for murmur3
+This package registers multihashes for murmur3
 */
 package murmur3
 

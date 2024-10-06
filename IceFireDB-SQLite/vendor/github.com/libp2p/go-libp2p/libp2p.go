@@ -2,8 +2,7 @@ package libp2p
 
 import (
 	"github.com/libp2p/go-libp2p/config"
-
-	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p/core/host"
 )
 
 // Config describes a set of settings for a libp2p node.
@@ -38,19 +37,18 @@ func ChainOptions(opts ...Option) Option {
 // transport protocols;
 //
 // - If no multiplexer configuration is provided, the node is configured by
-// default to use the "yamux/1.0.0" and "mplux/6.7.0" stream connection
-// multiplexers;
+// default to use yamux;
 //
 // - If no security transport is provided, the host uses the go-libp2p's noise
 // and/or tls encrypted transport to encrypt all traffic;
 //
-// - If no peer identity is provided, it generates a random RSA 2048 key-pair
+// - If no peer identity is provided, it generates a random Ed25519 key-pair
 // and derives a new identity from it;
 //
 // - If no peerstore is provided, the host is initialized with an empty
 // peerstore.
 //
-// To stop/shutdown the returned libp2p node, the user needs to cancel the passed context and call `Close` on the returned Host.
+// To stop/shutdown the returned libp2p node, the user needs to call `Close` on the returned Host.
 func New(opts ...Option) (host.Host, error) {
 	return NewWithoutDefaults(append(opts, FallbackDefaults)...)
 }

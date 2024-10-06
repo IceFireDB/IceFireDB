@@ -10,7 +10,8 @@ import (
 )
 
 // registry is a simple map which maps a multihash indicator number
-// to a standard golang Hash interface.
+// to a function : (size:int) -> ((hasher:hash.Hash), (bool:success))
+// The function may error (i.e., return (nil, false)) to signify that the hasher can't return that many bytes.
 //
 // Multihash indicator numbers are reserved and described in
 // https://github.com/multiformats/multicodec/blob/master/table.csv .
@@ -18,7 +19,7 @@ import (
 //
 // Hashers which are available in the golang stdlib will be registered automatically.
 // Others can be added using the Register function.
-var registry = make(map[uint64]func() hash.Hash)
+var registry = make(map[uint64]func(int) (h hash.Hash, ok bool))
 
 // Register adds a new hash to the set available from GetHasher and Sum.
 //
@@ -37,8 +38,34 @@ func Register(indicator uint64, hasherFactory func() hash.Hash) {
 	if hasherFactory == nil {
 		panic("not sensible to attempt to register a nil function")
 	}
+	maxSize := hasherFactory().Size()
+	registry[indicator] = func(size int) (hash.Hash, bool) {
+		if size > maxSize {
+			return nil, false
+		}
+		return hasherFactory(), true
+	}
+	DefaultLengths[indicator] = maxSize
+}
+
+// RegisterVariableSize is like Register, but adds a new variable-sized hasher factory that takes a
+// size hint.
+//
+// When passed -1, the hasher should produce digests with the hash-function's default length. When
+// passed a non-negative integer, the hasher should try to produce digests of at least the specified
+// size.
+func RegisterVariableSize(indicator uint64, hasherFactory func(sizeHint int) (hash.Hash, bool)) {
+	if hasherFactory == nil {
+		panic("not sensible to attempt to register a nil function")
+	}
+
+	if hasher, ok := hasherFactory(-1); !ok {
+		panic("failed to determine default hash length for hasher")
+	} else {
+		DefaultLengths[indicator] = hasher.Size()
+	}
+
 	registry[indicator] = hasherFactory
-	DefaultLengths[indicator] = hasherFactory().Size()
 }
 
 // GetHasher returns a new hash.Hash according to the indicator code number provided.
@@ -54,11 +81,26 @@ func Register(indicator uint64, hasherFactory func() hash.Hash) {
 //
 // If an error is returned, it will match `errors.Is(err, ErrSumNotSupported)`.
 func GetHasher(indicator uint64) (hash.Hash, error) {
+	return GetVariableHasher(indicator, -1)
+}
+
+// GetVariableHasher returns a new hash.Hash according to the indicator code number provided, with
+// the specified size hint.
+//
+// NOTE: The size hint is only a hint. Hashers will attempt to produce at least the number of requested bytes, but may not.
+//
+// This function can fail if either the hash code is not registered, or the passed size hint is
+// statically incompatible with the specified hash function.
+func GetVariableHasher(indicator uint64, sizeHint int) (hash.Hash, error) {
 	factory, exists := registry[indicator]
 	if !exists {
 		return nil, fmt.Errorf("unknown multihash code %d (0x%x): %w", indicator, indicator, ErrSumNotSupported)
 	}
-	return factory(), nil
+	hasher, ok := factory(sizeHint)
+	if !ok {
+		return nil, ErrLenTooLarge
+	}
+	return hasher, nil
 }
 
 // DefaultLengths maps a multihash indicator code to the output size for that hash, in units of bytes.
@@ -68,7 +110,7 @@ func GetHasher(indicator uint64) (hash.Hash, error) {
 var DefaultLengths = map[uint64]int{}
 
 func init() {
-	Register(IDENTITY, func() hash.Hash { return &identityMultihash{} })
+	RegisterVariableSize(IDENTITY, func(_ int) (hash.Hash, bool) { return &identityMultihash{}, true })
 	Register(MD5, md5.New)
 	Register(SHA1, sha1.New)
 	Register(SHA2_224, sha256.New224)
