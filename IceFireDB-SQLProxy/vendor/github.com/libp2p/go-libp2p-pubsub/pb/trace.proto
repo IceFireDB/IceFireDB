@@ -124,6 +124,7 @@ message TraceEvent {
     repeated ControlIWantMeta iwant = 2;
     repeated ControlGraftMeta graft = 3;
     repeated ControlPruneMeta prune = 4;
+    repeated ControlIDontWantMeta idontwant = 5;
   }
 
   message ControlIHaveMeta {
@@ -142,6 +143,10 @@ message TraceEvent {
   message ControlPruneMeta {
     optional string topic = 1;
     repeated bytes peers = 2;
+  }
+
+  message ControlIDontWantMeta {
+    repeated bytes messageIDs = 1;
   }
 }
 

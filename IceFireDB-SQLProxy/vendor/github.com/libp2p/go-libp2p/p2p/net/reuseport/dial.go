@@ -2,17 +2,10 @@ package reuseport
 
 import (
 	"context"
-	"net"
 
-	"github.com/libp2p/go-reuseport"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
-
-type dialer interface {
-	Dial(network, addr string) (net.Conn, error)
-	DialContext(ctx context.Context, network, addr string) (net.Conn, error)
-}
 
 // Dial dials the given multiaddr, reusing ports we're currently listening on if
 // possible.
@@ -31,7 +24,7 @@ func (t *Transport) DialContext(ctx context.Context, raddr ma.Multiaddr) (manet.
 	if err != nil {
 		return nil, err
 	}
-	var d dialer
+	var d *dialer
 	switch network {
 	case "tcp4":
 		d = t.v4.getDialer(network)
@@ -52,7 +45,7 @@ func (t *Transport) DialContext(ctx context.Context, raddr ma.Multiaddr) (manet.
 	return maconn, nil
 }
 
-func (n *network) getDialer(network string) dialer {
+func (n *network) getDialer(network string) *dialer {
 	n.mu.RLock()
 	d := n.dialer
 	n.mu.RUnlock()
@@ -61,53 +54,9 @@ func (n *network) getDialer(network string) dialer {
 		defer n.mu.Unlock()
 
 		if n.dialer == nil {
-			n.dialer = n.makeDialer(network)
+			n.dialer = newDialer(n.listeners)
 		}
 		d = n.dialer
 	}
 	return d
-}
-
-func (n *network) makeDialer(network string) dialer {
-	if !reuseport.Available() {
-		log.Debug("reuseport not available")
-		return &net.Dialer{}
-	}
-
-	var unspec net.IP
-	switch network {
-	case "tcp4":
-		unspec = net.IPv4zero
-	case "tcp6":
-		unspec = net.IPv6unspecified
-	default:
-		panic("invalid network: must be either tcp4 or tcp6")
-	}
-
-	// How many ports are we listening on.
-	var port = 0
-	for l := range n.listeners {
-		newPort := l.Addr().(*net.TCPAddr).Port
-		switch {
-		case newPort == 0: // Any port, ignore (really, we shouldn't get this case...).
-		case port == 0: // Haven't selected a port yet, choose this one.
-			port = newPort
-		case newPort == port: // Same as the selected port, continue...
-		default: // Multiple ports, use the multi dialer
-			return newMultiDialer(unspec, n.listeners)
-		}
-	}
-
-	// None.
-	if port == 0 {
-		return &net.Dialer{}
-	}
-
-	// One. Always dial from the single port we're listening on.
-	laddr := &net.TCPAddr{
-		IP:   unspec,
-		Port: port,
-	}
-
-	return (*singleDialer)(laddr)
 }

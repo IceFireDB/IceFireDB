@@ -1,4 +1,4 @@
-// Copyright (c) 2020 The Decred developers
+// Copyright (c) 2020-2022 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -85,6 +85,24 @@ const (
 	// ErrSigSTooBig is returned when a signature has S with a value that is
 	// greater than or equal to the group order.
 	ErrSigSTooBig = ErrorKind("ErrSigSTooBig")
+
+	// ErrSigInvalidLen is returned when a signature that should be a compact
+	// signature is not the required length.
+	ErrSigInvalidLen = ErrorKind("ErrSigInvalidLen")
+
+	// ErrSigInvalidRecoveryCode is returned when a signature that should be a
+	// compact signature has an invalid value for the public key recovery code.
+	ErrSigInvalidRecoveryCode = ErrorKind("ErrSigInvalidRecoveryCode")
+
+	// ErrSigOverflowsPrime is returned when a signature that should be a
+	// compact signature has the overflow bit set but adding the order to it
+	// would overflow the underlying field prime.
+	ErrSigOverflowsPrime = ErrorKind("ErrSigOverflowsPrime")
+
+	// ErrPointNotOnCurve is returned when attempting to recover a public key
+	// from a compact signature results in a point that is not on the elliptic
+	// curve.
+	ErrPointNotOnCurve = ErrorKind("ErrPointNotOnCurve")
 )
 
 // Error satisfies the error interface and prints human-readable errors.

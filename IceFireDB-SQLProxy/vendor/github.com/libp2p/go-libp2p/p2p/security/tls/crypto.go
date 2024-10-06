@@ -1,6 +1,7 @@
 package libp2ptls
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -10,15 +11,15 @@ import (
 	"encoding/asn1"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"os"
 	"runtime/debug"
 	"time"
 
-	"golang.org/x/sys/cpu"
-
-	ic "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
+	ic "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/sec"
 )
 
 const certValidityPeriod = 100 * 365 * 24 * time.Hour // ~100 years
@@ -38,24 +39,65 @@ type Identity struct {
 	config tls.Config
 }
 
+// IdentityConfig is used to configure an Identity
+type IdentityConfig struct {
+	CertTemplate *x509.Certificate
+	KeyLogWriter io.Writer
+}
+
+// IdentityOption transforms an IdentityConfig to apply optional settings.
+type IdentityOption func(r *IdentityConfig)
+
+// WithCertTemplate specifies the template to use when generating a new certificate.
+func WithCertTemplate(template *x509.Certificate) IdentityOption {
+	return func(c *IdentityConfig) {
+		c.CertTemplate = template
+	}
+}
+
+// WithKeyLogWriter optionally specifies a destination for TLS master secrets
+// in NSS key log format that can be used to allow external programs
+// such as Wireshark to decrypt TLS connections.
+// See https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/Key_Log_Format.
+// Use of KeyLogWriter compromises security and should only be
+// used for debugging.
+func WithKeyLogWriter(w io.Writer) IdentityOption {
+	return func(c *IdentityConfig) {
+		c.KeyLogWriter = w
+	}
+}
+
 // NewIdentity creates a new identity
-func NewIdentity(privKey ic.PrivKey) (*Identity, error) {
-	cert, err := keyToCertificate(privKey)
+func NewIdentity(privKey ic.PrivKey, opts ...IdentityOption) (*Identity, error) {
+	config := IdentityConfig{}
+	for _, opt := range opts {
+		opt(&config)
+	}
+
+	var err error
+	if config.CertTemplate == nil {
+		config.CertTemplate, err = certTemplate()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	cert, err := keyToCertificate(privKey, config.CertTemplate)
 	if err != nil {
 		return nil, err
 	}
 	return &Identity{
 		config: tls.Config{
-			MinVersion:               tls.VersionTLS13,
-			PreferServerCipherSuites: preferServerCipherSuites(),
-			InsecureSkipVerify:       true, // This is not insecure here. We will verify the cert chain ourselves.
-			ClientAuth:               tls.RequireAnyClientCert,
-			Certificates:             []tls.Certificate{*cert},
+			MinVersion:         tls.VersionTLS13,
+			InsecureSkipVerify: true, // This is not insecure here. We will verify the cert chain ourselves.
+			ClientAuth:         tls.RequireAnyClientCert,
+			Certificates:       []tls.Certificate{*cert},
 			VerifyPeerCertificate: func(_ [][]byte, _ [][]*x509.Certificate) error {
 				panic("tls config not specialized for peer")
 			},
 			NextProtos:             []string{alpn},
 			SessionTicketsDisabled: true,
+			KeyLogWriter:           config.KeyLogWriter,
 		},
 	}, nil
 }
@@ -103,7 +145,7 @@ func (i *Identity) ConfigForPeer(remote peer.ID) (*tls.Config, <-chan ic.PubKey)
 			if err != nil {
 				peerID = peer.ID(fmt.Sprintf("(not determined: %s)", err.Error()))
 			}
-			return fmt.Errorf("peer IDs don't match: expected %s, got %s", remote, peerID)
+			return sec.ErrPeerIDMismatch{Expected: remote, Actual: peerID}
 		}
 		keyCh <- pubKey
 		return nil
@@ -167,54 +209,50 @@ func PubKeyFromCertChain(chain []*x509.Certificate) (ic.PubKey, error) {
 	return pubKey, nil
 }
 
-func keyToCertificate(sk ic.PrivKey) (*tls.Certificate, error) {
-	certKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-
+// GenerateSignedExtension uses the provided private key to sign the public key, and returns the
+// signature within a pkix.Extension.
+// This extension is included in a certificate to cryptographically tie it to the libp2p private key.
+func GenerateSignedExtension(sk ic.PrivKey, pubKey crypto.PublicKey) (pkix.Extension, error) {
 	keyBytes, err := ic.MarshalPublicKey(sk.GetPublic())
 	if err != nil {
-		return nil, err
+		return pkix.Extension{}, err
 	}
-	certKeyPub, err := x509.MarshalPKIXPublicKey(certKey.Public())
+	certKeyPub, err := x509.MarshalPKIXPublicKey(pubKey)
 	if err != nil {
-		return nil, err
+		return pkix.Extension{}, err
 	}
 	signature, err := sk.Sign(append([]byte(certificatePrefix), certKeyPub...))
 	if err != nil {
-		return nil, err
+		return pkix.Extension{}, err
 	}
 	value, err := asn1.Marshal(signedKey{
 		PubKey:    keyBytes,
 		Signature: signature,
 	})
 	if err != nil {
+		return pkix.Extension{}, err
+	}
+
+	return pkix.Extension{Id: extensionID, Critical: extensionCritical, Value: value}, nil
+}
+
+// keyToCertificate generates a new ECDSA private key and corresponding x509 certificate.
+// The certificate includes an extension that cryptographically ties it to the provided libp2p
+// private key to authenticate TLS connections.
+func keyToCertificate(sk ic.PrivKey, certTmpl *x509.Certificate) (*tls.Certificate, error) {
+	certKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
 		return nil, err
 	}
 
-	bigNum := big.NewInt(1 << 62)
-	sn, err := rand.Int(rand.Reader, bigNum)
+	// after calling CreateCertificate, these will end up in Certificate.Extensions
+	extension, err := GenerateSignedExtension(sk, certKey.Public())
 	if err != nil {
 		return nil, err
 	}
-	subjectSN, err := rand.Int(rand.Reader, bigNum)
-	if err != nil {
-		return nil, err
-	}
-	tmpl := &x509.Certificate{
-		SerialNumber: sn,
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(certValidityPeriod),
-		// According to RFC 3280, the issuer field must be set,
-		// see https://datatracker.ietf.org/doc/html/rfc3280#section-4.1.2.4.
-		Subject: pkix.Name{SerialNumber: subjectSN.String()},
-		// after calling CreateCertificate, these will end up in Certificate.Extensions
-		ExtraExtensions: []pkix.Extension{
-			{Id: extensionID, Critical: extensionCritical, Value: value},
-		},
-	}
-	certDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, certKey.Public(), certKey)
+	certTmpl.ExtraExtensions = append(certTmpl.ExtraExtensions, extension)
+
+	certDER, err := x509.CreateCertificate(rand.Reader, certTmpl, certTmpl, certKey.Public(), certKey)
 	if err != nil {
 		return nil, err
 	}
@@ -224,24 +262,25 @@ func keyToCertificate(sk ic.PrivKey) (*tls.Certificate, error) {
 	}, nil
 }
 
-// We want nodes without AES hardware (e.g. ARM) support to always use ChaCha.
-// Only if both nodes have AES hardware support (e.g. x86), AES should be used.
-// x86->x86: AES, ARM->x86: ChaCha, x86->ARM: ChaCha and ARM->ARM: Chacha
-// This function returns true if we don't have AES hardware support, and false otherwise.
-// Thus, ARM servers will always use their own cipher suite preferences (ChaCha first),
-// and x86 servers will aways use the client's cipher suite preferences.
-func preferServerCipherSuites() bool {
-	// Copied from the Go TLS implementation.
+// certTemplate returns the template for generating an Identity's TLS certificates.
+func certTemplate() (*x509.Certificate, error) {
+	bigNum := big.NewInt(1 << 62)
+	sn, err := rand.Int(rand.Reader, bigNum)
+	if err != nil {
+		return nil, err
+	}
 
-	// Check the cpu flags for each platform that has optimized GCM implementations.
-	// Worst case, these variables will just all be false.
-	var (
-		hasGCMAsmAMD64 = cpu.X86.HasAES && cpu.X86.HasPCLMULQDQ
-		hasGCMAsmARM64 = cpu.ARM64.HasAES && cpu.ARM64.HasPMULL
-		// Keep in sync with crypto/aes/cipher_s390x.go.
-		hasGCMAsmS390X = cpu.S390X.HasAES && cpu.S390X.HasAESCBC && cpu.S390X.HasAESCTR && (cpu.S390X.HasGHASH || cpu.S390X.HasAESGCM)
+	subjectSN, err := rand.Int(rand.Reader, bigNum)
+	if err != nil {
+		return nil, err
+	}
 
-		hasGCMAsm = hasGCMAsmAMD64 || hasGCMAsmARM64 || hasGCMAsmS390X
-	)
-	return !hasGCMAsm
+	return &x509.Certificate{
+		SerialNumber: sn,
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(certValidityPeriod),
+		// According to RFC 3280, the issuer field must be set,
+		// see https://datatracker.ietf.org/doc/html/rfc3280#section-4.1.2.4.
+		Subject: pkix.Name{SerialNumber: subjectSN.String()},
+	}, nil
 }

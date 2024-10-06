@@ -93,7 +93,7 @@ func (enc Encoding) WithPadding(padding rune) *Encoding {
 // RFC 4648.
 var StdEncoding = NewEncodingCI(encodeStd)
 
-// HexEncoding is the ``Extended Hex Alphabet'' defined in RFC 4648.
+// HexEncoding is the “Extended Hex Alphabet” defined in RFC 4648.
 // It is typically used in DNS.
 var HexEncoding = NewEncodingCI(encodeHex)
 
@@ -226,6 +226,7 @@ func (e *encoder) Write(p []byte) (n int, err error) {
 	}
 
 	// Trailing fringe.
+	//lint:ignore S1001 fixed-length 5-byte slice
 	for i := 0; i < len(p); i++ {
 		e.buf[i] = p[i]
 	}

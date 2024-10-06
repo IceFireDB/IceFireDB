@@ -6,7 +6,8 @@ import (
 	"time"
 
 	asnutil "github.com/libp2p/go-libp2p-asn-util"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
@@ -28,7 +29,7 @@ type constraints struct {
 	total []time.Time
 	peers map[peer.ID][]time.Time
 	ips   map[string][]time.Time
-	asns  map[string][]time.Time
+	asns  map[uint32][]time.Time
 }
 
 // newConstraints creates a new constraints object.
@@ -39,7 +40,7 @@ func newConstraints(rc *Resources) *constraints {
 		rc:    rc,
 		peers: make(map[peer.ID][]time.Time),
 		ips:   make(map[string][]time.Time),
-		asns:  make(map[string][]time.Time),
+		asns:  make(map[uint32][]time.Time),
 	}
 }
 
@@ -72,10 +73,10 @@ func (c *constraints) AddReservation(p peer.ID, a ma.Multiaddr) error {
 	}
 
 	var asnReservations []time.Time
-	var asn string
+	var asn uint32
 	if ip.To4() == nil {
-		asn, _ = asnutil.Store.AsnForIPv6(ip)
-		if asn != "" {
+		asn = asnutil.AsnForIPv6(ip)
+		if asn != 0 {
 			asnReservations = c.asns[asn]
 			if len(asnReservations) >= c.rc.MaxReservationsPerASN {
 				return errTooManyReservationsForASN
@@ -92,7 +93,7 @@ func (c *constraints) AddReservation(p peer.ID, a ma.Multiaddr) error {
 	ipReservations = append(ipReservations, expiry)
 	c.ips[ip.String()] = ipReservations
 
-	if asn != "" {
+	if asn != 0 {
 		asnReservations = append(asnReservations, expiry)
 		c.asns[asn] = asnReservations
 	}

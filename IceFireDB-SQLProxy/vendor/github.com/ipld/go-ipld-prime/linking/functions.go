@@ -11,7 +11,7 @@ import (
 // This file contains all the functions on LinkSystem.
 // These are the helpful, user-facing functions we expect folks to use "most of the time" when loading and storing data.
 
-// Varations:
+// Variations:
 // - Load vs Store vs ComputeLink
 // - Load vs LoadPlusRaw
 // - With or without LinkContext?
@@ -141,7 +141,7 @@ func (lsys *LinkSystem) LoadRaw(lnkCtx LinkContext, lnk datamodel.Link) ([]byte,
 	hasher.Write(buf.Bytes())
 	hash := hasher.Sum(nil)
 	lnk2 := lnk.Prototype().BuildLink(hash)
-	if lnk2 != lnk {
+	if lnk2.Binary() != lnk.Binary() {
 		return nil, ErrHashMismatch{Actual: lnk2, Expected: lnk}
 	}
 	// No codec to deploy; this is the raw load function.
@@ -205,7 +205,7 @@ func (lsys *LinkSystem) Fill(lnkCtx LinkContext, lnk datamodel.Link, na datamode
 	// (Then do a bit of a jig to build a link out of it -- because that's what we do the actual hash equality check on.)
 	hash := hasher.Sum(nil)
 	lnk2 := lnk.Prototype().BuildLink(hash)
-	if lnk2 != lnk {
+	if lnk2.Binary() != lnk.Binary() {
 		return ErrHashMismatch{Actual: lnk2, Expected: lnk}
 	}
 	// If we got all the way through IO and through the hash check:

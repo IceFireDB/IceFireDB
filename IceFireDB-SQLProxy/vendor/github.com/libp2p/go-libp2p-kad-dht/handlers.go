@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	pstore "github.com/libp2p/go-libp2p-peerstore"
+	"github.com/libp2p/go-libp2p/core/peer"
+	pstore "github.com/libp2p/go-libp2p/p2p/host/peerstore"
 
 	"github.com/gogo/protobuf/proto"
+	u "github.com/ipfs/boxo/util"
 	ds "github.com/ipfs/go-datastore"
-	u "github.com/ipfs/go-ipfs-util"
 	"github.com/libp2p/go-libp2p-kad-dht/internal"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 	recpb "github.com/libp2p/go-libp2p-record/pb"
@@ -262,29 +262,25 @@ func (dht *IpfsDHT) handleFindPeer(ctx context.Context, from peer.ID, pmes *pb.M
 
 	// if looking for self... special case where we send it on CloserPeers.
 	targetPid := peer.ID(pmes.GetKey())
-	if targetPid == dht.self {
-		closest = []peer.ID{dht.self}
-	} else {
-		closest = dht.betterPeersToQuery(pmes, from, dht.bucketSize)
+	closest = dht.betterPeersToQuery(pmes, from, dht.bucketSize)
 
-		// Never tell a peer about itself.
-		if targetPid != from {
-			// Add the target peer to the set of closest peers if
-			// not already present in our routing table.
-			//
-			// Later, when we lookup known addresses for all peers
-			// in this set, we'll prune this peer if we don't
-			// _actually_ know where it is.
-			found := false
-			for _, p := range closest {
-				if targetPid == p {
-					found = true
-					break
-				}
+	// Never tell a peer about itself.
+	if targetPid != from {
+		// Add the target peer to the set of closest peers if
+		// not already present in our routing table.
+		//
+		// Later, when we lookup known addresses for all peers
+		// in this set, we'll prune this peer if we don't
+		// _actually_ know where it is.
+		found := false
+		for _, p := range closest {
+			if targetPid == p {
+				found = true
+				break
 			}
-			if !found {
-				closest = append(closest, targetPid)
-			}
+		}
+		if !found {
+			closest = append(closest, targetPid)
 		}
 	}
 
@@ -321,7 +317,16 @@ func (dht *IpfsDHT) handleGetProviders(ctx context.Context, p peer.ID, pmes *pb.
 	if err != nil {
 		return nil, err
 	}
-	resp.ProviderPeers = pb.PeerInfosToPBPeers(dht.host.Network(), providers)
+
+	filtered := make([]peer.AddrInfo, len(providers))
+	for i, provider := range providers {
+		filtered[i] = peer.AddrInfo{
+			ID:    provider.ID,
+			Addrs: dht.filterAddrs(provider.Addrs),
+		}
+	}
+
+	resp.ProviderPeers = pb.PeerInfosToPBPeers(dht.host.Network(), filtered)
 
 	// Also send closer peers.
 	closer := dht.betterPeersToQuery(pmes, p, dht.bucketSize)
@@ -359,7 +364,10 @@ func (dht *IpfsDHT) handleAddProvider(ctx context.Context, p peer.ID, pmes *pb.M
 			continue
 		}
 
-		dht.providerStore.AddProvider(ctx, key, peer.AddrInfo{ID: p})
+		// We run the addrs filter after checking for the length,
+		// this allows transient nodes with varying /p2p-circuit addresses to still have their anouncement go through.
+		addrs := dht.filterAddrs(pi.Addrs)
+		dht.providerStore.AddProvider(ctx, key, peer.AddrInfo{ID: pi.ID, Addrs: addrs})
 	}
 
 	return nil, nil

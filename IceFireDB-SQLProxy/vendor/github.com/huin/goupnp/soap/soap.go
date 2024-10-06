@@ -194,9 +194,13 @@ type soapBody struct {
 
 // SOAPFaultError implements error, and contains SOAP fault information.
 type SOAPFaultError struct {
-	FaultCode   string `xml:"faultCode"`
-	FaultString string `xml:"faultString"`
+	FaultCode   string `xml:"faultcode"`
+	FaultString string `xml:"faultstring"`
 	Detail      struct {
+		UPnPError struct {
+			Errorcode        int    `xml:"errorCode"`
+			ErrorDescription string `xml:"errorDescription"`
+		} `xml:"UPnPError"`
 		Raw []byte `xml:",innerxml"`
 	} `xml:"detail"`
 }

@@ -7,7 +7,7 @@ This is an optimized codec for []byte <=> base36 string conversion
 
 ## Documentation
 
-https://pkg.go.dev/github.com/multicodec/go-base36
+https://pkg.go.dev/github.com/multiformats/go-base36
 
 ## Lead Maintainer
 

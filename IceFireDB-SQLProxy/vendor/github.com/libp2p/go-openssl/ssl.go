@@ -20,6 +20,8 @@ import "C"
 import (
 	"os"
 	"unsafe"
+
+	"github.com/mattn/go-pointer"
 )
 
 type SSLTLSExtErr int
@@ -53,7 +55,7 @@ func go_ssl_verify_cb_thunk(p unsafe.Pointer, ok C.int, ctx *C.X509_STORE_CTX) C
 			os.Exit(1)
 		}
 	}()
-	verify_cb := (*SSL)(p).verify_cb
+	verify_cb := pointer.Restore(p).(*SSL).verify_cb
 	// set up defaults just in case verify_cb is nil
 	if verify_cb != nil {
 		store := &CertificateStoreCtx{ctx: ctx}
@@ -159,11 +161,11 @@ func sni_cb_thunk(p unsafe.Pointer, con *C.SSL, ad unsafe.Pointer, arg unsafe.Po
 		}
 	}()
 
-	sni_cb := (*Ctx)(p).sni_cb
+	sni_cb := pointer.Restore(p).(*Ctx).sni_cb
 
 	s := &SSL{ssl: con}
 	// This attaches a pointer to our SSL struct into the SNI callback.
-	C.SSL_set_ex_data(s.ssl, get_ssl_idx(), unsafe.Pointer(s))
+	C.SSL_set_ex_data(s.ssl, get_ssl_idx(), pointer.Save(s))
 
 	// Note: this is ctx.sni_cb, not C.sni_cb
 	return C.int(sni_cb(s))

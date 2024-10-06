@@ -3,11 +3,11 @@ package basicnode
 // Prototype embeds a NodePrototype for every kind of Node implementation in this package.
 // You can use it like this:
 //
-// 		basicnode.Prototype.Map.NewBuilder().BeginMap() //...
+//	basicnode.Prototype.Map.NewBuilder().BeginMap() //...
 //
 // and:
 //
-// 		basicnode.Prototype.String.NewBuilder().AssignString("x") // ...
+//	basicnode.Prototype.String.NewBuilder().AssignString("x") // ...
 //
 // Most of the prototypes are for one particular Kind of node (e.g. string, int, etc);
 // you can use the "Any" style if you want a builder that can accept any kind of data.

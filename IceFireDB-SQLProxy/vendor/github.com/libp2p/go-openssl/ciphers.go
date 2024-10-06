@@ -125,7 +125,7 @@ func (ctx *cipherCtx) applyKeyAndIV(key, iv []byte) error {
 		} else {
 			res = C.EVP_DecryptInit_ex(ctx.ctx, nil, nil, kptr, iptr)
 		}
-		if 1 != res {
+		if res != 1 {
 			return errors.New("failed to apply key/IV")
 		}
 	}
@@ -243,7 +243,7 @@ func newEncryptionCipherCtx(c *Cipher, e *Engine, key, iv []byte) (
 	if e != nil {
 		eptr = e.e
 	}
-	if 1 != C.EVP_EncryptInit_ex(ctx.ctx, c.ptr, eptr, nil, nil) {
+	if C.EVP_EncryptInit_ex(ctx.ctx, c.ptr, eptr, nil, nil) != 1 {
 		return nil, errors.New("failed to initialize cipher context")
 	}
 	err = ctx.applyKeyAndIV(key, iv)
@@ -266,7 +266,7 @@ func newDecryptionCipherCtx(c *Cipher, e *Engine, key, iv []byte) (
 	if e != nil {
 		eptr = e.e
 	}
-	if 1 != C.EVP_DecryptInit_ex(ctx.ctx, c.ptr, eptr, nil, nil) {
+	if C.EVP_DecryptInit_ex(ctx.ctx, c.ptr, eptr, nil, nil) != 1 {
 		return nil, errors.New("failed to initialize cipher context")
 	}
 	err = ctx.applyKeyAndIV(key, iv)
@@ -317,7 +317,7 @@ func (ctx *decryptionCipherCtx) DecryptUpdate(input []byte) ([]byte, error) {
 func (ctx *encryptionCipherCtx) EncryptFinal() ([]byte, error) {
 	outbuf := make([]byte, ctx.BlockSize())
 	var outlen C.int
-	if 1 != C.EVP_EncryptFinal_ex(ctx.ctx, (*C.uchar)(&outbuf[0]), &outlen) {
+	if C.EVP_EncryptFinal_ex(ctx.ctx, (*C.uchar)(&outbuf[0]), &outlen) != 1 {
 		return nil, errors.New("encryption failed")
 	}
 	return outbuf[:outlen], nil
@@ -326,7 +326,7 @@ func (ctx *encryptionCipherCtx) EncryptFinal() ([]byte, error) {
 func (ctx *decryptionCipherCtx) DecryptFinal() ([]byte, error) {
 	outbuf := make([]byte, ctx.BlockSize())
 	var outlen C.int
-	if 1 != C.EVP_DecryptFinal_ex(ctx.ctx, (*C.uchar)(&outbuf[0]), &outlen) {
+	if C.EVP_DecryptFinal_ex(ctx.ctx, (*C.uchar)(&outbuf[0]), &outlen) != 1 {
 		// this may mean the tag failed to verify- all previous plaintext
 		// returned must be considered faked and invalid
 		return nil, errors.New("decryption failed")

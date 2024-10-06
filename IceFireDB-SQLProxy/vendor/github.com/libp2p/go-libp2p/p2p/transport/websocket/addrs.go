@@ -105,23 +105,17 @@ func ParseWebsocketNetAddr(a net.Addr) (ma.Multiaddr, error) {
 }
 
 func parseMultiaddr(maddr ma.Multiaddr) (*url.URL, error) {
-	// Only look at the _last_ component.
-	maddr, wscomponent := ma.SplitLast(maddr)
-	if maddr == nil || wscomponent == nil {
-		return nil, fmt.Errorf("websocket addrs need at least two components")
+	parsed, err := parseWebsocketMultiaddr(maddr)
+	if err != nil {
+		return nil, err
 	}
 
-	var scheme string
-	switch wscomponent.Protocol().Code {
-	case ma.P_WS:
-		scheme = "ws"
-	case ma.P_WSS:
+	scheme := "ws"
+	if parsed.isWSS {
 		scheme = "wss"
-	default:
-		return nil, fmt.Errorf("not a websocket multiaddr")
 	}
 
-	network, host, err := manet.DialArgs(maddr)
+	network, host, err := manet.DialArgs(parsed.restMultiaddr)
 	if err != nil {
 		return nil, err
 	}
@@ -134,4 +128,48 @@ func parseMultiaddr(maddr ma.Multiaddr) (*url.URL, error) {
 		Scheme: scheme,
 		Host:   host,
 	}, nil
+}
+
+type parsedWebsocketMultiaddr struct {
+	isWSS bool
+	// sni is the SNI value for the TLS handshake, and for setting HTTP Host header
+	sni *ma.Component
+	// the rest of the multiaddr before the /tls/sni/example.com/ws or /ws or /wss
+	restMultiaddr ma.Multiaddr
+}
+
+func parseWebsocketMultiaddr(a ma.Multiaddr) (parsedWebsocketMultiaddr, error) {
+	out := parsedWebsocketMultiaddr{}
+	// First check if we have a WSS component. If so we'll canonicalize it into a /tls/ws
+	withoutWss := a.Decapsulate(wssComponent)
+	if !withoutWss.Equal(a) {
+		a = withoutWss.Encapsulate(tlsWsComponent)
+	}
+
+	// Remove the ws component
+	withoutWs := a.Decapsulate(wsComponent)
+	if withoutWs.Equal(a) {
+		return out, fmt.Errorf("not a websocket multiaddr")
+	}
+
+	rest := withoutWs
+	// If this is not a wss then withoutWs is the rest of the multiaddr
+	out.restMultiaddr = withoutWs
+	for {
+		var head *ma.Component
+		rest, head = ma.SplitLast(rest)
+		if head == nil || rest == nil {
+			break
+		}
+
+		if head.Protocol().Code == ma.P_SNI {
+			out.sni = head
+		} else if head.Protocol().Code == ma.P_TLS {
+			out.isWSS = true
+			out.restMultiaddr = rest
+			break
+		}
+	}
+
+	return out, nil
 }

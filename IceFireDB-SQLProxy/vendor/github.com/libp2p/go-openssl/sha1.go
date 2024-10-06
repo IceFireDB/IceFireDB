@@ -58,7 +58,7 @@ func engineRef(e *Engine) *C.ENGINE {
 }
 
 func (s *SHA1Hash) Reset() error {
-	if 1 != C.X_EVP_DigestInit_ex(s.ctx, C.X_EVP_sha1(), engineRef(s.engine)) {
+	if C.X_EVP_DigestInit_ex(s.ctx, C.X_EVP_sha1(), engineRef(s.engine)) != 1 {
 		return errors.New("openssl: sha1: cannot init digest ctx")
 	}
 	return nil
@@ -68,16 +68,16 @@ func (s *SHA1Hash) Write(p []byte) (n int, err error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	if 1 != C.X_EVP_DigestUpdate(s.ctx, unsafe.Pointer(&p[0]),
-		C.size_t(len(p))) {
+	if C.X_EVP_DigestUpdate(s.ctx, unsafe.Pointer(&p[0]),
+		C.size_t(len(p))) != 1 {
 		return 0, errors.New("openssl: sha1: cannot update digest")
 	}
 	return len(p), nil
 }
 
 func (s *SHA1Hash) Sum() (result [20]byte, err error) {
-	if 1 != C.X_EVP_DigestFinal_ex(s.ctx,
-		(*C.uchar)(unsafe.Pointer(&result[0])), nil) {
+	if C.X_EVP_DigestFinal_ex(s.ctx,
+		(*C.uchar)(unsafe.Pointer(&result[0])), nil) != 1 {
 		return result, errors.New("openssl: sha1: cannot finalize ctx")
 	}
 	return result, s.Reset()

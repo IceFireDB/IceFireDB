@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/google/gopacket/routing"
 	netroute "github.com/libp2p/go-netroute"
@@ -237,4 +237,9 @@ func inAddrRange(ip net.IP, ipnets []*net.IPNet) bool {
 	}
 
 	return false
+}
+
+func hasValidConnectedness(host host.Host, id peer.ID) bool {
+	connectedness := host.Network().Connectedness(id)
+	return connectedness == network.Connected || connectedness == network.Limited
 }

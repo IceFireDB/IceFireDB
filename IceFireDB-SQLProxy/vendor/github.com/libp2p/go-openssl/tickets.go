@@ -20,6 +20,8 @@ import "C"
 import (
 	"os"
 	"unsafe"
+
+	"github.com/mattn/go-pointer"
 )
 
 const (
@@ -127,7 +129,7 @@ func go_ticket_key_cb_thunk(p unsafe.Pointer, s *C.SSL, key_name *C.uchar,
 		}
 	}()
 
-	ctx := (*Ctx)(p)
+	ctx := pointer.Restore(p).(*Ctx)
 	store := ctx.ticket_store
 	if store == nil {
 		// TODO(jeff): should this be an error condition? it doesn't make sense

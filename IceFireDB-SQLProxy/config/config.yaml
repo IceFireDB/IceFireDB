@@ -10,15 +10,15 @@ mysql:
   addr: "192.168.2.80:3306"
   user: "root"
   password: "123456"
-  dbname: "zta"
+  dbname: "exampledb"
   minAlive: 1 # Specifies the minimum number of open connections the pool will attempt to maintain
   maxAlive: 64 # Specifies the maximum number of open connections the pool will attempt to maintain
   maxIdle: 4 # Maximum number of idle connections
 
 # Tenant list
 userlist:
-  - user: host1
-    password: host1
+  - user: root
+    password: 123456
 
 # p2p config
 p2p:

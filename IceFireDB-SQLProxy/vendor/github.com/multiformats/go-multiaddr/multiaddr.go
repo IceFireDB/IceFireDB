@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
+
+	"golang.org/x/exp/slices"
 )
 
 // multiaddr is the data structure representing a Multiaddr
@@ -148,26 +149,46 @@ func (m *multiaddr) Encapsulate(o Multiaddr) Multiaddr {
 }
 
 // Decapsulate unwraps Multiaddr up until the given Multiaddr is found.
-func (m *multiaddr) Decapsulate(o Multiaddr) Multiaddr {
-	s1 := m.String()
-	s2 := o.String()
-	i := strings.LastIndex(s1, s2)
-	if i < 0 {
+func (m *multiaddr) Decapsulate(right Multiaddr) Multiaddr {
+	if right == nil {
+		return m
+	}
+
+	leftParts := Split(m)
+	rightParts := Split(right)
+
+	lastIndex := -1
+	for i := range leftParts {
+		foundMatch := false
+		for j, rightC := range rightParts {
+			if len(leftParts) <= i+j {
+				foundMatch = false
+				break
+			}
+
+			foundMatch = rightC.Equal(leftParts[i+j])
+			if !foundMatch {
+				break
+			}
+		}
+
+		if foundMatch {
+			lastIndex = i
+		}
+	}
+
+	if lastIndex == 0 {
+		return nil
+	}
+
+	if lastIndex < 0 {
 		// if multiaddr not contained, returns a copy.
 		cpy := make([]byte, len(m.bytes))
 		copy(cpy, m.bytes)
 		return &multiaddr{bytes: cpy}
 	}
 
-	if i == 0 {
-		return nil
-	}
-
-	ma, err := NewMultiaddr(s1[:i])
-	if err != nil {
-		panic("Multiaddr.Decapsulate incorrect byte boundaries.")
-	}
-	return ma
+	return Join(leftParts[:lastIndex]...)
 }
 
 var ErrProtocolNotFound = fmt.Errorf("protocol not found in multiaddr")
@@ -209,4 +230,25 @@ func Contains(addrs []Multiaddr, addr Multiaddr) bool {
 		}
 	}
 	return false
+}
+
+// Unique deduplicates addresses in place, leave only unique addresses.
+// It doesn't allocate.
+func Unique(addrs []Multiaddr) []Multiaddr {
+	if len(addrs) == 0 {
+		return addrs
+	}
+	// Use the new slices package here, as the sort function doesn't allocate (sort.Slice does).
+	slices.SortFunc(addrs, func(a, b Multiaddr) int { return bytes.Compare(a.Bytes(), b.Bytes()) })
+	idx := 1
+	for i := 1; i < len(addrs); i++ {
+		if !addrs[i-1].Equal(addrs[i]) {
+			addrs[idx] = addrs[i]
+			idx++
+		}
+	}
+	for i := idx; i < len(addrs); i++ {
+		addrs[i] = nil
+	}
+	return addrs[:idx]
 }
