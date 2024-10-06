@@ -54,33 +54,20 @@ func ExpandPathnames(paths []string) ([]string, error) {
 	return out, nil
 }
 
-type randGen struct {
-	rand.Rand
-}
-
 // NewTimeSeededRand returns a random bytes reader
 // which has been initialized with the current time.
+//
+// Deprecated: use github.com/ipfs/go-test/random instead.
 func NewTimeSeededRand() io.Reader {
-	src := rand.NewSource(time.Now().UnixNano())
-	return &randGen{
-		Rand: *rand.New(src),
-	}
+	return NewSeededRand(time.Now().UnixNano())
 }
 
 // NewSeededRand returns a random bytes reader
 // initialized with the given seed.
+//
+// Deprecated: use github.com/ipfs/go-test/random instead.
 func NewSeededRand(seed int64) io.Reader {
-	src := rand.NewSource(seed)
-	return &randGen{
-		Rand: *rand.New(src),
-	}
-}
-
-func (r *randGen) Read(p []byte) (n int, err error) {
-	for i := 0; i < len(p); i++ {
-		p[i] = byte(r.Rand.Intn(255))
-	}
-	return len(p), nil
+	return rand.New(rand.NewSource(seed))
 }
 
 // GetenvBool is the way to check an env var as a boolean

@@ -208,7 +208,9 @@ type tracingConn struct {
 	isClient  bool
 
 	manet.Conn
-	tcpConn *tcp.Conn
+	tcpConn   *tcp.Conn
+	closeOnce sync.Once
+	closeErr  error
 }
 
 func newTracingConn(c manet.Conn, isClient bool) (*tracingConn, error) {
@@ -236,8 +238,11 @@ func (c *tracingConn) getDirection() string {
 }
 
 func (c *tracingConn) Close() error {
-	collector.ClosedConn(c, c.getDirection())
-	return c.Conn.Close()
+	c.closeOnce.Do(func() {
+		collector.ClosedConn(c, c.getDirection())
+		c.closeErr = c.Conn.Close()
+	})
+	return c.closeErr
 }
 
 func (c *tracingConn) getTCPInfo() (*tcpinfo.Info, error) {

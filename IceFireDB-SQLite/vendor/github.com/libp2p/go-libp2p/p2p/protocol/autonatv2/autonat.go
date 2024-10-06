@@ -19,17 +19,15 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-//go:generate protoc --go_out=. --go_opt=Mpb/autonatv2.proto=./pb pb/autonatv2.proto
-
 const (
 	ServiceName      = "libp2p.autonatv2"
 	DialBackProtocol = "/libp2p/autonat/2/dial-back"
 	DialProtocol     = "/libp2p/autonat/2/dial-request"
 
 	maxMsgSize            = 8192
-	streamTimeout         = time.Minute
+	streamTimeout         = 15 * time.Second
 	dialBackStreamTimeout = 5 * time.Second
-	dialBackDialTimeout   = 30 * time.Second
+	dialBackDialTimeout   = 10 * time.Second
 	dialBackMaxMsgSize    = 1024
 	minHandshakeSizeBytes = 30_000 // for amplification attack prevention
 	maxHandshakeSizeBytes = 100_000

@@ -102,6 +102,11 @@ func (c *ConnManager) getReuse(network string) (*reuse, error) {
 }
 
 func (c *ConnManager) ListenQUIC(addr ma.Multiaddr, tlsConf *tls.Config, allowWindowIncrease func(conn quic.Connection, delta uint64) bool) (Listener, error) {
+	return c.ListenQUICAndAssociate(nil, addr, tlsConf, allowWindowIncrease)
+}
+
+// ListenQUICAndAssociate returns a QUIC listener and associates the underlying transport with the given association.
+func (c *ConnManager) ListenQUICAndAssociate(association any, addr ma.Multiaddr, tlsConf *tls.Config, allowWindowIncrease func(conn quic.Connection, delta uint64) bool) (Listener, error) {
 	netw, host, err := manet.DialArgs(addr)
 	if err != nil {
 		return nil, err
@@ -117,7 +122,7 @@ func (c *ConnManager) ListenQUIC(addr ma.Multiaddr, tlsConf *tls.Config, allowWi
 	key := laddr.String()
 	entry, ok := c.quicListeners[key]
 	if !ok {
-		tr, err := c.transportForListen(netw, laddr)
+		tr, err := c.transportForListen(association, netw, laddr)
 		if err != nil {
 			return nil, err
 		}
@@ -176,13 +181,18 @@ func (c *ConnManager) SharedNonQUICPacketConn(network string, laddr *net.UDPAddr
 	return nil, errors.New("expected to be able to share with a QUIC listener, but the QUIC listener is not using a refcountedTransport. `DisableReuseport` should not be set")
 }
 
-func (c *ConnManager) transportForListen(network string, laddr *net.UDPAddr) (refCountedQuicTransport, error) {
+func (c *ConnManager) transportForListen(association any, network string, laddr *net.UDPAddr) (refCountedQuicTransport, error) {
 	if c.enableReuseport {
 		reuse, err := c.getReuse(network)
 		if err != nil {
 			return nil, err
 		}
-		return reuse.TransportForListen(network, laddr)
+		tr, err := reuse.TransportForListen(network, laddr)
+		if err != nil {
+			return nil, err
+		}
+		tr.associate(association)
+		return tr, nil
 	}
 
 	conn, err := net.ListenUDP(network, laddr)
@@ -197,6 +207,14 @@ func (c *ConnManager) transportForListen(network string, laddr *net.UDPAddr) (re
 			TokenGeneratorKey: &c.tokenKey,
 		},
 	}, nil
+}
+
+type associationKey struct{}
+
+// WithAssociation returns a new context with the given association. Used in
+// DialQUIC to prefer a transport that has the given association.
+func WithAssociation(ctx context.Context, association any) context.Context {
+	return context.WithValue(ctx, associationKey{}, association)
 }
 
 func (c *ConnManager) DialQUIC(ctx context.Context, raddr ma.Multiaddr, tlsConf *tls.Config, allowWindowIncrease func(conn quic.Connection, delta uint64) bool) (quic.Connection, error) {
@@ -214,12 +232,17 @@ func (c *ConnManager) DialQUIC(ctx context.Context, raddr ma.Multiaddr, tlsConf 
 
 	if v == quic.Version1 {
 		// The endpoint has explicit support for QUIC v1, so we'll only use that version.
-		quicConf.Versions = []quic.VersionNumber{quic.Version1}
+		quicConf.Versions = []quic.Version{quic.Version1}
 	} else {
 		return nil, errors.New("unknown QUIC version")
 	}
 
-	tr, err := c.TransportForDial(netw, naddr)
+	var tr refCountedQuicTransport
+	if association := ctx.Value(associationKey{}); association != nil {
+		tr, err = c.TransportWithAssociationForDial(association, netw, naddr)
+	} else {
+		tr, err = c.TransportForDial(netw, naddr)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -232,12 +255,17 @@ func (c *ConnManager) DialQUIC(ctx context.Context, raddr ma.Multiaddr, tlsConf 
 }
 
 func (c *ConnManager) TransportForDial(network string, raddr *net.UDPAddr) (refCountedQuicTransport, error) {
+	return c.TransportWithAssociationForDial(nil, network, raddr)
+}
+
+// TransportWithAssociationForDial returns a QUIC transport for dialing, preferring a transport with the given association.
+func (c *ConnManager) TransportWithAssociationForDial(association any, network string, raddr *net.UDPAddr) (refCountedQuicTransport, error) {
 	if c.enableReuseport {
 		reuse, err := c.getReuse(network)
 		if err != nil {
 			return nil, err
 		}
-		return reuse.TransportForDial(network, raddr)
+		return reuse.transportWithAssociationForDial(association, network, raddr)
 	}
 
 	var laddr *net.UDPAddr
