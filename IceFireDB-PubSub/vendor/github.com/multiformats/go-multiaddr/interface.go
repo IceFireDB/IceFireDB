@@ -12,11 +12,10 @@ Learn more here: https://github.com/multiformats/multiaddr
 
 Multiaddrs have both a binary and string representation.
 
-    import ma "github.com/multiformats/go-multiaddr"
+	import ma "github.com/multiformats/go-multiaddr"
 
-    addr, err := ma.NewMultiaddr("/ip4/1.2.3.4/tcp/80")
-    // err non-nil when parsing failed.
-
+	addr, err := ma.NewMultiaddr("/ip4/1.2.3.4/tcp/80")
+	// err non-nil when parsing failed.
 */
 type Multiaddr interface {
 	json.Marshaler
@@ -48,9 +47,11 @@ type Multiaddr interface {
 	//
 	Encapsulate(Multiaddr) Multiaddr
 
-	// Decapsultate removes a Multiaddr wrapping. For example:
+	// Decapsulate removes a Multiaddr wrapping. For example:
 	//
-	//      /ip4/1.2.3.4/tcp/80 decapsulate /ip4/1.2.3.4 = /tcp/80
+	//      /ip4/1.2.3.4/tcp/80 decapsulate /tcp/80 = /ip4/1.2.3.4
+	//      /ip4/1.2.3.4/tcp/80 decapsulate /udp/80 = /ip4/1.2.3.4/tcp/80
+	//      /ip4/1.2.3.4/tcp/80 decapsulate /ip4/1.2.3.4 = nil
 	//
 	Decapsulate(Multiaddr) Multiaddr
 

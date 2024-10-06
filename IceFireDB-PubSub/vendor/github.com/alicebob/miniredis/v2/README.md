@@ -34,19 +34,22 @@ Implemented commands:
    - SWAPDB
    - QUIT
  - Key
+   - COPY
    - DEL
    - EXISTS
    - EXPIRE
    - EXPIREAT
+   - EXPIRETIME
    - KEYS
    - MOVE
    - PERSIST
    - PEXPIRE
    - PEXPIREAT
+   - PEXPIRETIME
    - PTTL
+   - RANDOMKEY -- see m.Seed(...)
    - RENAME
    - RENAMENX
-   - RANDOMKEY -- see m.Seed(...)
    - SCAN
    - TOUCH
    - TTL
@@ -63,6 +66,8 @@ Implemented commands:
    - FLUSHALL
    - FLUSHDB
    - TIME -- returns time.Now() or value set by SetTime()
+   - COMMAND -- partly
+   - INFO -- partly, returns only "clients" section with one field "connected_clients"
  - String keys (complete)
    - APPEND
    - BITCOUNT
@@ -75,6 +80,7 @@ Implemented commands:
    - GETRANGE
    - GETSET
    - GETDEL
+   - GETEX
    - INCR
    - INCRBY
    - INCRBYFLOAT
@@ -99,6 +105,7 @@ Implemented commands:
    - HLEN
    - HMGET
    - HMSET
+   - HRANDFIELD
    - HSET
    - HSETNX
    - HSTRLEN
@@ -122,6 +129,8 @@ Implemented commands:
    - RPOPLPUSH
    - RPUSH
    - RPUSHX
+   - LMOVE
+   - BLMOVE
  - Pub/Sub (complete)
    - PSUBSCRIBE
    - PUBLISH
@@ -136,20 +145,23 @@ Implemented commands:
    - SDIFFSTORE
    - SINTER
    - SINTERSTORE
+   - SINTERCARD
    - SISMEMBER
    - SMEMBERS
+   - SMISMEMBER
    - SMOVE
    - SPOP -- see m.Seed(...)
    - SRANDMEMBER -- see m.Seed(...)
    - SREM
+   - SSCAN
    - SUNION
    - SUNIONSTORE
-   - SSCAN
  - Sorted Set keys (complete)
    - ZADD
    - ZCARD
    - ZCOUNT
    - ZINCRBY
+   - ZINTER
    - ZINTERSTORE
    - ZLEXCOUNT
    - ZPOPMIN
@@ -168,14 +180,22 @@ Implemented commands:
    - ZREVRANGEBYSCORE
    - ZREVRANK
    - ZSCORE
+   - ZUNION
    - ZUNIONSTORE
    - ZSCAN
  - Stream keys
    - XACK
    - XADD
+   - XAUTOCLAIM
+   - XCLAIM
    - XDEL
    - XGROUP CREATE
+   - XGROUP CREATECONSUMER
+   - XGROUP DESTROY
+   - XGROUP DELCONSUMER
    - XINFO STREAM -- partly
+   - XINFO GROUPS
+   - XINFO CONSUMERS -- partly
    - XLEN
    - XRANGE
    - XREAD
@@ -198,8 +218,6 @@ Implemented commands:
    - GEORADIUS_RO
    - GEORADIUSBYMEMBER
    - GEORADIUSBYMEMBER_RO
- - Server
-   - COMMAND -- partly
  - Cluster
    - CLUSTER SLOTS
    - CLUSTER KEYSLOT
@@ -297,7 +315,6 @@ Commands which will probably not be implemented:
     - ~~CLIENT *~~
     - ~~CONFIG *~~
     - ~~DEBUG *~~
-    - ~~INFO~~
     - ~~LASTSAVE~~
     - ~~MONITOR~~
     - ~~ROLE~~
@@ -310,7 +327,7 @@ Commands which will probably not be implemented:
 
 ## &c.
 
-Integration tests are run against Redis 6.2.4. The [./integration](./integration/) subdir
+Integration tests are run against Redis 7.2.4. The [./integration](./integration/) subdir
 compares miniredis against a real redis instance.
 
 The Redis 6 RESP3 protocol is supported. If there are problems, please open
@@ -320,5 +337,4 @@ If you want to test Redis Sentinel have a look at [minisentinel](https://github.
 
 A changelog is kept at [CHANGELOG.md](https://github.com/alicebob/miniredis/blob/master/CHANGELOG.md).
 
-[![Build Status](https://travis-ci.com/alicebob/miniredis.svg?branch=master)](https://travis-ci.com/alicebob/miniredis)
 [![Go Reference](https://pkg.go.dev/badge/github.com/alicebob/miniredis/v2.svg)](https://pkg.go.dev/github.com/alicebob/miniredis/v2)

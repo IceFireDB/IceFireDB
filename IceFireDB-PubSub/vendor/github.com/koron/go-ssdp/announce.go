@@ -4,30 +4,60 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+
+	"github.com/koron/go-ssdp/internal/multicast"
 )
 
 // AnnounceAlive sends ssdp:alive message.
-func AnnounceAlive(nt, usn, location, server string, maxAge int, localAddr string) error {
+// location should be a string or a ssdp.LocationProvider.
+func AnnounceAlive(nt, usn string, location interface{}, server string, maxAge int, localAddr string) error {
+	locProv, err := toLocationProvider(location)
+	if err != nil {
+		return err
+	}
 	// dial multicast UDP packet.
-	conn, err := multicastListen(localAddr)
+	conn, err := multicast.Listen(&multicast.AddrResolver{Addr: localAddr})
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 	// build and send message.
-	msg, err := buildAlive(ssdpAddrIPv4, nt, usn, location, server, maxAge)
+	addr, err := multicast.SendAddr()
 	if err != nil {
 		return err
 	}
-	if _, err := conn.WriteTo(msg, ssdpAddrIPv4); err != nil {
+	msg := &aliveDataProvider{
+		host:     addr,
+		nt:       nt,
+		usn:      usn,
+		location: locProv,
+		server:   server,
+		maxAge:   maxAge,
+	}
+	if _, err := conn.WriteTo(msg, addr); err != nil {
 		return err
 	}
 	return nil
 }
 
-func buildAlive(raddr net.Addr, nt, usn, location, server string, maxAge int) ([]byte, error) {
+type aliveDataProvider struct {
+	host     net.Addr
+	nt       string
+	usn      string
+	location LocationProvider
+	server   string
+	maxAge   int
+}
+
+func (p *aliveDataProvider) Bytes(ifi *net.Interface) []byte {
+	return buildAlive(p.host, p.nt, p.usn, p.location.Location(nil, ifi), p.server, p.maxAge)
+}
+
+var _ multicast.DataProvider = (*aliveDataProvider)(nil)
+
+func buildAlive(raddr net.Addr, nt, usn, location, server string, maxAge int) []byte {
+	// bytes.Buffer#Write() is never fail, so we can omit error checks.
 	b := new(bytes.Buffer)
-	// FIXME: error should be checked.
 	b.WriteString("NOTIFY * HTTP/1.1\r\n")
 	fmt.Fprintf(b, "HOST: %s\r\n", raddr.String())
 	fmt.Fprintf(b, "NT: %s\r\n", nt)
@@ -41,23 +71,27 @@ func buildAlive(raddr net.Addr, nt, usn, location, server string, maxAge int) ([
 	}
 	fmt.Fprintf(b, "CACHE-CONTROL: max-age=%d\r\n", maxAge)
 	b.WriteString("\r\n")
-	return b.Bytes(), nil
+	return b.Bytes()
 }
 
 // AnnounceBye sends ssdp:byebye message.
 func AnnounceBye(nt, usn, localAddr string) error {
 	// dial multicast UDP packet.
-	conn, err := multicastListen(localAddr)
+	conn, err := multicast.Listen(&multicast.AddrResolver{Addr: localAddr})
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 	// build and send message.
-	msg, err := buildBye(ssdpAddrIPv4, nt, usn)
+	addr, err := multicast.SendAddr()
 	if err != nil {
 		return err
 	}
-	if _, err := conn.WriteTo(msg, ssdpAddrIPv4); err != nil {
+	msg, err := buildBye(addr, nt, usn)
+	if err != nil {
+		return err
+	}
+	if _, err := conn.WriteTo(multicast.BytesDataProvider(msg), addr); err != nil {
 		return err
 	}
 	return nil

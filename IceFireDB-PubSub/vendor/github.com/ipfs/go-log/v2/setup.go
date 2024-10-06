@@ -8,9 +8,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/mattn/go-isatty"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+var config Config
 
 func init() {
 	SetupLogging(configFromEnv())
@@ -30,9 +33,9 @@ const (
 	envLoggingFmt = "GOLOG_LOG_FMT"
 
 	envLoggingFile = "GOLOG_FILE" // /path/to/file
-	envLoggingURL = "GOLOG_URL" // url that will be processed by sink in the zap
+	envLoggingURL  = "GOLOG_URL"  // url that will be processed by sink in the zap
 
-	envLoggingOutput = "GOLOG_OUTPUT" // possible values: stdout|stderr|file combine multiple values with '+'
+	envLoggingOutput = "GOLOG_OUTPUT"     // possible values: stdout|stderr|file combine multiple values with '+'
 	envLoggingLabels = "GOLOG_LOG_LABELS" // comma-separated key-value pairs, i.e. "app=example_app,dc=sjc-1"
 )
 
@@ -48,8 +51,11 @@ type Config struct {
 	// Format overrides the format of the log output. Defaults to ColorizedOutput
 	Format LogFormat
 
-	// Level is the minimum enabled logging level.
+	// Level is the default minimum enabled logging level.
 	Level LogLevel
+
+	// SubsystemLevels are the default levels per-subsystem. When unspecified, defaults to Level.
+	SubsystemLevels map[string]LogLevel
 
 	// Stderr indicates whether logs should be written to stderr.
 	Stderr bool
@@ -68,7 +74,7 @@ type Config struct {
 }
 
 // ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
-var ErrNoSuchLogger = errors.New("Error: No such logger")
+var ErrNoSuchLogger = errors.New("error: No such logger")
 
 var loggerMutex sync.RWMutex // guards access to global logger state
 
@@ -88,6 +94,12 @@ var primaryCore zapcore.Core
 // loggerCore is the base for all loggers created by this package
 var loggerCore = &lockedMultiCore{}
 
+// GetConfig returns a copy of the saved config. It can be inspected, modified,
+// and re-applied using a subsequent call to SetupLogging().
+func GetConfig() Config {
+	return config
+}
+
 // SetupLogging will initialize the logger backend and set the flags.
 // TODO calling this in `init` pushes all configuration to env variables
 // - move it out of `init`? then we need to change all the code (js-ipfs, go-ipfs) to call this explicitly
@@ -95,6 +107,8 @@ var loggerCore = &lockedMultiCore{}
 func SetupLogging(cfg Config) {
 	loggerMutex.Lock()
 	defer loggerMutex.Unlock()
+
+	config = cfg
 
 	primaryFormat = cfg.Format
 	defaultLevel = cfg.Level
@@ -131,14 +145,34 @@ func SetupLogging(cfg Config) {
 		newPrimaryCore = newPrimaryCore.With([]zap.Field{zap.String(k, v)})
 	}
 
-	if primaryCore != nil {
-		loggerCore.ReplaceCore(primaryCore, newPrimaryCore)
-	} else {
-		loggerCore.AddCore(newPrimaryCore)
-	}
-	primaryCore = newPrimaryCore
-
+	setPrimaryCore(newPrimaryCore)
 	setAllLoggers(defaultLevel)
+
+	for name, level := range cfg.SubsystemLevels {
+		if leveler, ok := levels[name]; ok {
+			leveler.SetLevel(zapcore.Level(level))
+		} else {
+			levels[name] = zap.NewAtomicLevelAt(zapcore.Level(level))
+		}
+	}
+}
+
+// SetPrimaryCore changes the primary logging core. If the SetupLogging was
+// called then the previously configured core will be replaced.
+func SetPrimaryCore(core zapcore.Core) {
+	loggerMutex.Lock()
+	defer loggerMutex.Unlock()
+
+	setPrimaryCore(core)
+}
+
+func setPrimaryCore(core zapcore.Core) {
+	if primaryCore != nil {
+		loggerCore.ReplaceCore(primaryCore, core)
+	} else {
+		loggerCore.AddCore(core)
+	}
+	primaryCore = core
 }
 
 // SetDebugLogging calls SetAllLoggers with logging.DEBUG
@@ -228,10 +262,14 @@ func getLogger(name string) *zap.SugaredLogger {
 	defer loggerMutex.Unlock()
 	log, ok := loggers[name]
 	if !ok {
-		levels[name] = zap.NewAtomicLevelAt(zapcore.Level(defaultLevel))
+		level, ok := levels[name]
+		if !ok {
+			level = zap.NewAtomicLevelAt(zapcore.Level(defaultLevel))
+			levels[name] = level
+		}
 		log = zap.New(loggerCore).
 			WithOptions(
-				zap.IncreaseLevel(levels[name]),
+				zap.IncreaseLevel(level),
 				zap.AddCaller(),
 			).
 			Named(name).
@@ -246,10 +284,11 @@ func getLogger(name string) *zap.SugaredLogger {
 // configFromEnv returns a Config with defaults populated using environment variables.
 func configFromEnv() Config {
 	cfg := Config{
-		Format: ColorizedOutput,
-		Stderr: true,
-		Level:  LevelError,
-		Labels: map[string]string{},
+		Format:          ColorizedOutput,
+		Stderr:          true,
+		Level:           LevelError,
+		SubsystemLevels: map[string]LogLevel{},
+		Labels:          map[string]string{},
 	}
 
 	format := os.Getenv(envLoggingFmt)
@@ -257,11 +296,20 @@ func configFromEnv() Config {
 		format = os.Getenv(envIPFSLoggingFmt)
 	}
 
+	var noExplicitFormat bool
+
 	switch format {
+	case "color":
+		cfg.Format = ColorizedOutput
 	case "nocolor":
 		cfg.Format = PlaintextOutput
 	case "json":
 		cfg.Format = JSONOutput
+	default:
+		if format != "" {
+			fmt.Fprintf(os.Stderr, "ignoring unrecognized log format '%s'\n", format)
+		}
+		noExplicitFormat = true
 	}
 
 	lvl := os.Getenv(envLogging)
@@ -269,10 +317,19 @@ func configFromEnv() Config {
 		lvl = os.Getenv(envIPFSLogging)
 	}
 	if lvl != "" {
-		var err error
-		cfg.Level, err = LevelFromString(lvl)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error setting log levels: %s\n", err)
+		for _, kvs := range strings.Split(lvl, ",") {
+			kv := strings.SplitN(kvs, "=", 2)
+			lvl, err := LevelFromString(kv[len(kv)-1])
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error setting log level %q: %s\n", kvs, err)
+				continue
+			}
+			switch len(kv) {
+			case 1:
+				cfg.Level = lvl
+			case 2:
+				cfg.SubsystemLevels[kv[0]] = lvl
+			}
 		}
 	}
 
@@ -303,14 +360,41 @@ func configFromEnv() Config {
 		}
 	}
 
+	// Check that neither of the requested Std* nor the file are TTYs
+	// At this stage (configFromEnv) we do not have a uniform list to examine yet
+	if noExplicitFormat &&
+		!(cfg.Stdout && isTerm(os.Stdout)) &&
+		!(cfg.Stderr && isTerm(os.Stderr)) &&
+		// check this last: expensive
+		!(cfg.File != "" && pathIsTerm(cfg.File)) {
+		cfg.Format = PlaintextOutput
+	}
+
 	labels := os.Getenv(envLoggingLabels)
 	if labels != "" {
 		labelKVs := strings.Split(labels, ",")
 		for _, label := range labelKVs {
 			kv := strings.Split(label, "=")
+			if len(kv) != 2 {
+				fmt.Fprint(os.Stderr, "invalid label k=v: ", label)
+				continue
+			}
 			cfg.Labels[kv[0]] = kv[1]
 		}
 	}
 
 	return cfg
+}
+
+func isTerm(f *os.File) bool {
+	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
+}
+
+func pathIsTerm(p string) bool {
+	// !!!no!!! O_CREAT, if we fail - we fail
+	f, err := os.OpenFile(p, os.O_WRONLY, 0)
+	if f != nil {
+		defer f.Close() // nolint:errcheck
+	}
+	return err == nil && isTerm(f)
 }

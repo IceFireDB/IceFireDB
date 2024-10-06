@@ -30,13 +30,9 @@ The protocol is defined [here](https://github.com/multiformats/multistream-selec
 go get github.com/multiformats/go-multistream
 ```
 
-Note that `go-multistream` is packaged with Gx, so it is recommended to use Gx to install and use it (see Usage section).
-
-
 ## Usage
 
 ### Example
-
 
 This example shows how to use a multistream muxer. A muxer uses user-added handlers to handle different "protocols". The first step when interacting with a connection handler by the muxer is to select the protocol (the example uses `SelectProtoOrFail`). This will then let the muxer use the right handler.
 
@@ -57,7 +53,7 @@ import (
 // "/cats" and "/dogs" and exposes it on a localhost:8765. It then opens connections
 // to that port, selects the protocols and tests that the handlers are working.
 func main() {
-	mux := ms.NewMultistreamMuxer()
+	mux := ms.NewMultistreamMuxer[string]()
 	mux.AddHandler("/cats", func(proto string, rwc io.ReadWriteCloser) error {
 		fmt.Fprintln(rwc, proto, ": HELLO I LIKE CATS")
 		return rwc.Close()

@@ -19,6 +19,9 @@ type Datastore struct {
 	maxBufferEntries int
 }
 
+var _ ds.Datastore = (*Datastore)(nil)
+var _ ds.PersistentDatastore = (*Datastore)(nil)
+
 type op struct {
 	delete bool
 	value  []byte

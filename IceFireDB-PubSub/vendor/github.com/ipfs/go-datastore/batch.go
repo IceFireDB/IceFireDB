@@ -17,6 +17,8 @@ type basicBatch struct {
 	target Datastore
 }
 
+var _ Batch = (*basicBatch)(nil)
+
 func NewBasicBatch(ds Datastore) Batch {
 	return &basicBatch{
 		ops:    make(map[Key]op),

@@ -11,8 +11,8 @@ import (
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/pkg/router"
 	"github.com/IceFireDB/components-go/RESPHandle"
 	"github.com/IceFireDB/components-go/p2p"
-	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sirupsen/logrus"
 )
 
@@ -196,7 +196,7 @@ func (cr *PubSub) PubLoop() {
 			// Create a ChatMessage
 			m := chatmessage{
 				Message:    message,
-				SenderID:   cr.selfid.Pretty(),
+				SenderID:   cr.selfid.String(),
 				SenderName: cr.ClientName,
 			}
 
@@ -282,7 +282,7 @@ func (cr *PubSub) printPeer() {
 		// Iterate over the list of peers
 		for _, p := range peers {
 			// Generate the pretty version of the peer ID
-			peerid := p.Pretty()
+			peerid := p.String()
 			// Add the peer ID to the peer box
 			if _, ok := peersAll[peerid]; ok {
 				peersAll[peerid]++

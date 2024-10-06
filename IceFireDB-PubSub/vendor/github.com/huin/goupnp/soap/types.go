@@ -526,3 +526,53 @@ func MarshalURI(v *url.URL) (string, error) {
 func UnmarshalURI(s string) (*url.URL, error) {
 	return url.Parse(s)
 }
+
+// TypeData provides metadata about for marshalling and unmarshalling a SOAP
+// type.
+type TypeData struct {
+	funcSuffix string
+	goType     string
+}
+
+// GoTypeName returns the name of the Go type.
+func (td TypeData) GoTypeName() string {
+	return td.goType
+}
+
+// MarshalFunc returns the name of the function that marshals the type.
+func (td TypeData) MarshalFunc() string {
+	return fmt.Sprintf("Marshal%s", td.funcSuffix)
+}
+
+// UnmarshalFunc returns the name of the function that unmarshals the type.
+func (td TypeData) UnmarshalFunc() string {
+	return fmt.Sprintf("Unmarshal%s", td.funcSuffix)
+}
+
+// TypeDataMap maps from a SOAP type (e.g "fixed.14.4") to its type data.
+var TypeDataMap = map[string]TypeData{
+	"ui1":         {"Ui1", "uint8"},
+	"ui2":         {"Ui2", "uint16"},
+	"ui4":         {"Ui4", "uint32"},
+	"ui8":         {"Ui8", "uint64"},
+	"i1":          {"I1", "int8"},
+	"i2":          {"I2", "int16"},
+	"i4":          {"I4", "int32"},
+	"int":         {"Int", "int64"},
+	"r4":          {"R4", "float32"},
+	"r8":          {"R8", "float64"},
+	"number":      {"R8", "float64"}, // Alias for r8.
+	"fixed.14.4":  {"Fixed14_4", "float64"},
+	"float":       {"R8", "float64"},
+	"char":        {"Char", "rune"},
+	"string":      {"String", "string"},
+	"date":        {"Date", "time.Time"},
+	"dateTime":    {"DateTime", "time.Time"},
+	"dateTime.tz": {"DateTimeTz", "time.Time"},
+	"time":        {"TimeOfDay", "soap.TimeOfDay"},
+	"time.tz":     {"TimeOfDayTz", "soap.TimeOfDay"},
+	"boolean":     {"Boolean", "bool"},
+	"bin.base64":  {"BinBase64", "[]byte"},
+	"bin.hex":     {"BinHex", "[]byte"},
+	"uri":         {"URI", "*url.URL"},
+}

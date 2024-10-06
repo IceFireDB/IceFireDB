@@ -28,15 +28,49 @@ if you want to write your own extensions, whether for new Node implementations
 or new codecs, or new higher-order order functions!)
 
 - `github.com/ipld/go-ipld-prime` -- imported as just `ipld` -- contains the core interfaces for IPLD.  The most important interfaces are `Node`, `NodeBuilder`, `Path`, and `Link`.
-- `github.com/ipld/go-ipld-prime/node/basic` -- imported as `basicnode` -- provides concrete implementations of `Node` and `NodeBuilder` which work for any kind of data.
+- `github.com/ipld/go-ipld-prime/node/basicnode` -- provides concrete implementations of `Node` and `NodeBuilder` which work for any kind of data, using unstructured memory.
+- `github.com/ipld/go-ipld-prime/node/bindnode` -- provides concrete implementations of `Node` and `NodeBuilder` which store data in native golang structures, interacting with it via reflection.  Also supports IPLD Schemas!
 - `github.com/ipld/go-ipld-prime/traversal` -- contains higher-order functions for traversing graphs of data easily.
 - `github.com/ipld/go-ipld-prime/traversal/selector` -- contains selectors, which are sort of like regexps, but for trees and graphs of IPLD data!
-- `github.com/ipld/go-ipld-prime/codec -- parent package of all the codec implementations!
+- `github.com/ipld/go-ipld-prime/codec` -- parent package of all the codec implementations!
 - `github.com/ipld/go-ipld-prime/codec/dagcbor` -- implementations of marshalling and unmarshalling as CBOR (a fast, binary serialization format).
 - `github.com/ipld/go-ipld-prime/codec/dagjson` -- implementations of marshalling and unmarshalling as JSON (a popular human readable format).
 - `github.com/ipld/go-ipld-prime/linking/cid` -- imported as `cidlink` -- provides concrete implementations of `Link` as a CID.  Also, the multicodec registry.
 - `github.com/ipld/go-ipld-prime/schema` -- contains the `schema.Type` and `schema.TypedNode` interface declarations, which represent IPLD Schema type information.
 - `github.com/ipld/go-ipld-prime/node/typed` -- provides concrete implementations of `schema.TypedNode` which decorate a basic `Node` at runtime to have additional features described by IPLD Schemas.
+
+
+Getting Started
+---------------
+
+Let's say you want to create some data programmatically,
+and then serialize it, or save it as [blocks].
+
+You've got a ton of different options, depending on what golang convention you want to use:
+
+- the `qp` package -- [example](https://pkg.go.dev/github.com/ipld/go-ipld-prime/fluent/qp#example-package)
+- the `bindnode` system, if you want to use golang types -- [example](https://pkg.go.dev/github.com/ipld/go-ipld-prime/node/bindnode#example-Wrap-NoSchema), [example with schema](https://pkg.go.dev/github.com/ipld/go-ipld-prime/node/bindnode#example-Wrap-WithSchema)
+- or the [`NodeBuilder`](https://pkg.go.dev/github.com/ipld/go-ipld-prime/datamodel#NodeBuilder) interfaces, raw (verbose; not recommended)
+- or even some codegen systems!
+
+Once you've got a Node full of data,
+you can serialize it:
+
+https://pkg.go.dev/github.com/ipld/go-ipld-prime#example-package-CreateDataAndMarshal
+
+But probably you want to do more than that;
+probably you want to store this data as a block,
+and get a CID that links back to it.
+For this you use `LinkSystem`:
+
+https://pkg.go.dev/github.com/ipld/go-ipld-prime/linking#example-LinkSystem.Store
+
+Hopefully these pointers give you some useful getting-started focal points.
+The API docs should help from here on out.
+We also highly recommend scanning the [godocs](https://pkg.go.dev/github.com/ipld/go-ipld-prime) for other pieces of example code, in various packages!
+
+Let us know in [issues](https://github.com/ipld/go-ipld-prime/issues), [chat, or other community spaces](https://ipld.io/docs/intro/community/) if you need more help,
+or have suggestions on how we can improve the getting-started experiences!
 
 
 
@@ -46,8 +80,15 @@ Other IPLD Libraries
 The IPLD specifications are designed to be language-agnostic.
 Many implementations exist in a variety of languages.
 
-For overall behaviors and specifications, refer to the specs repo:
-  https://github.com/ipld/specs/
+For overall behaviors and specifications, refer to the IPLD website, or its source, in IPLD meta repo:
+- https://ipld.io/
+- https://github.com/ipld/ipld/
+You should find specs in the `specs/` dir there,
+human-friendly docs in the `docs/` dir,
+and information about _why_ things are designed the way they are mostly in the `design/` directories.
+
+There are also pages in the IPLD website specifically about golang IPLD libraries,
+and your alternatives: https://ipld.io/libraries/golang/
 
 
 ### distinctions from go-ipld-interface&go-ipld-cbor
@@ -88,45 +129,66 @@ We now consider many of the earlier golang IPLD libraries to be defacto deprecat
 and you should expect new features *here*, rather than in those libraries.
 (Those libraries still won't be going away anytime soon, but we really don't recomend new construction on them.)
 
+### migrating
+
+**For recommendations on where to start when migrating:**
+see [README_migrationGuide](./README_migrationGuide.md).
+That document will provide examples of which old concepts and API names map to which new APIs,
+and should help set you on the right track.
+
 ### unixfsv1
 
-Be advised that faculties for dealing with unixfsv1 data are still limited.
-You can find some tools for dealing with dag-pb (the underlying codec) in the [ipld/go-codec-dagpb](https://github.com/ipld/go-codec-dagpb) repo,
-and there are also some tools retrofitting some of unixfsv1's other features to be perceivable using an ADL in the [ipfs/go-unixfsnode](https://github.com/ipfs/go-unixfsnode) repo...
-however, a "some assembly required" advisory may still be in effect; check the readmes in those repos for details on what they support.
+Lots of people who hear about IPLD have heard about it through IPFS.
+IPFS has IPLD-native APIs, but IPFS *also* makes heavy use of a specific system called "UnixFSv1",
+so people often wonder if UnixFSv1 is supported in IPLD libraries.
+
+The answer is "yes" -- but it's not part of the core.
+
+UnixFSv1 is now treated as an [ADL](https://ipld.io/glossary/#adl),
+and a go-ipld-prime compatible implementation can be found
+in the [ipfs/go-unixfsnode](https://github.com/ipfs/go-unixfsnode) repo.
+
+Additionally, the codec used in UnixFSv1 -- dag-pb --
+can be found implemented in the [ipld/go-codec-dagpb](https://github.com/ipld/go-codec-dagpb) repo.
+
+A "some assembly required" advisory may still be in effect for these pieces;
+check the readmes in those repos for details on what they support.
+
+The move to making UnixFSv1 a non-core system has been an arduous retrofit.
+However, framing it as an ADL also provides many advantages:
+
+- it demonstrates that ADLs as a plugin system _work_, and others can develop new systems in this pattern!
+- it has made pathing over UnixFSv1 much more standard and well-defined
+- this standardization means systems like [Selectors](https://ipld.io/glossary/#selectors) work naturally over UnixFSv1...
+- ... which in turn means anything using them (ex: CAR export; graphsync; etc) can very easily be asked to produce a merkle-proof
+  for a path over UnixFSv1 data, without requiring the querier to know about the internals.  Whew!
+
+We hope users and developers alike will find value in how these systems are now layered.
 
 
 
 Change Policy
 -------------
 
-The go-ipld-prime library is already usable.  We are also still in development, and may still change things.
+The go-ipld-prime library is ready to use, and we value stability highly.
 
-A changelog can be found at [CHANGELOG.md](CHANGELOG.md).
+We make releases periodically.
+However, using a commit hash to pin versions precisely when depending on this library is also perfectly acceptable.
+(Only commit hashes on the master branch can be expected to persist, however;
+depending on a commit hash in a branch is not recommended.  See [development branches](#development-branches).)
 
-Using a commit hash to pin versions precisely when depending on this library is advisable (as it is with any other).
+We maintain a [CHANGELOG](CHANGELOG.md)!
+Please read it, when updating!
 
-We may sometimes tag releases, but it's just as acceptable to track commits on master without the indirection.
+We do make reasonable attempts to minimize the degree of changes to the library which will create "breaking change" experiences for downstream consumers,
+and we do document these in the changelog (often, even with specific migration instructions).
+However, we do also still recommend running your own compile and test suites as a matter of course after updating.
 
-The following are all norms you can expect of changes to this codebase:
-
-- The `master` branch will not be force-pushed.
-    - (exceptional circumstances may exist, but such exceptions will only be considered valid for about as long after push as the "$N-second-rule" about dropped food).
-    - Therefore, commit hashes on master are gold to link against.
-- All other branches *will* be force-pushed.
-    - Therefore, commit hashes not reachable from the master branch are inadvisable to link against.
-- If it's on master, it's understood to be good, in as much as we can tell.
-- Development proceeds -- both starting from and ending on -- the `master` branch.
-    - There are no other long-running supported-but-not-master branches.
-    - The existence of tags at any particular commit do not indicate that we will consider starting a long running and supported diverged branch from that point, nor start doing backports, etc.
-- All changes are presumed breaking until proven otherwise; and we don't have the time and attention budget at this point for doing the "proven otherwise".
-    - All consumers updating their libraries should run their own compiler, linking, and test suites before assuming the update applies cleanly -- as is good practice regardless.
-    - Any idea of semver indicating more or less breakage should be treated as a street vendor selling potions of levitation -- it's likely best disregarded.
-
-None of this is to say we'll go breaking things willy-nilly for fun; but it *is* to say:
-
-- Staying close to master is always better than not staying close to master;
-- and trust your compiler and your tests rather than tea-leaf patterns in a tag string.
+You can help make developing this library easier by staying up-to-date as a downstream consumer!
+When we do discover a need for API changes, we typically try to introduce the new API first,
+and do at least one release tag in which the old API is deprecated (but not yet removed).
+We will all be able to develop software faster, together, as an ecosystem,
+if libraries can keep reasonably closely up-to-date with the most recent tags.
 
 
 ### Version Names
@@ -140,7 +202,8 @@ When a tag is made, version number steps in go-ipld-prime advance as follows:
 [This is WarpVer](https://gist.github.com/warpfork/98d2f4060c68a565e8ad18ea4814c25f).
 
 These version numbers are provided as hints about what to expect,
-but ultimately, you should always invoke your compiler and your tests to tell you about compatibility.
+but ultimately, you should always invoke your compiler and your tests to tell you about compatibility,
+as well as read the [changelog](CHANGELOG.md).
 
 
 ### Updating
@@ -154,3 +217,20 @@ so if you're cautious about absorbing changes, you should update to the even num
 run all your tests, and *then* upgrade to the odd number.
 Usually the step to the even number should go off without a hitch, but if you *do* get problems from advancing to an even number tag,
 A) you can be pretty sure it's a bug, and B) you didn't have to edit a bunch of code before finding that out.
+
+
+### Development branches
+
+The following are norms you can expect of changes to this codebase, and the treatment of branches:
+
+- The `master` branch will not be force-pushed.
+    - (exceptional circumstances may exist, but such exceptions will only be considered valid for about as long after push as the "$N-second-rule" about dropped food).
+    - Therefore, commit hashes on master are gold to link against.
+- All other branches *can* be force-pushed.
+    - Therefore, commit hashes not reachable from the master branch are inadvisable to link against.
+- If it's on master, it's understood to be good, in as much as we can tell.
+    - Changes and features don't get merged until their tests pass!
+    - Packages of "alpha" developmental status may exist, and be more subject to change than other more finalized parts of the repo, but their self-tests will at least pass.
+- Development proceeds -- both starting from and ending on -- the `master` branch.
+    - There are no other long-running supported-but-not-master branches.
+    - The existence of tags at any particular commit do not indicate that we will consider starting a long running and supported diverged branch from that point, nor start doing backports, etc.

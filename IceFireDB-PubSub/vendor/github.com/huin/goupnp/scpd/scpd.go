@@ -2,6 +2,7 @@ package scpd
 
 import (
 	"encoding/xml"
+	"sort"
 	"strings"
 )
 
@@ -35,6 +36,14 @@ func (scpd *SCPD) Clean() {
 	for i := range scpd.StateVariables {
 		scpd.StateVariables[i].clean()
 	}
+}
+
+func (scpd *SCPD) OrderedActions() []Action {
+	actions := append([]Action{}, scpd.Actions...)
+	sort.SliceStable(actions, func(i, j int) bool {
+		return actions[i].Name < actions[j].Name
+	})
+	return actions
 }
 
 func (scpd *SCPD) GetStateVariable(variable string) *StateVariable {

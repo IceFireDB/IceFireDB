@@ -10,6 +10,9 @@ import (
 	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/koron/go-ssdp/internal/multicast"
+	"github.com/koron/go-ssdp/internal/ssdplog"
 )
 
 // Service is discovered service.
@@ -65,22 +68,26 @@ const (
 	RootDevice = "upnp:rootdevice"
 )
 
-// Search searchs services by SSDP.
+// Search searches services by SSDP.
 func Search(searchType string, waitSec int, localAddr string) ([]Service, error) {
 	// dial multicast UDP packet.
-	conn, err := multicastListen(localAddr)
+	conn, err := multicast.Listen(&multicast.AddrResolver{Addr: localAddr})
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	logf("search on %s", conn.LocalAddr().String())
+	ssdplog.Printf("search on %s", conn.LocalAddr().String())
 
 	// send request.
-	msg, err := buildSearch(ssdpAddrIPv4, searchType, waitSec)
+	addr, err := multicast.SendAddr()
 	if err != nil {
 		return nil, err
 	}
-	if _, err := conn.WriteTo(msg, ssdpAddrIPv4); err != nil {
+	msg, err := buildSearch(addr, searchType, waitSec)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := conn.WriteTo(multicast.BytesDataProvider(msg), addr); err != nil {
 		return nil, err
 	}
 
@@ -89,15 +96,15 @@ func Search(searchType string, waitSec int, localAddr string) ([]Service, error)
 	h := func(a net.Addr, d []byte) error {
 		srv, err := parseService(a, d)
 		if err != nil {
-			logf("invalid search response from %s: %s", a.String(), err)
+			ssdplog.Printf("invalid search response from %s: %s", a.String(), err)
 			return nil
 		}
 		list = append(list, *srv)
-		logf("search response from %s: %s", a.String(), srv.USN)
+		ssdplog.Printf("search response from %s: %s", a.String(), srv.USN)
 		return nil
 	}
 	d := time.Second * time.Duration(waitSec)
-	if err := conn.readPackets(d, h); err != nil {
+	if err := conn.ReadPackets(d, h); err != nil {
 		return nil, err
 	}
 
@@ -120,7 +127,6 @@ var (
 	errWithoutHTTPPrefix = errors.New("without HTTP prefix")
 )
 
-// FIXME: https://github.com/koron/go-ssdp/issues/10
 var endOfHeader = []byte{'\r', '\n', '\r', '\n'}
 
 func parseService(addr net.Addr, data []byte) (*Service, error) {

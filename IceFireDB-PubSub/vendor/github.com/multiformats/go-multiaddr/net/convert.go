@@ -1,6 +1,7 @@
 package manet
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"path/filepath"
@@ -49,6 +50,33 @@ func (cm *CodecMap) ToNetAddr(maddr ma.Multiaddr) (net.Addr, error) {
 	}
 
 	return p(maddr)
+}
+
+// MultiaddrToIPNet converts a multiaddr to an IPNet. Useful for seeing if another IP address is contained within this multiaddr network+mask
+func MultiaddrToIPNet(m ma.Multiaddr) (*net.IPNet, error) {
+	var ipString string
+	var mask string
+
+	ma.ForEach(m, func(c ma.Component) bool {
+		if c.Protocol().Code == ma.P_IP4 || c.Protocol().Code == ma.P_IP6 {
+			ipString = c.Value()
+		}
+		if c.Protocol().Code == ma.P_IPCIDR {
+			mask = c.Value()
+		}
+		return ipString == "" || mask == ""
+	})
+
+	if ipString == "" {
+		return nil, errors.New("no ip protocol found")
+	}
+
+	if mask == "" {
+		return nil, errors.New("no mask found")
+	}
+
+	_, ipnet, err := net.ParseCIDR(ipString + "/" + string(mask))
+	return ipnet, err
 }
 
 func parseBasicNetMaddr(maddr ma.Multiaddr) (net.Addr, error) {

@@ -59,10 +59,17 @@ fmt.Println("Got CID: ", c)
 #### Creating a CID from scratch
 
 ```go
+
+import (
+  cid "github.com/ipfs/go-cid"
+  mc "github.com/multiformats/go-multicodec"
+  mh "github.com/multiformats/go-multihash"
+)
+
 // Create a cid manually by specifying the 'prefix' parameters
 pref := cid.Prefix{
 	Version: 1,
-	Codec: cid.Raw,
+	Codec: uint64(mc.Raw),
 	MhType: mh.SHA2_256,
 	MhLength: -1, // default length
 }

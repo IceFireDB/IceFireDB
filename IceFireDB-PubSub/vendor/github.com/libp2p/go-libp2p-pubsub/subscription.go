@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"sync"
 )
 
 // Subscription handles the details of a particular Topic subscription.
@@ -12,6 +13,7 @@ type Subscription struct {
 	cancelCh chan<- *Subscription
 	ctx      context.Context
 	err      error
+	once     sync.Once
 }
 
 // Topic returns the topic string associated with the Subscription
@@ -43,5 +45,7 @@ func (sub *Subscription) Cancel() {
 }
 
 func (sub *Subscription) close() {
-	close(sub.ch)
+	sub.once.Do(func() {
+		close(sub.ch)
+	})
 }

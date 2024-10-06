@@ -4,7 +4,7 @@
 // that can be found in the LICENSE file in the root of the source
 // tree.
 
-// +build linux
+//go:build linux
 
 // Generate a local routing table structure following the code at
 // https://github.com/google/gopacket/blob/master/routing/routing.go
@@ -19,6 +19,22 @@ import (
 
 	"github.com/google/gopacket/routing"
 )
+
+// Pulled from http://man7.org/linux/man-pages/man7/rtnetlink.7.html
+// See the section on RTM_NEWROUTE, specifically 'struct rtmsg'.
+type routeInfoInMemory struct {
+	Family byte
+	DstLen byte
+	SrcLen byte
+	TOS    byte
+
+	Table    byte
+	Protocol byte
+	Scope    byte
+	Type     byte
+
+	Flags uint32
+}
 
 func New() (routing.Router, error) {
 	rtr := &router{}

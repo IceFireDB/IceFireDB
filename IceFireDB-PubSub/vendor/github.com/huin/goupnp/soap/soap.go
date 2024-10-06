@@ -4,6 +4,7 @@ package soap
 
 import (
 	"bytes"
+	"context"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
@@ -33,13 +34,13 @@ func NewSOAPClient(endpointURL url.URL) *SOAPClient {
 // PerformSOAPAction makes a SOAP request, with the given action.
 // inAction and outAction must both be pointers to structs with string fields
 // only.
-func (client *SOAPClient) PerformAction(actionNamespace, actionName string, inAction interface{}, outAction interface{}) error {
+func (client *SOAPClient) PerformActionCtx(ctx context.Context, actionNamespace, actionName string, inAction interface{}, outAction interface{}) error {
 	requestBytes, err := encodeRequestAction(actionNamespace, actionName, inAction)
 	if err != nil {
 		return err
 	}
 
-	response, err := client.HTTPClient.Do(&http.Request{
+	req := &http.Request{
 		Method: "POST",
 		URL:    &client.EndpointURL,
 		Header: http.Header{
@@ -49,12 +50,14 @@ func (client *SOAPClient) PerformAction(actionNamespace, actionName string, inAc
 		Body: ioutil.NopCloser(bytes.NewBuffer(requestBytes)),
 		// Set ContentLength to avoid chunked encoding - some servers might not support it.
 		ContentLength: int64(len(requestBytes)),
-	})
+	}
+	req = req.WithContext(ctx)
+	response, err := client.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("goupnp: error performing SOAP HTTP request: %v", err)
 	}
 	defer response.Body.Close()
-	if response.StatusCode != 200 {
+	if response.StatusCode != 200 && response.ContentLength == 0 {
 		return fmt.Errorf("goupnp: SOAP request got HTTP %s", response.Status)
 	}
 
@@ -66,6 +69,8 @@ func (client *SOAPClient) PerformAction(actionNamespace, actionName string, inAc
 
 	if responseEnv.Body.Fault != nil {
 		return responseEnv.Body.Fault
+	} else if response.StatusCode != 200 {
+		return fmt.Errorf("goupnp: SOAP request got HTTP %s", response.Status)
 	}
 
 	if outAction != nil {
@@ -75,6 +80,12 @@ func (client *SOAPClient) PerformAction(actionNamespace, actionName string, inAc
 	}
 
 	return nil
+}
+
+// PerformAction is the legacy version of PerformActionCtx, which uses
+// context.Background.
+func (client *SOAPClient) PerformAction(actionNamespace, actionName string, inAction interface{}, outAction interface{}) error {
+	return client.PerformActionCtx(context.Background(), actionNamespace, actionName, inAction, outAction)
 }
 
 // newSOAPAction creates a soapEnvelope with the given action and arguments.
@@ -127,7 +138,7 @@ func encodeRequestArgs(w *bytes.Buffer, inAction interface{}) error {
 		if value.Kind() != reflect.String {
 			return fmt.Errorf("goupnp: SOAP arg %q is not of type string, but of type %v", argName, value.Type())
 		}
-		elem := xml.StartElement{xml.Name{"", argName}, nil}
+		elem := xml.StartElement{Name: xml.Name{Space: "", Local: argName}, Attr: nil}
 		if err := enc.EncodeToken(elem); err != nil {
 			return fmt.Errorf("goupnp: error encoding start element for SOAP arg %q: %v", argName, err)
 		}
@@ -185,9 +196,16 @@ type soapBody struct {
 type SOAPFaultError struct {
 	FaultCode   string `xml:"faultcode"`
 	FaultString string `xml:"faultstring"`
-	Detail      string `xml:"detail"`
+	Detail      struct {
+		UPnPError struct {
+			Errorcode        int    `xml:"errorCode"`
+			ErrorDescription string `xml:"errorDescription"`
+		} `xml:"UPnPError"`
+		Raw []byte `xml:",innerxml"`
+	} `xml:"detail"`
 }
 
 func (err *SOAPFaultError) Error() string {
-	return fmt.Sprintf("SOAP fault: %s", err.FaultString)
+	return fmt.Sprintf("SOAP fault. Code: %s | Explanation: %s | Detail: %s",
+		err.FaultCode, err.FaultString, string(err.Detail.Raw))
 }

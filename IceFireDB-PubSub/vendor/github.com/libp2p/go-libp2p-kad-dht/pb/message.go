@@ -1,10 +1,10 @@
 package dht_pb
 
 import (
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -72,9 +72,9 @@ func RawPeerInfosToPBPeers(peers []peer.AddrInfo) []Message_Peer {
 // information from the given network.Network.
 func PeerInfosToPBPeers(n network.Network, peers []peer.AddrInfo) []Message_Peer {
 	pbps := RawPeerInfosToPBPeers(peers)
-	for i, pbp := range pbps {
+	for i := range pbps {
 		c := ConnectionType(n.Connectedness(peers[i].ID))
-		pbp.Connection = c
+		pbps[i].Connection = c
 	}
 	return pbps
 }
@@ -146,10 +146,6 @@ func ConnectionType(c network.Connectedness) Message_ConnectionType {
 		return Message_NOT_CONNECTED
 	case network.Connected:
 		return Message_CONNECTED
-	case network.CanConnect:
-		return Message_CAN_CONNECT
-	case network.CannotConnect:
-		return Message_CANNOT_CONNECT
 	}
 }
 
@@ -163,9 +159,5 @@ func Connectedness(c Message_ConnectionType) network.Connectedness {
 		return network.NotConnected
 	case Message_CONNECTED:
 		return network.Connected
-	case Message_CAN_CONNECT:
-		return network.CanConnect
-	case Message_CANNOT_CONNECT:
-		return network.CannotConnect
 	}
 }

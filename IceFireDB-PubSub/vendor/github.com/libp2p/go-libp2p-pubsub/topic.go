@@ -5,14 +5,22 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
+	"github.com/libp2p/go-libp2p/core/crypto"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // ErrTopicClosed is returned if a Topic is utilized after it has been closed
 var ErrTopicClosed = errors.New("this Topic is closed, try opening a new one")
+
+// ErrNilSignKey is returned if a nil private key was provided
+var ErrNilSignKey = errors.New("nil sign key")
+
+// ErrEmptyPeerID is returned if an empty peer ID was provided
+var ErrEmptyPeerID = errors.New("empty peer ID")
 
 // Topic is the handle for a pubsub topic
 type Topic struct {
@@ -130,7 +138,7 @@ func (t *Topic) sendNotification(evt PeerEvent) {
 }
 
 // Subscribe returns a new Subscription for the topic.
-// Note that subscription is not an instanteneous operation. It may take some time
+// Note that subscription is not an instantaneous operation. It may take some time
 // before the subscription is processed by the pubsub main loop and propagated to our peers.
 func (t *Topic) Subscribe(opts ...SubOpt) (*Subscription, error) {
 	t.mux.RLock()
@@ -141,7 +149,6 @@ func (t *Topic) Subscribe(opts ...SubOpt) (*Subscription, error) {
 
 	sub := &Subscription{
 		topic: t.topic,
-		ch:    make(chan *Message, 32),
 		ctx:   t.p.ctx,
 	}
 
@@ -150,6 +157,11 @@ func (t *Topic) Subscribe(opts ...SubOpt) (*Subscription, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if sub.ch == nil {
+		// apply the default size
+		sub.ch = make(chan *Message, 32)
 	}
 
 	out := make(chan *Subscription, 1)
@@ -197,8 +209,13 @@ func (t *Topic) Relay() (RelayCancelFunc, error) {
 // RouterReady is a function that decides if a router is ready to publish
 type RouterReady func(rt PubSubRouter, topic string) (bool, error)
 
+// ProvideKey is a function that provides a private key and its associated peer ID when publishing a new message
+type ProvideKey func() (crypto.PrivKey, peer.ID)
+
 type PublishOptions struct {
-	ready RouterReady
+	ready     RouterReady
+	customKey ProvideKey
+	local     bool
 }
 
 type PubOpt func(pub *PublishOptions) error
@@ -211,23 +228,8 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 		return ErrTopicClosed
 	}
 
-	m := &pb.Message{
-		Data:  data,
-		Topic: &t.topic,
-		From:  nil,
-		Seqno: nil,
-	}
-	if t.p.signID != "" {
-		m.From = []byte(t.p.signID)
-		m.Seqno = t.p.nextSeqno()
-	}
-	if t.p.signKey != nil {
-		m.From = []byte(t.p.signID)
-		err := signMessage(t.p.signID, t.p.signKey, m)
-		if err != nil {
-			return err
-		}
-	}
+	pid := t.p.signID
+	key := t.p.signKey
 
 	pub := &PublishOptions{}
 	for _, opt := range opts {
@@ -237,17 +239,76 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 		}
 	}
 
+	if pub.customKey != nil && !pub.local {
+		key, pid = pub.customKey()
+		if key == nil {
+			return ErrNilSignKey
+		}
+		if len(pid) == 0 {
+			return ErrEmptyPeerID
+		}
+	}
+
+	m := &pb.Message{
+		Data:  data,
+		Topic: &t.topic,
+		From:  nil,
+		Seqno: nil,
+	}
+	if pid != "" {
+		m.From = []byte(pid)
+		m.Seqno = t.p.nextSeqno()
+	}
+	if key != nil {
+		m.From = []byte(pid)
+		err := signMessage(pid, key, m)
+		if err != nil {
+			return err
+		}
+	}
+
 	if pub.ready != nil {
-		t.p.disc.Bootstrap(ctx, t.topic, pub.ready)
+		if t.p.disc.discovery != nil {
+			t.p.disc.Bootstrap(ctx, t.topic, pub.ready)
+		} else {
+			// TODO: we could likely do better than polling every 200ms.
+			// For example, block this goroutine on a channel,
+			// and check again whenever events tell us that the number of
+			// peers has increased.
+			var ticker *time.Ticker
+		readyLoop:
+			for {
+				// Check if ready for publishing.
+				// Similar to what disc.Bootstrap does.
+				res := make(chan bool, 1)
+				select {
+				case t.p.eval <- func() {
+					done, _ := pub.ready(t.p.rt, t.topic)
+					res <- done
+				}:
+					if <-res {
+						break readyLoop
+					}
+				case <-t.p.ctx.Done():
+					return t.p.ctx.Err()
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				if ticker == nil {
+					ticker = time.NewTicker(200 * time.Millisecond)
+					defer ticker.Stop()
+				}
+
+				select {
+				case <-ticker.C:
+				case <-ctx.Done():
+					return fmt.Errorf("router is not ready: %w", ctx.Err())
+				}
+			}
+		}
 	}
 
-	select {
-	case t.p.publish <- &Message{m, t.p.host.ID(), nil}:
-	case <-t.p.ctx.Done():
-		return t.p.ctx.Err()
-	}
-
-	return nil
+	return t.p.val.PushLocal(&Message{m, "", t.p.host.ID(), nil, pub.local})
 }
 
 // WithReadiness returns a publishing option for only publishing when the router is ready.
@@ -255,6 +316,30 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 func WithReadiness(ready RouterReady) PubOpt {
 	return func(pub *PublishOptions) error {
 		pub.ready = ready
+		return nil
+	}
+}
+
+// WithLocalPublication returns a publishing option to notify in-process subscribers only.
+// It prevents message publication to mesh peers.
+// Useful in edge cases where the msg needs to be only delivered to the in-process subscribers,
+// e.g. not to spam the network with outdated msgs.
+// Should not be used specifically for in-process pubsubing.
+func WithLocalPublication(local bool) PubOpt {
+	return func(pub *PublishOptions) error {
+		pub.local = local
+		return nil
+	}
+}
+
+// WithSecretKeyAndPeerId returns a publishing option for providing a custom private key and its corresponding peer ID
+// This option is useful when we want to send messages from "virtual", never-connectable peers in the network
+func WithSecretKeyAndPeerId(key crypto.PrivKey, pid peer.ID) PubOpt {
+	return func(pub *PublishOptions) error {
+		pub.customKey = func() (crypto.PrivKey, peer.ID) {
+			return key, pid
+		}
+
 		return nil
 	}
 }
