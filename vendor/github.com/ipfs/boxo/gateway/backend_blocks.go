@@ -156,6 +156,12 @@ func (bb *BlocksBackend) Get(ctx context.Context, path path.ImmutablePath, range
 		return md, nil, err
 	}
 
+	// Set modification time in ContentPathMetadata if found in dag-pb's optional mtime field (UnixFS 1.5)
+	mtime := f.ModTime()
+	if !mtime.IsZero() {
+		md.ModTime = mtime
+	}
+
 	if d, ok := f.(files.Directory); ok {
 		dir, err := uio.NewDirectoryFromNode(bb.dagService, nd)
 		if err != nil {
@@ -229,6 +235,12 @@ func (bb *BlocksBackend) Head(ctx context.Context, path path.ImmutablePath) (Con
 	fileNode, err := ufile.NewUnixfsFile(ctx, bb.dagService, nd)
 	if err != nil {
 		return ContentPathMetadata{}, nil, err
+	}
+
+	// Set modification time in ContentPathMetadata if found in dag-pb's optional mtime field (UnixFS 1.5)
+	mtime := fileNode.ModTime()
+	if !mtime.IsZero() {
+		md.ModTime = mtime
 	}
 
 	sz, err := fileNode.Size()

@@ -207,6 +207,7 @@ func (t *transport) dial(ctx context.Context, addr ma.Multiaddr, url, sni string
 			return verifyRawCerts(rawCerts, certHashes)
 		}
 	}
+	ctx = quicreuse.WithAssociation(ctx, t)
 	conn, err := t.connManager.DialQUIC(ctx, addr, tlsConf, t.allowWindowIncrease)
 	if err != nil {
 		return nil, nil, err
@@ -331,7 +332,7 @@ func (t *transport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
 	}
 	tlsConf.NextProtos = append(tlsConf.NextProtos, http3.NextProtoH3)
 
-	ln, err := t.connManager.ListenQUIC(laddr, tlsConf, t.allowWindowIncrease)
+	ln, err := t.connManager.ListenQUICAndAssociate(t, laddr, tlsConf, t.allowWindowIncrease)
 	if err != nil {
 		return nil, err
 	}

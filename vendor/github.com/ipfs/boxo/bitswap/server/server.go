@@ -251,6 +251,38 @@ func HasBlockBufferSize(count int) Option {
 	}
 }
 
+// WithWantHaveReplaceSize sets the maximum size of a block in bytes up to
+// which the bitswap server will replace a WantHave with a WantBlock response.
+//
+// Behavior:
+//   - If size > 0: The server may send full blocks instead of just confirming possession
+//     for blocks up to the specified size.
+//   - If size = 0: WantHave replacement is disabled entirely. This allows the server to
+//     skip reading block sizes during WantHave request processing, which can be more
+//     efficient if the data storage bills "possession" checks and "reads" differently.
+//
+// Performance considerations:
+//   - Enabling replacement (size > 0) may reduce network round-trips but requires
+//     checking block sizes for each WantHave request to decide if replacement should occur.
+//   - Disabling replacement (size = 0) optimizes server performance by avoiding
+//     block size checks, potentially reducing infrastructure costs if possession checks
+//     are less expensive than full reads.
+//
+// It defaults to [defaults.DefaultWantHaveReplaceSize]
+// and the value may change in future releases.
+//
+// Use this option to set explicit behavior to balance between network
+// efficiency, server performance, and potential storage cost optimizations
+// based on your specific use case and storage backend.
+func WithWantHaveReplaceSize(size int) Option {
+	if size < 0 {
+		size = 0
+	}
+	return func(bs *Server) {
+		bs.engineOptions = append(bs.engineOptions, decision.WithWantHaveReplaceSize(size))
+	}
+}
+
 // WantlistForPeer returns the currently understood list of blocks requested by a
 // given peer.
 func (bs *Server) WantlistForPeer(p peer.ID) []cid.Cid {

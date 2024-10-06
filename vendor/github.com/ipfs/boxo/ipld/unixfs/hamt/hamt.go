@@ -29,8 +29,6 @@ import (
 	"os"
 	"sync"
 
-	"golang.org/x/sync/errgroup"
-
 	format "github.com/ipfs/boxo/ipld/unixfs"
 	"github.com/ipfs/boxo/ipld/unixfs/internal"
 
@@ -38,7 +36,11 @@ import (
 	bitfield "github.com/ipfs/go-bitfield"
 	cid "github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
+	logging "github.com/ipfs/go-log/v2"
+	"golang.org/x/sync/errgroup"
 )
+
+var log = logging.Logger("unixfs-hamt")
 
 const (
 	// HashMurmur3 is the multiformats identifier for Murmur3
@@ -430,8 +432,13 @@ type listCidsAndShards struct {
 func (ds *Shard) walkChildren(processLinkValues func(formattedLink *ipld.Link) error) (*listCidsAndShards, error) {
 	res := &listCidsAndShards{}
 
-	for idx, lnk := range ds.childer.links {
-		if nextShard := ds.childer.children[idx]; nextShard == nil {
+	for i, nextShard := range ds.childer.children {
+		if nextShard == nil {
+			lnk := ds.childer.link(i)
+			if lnk == nil {
+				log.Warnf("internal HAMT error: both link and shard nil at pos %d, dumping shard: %+v", i, *ds)
+				return nil, fmt.Errorf("internal HAMT error: both link and shard nil, check log")
+			}
 			lnkLinkType, err := ds.childLinkType(lnk)
 			if err != nil {
 				return nil, err
@@ -454,7 +461,6 @@ func (ds *Shard) walkChildren(processLinkValues func(formattedLink *ipld.Link) e
 			default:
 				return nil, errors.New("unsupported shard link type")
 			}
-
 		} else {
 			if nextShard.val != nil {
 				formattedLink := &ipld.Link{

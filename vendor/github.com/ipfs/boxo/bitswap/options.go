@@ -71,6 +71,13 @@ func WithTaskComparator(comparator server.TaskComparator) Option {
 	return Option{server.WithTaskComparator(comparator)}
 }
 
+// WithWantHaveReplaceSize sets the maximum size of a block in bytes up to
+// which the bitswap server will replace a WantHave with a WantBlock response.
+// See [server.WithWantHaveReplaceSize] for details.
+func WithWantHaveReplaceSize(size int) Option {
+	return Option{server.WithWantHaveReplaceSize(size)}
+}
+
 func ProviderSearchDelay(newProvSearchDelay time.Duration) Option {
 	return Option{client.ProviderSearchDelay(newProvSearchDelay)}
 }

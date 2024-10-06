@@ -30,8 +30,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-//go:generate protoc --proto_path=$PWD:$PWD/../../.. --go_out=. --go_opt=Mpb/identify.proto=./pb pb/identify.proto
-
 var log = logging.Logger("net/identify")
 
 var Timeout = 30 * time.Second // timeout on all incoming Identify interactions
@@ -997,7 +995,7 @@ func (ids *idService) addConnWithLock(c network.Conn) {
 }
 
 func signedPeerRecordFromMessage(msg *pb.Identify) (*record.Envelope, error) {
-	if msg.SignedPeerRecord == nil || len(msg.SignedPeerRecord) == 0 {
+	if len(msg.SignedPeerRecord) == 0 {
 		return nil, nil
 	}
 	env, _, err := record.ConsumeEnvelope(msg.SignedPeerRecord, peer.PeerRecordEnvelopeDomain)

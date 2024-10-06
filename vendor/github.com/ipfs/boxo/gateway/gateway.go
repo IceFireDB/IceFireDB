@@ -209,7 +209,8 @@ type ContentPathMetadata struct {
 	PathSegmentRoots     []cid.Cid
 	LastSegment          path.ImmutablePath
 	LastSegmentRemainder []string
-	ContentType          string // Only used for UnixFS requests
+	ContentType          string    // Only used for UnixFS requests
+	ModTime              time.Time // Optional, non-zero values may be present in UnixFS 1.5 DAGs
 }
 
 // ByteRange describes a range request within a UnixFS file. "From" and "To" mostly
