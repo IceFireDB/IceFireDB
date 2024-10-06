@@ -21,6 +21,9 @@ var (
 	// ErrIntValueError can returned by INCRBY
 	ErrIntValueError = errors.New(msgInvalidInt)
 
+	// ErrIntValueOverflowError can be returned by INCR, DECR, INCRBY, DECRBY
+	ErrIntValueOverflowError = errors.New(msgIntOverflow)
+
 	// ErrFloatValueError can returned by INCRBYFLOAT
 	ErrFloatValueError = errors.New(msgInvalidFloat)
 )
@@ -421,7 +424,7 @@ func (db *RedisDB) SetTTL(k string, ttl time.Duration) {
 	defer db.master.signal.Broadcast()
 
 	db.ttl[k] = ttl
-	db.keyVersion[k]++
+	db.incr(k)
 }
 
 // Type gives the type of a key, or ""
@@ -506,7 +509,7 @@ func (db *RedisDB) hdel(k, f string) {
 		return
 	}
 	delete(db.hashKeys[k], f)
-	db.keyVersion[k]++
+	db.incr(k)
 }
 
 // HIncrBy increases the integer value of a hash field by delta (int).
@@ -666,6 +669,24 @@ func (db *RedisDB) ZScore(k, member string) (float64, error) {
 	return db.ssetScore(k, member), nil
 }
 
+// ZScore gives scores of a list of members in a sorted set.
+func (m *Miniredis) ZMScore(k string, members ...string) ([]float64, error) {
+	return m.DB(m.selectedDB).ZMScore(k, members)
+}
+
+func (db *RedisDB) ZMScore(k string, members []string) ([]float64, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	if !db.exists(k) {
+		return nil, ErrKeyNotFound
+	}
+	if db.t(k) != "zset" {
+		return nil, ErrWrongType
+	}
+	return db.ssetMScore(k, members), nil
+}
+
 // XAdd adds an entry to a stream. `id` can be left empty or be '*'.
 // If a value is given normal XADD rules apply. Values should be an even
 // length.
@@ -792,4 +813,12 @@ func (db *RedisDB) HllMerge(destKey string, sourceKeys ...string) error {
 	defer db.master.Unlock()
 
 	return db.hllMerge(append([]string{destKey}, sourceKeys...))
+}
+
+// Copy a value.
+// Needs the IDs of both the source and dest DBs (which can differ).
+// Returns ErrKeyNotFound if src does not exist.
+// Overwrites dest if it already exists (unlike the redis command, which needs a flag to allow that).
+func (m *Miniredis) Copy(srcDB int, src string, destDB int, dest string) error {
+	return m.copy(m.DB(srcDB), src, m.DB(destDB), dest)
 }

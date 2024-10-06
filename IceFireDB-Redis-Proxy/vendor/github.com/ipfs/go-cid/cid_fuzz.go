@@ -1,10 +1,9 @@
-// +build gofuzz
+//go:build gofuzz
 
 package cid
 
 func Fuzz(data []byte) int {
 	cid, err := Cast(data)
-
 	if err != nil {
 		return 0
 	}

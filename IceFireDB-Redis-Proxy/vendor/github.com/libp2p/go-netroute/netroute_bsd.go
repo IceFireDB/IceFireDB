@@ -4,11 +4,11 @@
 // that can be found in the LICENSE file in the root of the source
 // tree.
 
-// +build darwin dragonfly freebsd netbsd openbsd
+//go:build darwin || dragonfly || freebsd || netbsd || openbsd
 
 // This is a BSD import for the routing structure initially found in
 // https://github.com/google/gopacket/blob/master/routing/routing.go
-//RIB parsing follows the BSD route format described in
+// RIB parsing follows the BSD route format described in
 // https://github.com/freebsd/freebsd/blob/master/sys/net/route.h
 package netroute
 
@@ -66,20 +66,19 @@ func New() (routing.Router, error) {
 	var ipn *net.IPNet
 	for _, msg := range msgs {
 		m := msg.(*route.RouteMessage)
+		// We ignore the error (m.Err) here. It's not clear what this error actually means,
+		// and it makes us miss routes that _should_ be included.
 		routeInfo := new(rtInfo)
 
 		if m.Version < 3 || m.Version > 5 {
-			return nil, fmt.Errorf("Unexpected RIB message version: %d", m.Version)
+			return nil, fmt.Errorf("unexpected RIB message version: %d", m.Version)
 		}
 		if m.Type != 4 /* RTM_GET */ {
-			return nil, fmt.Errorf("Unexpected RIB message type: %d", m.Type)
+			return nil, fmt.Errorf("unexpected RIB message type: %d", m.Type)
 		}
 
 		if m.Flags&RTF_UP == 0 ||
 			m.Flags&(RTF_REJECT|RTF_BLACKHOLE) != 0 {
-			continue
-		}
-		if m.Err != nil {
 			continue
 		}
 
@@ -95,7 +94,7 @@ func New() (routing.Router, error) {
 			}
 			routeInfo.Dst = ipn
 		} else {
-			return nil, fmt.Errorf("Unexpected RIB destination: %v", err)
+			return nil, fmt.Errorf("unexpected RIB destination: %v", err)
 		}
 
 		if m.Flags&RTF_GATEWAY != 0 {

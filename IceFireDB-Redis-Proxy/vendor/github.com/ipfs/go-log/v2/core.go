@@ -1,6 +1,7 @@
 package log
 
 import (
+	"reflect"
 	"sync"
 
 	"go.uber.org/multierr"
@@ -80,7 +81,7 @@ func (l *lockedMultiCore) DeleteCore(core zapcore.Core) {
 
 	w := 0
 	for i := 0; i < len(l.cores); i++ {
-		if l.cores[i] == core {
+		if reflect.DeepEqual(l.cores[i], core) {
 			continue
 		}
 		l.cores[w] = l.cores[i]
@@ -94,7 +95,7 @@ func (l *lockedMultiCore) ReplaceCore(original, replacement zapcore.Core) {
 	defer l.mu.Unlock()
 
 	for i := 0; i < len(l.cores); i++ {
-		if l.cores[i] == original {
+		if reflect.DeepEqual(l.cores[i], original) {
 			l.cores[i] = replacement
 		}
 	}

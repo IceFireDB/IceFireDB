@@ -9,7 +9,7 @@ import (
 func Matches(maddr ma.Multiaddr) (matches bool) {
 	ma.ForEach(maddr, func(c ma.Component) bool {
 		switch c.Protocol().Code {
-		case DnsProtocol.Code, Dns4Protocol.Code, Dns6Protocol.Code, DnsaddrProtocol.Code:
+		case dnsProtocol.Code, dns4Protocol.Code, dns6Protocol.Code, dnsaddrProtocol.Code:
 			matches = true
 		}
 		return !matches
@@ -41,17 +41,4 @@ func offset(maddr ma.Multiaddr, offset int) ma.Multiaddr {
 		return false
 	})
 	return after
-}
-
-// takes the cross product of two sets of multiaddrs
-//
-// assumes `a` is non-empty.
-func cross(a, b []ma.Multiaddr) []ma.Multiaddr {
-	res := make([]ma.Multiaddr, 0, len(a)*len(b))
-	for _, x := range a {
-		for _, y := range b {
-			res = append(res, x.Encapsulate(y))
-		}
-	}
-	return res
 }

@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 
 	manet "github.com/multiformats/go-multiaddr/net"
 )
@@ -177,12 +177,12 @@ func WithPeerGater(params *PeerGaterParams) Option {
 
 		// hook the tracer
 		if ps.tracer != nil {
-			ps.tracer.internal = append(ps.tracer.internal, gs.gate)
+			ps.tracer.raw = append(ps.tracer.raw, gs.gate)
 		} else {
 			ps.tracer = &pubsubTracer{
-				internal: []internalTracer{gs.gate},
-				pid:      ps.host.ID(),
-				msgID:    ps.msgID,
+				raw:   []RawTracer{gs.gate},
+				pid:   ps.host.ID(),
+				idGen: ps.idGen,
 			}
 		}
 
@@ -303,6 +303,10 @@ func (pg *peerGater) getPeerIP(p peer.ID) string {
 		// most streams; it's a nightmare to track multiple IPs per peer, so pick the best one.
 		streams := make(map[string]int)
 		for _, c := range conns {
+			if c.Stat().Limited {
+				// ignore transient
+				continue
+			}
 			streams[c.ID()] = len(c.GetStreams())
 		}
 		sort.Slice(conns, func(i, j int) bool {
@@ -358,6 +362,9 @@ func (pg *peerGater) AcceptFrom(p peer.ID) AcceptStatus {
 	return AcceptControl
 }
 
+// -- RawTracer interface methods
+var _ RawTracer = (*peerGater)(nil)
+
 // tracer interface
 func (pg *peerGater) AddPeer(p peer.ID, proto protocol.ID) {
 	pg.Lock()
@@ -411,13 +418,13 @@ func (pg *peerGater) RejectMessage(msg *Message, reason string) {
 	defer pg.Unlock()
 
 	switch reason {
-	case rejectValidationQueueFull:
+	case RejectValidationQueueFull:
 		fallthrough
-	case rejectValidationThrottled:
+	case RejectValidationThrottled:
 		pg.lastThrottle = time.Now()
 		pg.throttle++
 
-	case rejectValidationIgnored:
+	case RejectValidationIgnored:
 		st := pg.getPeerStats(msg.ReceivedFrom)
 		st.ignore++
 
@@ -436,3 +443,11 @@ func (pg *peerGater) DuplicateMessage(msg *Message) {
 }
 
 func (pg *peerGater) ThrottlePeer(p peer.ID) {}
+
+func (pg *peerGater) RecvRPC(rpc *RPC) {}
+
+func (pg *peerGater) SendRPC(rpc *RPC, p peer.ID) {}
+
+func (pg *peerGater) DropRPC(rpc *RPC, p peer.ID) {}
+
+func (pg *peerGater) UndeliverableMessage(msg *Message) {}

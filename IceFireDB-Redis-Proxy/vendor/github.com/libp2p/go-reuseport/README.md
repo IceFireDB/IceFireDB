@@ -1,13 +1,12 @@
 # go-reuseport
 
 [![](https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square)](https://protocol.ai)
+[![GoDoc](https://godoc.org/github.com/libp2p/go-reuseport?status.svg)](https://godoc.org/github.com/libp2p/go-reuseport)
 [![](https://img.shields.io/badge/project-libp2p-yellow.svg?style=flat-square)](https://libp2p.io/)
 [![](https://img.shields.io/badge/freenode-%23libp2p-yellow.svg?style=flat-square)](https://webchat.freenode.net/?channels=%23libp2p)
 [![codecov](https://codecov.io/gh/libp2p/go-reuseport/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-reuseport)
 [![Travis CI](https://travis-ci.org/libp2p/go-reuseport.svg?branch=master)](https://travis-ci.org/libp2p/go-reuseport)
 [![Discourse posts](https://img.shields.io/discourse/https/discuss.libp2p.io/posts.svg)](https://discuss.libp2p.io)
-
-**NOTE:** This package REQUIRES go >= 1.11.
 
 This package enables listening and dialing from _the same_ TCP or UDP port.
 This means that the following sockopts may be set:
@@ -16,8 +15,6 @@ This means that the following sockopts may be set:
 SO_REUSEADDR
 SO_REUSEPORT
 ```
-
-- godoc: https://godoc.org/github.com/libp2p/go-reuseport
 
 This is a simple package to help with address reuse. This is particularly
 important when attempting to do TCP NAT holepunching, which requires a process

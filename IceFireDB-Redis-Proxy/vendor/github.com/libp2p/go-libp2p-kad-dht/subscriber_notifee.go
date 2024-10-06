@@ -1,28 +1,15 @@
 package dht
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/libp2p/go-libp2p-core/event"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-
-	"github.com/libp2p/go-eventbus"
-
-	"github.com/jbenet/goprocess"
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/libp2p/go-libp2p/core/event"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 )
 
-// subscriberNotifee implements network.Notifee and also manages the subscriber to the event bus. We consume peer
-// identification events to trigger inclusion in the routing table, and we consume Disconnected events to eject peers
-// from it.
-type subscriberNotifee struct {
-	dht  *IpfsDHT
-	subs event.Subscription
-}
-
-func newSubscriberNotifiee(dht *IpfsDHT) (*subscriberNotifee, error) {
+func (dht *IpfsDHT) startNetworkSubscriber() error {
 	bufSize := eventbus.BufSize(256)
 
 	evts := []interface{}{
@@ -36,6 +23,9 @@ func newSubscriberNotifiee(dht *IpfsDHT) (*subscriberNotifee, error) {
 		// register for event bus notifications for when our local address/addresses change so we can
 		// advertise those to the network
 		new(event.EvtLocalAddressesUpdated),
+
+		// we want to know when we are disconnecting from other peers.
+		new(event.EvtPeerConnectednessChanged),
 	}
 
 	// register for event bus local routability changes in order to trigger switching between client and server modes
@@ -46,61 +36,57 @@ func newSubscriberNotifiee(dht *IpfsDHT) (*subscriberNotifee, error) {
 
 	subs, err := dht.host.EventBus().Subscribe(evts, bufSize)
 	if err != nil {
-		return nil, fmt.Errorf("dht could not subscribe to eventbus events; err: %s", err)
+		return fmt.Errorf("dht could not subscribe to eventbus events: %w", err)
 	}
 
-	nn := &subscriberNotifee{
-		dht:  dht,
-		subs: subs,
-	}
+	dht.wg.Add(1)
+	go func() {
+		defer dht.wg.Done()
+		defer subs.Close()
 
-	// register for network notifications
-	dht.host.Network().Notify(nn)
+		for {
+			select {
+			case e, more := <-subs.Out():
+				if !more {
+					return
+				}
 
-	return nn, nil
-}
-
-func (nn *subscriberNotifee) subscribe(proc goprocess.Process) {
-	dht := nn.dht
-	defer dht.host.Network().StopNotify(nn)
-	defer nn.subs.Close()
-
-	for {
-		select {
-		case e, more := <-nn.subs.Out():
-			if !more {
+				switch evt := e.(type) {
+				case event.EvtLocalAddressesUpdated:
+					// when our address changes, we should proactively tell our closest peers about it so
+					// we become discoverable quickly. The Identify protocol will push a signed peer record
+					// with our new address to all peers we are connected to. However, we might not necessarily be connected
+					// to our closet peers & so in the true spirit of Zen, searching for ourself in the network really is the best way
+					// to to forge connections with those matter.
+					if dht.autoRefresh || dht.testAddressUpdateProcessing {
+						dht.rtRefreshManager.RefreshNoWait()
+					}
+				case event.EvtPeerProtocolsUpdated:
+					handlePeerChangeEvent(dht, evt.Peer)
+				case event.EvtPeerIdentificationCompleted:
+					handlePeerChangeEvent(dht, evt.Peer)
+				case event.EvtPeerConnectednessChanged:
+					if evt.Connectedness != network.Connected {
+						dht.msgSender.OnDisconnect(dht.ctx, evt.Peer)
+					}
+				case event.EvtLocalReachabilityChanged:
+					if dht.auto == ModeAuto || dht.auto == ModeAutoServer {
+						handleLocalReachabilityChangedEvent(dht, evt)
+					} else {
+						// something has gone really wrong if we get an event we did not subscribe to
+						logger.Errorf("received LocalReachabilityChanged event that was not subscribed to")
+					}
+				default:
+					// something has gone really wrong if we get an event for another type
+					logger.Errorf("got wrong type from subscription: %T", e)
+				}
+			case <-dht.ctx.Done():
 				return
 			}
-
-			switch evt := e.(type) {
-			case event.EvtLocalAddressesUpdated:
-				// when our address changes, we should proactively tell our closest peers about it so
-				// we become discoverable quickly. The Identify protocol will push a signed peer record
-				// with our new address to all peers we are connected to. However, we might not necessarily be connected
-				// to our closet peers & so in the true spirit of Zen, searching for ourself in the network really is the best way
-				// to to forge connections with those matter.
-				if dht.autoRefresh || dht.testAddressUpdateProcessing {
-					dht.rtRefreshManager.RefreshNoWait()
-				}
-			case event.EvtPeerProtocolsUpdated:
-				handlePeerChangeEvent(dht, evt.Peer)
-			case event.EvtPeerIdentificationCompleted:
-				handlePeerChangeEvent(dht, evt.Peer)
-			case event.EvtLocalReachabilityChanged:
-				if dht.auto == ModeAuto || dht.auto == ModeAutoServer {
-					handleLocalReachabilityChangedEvent(dht, evt)
-				} else {
-					// something has gone really wrong if we get an event we did not subscribe to
-					logger.Errorf("received LocalReachabilityChanged event that was not subscribed to")
-				}
-			default:
-				// something has gone really wrong if we get an event for another type
-				logger.Errorf("got wrong type from subscription: %T", e)
-			}
-		case <-proc.Closing():
-			return
 		}
-	}
+	}()
+
+	return nil
 }
 
 func handlePeerChangeEvent(dht *IpfsDHT, p peer.ID) {
@@ -109,10 +95,9 @@ func handlePeerChangeEvent(dht *IpfsDHT, p peer.ID) {
 		logger.Errorf("could not check peerstore for protocol support: err: %s", err)
 		return
 	} else if valid {
-		dht.peerFound(dht.ctx, p, false)
-		dht.fixRTIfNeeded()
+		dht.peerFound(p)
 	} else {
-		dht.peerStoppedDHT(dht.ctx, p)
+		dht.peerStoppedDHT(p)
 	}
 }
 
@@ -147,48 +132,10 @@ func handleLocalReachabilityChangedEvent(dht *IpfsDHT, e event.EvtLocalReachabil
 // supporting the primary protocols, we do not want to add peers that are speaking obsolete secondary protocols to our
 // routing table
 func (dht *IpfsDHT) validRTPeer(p peer.ID) (bool, error) {
-	b, err := dht.peerstore.FirstSupportedProtocol(p, dht.protocolsStrs...)
+	b, err := dht.peerstore.FirstSupportedProtocol(p, dht.protocols...)
 	if len(b) == 0 || err != nil {
 		return false, err
 	}
 
 	return dht.routingTablePeerFilter == nil || dht.routingTablePeerFilter(dht, p), nil
 }
-
-type disconnector interface {
-	OnDisconnect(ctx context.Context, p peer.ID)
-}
-
-func (nn *subscriberNotifee) Disconnected(n network.Network, v network.Conn) {
-	dht := nn.dht
-
-	ms, ok := dht.msgSender.(disconnector)
-	if !ok {
-		return
-	}
-
-	select {
-	case <-dht.Process().Closing():
-		return
-	default:
-	}
-
-	p := v.RemotePeer()
-
-	// Lock and check to see if we're still connected. We lock to make sure
-	// we don't concurrently process a connect event.
-	dht.plk.Lock()
-	defer dht.plk.Unlock()
-	if dht.host.Network().Connectedness(p) == network.Connected {
-		// We're still connected.
-		return
-	}
-
-	ms.OnDisconnect(dht.Context(), p)
-}
-
-func (nn *subscriberNotifee) Connected(network.Network, network.Conn)      {}
-func (nn *subscriberNotifee) OpenedStream(network.Network, network.Stream) {}
-func (nn *subscriberNotifee) ClosedStream(network.Network, network.Stream) {}
-func (nn *subscriberNotifee) Listen(network.Network, ma.Multiaddr)         {}
-func (nn *subscriberNotifee) ListenClose(network.Network, ma.Multiaddr)    {}

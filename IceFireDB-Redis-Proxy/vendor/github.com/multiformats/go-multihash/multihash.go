@@ -27,11 +27,12 @@ var (
 
 // ErrInconsistentLen is returned when a decoded multihash has an inconsistent length
 type ErrInconsistentLen struct {
-	dm *DecodedMultihash
+	dm          DecodedMultihash
+	lengthFound int
 }
 
 func (e ErrInconsistentLen) Error() string {
-	return fmt.Sprintf("multihash length inconsistent: expected %d, got %d", e.dm.Length, len(e.dm.Digest))
+	return fmt.Sprintf("multihash length inconsistent: expected %d; got %d", e.dm.Length, e.lengthFound)
 }
 
 // constants
@@ -51,6 +52,7 @@ const (
 	KECCAK_256 = 0x1B
 	KECCAK_384 = 0x1C
 	KECCAK_512 = 0x1D
+	BLAKE3     = 0x1E
 
 	SHAKE_128 = 0x18
 	SHAKE_256 = 0x19
@@ -64,9 +66,9 @@ const (
 
 	DBL_SHA2_256 = 0x56
 
-	MURMUR3_128 = 0x22
-	// Deprecated: use MURMUR3_128
-	MURMUR3 = MURMUR3_128
+	MURMUR3X64_64 = 0x22
+	// Deprecated: use MURMUR3X64_64
+	MURMUR3 = MURMUR3X64_64
 
 	SHA2_256_TRUNC254_PADDED  = 0x1012
 	X11                       = 0x1100
@@ -103,11 +105,12 @@ var Names = map[string]uint64{
 	"sha3-384":                  SHA3_384,
 	"sha3-512":                  SHA3_512,
 	"dbl-sha2-256":              DBL_SHA2_256,
-	"murmur3-128":               MURMUR3_128,
+	"murmur3-x64-64":            MURMUR3X64_64,
 	"keccak-224":                KECCAK_224,
 	"keccak-256":                KECCAK_256,
 	"keccak-384":                KECCAK_384,
 	"keccak-512":                KECCAK_512,
+	"blake3":                    BLAKE3,
 	"shake-128":                 SHAKE_128,
 	"shake-256":                 SHAKE_256,
 	"sha2-256-trunc254-padded":  SHA2_256_TRUNC254_PADDED,
@@ -127,11 +130,12 @@ var Codes = map[uint64]string{
 	SHA3_384:                  "sha3-384",
 	SHA3_512:                  "sha3-512",
 	DBL_SHA2_256:              "dbl-sha2-256",
-	MURMUR3_128:               "murmur3-128",
+	MURMUR3X64_64:             "murmur3-x64-64",
 	KECCAK_224:                "keccak-224",
 	KECCAK_256:                "keccak-256",
 	KECCAK_384:                "keccak-384",
 	KECCAK_512:                "keccak-512",
+	BLAKE3:                    "blake3",
 	SHAKE_128:                 "shake-128",
 	SHAKE_256:                 "shake-256",
 	SHA2_256_TRUNC254_PADDED:  "sha2-256-trunc254-padded",
@@ -140,6 +144,7 @@ var Codes = map[uint64]string{
 	MD5:                       "md5",
 }
 
+// reads a varint from buf and returns bytes read.
 func uvarint(buf []byte) (uint64, []byte, error) {
 	n, c, err := varint.FromUvarint(buf)
 	if err != nil {
@@ -170,12 +175,12 @@ type DecodedMultihash struct {
 type Multihash []byte
 
 // HexString returns the hex-encoded representation of a multihash.
-func (m *Multihash) HexString() string {
-	return hex.EncodeToString([]byte(*m))
+func (m Multihash) HexString() string {
+	return hex.EncodeToString([]byte(m))
 }
 
 // String is an alias to HexString().
-func (m *Multihash) String() string {
+func (m Multihash) String() string {
 	return m.HexString()
 }
 
@@ -217,12 +222,26 @@ func Cast(buf []byte) (Multihash, error) {
 
 // Decode parses multihash bytes into a DecodedMultihash.
 func Decode(buf []byte) (*DecodedMultihash, error) {
-	rlen, code, hdig, err := readMultihashFromBuf(buf)
+	// outline decode allowing the &dm expression to be inlined into the caller.
+	// This moves the heap allocation into the caller and if the caller doesn't
+	// leak dm the compiler will use a stack allocation instead.
+	// If you do not outline this &dm always heap allocate since the pointer is
+	// returned which cause a heap allocation because Decode's stack frame is
+	// about to disapear.
+	dm, err := decode(buf)
 	if err != nil {
 		return nil, err
 	}
+	return &dm, nil
+}
 
-	dm := &DecodedMultihash{
+func decode(buf []byte) (dm DecodedMultihash, err error) {
+	rlen, code, hdig, err := readMultihashFromBuf(buf)
+	if err != nil {
+		return DecodedMultihash{}, err
+	}
+
+	dm = DecodedMultihash{
 		Code:   code,
 		Name:   Codes[code],
 		Length: len(hdig),
@@ -230,7 +249,7 @@ func Decode(buf []byte) (*DecodedMultihash, error) {
 	}
 
 	if len(buf) != rlen {
-		return nil, ErrInconsistentLen{dm}
+		return dm, ErrInconsistentLen{dm, rlen}
 	}
 
 	return dm, nil
@@ -261,8 +280,8 @@ func EncodeName(buf []byte, name string) ([]byte, error) {
 // Note: the returned digest is a slice over the passed in data and should be
 // copied if the buffer will be reused
 func readMultihashFromBuf(buf []byte) (int, uint64, []byte, error) {
-	bufl := len(buf)
-	if bufl < 2 {
+	initBufLength := len(buf)
+	if initBufLength < 2 {
 		return 0, 0, nil, ErrTooShort
 	}
 
@@ -286,7 +305,8 @@ func readMultihashFromBuf(buf []byte) (int, uint64, []byte, error) {
 		return 0, 0, nil, errors.New("length greater than remaining number of bytes in buffer")
 	}
 
-	rlen := (bufl - len(buf)) + int(length)
+	// rlen is the advertised size of the CID
+	rlen := (initBufLength - len(buf)) + int(length)
 	return rlen, code, buf[:length], nil
 }
 

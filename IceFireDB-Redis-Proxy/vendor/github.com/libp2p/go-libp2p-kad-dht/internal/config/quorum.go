@@ -1,6 +1,6 @@
 package config
 
-import "github.com/libp2p/go-libp2p-core/routing"
+import "github.com/libp2p/go-libp2p/core/routing"
 
 type QuorumOptionKey struct{}
 

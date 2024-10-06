@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"math/bits"
 
-	u "github.com/ipfs/go-ipfs-util"
+	u "github.com/ipfs/boxo/util"
 	sha256 "github.com/minio/sha256-simd"
 )
 

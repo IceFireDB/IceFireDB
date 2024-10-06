@@ -8,9 +8,8 @@
 </p>
 
 <p align="left">
-  <a href="https://travis-ci.com/libp2p/go-libp2p-pubsub"><img src="https://travis-ci.com/libp2p/go-libp2p-pubsub.svg?branch=master"></a>
   <a href="https://codecov.io/gh/libp2p/go-libp2p-pubsub"><img src="https://codecov.io/gh/libp2p/go-libp2p-pubsub/branch/master/graph/badge.svg"></a>
-  <a href="https://goreportcard.com/report/github.com/libp2p/go-libp2p-pubsub"><img src="https://goreportcard.com/badge/github.com/libp2p/go-libp2p-pubsub" /></a>  
+  <a href="https://goreportcard.com/report/github.com/libp2p/go-libp2p-pubsub"><img src="https://goreportcard.com/badge/github.com/libp2p/go-libp2p-pubsub" /></a>
   <a href="https://github.com/RichardLitt/standard-readme"><img src="https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square" /></a>
   <a href="https://godoc.org/github.com/libp2p/go-libp2p-pubsub"><img src="http://img.shields.io/badge/godoc-reference-5272B4.svg?style=flat-square" /></a>
   <a href=""><img src="https://img.shields.io/badge/golang-%3E%3D1.14.0-orange.svg?style=flat-square" /></a>
@@ -22,7 +21,6 @@ This repo contains the canonical pubsub implementation for libp2p. We currently 
 - Randomsub, which is a simple probabilistic router that propagates to random subsets of peers.
 - Gossipsub, which is a more advanced router with mesh formation and gossip propagation. See [spec](https://github.com/libp2p/specs/tree/master/pubsub/gossipsub) and  [implementation](https://github.com/libp2p/go-libp2p-pubsub/blob/master/gossipsub.go) for more details.
 
-**PSA: The Hardening Extensions for Gossipsub (Gossipsub V1.1) can be found under development at https://github.com/libp2p/go-libp2p-pubsub/pull/263**
 
 ## Repo Lead Maintainer
 
@@ -37,7 +35,7 @@ This repo contains the canonical pubsub implementation for libp2p. We currently 
 
 - [Install](#install)
 - [Usage](#usage)
-- [Implementations](#implementations)
+- [Example](#example)
 - [Documentation](#documentation)
 - [Tracing](#tracing)
 - [Contribute](#contribute)
@@ -57,7 +55,7 @@ To be used for messaging in p2p instrastructure (as part of libp2p) such as IPFS
 
 ### Example
 
-https://github.com/libp2p/go-libp2p-examples/tree/master/pubsub
+https://github.com/libp2p/go-libp2p/tree/master/examples/pubsub
 
 ## Documentation
 
@@ -107,12 +105,22 @@ If you want to trace using a remote peer, you can do so using the `traced` daemo
 
 For instance, to capture the trace as a json file, you can use the following option:
 ```go
-pubsub.NewGossipSub(..., pubsub.NewEventTracer(pubsub.NewJSONTracer("/path/to/trace.json")))
+tracer, err := pubsub.NewJSONTracer("/path/to/trace.json")
+if err != nil {
+  panic(err)
+}
+
+pubsub.NewGossipSub(..., pubsub.WithEventTracer(tracer))
 ```
 
 To capture the trace as a protobuf, you can use the following option:
 ```go
-pubsub.NewGossipSub(..., pubsub.NewEventTracer(pubsub.NewPBTracer("/path/to/trace.pb")))
+tracer, err := pubsub.NewPBTracer("/path/to/trace.pb")
+if err != nil {
+  panic(err)
+}
+
+pubsub.NewGossipSub(..., pubsub.WithEventTracer(tracer))
 ```
 
 Finally, to use the remote tracer, you can use the following incantations:

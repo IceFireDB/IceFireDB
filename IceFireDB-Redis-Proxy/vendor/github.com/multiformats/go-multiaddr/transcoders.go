@@ -5,12 +5,15 @@ import (
 	"encoding/base32"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/ipfs/go-cid"
+	"github.com/multiformats/go-multibase"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -54,6 +57,22 @@ func (t twrp) ValidateBytes(b []byte) error {
 var TranscoderIP4 = NewTranscoderFromFunctions(ip4StB, ip4BtS, nil)
 var TranscoderIP6 = NewTranscoderFromFunctions(ip6StB, ip6BtS, nil)
 var TranscoderIP6Zone = NewTranscoderFromFunctions(ip6zoneStB, ip6zoneBtS, ip6zoneVal)
+var TranscoderIPCIDR = NewTranscoderFromFunctions(ipcidrStB, ipcidrBtS, nil)
+
+func ipcidrBtS(b []byte) (string, error) {
+	if len(b) != 1 {
+		return "", fmt.Errorf("invalid length (should be == 1)")
+	}
+	return strconv.Itoa(int(b[0])), nil
+}
+
+func ipcidrStB(s string) ([]byte, error) {
+	ipMask, err := strconv.ParseUint(s, 10, 8)
+	if err != nil {
+		return nil, err
+	}
+	return []byte{byte(uint8(ipMask))}, nil
+}
 
 func ip4StB(s string) ([]byte, error) {
 	i := net.ParseIP(s).To4()
@@ -115,12 +134,9 @@ func ip4BtS(b []byte) (string, error) {
 var TranscoderPort = NewTranscoderFromFunctions(portStB, portBtS, nil)
 
 func portStB(s string) ([]byte, error) {
-	i, err := strconv.Atoi(s)
+	i, err := strconv.ParseUint(s, 10, 16)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse port addr: %s", err)
-	}
-	if i >= 65536 {
-		return nil, fmt.Errorf("failed to parse port addr: %s", "greater than 65536")
 	}
 	b := make([]byte, 2)
 	binary.BigEndian.PutUint16(b, uint16(i))
@@ -129,10 +145,10 @@ func portStB(s string) ([]byte, error) {
 
 func portBtS(b []byte) (string, error) {
 	i := binary.BigEndian.Uint16(b)
-	return strconv.Itoa(int(i)), nil
+	return strconv.FormatUint(uint64(i), 10), nil
 }
 
-var TranscoderOnion = NewTranscoderFromFunctions(onionStB, onionBtS, nil)
+var TranscoderOnion = NewTranscoderFromFunctions(onionStB, onionBtS, onionValidate)
 
 func onionStB(s string) ([]byte, error) {
 	addr := strings.Split(s, ":")
@@ -140,25 +156,23 @@ func onionStB(s string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to parse onion addr: %s does not contain a port number", s)
 	}
 
-	// onion address without the ".onion" substring
-	if len(addr[0]) != 16 {
-		return nil, fmt.Errorf("failed to parse onion addr: %s not a Tor onion address", s)
-	}
 	onionHostBytes, err := base32.StdEncoding.DecodeString(strings.ToUpper(addr[0]))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode base32 onion addr: %s %s", s, err)
 	}
 
+	// onion address without the ".onion" substring are 10 bytes long
+	if len(onionHostBytes) != 10 {
+		return nil, fmt.Errorf("failed to parse onion addr: %s not a Tor onion address", s)
+	}
+
 	// onion port number
-	i, err := strconv.Atoi(addr[1])
+	i, err := strconv.ParseUint(addr[1], 10, 16)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse onion addr: %s", err)
 	}
-	if i >= 65536 {
-		return nil, fmt.Errorf("failed to parse onion addr: %s", "port greater than 65536")
-	}
-	if i < 1 {
-		return nil, fmt.Errorf("failed to parse onion addr: %s", "port less than 1")
+	if i == 0 {
+		return nil, fmt.Errorf("failed to parse onion addr: %s", "non-zero port")
 	}
 
 	onionPortBytes := make([]byte, 2)
@@ -172,10 +186,24 @@ func onionStB(s string) ([]byte, error) {
 func onionBtS(b []byte) (string, error) {
 	addr := strings.ToLower(base32.StdEncoding.EncodeToString(b[0:10]))
 	port := binary.BigEndian.Uint16(b[10:12])
-	return addr + ":" + strconv.Itoa(int(port)), nil
+	if port == 0 {
+		return "", fmt.Errorf("failed to parse onion addr: %s", "non-zero port")
+	}
+	return addr + ":" + strconv.FormatUint(uint64(port), 10), nil
 }
 
-var TranscoderOnion3 = NewTranscoderFromFunctions(onion3StB, onion3BtS, nil)
+func onionValidate(b []byte) error {
+	if len(b) != 12 {
+		return fmt.Errorf("invalid len for onion addr: got %d expected 12", len(b))
+	}
+	port := binary.BigEndian.Uint16(b[10:12])
+	if port == 0 {
+		return fmt.Errorf("invalid port 0 for onion addr")
+	}
+	return nil
+}
+
+var TranscoderOnion3 = NewTranscoderFromFunctions(onion3StB, onion3BtS, onion3Validate)
 
 func onion3StB(s string) ([]byte, error) {
 	addr := strings.Split(s, ":")
@@ -193,15 +221,12 @@ func onion3StB(s string) ([]byte, error) {
 	}
 
 	// onion port number
-	i, err := strconv.Atoi(addr[1])
+	i, err := strconv.ParseUint(addr[1], 10, 16)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse onion addr: %s", err)
 	}
-	if i >= 65536 {
-		return nil, fmt.Errorf("failed to parse onion addr: %s", "port greater than 65536")
-	}
-	if i < 1 {
-		return nil, fmt.Errorf("failed to parse onion addr: %s", "port less than 1")
+	if i == 0 {
+		return nil, fmt.Errorf("failed to parse onion addr: %s", "non-zero port")
 	}
 
 	onionPortBytes := make([]byte, 2)
@@ -215,8 +240,22 @@ func onion3StB(s string) ([]byte, error) {
 func onion3BtS(b []byte) (string, error) {
 	addr := strings.ToLower(base32.StdEncoding.EncodeToString(b[0:35]))
 	port := binary.BigEndian.Uint16(b[35:37])
-	str := addr + ":" + strconv.Itoa(int(port))
+	if port < 1 {
+		return "", fmt.Errorf("failed to parse onion addr: %s", "port less than 1")
+	}
+	str := addr + ":" + strconv.FormatUint(uint64(port), 10)
 	return str, nil
+}
+
+func onion3Validate(b []byte) error {
+	if len(b) != 37 {
+		return fmt.Errorf("invalid len for onion addr: got %d expected 37", len(b))
+	}
+	port := binary.BigEndian.Uint16(b[35:37])
+	if port == 0 {
+		return fmt.Errorf("invalid port 0 for onion addr")
+	}
+	return nil
 }
 
 var TranscoderGarlic64 = NewTranscoderFromFunctions(garlic64StB, garlic64BtS, garlic64Validate)
@@ -225,16 +264,14 @@ var TranscoderGarlic64 = NewTranscoderFromFunctions(garlic64StB, garlic64BtS, ga
 var garlicBase64Encoding = base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-~")
 
 func garlic64StB(s string) ([]byte, error) {
-	// i2p base64 address will be between 516 and 616 characters long, depending on
-	// certificate type
-	if len(s) < 516 || len(s) > 616 {
-		return nil, fmt.Errorf("failed to parse garlic addr: %s not an i2p base64 address. len: %d", s, len(s))
-	}
 	garlicHostBytes, err := garlicBase64Encoding.DecodeString(s)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode base64 i2p addr: %s %s", s, err)
 	}
 
+	if err := garlic64Validate(garlicHostBytes); err != nil {
+		return nil, err
+	}
 	return garlicHostBytes, nil
 }
 
@@ -259,18 +296,16 @@ var TranscoderGarlic32 = NewTranscoderFromFunctions(garlic32StB, garlic32BtS, ga
 var garlicBase32Encoding = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567")
 
 func garlic32StB(s string) ([]byte, error) {
-	// an i2p base32 address with a length of greater than 55 characters is
-	// using an Encrypted Leaseset v2. all other base32 addresses will always be
-	// exactly 52 characters
-	if len(s) < 55 && len(s) != 52 {
-		return nil, fmt.Errorf("failed to parse garlic addr: %s not a i2p base32 address. len: %d", s, len(s))
-	}
 	for len(s)%8 != 0 {
 		s += "="
 	}
 	garlicHostBytes, err := garlicBase32Encoding.DecodeString(s)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode base32 garlic addr: %s, err: %v len: %v", s, err, len(s))
+	}
+
+	if err := garlic32Validate(garlicHostBytes); err != nil {
+		return nil, err
 	}
 	return garlicHostBytes, nil
 }
@@ -283,8 +318,9 @@ func garlic32BtS(b []byte) (string, error) {
 }
 
 func garlic32Validate(b []byte) error {
-	// an i2p base64 for an Encrypted Leaseset v2 will be at least 35 bytes
-	// long other than that, they will be exactly 32 bytes
+	// an i2p address with encrypted leaseset has len >= 35 bytes
+	// all other addresses will always be exactly 32 bytes
+	// https://geti2p.net/spec/b32encrypted
 	if len(b) < 35 && len(b) != 32 {
 		return fmt.Errorf("failed to validate garlic addr: %s not an i2p base32 address. len: %d", b, len(b))
 	}
@@ -302,6 +338,9 @@ func p2pStB(s string) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse p2p addr: %s %s", s, err)
 		}
+		if err := p2pVal(m); err != nil {
+			return nil, err
+		}
 		return m, nil
 	}
 
@@ -312,6 +351,9 @@ func p2pStB(s string) ([]byte, error) {
 	}
 
 	if ty := c.Type(); ty == cid.Libp2pKey {
+		if err := p2pVal(c.Hash()); err != nil {
+			return nil, err
+		}
 		return c.Hash(), nil
 	} else {
 		return nil, fmt.Errorf("failed to parse p2p addr: %s has the invalid codec %d", s, ty)
@@ -319,8 +361,20 @@ func p2pStB(s string) ([]byte, error) {
 }
 
 func p2pVal(b []byte) error {
-	_, err := mh.Cast(b)
-	return err
+	h, err := mh.Decode([]byte(b))
+	if err != nil {
+		return fmt.Errorf("invalid multihash: %s", err)
+	}
+	// Peer IDs require either sha256 or identity multihash
+	// https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md#peer-ids
+	if h.Code != mh.SHA2_256 && h.Code != mh.IDENTITY {
+		return fmt.Errorf("invalid multihash code %d expected sha-256 or identity", h.Code)
+	}
+	// This check should ideally be in multihash. sha256 digest lengths MUST be 32
+	if h.Code == mh.SHA2_256 && h.Length != 32 {
+		return fmt.Errorf("invalid digest length %d for sha256 addr: expected 32", h.Length)
+	}
+	return nil
 }
 
 func p2pBtS(b []byte) (string, error) {
@@ -331,7 +385,7 @@ func p2pBtS(b []byte) (string, error) {
 	return m.B58String(), nil
 }
 
-var TranscoderUnix = NewTranscoderFromFunctions(unixStB, unixBtS, nil)
+var TranscoderUnix = NewTranscoderFromFunctions(unixStB, unixBtS, unixValidate)
 
 func unixStB(s string) ([]byte, error) {
 	return []byte(s), nil
@@ -341,9 +395,27 @@ func unixBtS(b []byte) (string, error) {
 	return string(b), nil
 }
 
+func unixValidate(b []byte) error {
+	// The string to bytes parser requires that all Path protocols begin with a '/'
+	// file://./codec.go#L49
+	if len(b) < 2 {
+		return fmt.Errorf("byte slice too short: %d", len(b))
+	}
+	if b[0] != '/' {
+		return errors.New("path protocol must begin with '/'")
+	}
+	if b[len(b)-1] == '/' {
+		return errors.New("unix socket path must not end in '/'")
+	}
+	return nil
+}
+
 var TranscoderDns = NewTranscoderFromFunctions(dnsStB, dnsBtS, dnsVal)
 
 func dnsVal(b []byte) error {
+	if len(b) == 0 {
+		return fmt.Errorf("empty dns addr")
+	}
 	if bytes.IndexByte(b, '/') >= 0 {
 		return fmt.Errorf("domain name %q contains a slash", string(b))
 	}
@@ -351,9 +423,62 @@ func dnsVal(b []byte) error {
 }
 
 func dnsStB(s string) ([]byte, error) {
-	return []byte(s), nil
+	b := []byte(s)
+	if err := dnsVal(b); err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
 func dnsBtS(b []byte) (string, error) {
 	return string(b), nil
+}
+
+var TranscoderCertHash = NewTranscoderFromFunctions(certHashStB, certHashBtS, validateCertHash)
+
+func certHashStB(s string) ([]byte, error) {
+	_, data, err := multibase.Decode(s)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := mh.Decode(data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func certHashBtS(b []byte) (string, error) {
+	return multibase.Encode(multibase.Base64url, b)
+}
+
+func validateCertHash(b []byte) error {
+	_, err := mh.Decode(b)
+	return err
+}
+
+var TranscoderHTTPPath = NewTranscoderFromFunctions(httpPathStB, httpPathBtS, validateHTTPPath)
+
+func httpPathStB(s string) ([]byte, error) {
+	unescaped, err := url.QueryUnescape(s)
+	if err != nil {
+		return nil, err
+	}
+	if len(unescaped) == 0 {
+		return nil, fmt.Errorf("empty http path is not allowed")
+	}
+	return []byte(unescaped), err
+}
+
+func httpPathBtS(b []byte) (string, error) {
+	if len(b) == 0 {
+		return "", fmt.Errorf("empty http path is not allowed")
+	}
+	return url.QueryEscape(string(b)), nil
+}
+
+func validateHTTPPath(b []byte) error {
+	if len(b) == 0 {
+		return fmt.Errorf("empty http path is not allowed")
+	}
+	return nil // We can represent any byte slice when we escape it.
 }

@@ -8,13 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-msgio"
+
+	//lint:ignore SA1019 TODO migrate away from gogo pb
 	"github.com/libp2p/go-msgio/protoio"
 
 	"go.opencensus.io/stats"
@@ -41,7 +43,7 @@ type messageSenderImpl struct {
 	protocols []protocol.ID
 }
 
-func NewMessageSenderImpl(h host.Host, protos []protocol.ID) pb.MessageSender {
+func NewMessageSenderImpl(h host.Host, protos []protocol.ID) pb.MessageSenderWithDisconnect {
 	return &messageSenderImpl{
 		host:      h,
 		strmap:    make(map[peer.ID]*peerMessageSender),
@@ -295,7 +297,10 @@ func (ms *peerMessageSender) SendRequest(ctx context.Context, pmes *pb.Message) 
 		if err := ms.ctxReadMsg(ctx, mes); err != nil {
 			_ = ms.s.Reset()
 			ms.s = nil
-
+			if err == context.Canceled {
+				// retry would be same error
+				return nil, err
+			}
 			if retry {
 				logger.Debugw("error reading message", "error", err)
 				return nil, err
