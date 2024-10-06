@@ -495,9 +495,12 @@ func (h *BasicHost) SignalAddressChange() {
 	}
 }
 
-func makeUpdatedAddrEvent(prev, current []ma.Multiaddr) *event.EvtLocalAddressesUpdated {
+func (h *BasicHost) makeUpdatedAddrEvent(prev, current []ma.Multiaddr) *event.EvtLocalAddressesUpdated {
+	if prev == nil && current == nil {
+		return nil
+	}
 	prevmap := make(map[string]ma.Multiaddr, len(prev))
-	evt := event.EvtLocalAddressesUpdated{Diffs: true}
+	evt := &event.EvtLocalAddressesUpdated{Diffs: true}
 	addrsAdded := false
 
 	for _, addr := range prev {
@@ -524,7 +527,19 @@ func makeUpdatedAddrEvent(prev, current []ma.Multiaddr) *event.EvtLocalAddresses
 		return nil
 	}
 
-	return &evt
+	// Our addresses have changed. Make a new signed peer record.
+	if !h.disableSignedPeerRecord {
+		// add signed peer record to the event
+		sr, err := h.makeSignedPeerRecord(current)
+		if err != nil {
+			log.Errorf("error creating a signed peer record from the set of current addresses, err=%s", err)
+			// drop this change
+			return nil
+		}
+		evt.SignedPeerRecord = sr
+	}
+
+	return evt
 }
 
 func (h *BasicHost) makeSignedPeerRecord(addrs []ma.Multiaddr) (*record.Envelope, error) {
@@ -548,34 +563,27 @@ func (h *BasicHost) background() {
 	var lastAddrs []ma.Multiaddr
 
 	emitAddrChange := func(currentAddrs []ma.Multiaddr, lastAddrs []ma.Multiaddr) {
-		// nothing to do if both are nil..defensive check
-		if currentAddrs == nil && lastAddrs == nil {
-			return
-		}
-
-		changeEvt := makeUpdatedAddrEvent(lastAddrs, currentAddrs)
-
+		changeEvt := h.makeUpdatedAddrEvent(lastAddrs, currentAddrs)
 		if changeEvt == nil {
 			return
 		}
-
+		// Our addresses have changed.
+		// store the signed peer record in the peer store.
 		if !h.disableSignedPeerRecord {
-			// add signed peer record to the event
-			sr, err := h.makeSignedPeerRecord(currentAddrs)
-			if err != nil {
-				log.Errorf("error creating a signed peer record from the set of current addresses, err=%s", err)
-				return
-			}
-			changeEvt.SignedPeerRecord = sr
-
-			// persist the signed record to the peerstore
-			if _, err := h.caBook.ConsumePeerRecord(sr, peerstore.PermanentAddrTTL); err != nil {
+			if _, err := h.caBook.ConsumePeerRecord(changeEvt.SignedPeerRecord, peerstore.PermanentAddrTTL); err != nil {
 				log.Errorf("failed to persist signed peer record in peer store, err=%s", err)
 				return
 			}
 		}
+		// update host addresses in the peer store
+		removedAddrs := make([]ma.Multiaddr, 0, len(changeEvt.Removed))
+		for _, ua := range changeEvt.Removed {
+			removedAddrs = append(removedAddrs, ua.Address)
+		}
+		h.Peerstore().SetAddrs(h.ID(), currentAddrs, peerstore.PermanentAddrTTL)
+		h.Peerstore().SetAddrs(h.ID(), removedAddrs, 0)
 
-		// emit addr change event on the bus
+		// emit addr change event
 		if err := h.emitters.evtLocalAddrsUpdated.Emit(*changeEvt); err != nil {
 			log.Warnf("error emitting event for updated addrs: %s", err)
 		}
@@ -587,11 +595,10 @@ func (h *BasicHost) background() {
 	defer ticker.Stop()
 
 	for {
+		// Update our local IP addresses before checking our current addresses.
 		if len(h.network.ListenAddresses()) > 0 {
 			h.updateLocalIpAddr()
 		}
-		// Request addresses anyways because, technically, address filters still apply.
-		// The underlying AllAddrs call is effectively a no-op.
 		curr := h.Addrs()
 		emitAddrChange(curr, lastAddrs)
 		lastAddrs = curr

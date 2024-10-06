@@ -103,7 +103,7 @@ func (s *BasicIpldStore) Put(ctx context.Context, v interface{}) (cid.Cid, error
 
 	var expCid cid.Cid
 	if c, ok := v.(cidProvider); ok {
-		expCid := c.Cid()
+		expCid = c.Cid()
 		pref := expCid.Prefix()
 		mhType = pref.MhType
 		mhLen = pref.MhLength
@@ -133,13 +133,13 @@ func (s *BasicIpldStore) Put(ctx context.Context, v interface{}) (cid.Cid, error
 			return cid.Undef, err
 		}
 
-		if err := s.Blocks.Put(ctx, blk); err != nil {
-			return cid.Undef, err
-		}
-
 		blkCid := blk.Cid()
 		if expCid != cid.Undef && blkCid != expCid {
 			return cid.Undef, fmt.Errorf("your object is not being serialized the way it expects to")
+		}
+
+		if err := s.Blocks.Put(ctx, blk); err != nil {
+			return cid.Undef, err
 		}
 
 		return blkCid, nil
@@ -150,13 +150,13 @@ func (s *BasicIpldStore) Put(ctx context.Context, v interface{}) (cid.Cid, error
 		return cid.Undef, err
 	}
 
-	if err := s.Blocks.Put(ctx, nd); err != nil {
-		return cid.Undef, err
-	}
-
 	ndCid := nd.Cid()
 	if expCid != cid.Undef && ndCid != expCid {
 		return cid.Undef, fmt.Errorf("your object is not being serialized the way it expects to")
+	}
+
+	if err := s.Blocks.Put(ctx, nd); err != nil {
+		return cid.Undef, err
 	}
 
 	return ndCid, nil

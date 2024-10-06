@@ -136,6 +136,7 @@ func (t *transport) dialWithScope(ctx context.Context, raddr ma.Multiaddr, p pee
 	}
 
 	tlsConf, keyCh := t.identity.ConfigForPeer(p)
+	ctx = quicreuse.WithAssociation(ctx, t)
 	pconn, err := t.connManager.DialQUIC(ctx, raddr, tlsConf, t.allowWindowIncrease)
 	if err != nil {
 		return nil, err
@@ -196,7 +197,7 @@ func (t *transport) holePunch(ctx context.Context, raddr ma.Multiaddr, p peer.ID
 	if err != nil {
 		return nil, err
 	}
-	tr, err := t.connManager.TransportForDial(network, addr)
+	tr, err := t.connManager.TransportWithAssociationForDial(t, network, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +314,7 @@ func (t *transport) Listen(addr ma.Multiaddr) (tpt.Listener, error) {
 			return nil, fmt.Errorf("can't listen on quic version %v, underlying listener doesn't support it", version)
 		}
 	} else {
-		ln, err := t.connManager.ListenQUIC(addr, &tlsConf, t.allowWindowIncrease)
+		ln, err := t.connManager.ListenQUICAndAssociate(t, addr, &tlsConf, t.allowWindowIncrease)
 		if err != nil {
 			return nil, err
 		}
@@ -326,7 +327,7 @@ func (t *transport) Listen(addr ma.Multiaddr) (tpt.Listener, error) {
 
 		acceptRunner = &acceptLoopRunner{
 			acceptSem: make(chan struct{}, 1),
-			muxer:     make(map[quic.VersionNumber]chan acceptVal),
+			muxer:     make(map[quic.Version]chan acceptVal),
 		}
 	}
 

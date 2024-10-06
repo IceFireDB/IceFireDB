@@ -1,5 +1,4 @@
 //go:build linux || freebsd || netbsd || openbsd || dragonfly
-// +build linux freebsd netbsd openbsd dragonfly
 
 package files
 

@@ -37,4 +37,7 @@ const (
 	// RebroadcastDelay is the default delay to trigger broadcast of
 	// random CIDs in the wantlist.
 	RebroadcastDelay = time.Minute
+
+	// DefaultWantHaveReplaceSize controls the implicit behavior of WithWantHaveReplaceSize.
+	DefaultWantHaveReplaceSize = 1024
 )

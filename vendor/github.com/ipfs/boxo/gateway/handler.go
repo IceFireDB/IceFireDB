@@ -300,6 +300,11 @@ func (i *handler) getOrHeadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Detect when If-Modified-Since HTTP header + UnixFS 1.5 allow returning HTTP 304 Not Modified.
+	if i.handleIfModifiedSince(w, r, rq) {
+		return
+	}
+
 	// Support custom response formats passed via ?format or Accept HTTP header
 	switch responseFormat {
 	case "", jsonResponseFormat, cborResponseFormat:
@@ -410,18 +415,25 @@ func addCacheControlHeaders(w http.ResponseWriter, r *http.Request, contentPath 
 		}
 
 		if lastMod.IsZero() {
-			// Otherwise, we set Last-Modified to the current time to leverage caching heuristics
+			// If no lastMod, set Last-Modified to the current time to leverage caching heuristics
 			// built into modern browsers: https://github.com/ipfs/kubo/pull/8074#pullrequestreview-645196768
 			modtime = time.Now()
 		} else {
+			// set Last-Modified to a meaningful value e.g. one read from dag-pb (UnixFS 1.5, mtime field)
+			// or the last time DNSLink / IPNS Record was modified / resoved or cache
 			modtime = lastMod
 		}
+
 	} else {
 		w.Header().Set("Cache-Control", immutableCacheControl)
-		modtime = noModtime // disable Last-Modified
 
-		// TODO: consider setting Last-Modified if UnixFS V1.5 ever gets released
-		// with metadata: https://github.com/ipfs/kubo/issues/6920
+		if lastMod.IsZero() {
+			// (noop) skip Last-Modified on immutable response
+			modtime = noModtime
+		} else {
+			// set Last-Modified to value read from dag-pb (UnixFS 1.5, mtime field)
+			modtime = lastMod
+		}
 	}
 
 	return modtime
@@ -505,6 +517,21 @@ func setIpfsRootsHeader(w http.ResponseWriter, rq *requestData, md *ContentPathM
 	rootCidList := strings.Join(pathRoots, ",") // convention from rfc2616#sec4.2
 
 	w.Header().Set("X-Ipfs-Roots", rootCidList)
+}
+
+// lastModifiedMatch returns true if we can respond with HTTP 304 Not Modified
+// It compares If-Modified-Since with logical modification time read from DAG
+// (e.g. UnixFS 1.5 modtime, if present)
+func lastModifiedMatch(ifModifiedSinceHeader string, lastModified time.Time) bool {
+	if ifModifiedSinceHeader == "" || lastModified.IsZero() {
+		return false
+	}
+	ifModifiedSinceTime, err := time.Parse(time.RFC1123, ifModifiedSinceHeader)
+	if err != nil {
+		return false
+	}
+	// ignoring fractional seconds (as HTTP dates don't include fractional seconds)
+	return !lastModified.Truncate(time.Second).After(ifModifiedSinceTime)
 }
 
 // etagMatch evaluates if we can respond with HTTP 304 Not Modified
@@ -742,6 +769,50 @@ func (i *handler) handleIfNoneMatch(w http.ResponseWriter, r *http.Request, rq *
 		return false
 	}
 
+	return false
+}
+
+func (i *handler) handleIfModifiedSince(w http.ResponseWriter, r *http.Request, rq *requestData) bool {
+	// Detect when If-Modified-Since HTTP header allows returning HTTP 304 Not Modified
+	ifModifiedSince := r.Header.Get("If-Modified-Since")
+	if ifModifiedSince == "" {
+		return false
+	}
+
+	// Resolve path to be able to read pathMetadata.ModTime
+	pathMetadata, err := i.backend.ResolvePath(r.Context(), rq.immutablePath)
+	if err != nil {
+		var forwardedPath path.ImmutablePath
+		var continueProcessing bool
+		if isWebRequest(rq.responseFormat) {
+			forwardedPath, continueProcessing = i.handleWebRequestErrors(w, r, rq.mostlyResolvedPath(), rq.immutablePath, rq.contentPath, err, rq.logger)
+			if continueProcessing {
+				pathMetadata, err = i.backend.ResolvePath(r.Context(), forwardedPath)
+			}
+		}
+		if !continueProcessing || err != nil {
+			err = fmt.Errorf("failed to resolve %s: %w", debugStr(rq.contentPath.String()), err)
+			i.webError(w, r, err, http.StatusInternalServerError)
+			return true
+		}
+	}
+
+	// Currently we only care about optional mtime from UnixFS 1.5 (dag-pb)
+	// but other sources of this metadata could be added in the future
+	lastModified := pathMetadata.ModTime
+	if lastModifiedMatch(ifModifiedSince, lastModified) {
+		w.WriteHeader(http.StatusNotModified)
+		return true
+	}
+
+	// Check if the resolvedPath is an immutable path.
+	_, err = path.NewImmutablePath(pathMetadata.LastSegment)
+	if err != nil {
+		i.webError(w, r, err, http.StatusInternalServerError)
+		return true
+	}
+
+	rq.pathMetadata = &pathMetadata
 	return false
 }
 

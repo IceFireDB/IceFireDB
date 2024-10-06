@@ -69,6 +69,36 @@ type refcountedTransport struct {
 	mutex       sync.Mutex
 	refCount    int
 	unusedSince time.Time
+
+	assocations map[any]struct{}
+}
+
+// associate an arbitrary value with this transport.
+// This lets us "tag" the refcountedTransport when listening so we can use it
+// later for dialing. Necessary for holepunching and learning about our own
+// observed listening address.
+func (c *refcountedTransport) associate(a any) {
+	if a == nil {
+		return
+	}
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	if c.assocations == nil {
+		c.assocations = make(map[any]struct{})
+	}
+	c.assocations[a] = struct{}{}
+}
+
+// hasAssociation returns true if the transport has the given association.
+// If it is a nil association, it will always return true.
+func (c *refcountedTransport) hasAssociation(a any) bool {
+	if a == nil {
+		return true
+	}
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	_, ok := c.assocations[a]
+	return ok
 }
 
 func (c *refcountedTransport) IncreaseCount() {
@@ -204,7 +234,7 @@ func (r *reuse) gc() {
 	}
 }
 
-func (r *reuse) TransportForDial(network string, raddr *net.UDPAddr) (*refcountedTransport, error) {
+func (r *reuse) transportWithAssociationForDial(association any, network string, raddr *net.UDPAddr) (*refcountedTransport, error) {
 	var ip *net.IP
 
 	// Only bother looking up the source address if we actually _have_ non 0.0.0.0 listeners.
@@ -224,7 +254,7 @@ func (r *reuse) TransportForDial(network string, raddr *net.UDPAddr) (*refcounte
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	tr, err := r.transportForDialLocked(network, ip)
+	tr, err := r.transportForDialLocked(association, network, ip)
 	if err != nil {
 		return nil, err
 	}
@@ -232,21 +262,26 @@ func (r *reuse) TransportForDial(network string, raddr *net.UDPAddr) (*refcounte
 	return tr, nil
 }
 
-func (r *reuse) transportForDialLocked(network string, source *net.IP) (*refcountedTransport, error) {
+func (r *reuse) transportForDialLocked(association any, network string, source *net.IP) (*refcountedTransport, error) {
 	if source != nil {
 		// We already have at least one suitable transport...
 		if trs, ok := r.unicast[source.String()]; ok {
-			// ... we don't care which port we're dialing from. Just use the first.
+			// Prefer a transport that has the given association. We want to
+			// reuse the transport the association used for listening.
 			for _, tr := range trs {
-				return tr, nil
+				if tr.hasAssociation(association) {
+					return tr, nil
+				}
 			}
 		}
 	}
 
 	// Use a transport listening on 0.0.0.0 (or ::).
-	// Again, we don't care about the port number.
+	// Again, prefer a transport that has the given association.
 	for _, tr := range r.globalListeners {
-		return tr, nil
+		if tr.hasAssociation(association) {
+			return tr, nil
+		}
 	}
 
 	// Use a transport we've previously dialed from

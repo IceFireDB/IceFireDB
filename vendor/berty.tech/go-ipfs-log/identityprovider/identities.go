@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 
-	"github.com/btcsuite/btcd/btcec"
+	btcec "github.com/btcsuite/btcd/btcec/v2"
 	"github.com/libp2p/go-libp2p/core/crypto"
 
 	"berty.tech/go-ipfs-log/errmsg"
@@ -59,7 +59,7 @@ func (i *Identities) Verify(signature []byte, publicKey crypto.PubKey, data []by
 //}
 
 func compressedToUncompressedS256Key(pubKeyBytes []byte) ([]byte, error) {
-	pubKey, err := btcec.ParsePubKey(pubKeyBytes, btcec.S256())
+	pubKey, err := btcec.ParsePubKey(pubKeyBytes)
 	if err != nil {
 		return nil, errmsg.ErrNotSecp256k1PubKey.Wrap(err)
 	}

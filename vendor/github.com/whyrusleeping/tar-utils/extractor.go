@@ -104,7 +104,12 @@ func (te *Extractor) Sanitize(toggle bool) {
 
 // outputPath returns the path at which to place tarPath
 func (te *Extractor) outputPath(tarPath string) (outPath string, err error) {
-	elems := strings.Split(tarPath, "/")    // break into elems
+	elems := strings.Split(tarPath, "/") // break into elems
+	for _, e := range elems {
+		if e == ".." {
+			return "", fmt.Errorf("%s : path contains '..'", tarPath)
+		}
+	}
 	elems = elems[1:]                       // remove original root
 	outPath = strings.Join(elems, "/")      // join elems
 	outPath = gopath.Join(te.Path, outPath) // rebase on to extraction target root
