@@ -1208,8 +1208,8 @@ github.com/whyrusleeping/go-keyspace
 # github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7
 ## explicit
 github.com/whyrusleeping/multiaddr-filter
-# github.com/whyrusleeping/tar-utils v0.0.0-20180509141711-8c6c8ba81d5c
-## explicit
+# github.com/whyrusleeping/tar-utils v0.0.0-20201201191210-20a61371de5b
+## explicit; go 1.14
 github.com/whyrusleeping/tar-utils
 # github.com/wlynxg/anet v0.0.4
 ## explicit; go 1.20
