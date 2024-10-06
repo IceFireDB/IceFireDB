@@ -29,14 +29,14 @@ func (a *Agent) GetCandidatePairsStats() []CandidatePairStats {
 				// FirstRequestTimestamp time.Time
 				// LastRequestTimestamp time.Time
 				// LastResponseTimestamp time.Time
-				// TotalRoundTripTime float64
-				// CurrentRoundTripTime float64
+				TotalRoundTripTime:   cp.TotalRoundTripTime(),
+				CurrentRoundTripTime: cp.CurrentRoundTripTime(),
 				// AvailableOutgoingBitrate float64
 				// AvailableIncomingBitrate float64
 				// CircuitBreakerTriggerCount uint32
 				// RequestsReceived uint64
 				// RequestsSent uint64
-				// ResponsesReceived uint64
+				ResponsesReceived: cp.ResponsesReceived(),
 				// ResponsesSent uint64
 				// RetransmissionsReceived uint64
 				// RetransmissionsSent uint64

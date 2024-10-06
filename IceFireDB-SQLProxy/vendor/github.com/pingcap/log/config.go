@@ -8,6 +8,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
@@ -40,7 +41,7 @@ type FileLogConfig struct {
 type Config struct {
 	// Log level.
 	Level string `toml:"level" json:"level"`
-	// Log format. one of json, text, or console.
+	// Log format. One of json or text.
 	Format string `toml:"format" json:"format"`
 	// Disable automatic timestamps in output.
 	DisableTimestamp bool `toml:"disable-timestamp" json:"disable-timestamp"`
@@ -65,6 +66,10 @@ type Config struct {
 	//
 	// Values configured here are per-second. See zapcore.NewSampler for details.
 	Sampling *zap.SamplingConfig `toml:"sampling" json:"sampling"`
+	// ErrorOutputPath is a path to write internal logger errors to.
+	// If this field is not set, the internal logger errors will be sent to the same file as in File field.
+	// Note: if we want to output the logger errors to stderr, we can just set this field to "stderr"
+	ErrorOutputPath string `toml:"error-output-path" json:"error-output-path"`
 }
 
 // ZapProperties records some information about zap.
@@ -72,10 +77,6 @@ type ZapProperties struct {
 	Core   zapcore.Core
 	Syncer zapcore.WriteSyncer
 	Level  zap.AtomicLevel
-}
-
-func newZapTextEncoder(cfg *Config) zapcore.Encoder {
-	return NewTextEncoder(cfg)
 }
 
 func (cfg *Config) buildOptions(errSink zapcore.WriteSyncer) []zap.Option {

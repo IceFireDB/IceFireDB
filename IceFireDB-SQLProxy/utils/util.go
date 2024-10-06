@@ -2,12 +2,13 @@ package utils
 
 import (
 	"fmt"
-	"github.com/libp2p/go-libp2p-core/host"
-	ma "github.com/multiformats/go-multiaddr"
 	"os"
 	"runtime/debug"
 	"strconv"
 	"time"
+
+	"github.com/libp2p/go-libp2p/core/host"
+	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/siddontang/go/hack"
 	"github.com/sirupsen/logrus"
@@ -77,7 +78,7 @@ func IsFileExist(path string) bool {
 
 func GetHostAddress(ha host.Host) string {
 	// Build host multiaddress
-	hostAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", ha.ID().Pretty()))
+	hostAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", ha.ID().String()))
 
 	// Now we can build a full multiaddress to reach this host
 	// by encapsulating both addresses:
