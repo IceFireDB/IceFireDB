@@ -118,7 +118,7 @@ github.com/btcsuite/btcd/btcec/v2/ecdsa
 # github.com/cenkalti/backoff/v4 v4.3.0
 ## explicit; go 1.18
 github.com/cenkalti/backoff/v4
-# github.com/ceramicnetwork/go-dag-jose v0.1.0 => github.com/IceFireDB/go-dag-jose v1.0.1
+# github.com/ceramicnetwork/go-dag-jose v0.1.0 => github.com/IceFireDB/go-dag-jose v1.0.2
 ## explicit; go 1.21
 github.com/ceramicnetwork/go-dag-jose/dagjose
 # github.com/cespare/xxhash v1.1.0
