@@ -89,6 +89,5 @@ For a quick demonstration of how IceFireDB-SQLProxy works, check out our [demo v
 - **Web2 to Web3 Transition**: Help traditional web2 applications transition to a web3 architecture by enabling decentralized data storage and synchronization.
 - **High Availability and Fault Tolerance**: Ensure that your data remains accessible and consistent even in the face of network disruptions or node failures.
 
----
-
-Thank you for your interest in IceFireDB-SQLProxy. We look forward to seeing how you can leverage this technology to build decentralized and resilient applications!
+### Disclaimers
+By using this software, you agree that the author, maintainer, and contributors are not responsible for any risks, costs, or problems you may encounter. If you find a software defect or bug, please submit a patch to help improve it!

@@ -73,3 +73,6 @@ userlist:
 ## Demo Video
 
 For a visual demonstration of IceFireDB SQLite in action, please watch the [demo video](https://user-images.githubusercontent.com/21053373/173170247-74b1daeb-7bd5-4dc0-8b93-62b334859ba8.mp4).
+
+### Disclaimers
+By using this software, you agree that the author, maintainer, and contributors are not responsible for any risks, costs, or problems you may encounter. If you find a software defect or bug, please submit a patch to help improve it!

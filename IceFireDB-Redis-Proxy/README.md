@@ -1,26 +1,26 @@
-# IceFireDB-Redis-proxy
+# IceFireDB-Redis-Proxy
 
-IceFireDB-Redis-proxy database proxy adds decentralization wings to traditional redis databases. Provide a convenient mechanism to build a globally distributed storage system with automatic networking. The instructions are automatically synchronized between the networked redis agents, and the redis agent writes data to the cluster or single-point redis storage. Through the decentralized middleware network proxy, decentralized data synchronization can be enabled for the Redis database commonly used in web2 applications.
+IceFireDB-Redis-Proxy is a database proxy that adds decentralization capabilities to traditional Redis databases. It provides a convenient mechanism to build a globally distributed storage system with automatic networking. Commands are automatically synchronized between networked Redis agents, and the Redis agent writes data to either a cluster or single-point Redis storage. Through the decentralized middleware network proxy, decentralized data synchronization can be enabled for the Redis databases commonly used in web2 applications.
 
-1. Complete data source mode support: stand-alone, cluster mode
-2. Rich command support
-3. Excellent cluster state management and failover
-4. Excellent traffic control strategy: traffic read-write separation and multi-tenant data isolation
-6. Supports P2P automatic networking, and the agent helps the traditional Redis database to achieve data dispersion.
+## Features
 
-## How does it work?
+1. **Complete Data Source Mode Support**: Stand-alone and cluster modes.
+2. **Rich Command Support**: Comprehensive support for Redis commands.
+3. **Excellent Cluster State Management and Failover**: Ensures high availability and reliability.
+4. **Excellent Traffic Control Strategy**: Includes traffic read-write separation and multi-tenant data isolation.
+5. **P2P Automatic Networking**: The agent helps traditional Redis databases achieve data dispersion.
 
-### scene introduction
+## How It Works
+
+### Scene Introduction
 ![image](https://user-images.githubusercontent.com/34047788/179436964-00aa6ffd-f6f4-4c60-a46c-fb0165296049.png)
 
-
-### system structure
+### System Structure
 ![image](https://user-images.githubusercontent.com/34047788/179439830-e0e4c480-553a-4274-9d12-9afacfcdfe77.png)
 
+## Configuration
 
-### Configuration
-
-In the config directory, the user stores the project configuration file, the file name: config.yaml, which can be modified according to their own needs
+In the `config` directory, users store the project configuration file named `config.yaml`, which can be modified according to their needs.
 
 ```yaml
 # Project proxy configuration
@@ -39,134 +39,135 @@ p2p:
 ...
 ```
 
-### Quickstart
+## Quickstart
 
-https://user-images.githubusercontent.com/52234994/173170991-08713e52-291c-4fae-bf46-ce87b959ce90.mp4
+### Video Tutorial
+[![Quickstart Video](https://user-images.githubusercontent.com/52234994/173170991-08713e52-291c-4fae-bf46-ce87b959ce90.mp4)](https://user-images.githubusercontent.com/52234994/173170991-08713e52-291c-4fae-bf46-ce87b959ce90.mp4)
 
-Run the binary file directly, if you need to run in the background, you can add it to the systemd system management
+### Running the Proxy
+Run the binary file directly. If you need to run it in the background, you can add it to the systemd system management.
+
 ```shell
 $ make
 $ ./bin/IceFireDB-Redis-Proxy -c ./config/config.yaml
 ```
 
-### Usage
+## Usage
+
+### Supported Commands
 
 #### String
-* APPEND
-* BITCOUNT
-* BITPOS
-* DECR
-* DECRBY
-* DEL
-* EXISTS
-* GET
-* GETBIT
-* SETBIT
-* GETRANGE
-* GETSET
-* INCR
-* INCRBY
-* MGET
-* MSET
-* SET
-* SETEX
-* SETEXAT
-* SETRANGE
-* EXPIRE
-* EXPIREAT
-* TTL
-
+- APPEND
+- BITCOUNT
+- BITPOS
+- DECR
+- DECRBY
+- DEL
+- EXISTS
+- GET
+- GETBIT
+- SETBIT
+- GETRANGE
+- GETSET
+- INCR
+- INCRBY
+- MGET
+- MSET
+- SET
+- SETEX
+- SETEXAT
+- SETRANGE
+- EXPIRE
+- EXPIREAT
+- TTL
 
 #### Set
-* SADD
-* SCARD
-* SETBIT
-* SISMEMBER
-* SMEMBERS
-* SPOP
-* SRANDMEMBER
-* SREM
-* SSCAN
+- SADD
+- SCARD
+- SETBIT
+- SISMEMBER
+- SMEMBERS
+- SPOP
+- SRANDMEMBER
+- SREM
+- SSCAN
 
 #### List
-* LINDEX
-* LINSERT
-* LLEN
-* LPOP
-* LPUSH
-* LPUSHX
-* LRANGE
-* LREM
-* LSET
-* LTRIM
-* RPOP
-* RPUSH
-* RPUSHX
+- LINDEX
+- LINSERT
+- LLEN
+- LPOP
+- LPUSH
+- LPUSHX
+- LRANGE
+- LREM
+- LSET
+- LTRIM
+- RPOP
+- RPUSH
+- RPUSHX
 
 #### Hash
-* HDEL
-* HEXISTS
-* HGET
-* HGETALL
-* HINCRBY
-* HINCRBYFLOAT
-* HKEYS
-* HLEN
-* HMGET
-* HMSET
-* HSCAN
-* HSET
-* HSETNX
-* HSTRLEN
-* HVALS
+- HDEL
+- HEXISTS
+- HGET
+- HGETALL
+- HINCRBY
+- HINCRBYFLOAT
+- HKEYS
+- HLEN
+- HMGET
+- HMSET
+- HSCAN
+- HSET
+- HSETNX
+- HSTRLEN
+- HVALS
 
 #### Sorted Sets
-* ZADD
-* ZCARD
-* ZCOUNT
-* ZINCRBY
-* ZLEXCOUNT
-* ZPOPMAX
-* ZPOPMIN
-* ZLEXCOUNT
-* ZRANGE
-* ZRANGEBYLEX
-* ZRANGEBYSCORE
-* ZRANK
-* ZREM
-* ZREMRANGEBYLEX
-* ZREMRANGEBYRANK
-* ZREMRANGEBYSCORE
-* ZREVRANGE
-* ZREVRANGEBYLEX
-* ZREVRANGEBYSCORE
-* ZREVRANK
-* ZSCAN
-* ZSCORE
+- ZADD
+- ZCARD
+- ZCOUNT
+- ZINCRBY
+- ZLEXCOUNT
+- ZPOPMAX
+- ZPOPMIN
+- ZRANGE
+- ZRANGEBYLEX
+- ZRANGEBYSCORE
+- ZRANK
+- ZREM
+- ZREMRANGEBYLEX
+- ZREMRANGEBYRANK
+- ZREMRANGEBYSCORE
+- ZREVRANGE
+- ZREVRANGEBYLEX
+- ZREVRANGEBYSCORE
+- ZREVRANK
+- ZSCAN
+- ZSCORE
 
 #### Stream
-* XACK
-* XADD
-* XCLAIM
-* XDEL
-* XLEN
-* XINFO
-* XPENDING
-* XRANGE
-* XREADGROUP
-* XREVRANGE
-* XTRIM
-* XGROUP
-
+- XACK
+- XADD
+- XCLAIM
+- XDEL
+- XLEN
+- XINFO
+- XPENDING
+- XRANGE
+- XREADGROUP
+- XREVRANGE
+- XTRIM
+- XGROUP
 
 #### Others
-
-* COMMAND
-* PING
-* QUIT
+- COMMAND
+- PING
+- QUIT
 
 ## License
-Icefiredb proxy uses the Apache 2.0 license. See [LICENSE](.LICENSE) for details.
+IceFireDB-Redis-Proxy is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
-## Disclaimers
-When you use this software, you have agreed and stated that the author, maintainer and contributor of this software are not responsible for any risks, costs or problems you encounter. If you find a software defect or BUG, ​​please submit a patch to help improve it!
+### Disclaimers
+By using this software, you agree that the author, maintainer, and contributors are not responsible for any risks, costs, or problems you may encounter. If you find a software defect or bug, please submit a patch to help improve it!
