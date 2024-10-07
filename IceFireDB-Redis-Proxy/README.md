@@ -42,7 +42,7 @@ p2p:
 ## Quickstart
 
 ### Video Tutorial
-[![Quickstart Video](https://user-images.githubusercontent.com/52234994/173170991-08713e52-291c-4fae-bf46-ce87b959ce90.mp4)](https://user-images.githubusercontent.com/52234994/173170991-08713e52-291c-4fae-bf46-ce87b959ce90.mp4)
+For a visual demonstration of IceFireDB-Redis-Proxy in action, please watch the [demo video](https://user-images.githubusercontent.com/52234994/173170991-08713e52-291c-4fae-bf46-ce87b959ce90.mp4).
 
 ### Running the Proxy
 Run the binary file directly. If you need to run it in the background, you can add it to the systemd system management.
