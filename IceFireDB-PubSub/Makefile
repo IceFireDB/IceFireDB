@@ -1,45 +1,49 @@
-PROG=bin/IceFireDB-PubSub
+# Project name and target file
+PROG = bin/IceFireDB-PubSub
+SRCS = ./cmd/pubsub
 
+# Get Git commit hash and build date
+COMMIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "GitNotFound")
+BUILD_DATE := $(shell date '+%Y-%m-%d %H:%M:%S')
 
-SRCS=./cmd/pubsub
+# Compile flags
+CFLAGS = -ldflags "-s -w -X \"main.BuildVersion=$(COMMIT_HASH)\" -X \"main.BuildDate=$(BUILD_DATE)\""
 
-# git commit hash
-COMMIT_HASH=$(shell git rev-parse --short HEAD || echo "GitNotFound")
-
-# Compile the date
-BUILD_DATE=$(shell date '+%Y-%m-%d %H:%M:%S')
-# compile
-CFLAGS = -ldflags "-s -w -X \"main.BuildVersion=${COMMIT_HASH}\""
-# Get GOOS from System
+# Detect local OS type
 LOCAL_OS := $(shell uname)
 ifeq ($(LOCAL_OS),Linux)
-   TARGET_OS_LOCAL = linux
+    TARGET_OS = linux
 else ifeq ($(LOCAL_OS),Darwin)
-   TARGET_OS_LOCAL = darwin
+    TARGET_OS = darwin
 else
-   TARGET_OS_LOCAL = windows
-   PROTOC_GEN_GO_NAME := "icefiredb.exe"
+    TARGET_OS = windows
+    PROG := $(PROG).exe
 endif
-export GOOS ?= $(TARGET_OS_LOCAL)
 
-all:
-	if [ ! -d "./bin/" ]; then \
-	mkdir bin; \
-	fi
-	GOPROXY=$(GOPROXY) GOOS=$(GOOS) GOARCH=amd64 go build $(CFLAGS) -o $(PROG) $(SRCS)
+# Set GOOS environment variable
+export GOOS ?= $(TARGET_OS)
 
-# Compiling the RACE version
-race:
-	if [ ! -d "./bin/" ]; then \
-    	mkdir bin; \
-    	fi
+# Default target: build the executable
+all: $(PROG)
+
+$(PROG): $(SRCS)
+	@mkdir -p bin
+	GOPROXY=$(GOPROXY) GOOS=$(GOOS) GOARCH=amd64 go build $(CFLAGS) -o $@ $(SRCS)
+
+# Build with race detection
+race: $(PROG)
 	GOPROXY=$(GOPROXY) go build $(CFLAGS) -race -o $(PROG) $(SRCS)
 
+# Clean generated files
 clean:
 	rm -rf ./bin
 
+# Run with race detection
 run:
 	GOPROXY=$(GOPROXY) go run --race cmd/pubsub/main.go -c config/config.yaml
 
+# Run with development configuration
 run_dev:
 	GOPROXY=$(GOPROXY) go run cmd/pubsub/main.go -c config/config_dev.yaml
+
+.PHONY: all race clean run run_dev
