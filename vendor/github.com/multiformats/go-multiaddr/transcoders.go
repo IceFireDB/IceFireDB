@@ -57,11 +57,11 @@ func (t twrp) ValidateBytes(b []byte) error {
 var TranscoderIP4 = NewTranscoderFromFunctions(ip4StB, ip4BtS, nil)
 var TranscoderIP6 = NewTranscoderFromFunctions(ip6StB, ip6BtS, nil)
 var TranscoderIP6Zone = NewTranscoderFromFunctions(ip6zoneStB, ip6zoneBtS, ip6zoneVal)
-var TranscoderIPCIDR = NewTranscoderFromFunctions(ipcidrStB, ipcidrBtS, nil)
+var TranscoderIPCIDR = NewTranscoderFromFunctions(ipcidrStB, ipcidrBtS, ipcidrValidate)
 
 func ipcidrBtS(b []byte) (string, error) {
-	if len(b) != 1 {
-		return "", fmt.Errorf("invalid length (should be == 1)")
+	if err := ipcidrValidate(b); err != nil {
+		return "", err
 	}
 	return strconv.Itoa(int(b[0])), nil
 }
@@ -72,6 +72,13 @@ func ipcidrStB(s string) ([]byte, error) {
 		return nil, err
 	}
 	return []byte{byte(uint8(ipMask))}, nil
+}
+
+func ipcidrValidate(b []byte) error {
+	if len(b) != 1 {
+		return fmt.Errorf("invalid length (should be == 1)")
+	}
+	return nil
 }
 
 func ip4StB(s string) ([]byte, error) {
@@ -481,4 +488,33 @@ func validateHTTPPath(b []byte) error {
 		return fmt.Errorf("empty http path is not allowed")
 	}
 	return nil // We can represent any byte slice when we escape it.
+}
+
+var TranscoderMemory = NewTranscoderFromFunctions(memoryStB, memoryBtS, memoryValidate)
+
+func memoryStB(s string) ([]byte, error) {
+	z, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, z)
+	return buf, nil
+}
+
+func memoryBtS(b []byte) (string, error) {
+	if len(b) != 8 {
+		return "", fmt.Errorf("expected uint64, only found %d bits", len(b)*8)
+	}
+	z := binary.BigEndian.Uint64(b)
+	return strconv.FormatUint(z, 10), nil
+}
+
+func memoryValidate(b []byte) error {
+	// Ensure the byte array is exactly 8 bytes long for a uint64 in big-endian format
+	if len(b) != 8 {
+		return errors.New("invalid length: must be exactly 8 bytes")
+	}
+
+	return nil
 }
