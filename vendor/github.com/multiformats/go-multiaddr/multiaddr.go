@@ -48,6 +48,9 @@ func NewMultiaddrBytes(b []byte) (a Multiaddr, err error) {
 
 // Equal tests whether two multiaddrs are equal
 func (m *multiaddr) Equal(m2 Multiaddr) bool {
+	if m2 == nil {
+		return false
+	}
 	return bytes.Equal(m.bytes, m2.Bytes())
 }
 
@@ -139,6 +142,10 @@ func (m *multiaddr) Protocols() []Protocol {
 
 // Encapsulate wraps a given Multiaddr, returning the resulting joined Multiaddr
 func (m *multiaddr) Encapsulate(o Multiaddr) Multiaddr {
+	if o == nil {
+		return m
+	}
+
 	mb := m.bytes
 	ob := o.Bytes()
 

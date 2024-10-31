@@ -70,6 +70,9 @@ func (m *Component) UnmarshalJSON(data []byte) error {
 }
 
 func (c *Component) Equal(o Multiaddr) bool {
+	if o == nil {
+		return false
+	}
 	return bytes.Equal(c.bytes, o.Bytes())
 }
 
