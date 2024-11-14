@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Designs on IceFireDB Documentation</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/</link><description>Recent content in Designs on IceFireDB Documentation</description><generator>Hugo</generator><language>en</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/index.xml" rel="self" type="application/rss+xml"/><item><title>OverView</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/overview/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/overview/</guid><description>&lt;h1 id="overview">
+ OverView
+ &lt;a class="anchor" href="#overview">#&lt;/a>
+&lt;/h1></description></item><item><title>Network layer</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/network/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/network/</guid><description>&lt;h1 id="network-layer-design">
+ Network layer design
+ &lt;a class="anchor" href="#network-layer-design">#&lt;/a>
+&lt;/h1>
+&lt;p>The network layer undertakes the work of inter-node networking, inter-node data distribution, and inter-node data consistency consensus. The network layer of IceFireDB is divided into two layers according to the distance of the physical network link:&lt;/p>
+&lt;ol>
+&lt;li>Data consistency network layer for short-distance networks.&lt;/li>
+&lt;li>Decentralized database network layer for wide-distance network.&lt;/li>
+&lt;/ol>
+&lt;p>The above two different network layers are supported by different technologies and have different requirements for data consistency sensitivity and timeliness.&lt;/p></description></item><item><title>Storage layer</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/storage/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/storage/</guid><description>&lt;h1 id="storage-layer-design">
+ Storage layer design
+ &lt;a class="anchor" href="#storage-layer-design">#&lt;/a>
+&lt;/h1>
+&lt;p>The storage layer is responsible for data storage, and the data storage here includes different storage media of web2 and web3. For web2, the storage media we face includes disk, OSS, and for web3, the storage media we face includes IPFS, blockchain, and smart contracts.Currently, the storage types supported by IceFireDB mainly include the following.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Engine type&lt;/th>
+ &lt;th style="text-align: left">describe&lt;/th>
+ &lt;th style="text-align: left">Driver directory&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">LevelDB&lt;/td>
+ &lt;td style="text-align: left">LevelDB is a fast key-value storage library written at Google that provides an ordered mapping from string keys to string values.&lt;/td>
+ &lt;td style="text-align: left">Default&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Badger&lt;/td>
+ &lt;td style="text-align: left">BadgerDB is an embeddable, persistent and fast key-value (KV) database written in pure Go.&lt;/td>
+ &lt;td style="text-align: left">&lt;a href="https://github.com/IceFireDB/IceFireDB/tree/main/driver/badger">Badger&lt;/a>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">OSS&lt;/td>
+ &lt;td style="text-align: left">Object storage is a technology that stores and manages data in an unstructured format called objects.&lt;/td>
+ &lt;td style="text-align: left">&lt;a href="https://github.com/IceFireDB/IceFireDB/tree/main/driver/oss">OSS&lt;/a>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">IPFS&lt;/td>
+ &lt;td style="text-align: left">IPFS (the InterPlanetary File System) is a hypermedia distribution protocol addressed by content and identities. It enables the creation of completely distributed applications, and in doing so aims to make the web faster, safer, and more open.&lt;/td>
+ &lt;td style="text-align: left">&lt;a href="https://github.com/IceFireDB/IceFireDB/tree/main/driver/ipfs">IPFS&lt;/a>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">CRDT-KV&lt;/td>
+ &lt;td style="text-align: left">The IceFireDB-CRDT-KV engine can support decentralized P2P networking, data synchronization and consistency between nodes. It is a component of the IceFireDB software ecosystem, thanks to the open source of IPFS.&lt;/td>
+ &lt;td style="text-align: left">&lt;a href="https://github.com/IceFireDB/IceFireDB/tree/main/driver/crdt">CRDT-KV&lt;/a>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">IPFS-LOG&lt;/td>
+ &lt;td style="text-align: left">icefiredb-ipfs-log is a distributed immutable, operation-based conflict-free replication data structure that relies on ipfs to store data and merges each peer node data based on pubsub conflict-free. You can easily implement custom data structures such as kv, event, nosql, etc. based on icefiredb-ipfs-log.&lt;/td>
+ &lt;td style="text-align: left">&lt;a href="https://github.com/IceFireDB/IceFireDB/tree/main/driver/ipfs-log">IPFS-LOG&lt;/a>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">OrbitDB&lt;/td>
+ &lt;td style="text-align: left">OrbitDB is a serverless, distributed, peer-to-peer database. OrbitDB uses IPFS as its data storage and IPFS Pubsub to automatically sync databases with peers.&lt;/td>
+ &lt;td style="text-align: left">&lt;a href="https://github.com/IceFireDB/IceFireDB/tree/main/driver/orbitdb">OrbitDB&lt;/a>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="storage-model">
+ Storage model
+ &lt;a class="anchor" href="#storage-model">#&lt;/a>
+&lt;/h2>
+&lt;p>The NoSQL storage layer of each individual IceGiant mainly includes the codec layer and the underlying KV storage layer. the underlying KV engine currently supports levelDB, badgerDB, IPFS and OSS, and the main data storage includes two ways:&lt;/p></description></item><item><title>Protocol layer</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/protocol/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/protocol/</guid><description>&lt;h1 id="protocol-layer-design">
+ Protocol layer design
+ &lt;a class="anchor" href="#protocol-layer-design">#&lt;/a>
+&lt;/h1>
+&lt;p>A good access method of the application can accelerate the growth of the application ecology, and a good protocol design can reduce the transformation cost of the stock application, so the protocol layer is an important component of the IceFireDB software stack. The communication protocol of IceFireDB-NoSQL fully integrates the Redis RESP protocol, which mainly includes the following two parts of the protocol:&lt;/p>
+&lt;ol>
+&lt;li>
+&lt;p>&lt;strong>Data control protocol&lt;/strong>: Complete support for RESP clients, supporting functional requirements for database data access.&lt;/p></description></item><item><title>Codec layer</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/codec/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/codec/</guid><description>&lt;h1 id="codec-layer-design">
+ Codec layer design
+ &lt;a class="anchor" href="#codec-layer-design">#&lt;/a>
+&lt;/h1>
+&lt;p>The codec layer is the glue of the IceFireDB data expression layer, because the bottom layer of IceFireDB supports many storage engines, including centralized storage such as web2 disk, OSS, leveldb, and badger, as well as web3&amp;rsquo;s IPFS, crdt-kv, and IPFS-LOG For this kind of decentralized storage, the storage interface provided by any kind of storage is simple and not standardized. The codec layer of IceFireDB-NoSQL is abstracted through a unified driver layer, and by encoding and decoding many instruction semantics into a KV model, a richer data expression layer is built to support more data scenarios, such as Strings\Hashs\Sets\Lists \Sorted Sets.&lt;/p></description></item></channel></rss>
