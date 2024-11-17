@@ -54,6 +54,7 @@ func init() {
 // 	return redcon.SimpleInt(n), nil
 // }
 
+// cmdEXPIREAT sets an expiration timestamp for a key.
 func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -64,10 +65,9 @@ func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	// If the timestamp is less than the current time, delete it
+	// If the timestamp is less than the current time, delete the key
 	if timestamp < time.Now().Unix() {
-		keys := make([][]byte, 1)
-		keys[0] = []byte(args[1])
+		keys := [][]byte{[]byte(args[1])}
 		_, err := ldb.Del(keys...)
 		if err != nil {
 			return nil, err
@@ -83,6 +83,7 @@ func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(v), nil
 }
 
+// cmdEXPIRE sets an expiration time for a key.
 func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
@@ -93,15 +94,17 @@ func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 	timestamp := m.Now().Unix() + duration
+
+	// If the timestamp is less than the current time, delete the key
 	if timestamp < time.Now().Unix() {
-		keys := make([][]byte, 1)
-		keys[0] = []byte(args[1])
+		keys := [][]byte{[]byte(args[1])}
 		_, err := ldb.Del(keys...)
 		if err != nil {
 			return nil, err
 		}
 		return redcon.SimpleInt(1), nil
 	}
+
 	v, err := ldb.ExpireAt([]byte(args[1]), timestamp)
 	if err != nil {
 		return nil, err
@@ -109,6 +112,7 @@ func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(v), nil
 }
 
+// cmdSTRLEN returns the length of the string value stored at key.
 func cmdSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
