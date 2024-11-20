@@ -125,64 +125,96 @@ func cmdSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
+// cmdSETRANGE overwrites part of the string stored at key, starting at the specified offset,
+// for the entire length of the value. If the offset is larger than the current length of the string,
+// the string is padded with zero-bytes to make offset fit. Non-existing keys are treated as empty strings.
 func cmdSETRANGE(m uhaha.Machine, args []string) (interface{}, error) {
+	// Check the number of arguments
 	if len(args) != 4 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
+	// Parse the key and offset
 	key := []byte(args[1])
 	offset, err := strconv.Atoi(args[2])
 	if err != nil {
 		return nil, err
 	}
 
-	value := args[3]
+	// Parse the value to be set
+	value := []byte(args[3])
 
-	n, err := ldb.SetRange(key, offset, []byte(value))
+	// Perform the SetRange operation
+	n, err := ldb.SetRange(key, offset, value)
 	if err != nil {
 		return nil, err
 	}
+
+	// Return the length of the string after the operation
 	return redcon.SimpleInt(n), nil
 }
 
+// cmdINCRBY increments the number stored at key by delta. If the key does not exist,
+// it is set to 0 before performing the operation. An error is returned if the key
+// contains a value of the wrong type or contains a string that can not be represented
+// as an integer.
 func cmdINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
+	// Check the number of arguments
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
+	// Parse the delta value
 	delta, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
 		return nil, err
 	}
 
+	// Perform the IncrBy operation
 	n, err := ldb.IncrBy([]byte(args[1]), delta)
 	if err != nil {
 		return nil, err
 	}
+
+	// Return the new value after increment
 	return redcon.SimpleInt(n), nil
 }
 
+// cmdINCR increments the number stored at key by one. If the key does not exist,
+// it is set to 0 before performing the operation. An error is returned if the key
+// contains a value of the wrong type or contains a string that can not be represented
+// as an integer.
 func cmdINCR(m uhaha.Machine, args []string) (interface{}, error) {
+	// Check the number of arguments
 	if len(args) != 2 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
+	// Perform the Incr operation
 	n, err := ldb.Incr([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
+
+	// Return the new value after increment
 	return redcon.SimpleInt(n), nil
 }
 
+// cmdGETSET sets the string value of a key and returns its old value. If the key does not exist,
+// it returns nil. An error is returned if the key contains a value of the wrong type.
 func cmdGETSET(m uhaha.Machine, args []string) (interface{}, error) {
+	// Check the number of arguments
 	if len(args) != 3 {
 		return nil, rafthub.ErrWrongNumArgs
 	}
 
+	// Perform the GetSet operation
 	v, err := ldb.GetSet([]byte(args[1]), []byte(args[2]))
 	if err != nil {
 		return nil, err
 	}
+
+	// Return the old value
 	return v, nil
 }
 
