@@ -7,7 +7,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/tidwall/redcon"
 	"github.com/tidwall/uhaha"
-	rafthub "github.com/tidwall/uhaha"
 )
 
 func init() {
@@ -38,7 +37,7 @@ func init() {
 
 func cmdHSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 || (len(args))%2 != 0 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	var n int64
@@ -53,7 +52,7 @@ func cmdHSET(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 	val, err := ldb.HGet([]byte(args[1]), []byte(args[2]))
 
@@ -74,7 +73,7 @@ func cmdHGET(m uhaha.Machine, args []string) (interface{}, error) {
 // HDEL key field [field ...]
 func cmdHDEL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	var n int64
@@ -93,7 +92,7 @@ func cmdHDEL(m uhaha.Machine, args []string) (interface{}, error) {
 // HEXISTS key field
 func cmdHEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	var n int64 = 1
@@ -110,7 +109,7 @@ func cmdHEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHGETALL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	v, err := ldb.HGetAll([]byte(args[1]))
@@ -128,7 +127,7 @@ func cmdHGETALL(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	delta, err := ledis.StrInt64([]byte(args[3]), nil)
@@ -145,7 +144,7 @@ func cmdHINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHKEYS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	v, err := ldb.HKeys([]byte(args[1]))
@@ -158,7 +157,7 @@ func cmdHKEYS(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.HLen([]byte(args[1]))
@@ -171,7 +170,7 @@ func cmdHLEN(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHMGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	keys := make([][]byte, len(args)-2)
@@ -190,11 +189,11 @@ func cmdHMGET(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHMSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	if len(args[2:])%2 != 0 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	key := args[1]
@@ -216,7 +215,7 @@ func cmdHMSET(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHSETNX(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	var n int64 = 1
@@ -239,7 +238,7 @@ func cmdHSETNX(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	val, err := ldb.HGet([]byte(args[1]), []byte(args[2]))
@@ -252,7 +251,7 @@ func cmdHSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHVALS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	v, err := ldb.HValues([]byte(args[1]))
@@ -264,7 +263,7 @@ func cmdHVALS(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.HClear([]byte(args[1]))
@@ -276,7 +275,7 @@ func cmdHCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHMCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	keys := make([][]byte, len(args)-1)
@@ -292,7 +291,7 @@ func cmdHMCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	duration, err := ledis.StrInt64([]byte(args[2]), nil)
@@ -319,7 +318,7 @@ func cmdHEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	timestamp, err := ledis.StrInt64([]byte(args[2]), nil)
@@ -345,7 +344,7 @@ func cmdHEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHTTL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	v, err := ldb.HTTL([]byte(args[1]))
@@ -357,7 +356,7 @@ func cmdHTTL(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHPERSIST(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.HPersist([]byte(args[1]))
@@ -369,7 +368,7 @@ func cmdHPERSIST(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdHKEYEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.HKeyExists([]byte(args[1]))

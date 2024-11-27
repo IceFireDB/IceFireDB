@@ -9,7 +9,6 @@ import (
 	"github.com/siddontang/go/hack"
 	"github.com/tidwall/redcon"
 	"github.com/tidwall/uhaha"
-	rafthub "github.com/tidwall/uhaha"
 )
 
 func init() {
@@ -116,7 +115,7 @@ func zparseScoreRange(minBuf []byte, maxBuf []byte) (min int64, max int64, err e
 
 func cmdZCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	min, max, err := zparseScoreRange([]byte(args[2]), []byte(args[3]))
@@ -134,7 +133,7 @@ func cmdZCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZCARD(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.ZCard([]byte(args[1]))
@@ -147,7 +146,7 @@ func cmdZCARD(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	min, max, err := zparseRange(args[2], args[3])
@@ -164,7 +163,7 @@ func cmdZRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 	args = args[4:]
 	if len(args) > 0 {
 		if len(args) != 1 {
-			return nil, rafthub.ErrWrongNumArgs
+			return nil, uhaha.ErrWrongNumArgs
 		}
 		if strings.ToLower(args[0]) == "withscores" {
 			withScores = true
@@ -194,7 +193,7 @@ func cmdZRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZREVRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	min, max, err := zparseRange(args[2], args[3])
@@ -211,7 +210,7 @@ func cmdZREVRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 	args = args[4:]
 	if len(args) > 0 {
 		if len(args) != 1 {
-			return nil, rafthub.ErrWrongNumArgs
+			return nil, uhaha.ErrWrongNumArgs
 		}
 		if strings.ToLower(args[0]) == "withscores" {
 			withScores = true
@@ -241,7 +240,7 @@ func cmdZREVRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZRANK(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.ZRank([]byte(args[1]), []byte(args[2]))
@@ -259,7 +258,7 @@ func cmdZRANK(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.ZClear([]byte(args[1]))
@@ -272,7 +271,7 @@ func cmdZCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZREM(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	members := make([][]byte, len(args)-2)
@@ -292,7 +291,7 @@ func cmdZREM(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZADD(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	ScorePair := make([]ledis.ScorePair, (len(args)-2)/2)
@@ -317,7 +316,7 @@ func cmdZADD(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.ZScore([]byte(args[1]), []byte(args[2]))
@@ -330,7 +329,7 @@ func cmdZSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	delta, err := strconv.Atoi(args[2])
@@ -348,7 +347,7 @@ func cmdZINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZREVRANK(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.ZRevRank([]byte(args[1]), []byte(args[2]))
@@ -365,7 +364,7 @@ func cmdZREVRANK(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZRANGEBYSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	min, max, err := zparseScoreRange([]byte(args[2]), []byte(args[3]))
@@ -434,7 +433,7 @@ func cmdZRANGEBYSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZREVRANGEBYSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	min, max, err := zparseScoreRange([]byte(args[3]), []byte(args[2]))
@@ -503,7 +502,7 @@ func cmdZREVRANGEBYSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZREMRANGEBYSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	min, max, err := zparseScoreRange([]byte(args[2]), []byte(args[3]))
@@ -525,7 +524,7 @@ func cmdZREMRANGEBYSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdZREMRANGEBYRANK(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	start, err := strconv.Atoi(args[2])
