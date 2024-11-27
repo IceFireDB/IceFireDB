@@ -9,7 +9,6 @@ import (
 	"github.com/siddontang/go/hack"
 	"github.com/tidwall/redcon"
 	"github.com/tidwall/uhaha"
-	rafthub "github.com/tidwall/uhaha"
 )
 
 func init() {
@@ -40,7 +39,7 @@ func init() {
 
 func cmdLTRIM(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	var start int64
@@ -64,7 +63,7 @@ func cmdLTRIM(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdLKEYEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.LKeyExists([]byte(args[1]))
@@ -76,7 +75,7 @@ func cmdLKEYEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 
 // func cmdLPERSIST(m uhaha.Machine, args []string) (interface{}, error) {
 // 	if len(args) != 2 {
-// 		return nil, rafthub.ErrWrongNumArgs
+// 		return nil, uhaha.ErrWrongNumArgs
 // 	}
 
 // 	n, err := ldb.LPersist([]byte(args[1]))
@@ -88,7 +87,7 @@ func cmdLKEYEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdLTTL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	v, err := ldb.LTTL([]byte(args[1]))
@@ -100,7 +99,7 @@ func cmdLTTL(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdLEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	timestamp, err := ledis.StrInt64([]byte(args[2]), nil)
@@ -126,7 +125,7 @@ func cmdLEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdLEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	duration, err := ledis.StrInt64([]byte(args[2]), nil)
@@ -153,7 +152,7 @@ func cmdLEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdLMCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	keys := make([][]byte, len(args)-1)
@@ -169,7 +168,7 @@ func cmdLMCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdLCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.LClear([]byte(args[1]))
@@ -182,7 +181,7 @@ func cmdLCLEAR(m uhaha.Machine, args []string) (interface{}, error) {
 func cmdRPOPLPUSH(m uhaha.Machine, args []string) (interface{}, error) {
 
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 	source, dest := []byte(args[1]), []byte(args[2])
 
@@ -219,7 +218,7 @@ func cmdRPOPLPUSH(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdLLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.LLen([]byte(args[1]))
@@ -231,7 +230,7 @@ func cmdLLEN(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdLSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	index, err := ledis.StrInt64([]byte(args[2]), nil)
@@ -247,7 +246,7 @@ func cmdLSET(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdLRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	var start int64
@@ -273,7 +272,7 @@ func cmdLRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdRPOP(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	v, err := ldb.RPop([]byte(args[1]))
@@ -285,7 +284,7 @@ func cmdRPOP(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdLPUSH(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	argList := make([][]byte, len(args)-2)
@@ -302,7 +301,7 @@ func cmdLPUSH(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdLINDEX(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 	index, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
@@ -324,7 +323,7 @@ func cmdLINDEX(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdLPOP(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	v, err := ldb.LPop([]byte(args[1]))
@@ -336,7 +335,7 @@ func cmdLPOP(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdRPUSH(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	argList := make([][]byte, len(args)-2)
@@ -354,7 +353,7 @@ func cmdRPUSH(m uhaha.Machine, args []string) (interface{}, error) {
 //Danger here: If it is a Raft write command, Raft will perform command rollback => stuck Raft. If it is a Raft read command, then Raft will not be able to roll back the queue consumption log, and dirty data in the queue will appear.
 // func cmdBLPOP(m uhaha.Machine, args []string) (interface{}, error) {
 // 	if len(args) < 3 {
-// 		return nil, rafthub.ErrWrongNumArgs
+// 		return nil, uhaha.ErrWrongNumArgs
 // 	}
 
 // 	keys, timeout, err := lParseBPopArgs(args)
@@ -372,7 +371,7 @@ func cmdRPUSH(m uhaha.Machine, args []string) (interface{}, error) {
 
 func lParseBPopArgs(argsOrigin []string) (keys [][]byte, timeout time.Duration, err error) {
 	if len(argsOrigin) < 3 {
-		err = rafthub.ErrWrongNumArgs
+		err = uhaha.ErrWrongNumArgs
 		return
 	}
 

@@ -39,7 +39,6 @@ func init() {
 
 	serverInfo.Server.OS = runtime.GOOS
 	serverInfo.Server.ProceessID = os.Getpid()
-	return
 }
 
 func (i *info) RegisterExtInfo(f ExtInfoFunc) {

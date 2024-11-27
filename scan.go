@@ -71,7 +71,7 @@ func parseXScanArgs(args []string) (cursor []byte, match string, count int, desc
 
 func parseScanArgs(args []string) (cursor []byte, match string, count int, desc bool, err error) {
 	cursor, match, count, desc, err = parseXScanArgs(args)
-	if bytes.Compare(cursor, nilCursorRedis) == 0 {
+	if bytes.Equal(cursor, nilCursorRedis) {
 		cursor = nilCursorLedis
 	}
 	return

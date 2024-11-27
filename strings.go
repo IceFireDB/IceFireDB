@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/ledisdb/ledisdb/ledis"
+
 	"github.com/tidwall/uhaha"
-	rafthub "github.com/tidwall/uhaha"
 
 	"github.com/tidwall/redcon"
 )
@@ -42,22 +42,10 @@ func init() {
 	// conf.AddWriteCommand("PERSIST", cmdPERSIST) //Prohibition: time persistence
 }
 
-// func cmdPERSIST(m uhaha.Machine, args []string) (interface{}, error) {
-// 	if len(args) != 2 {
-// 		return nil, rafthub.ErrWrongNumArgs
-// 	}
-
-// 	n, err := ldb.Persist([]byte(args[1]))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return redcon.SimpleInt(n), nil
-// }
-
 // cmdEXPIREAT sets an expiration timestamp for a key.
 func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	timestamp, err := ledis.StrInt64([]byte(args[2]), nil)
@@ -86,7 +74,7 @@ func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 // cmdEXPIRE sets an expiration time for a key.
 func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	duration, err := ledis.StrInt64([]byte(args[2]), nil)
@@ -115,7 +103,7 @@ func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 // cmdSTRLEN returns the length of the string value stored at key.
 func cmdSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.StrLen([]byte(args[1]))
@@ -131,7 +119,7 @@ func cmdSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
 func cmdSETRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 	// Check the number of arguments
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	// Parse the key and offset
@@ -161,7 +149,7 @@ func cmdSETRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 func cmdINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 	// Check the number of arguments
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	// Parse the delta value
@@ -187,7 +175,7 @@ func cmdINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
 func cmdINCR(m uhaha.Machine, args []string) (interface{}, error) {
 	// Check the number of arguments
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	// Perform the Incr operation
@@ -205,7 +193,7 @@ func cmdINCR(m uhaha.Machine, args []string) (interface{}, error) {
 func cmdGETSET(m uhaha.Machine, args []string) (interface{}, error) {
 	// Check the number of arguments
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	// Perform the GetSet operation
@@ -220,7 +208,7 @@ func cmdGETSET(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdGETRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	key := []byte(args[1])
@@ -243,7 +231,7 @@ func cmdGETRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdSETBIT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	key := args[1]
@@ -266,7 +254,7 @@ func cmdSETBIT(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdGETBIT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	key := []byte(args[1])
@@ -284,7 +272,7 @@ func cmdGETBIT(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	var counter int
@@ -305,7 +293,7 @@ func cmdEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdDECRBY(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	delta, err := ledis.StrInt64([]byte(args[2]), nil)
@@ -322,7 +310,7 @@ func cmdDECRBY(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdDECR(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.Decr([]byte(args[1]))
@@ -334,7 +322,7 @@ func cmdDECR(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdBITPOS(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	key := []byte(args[1])
@@ -357,7 +345,7 @@ func cmdBITPOS(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdBITOP(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	op := args[1]
@@ -378,7 +366,7 @@ func cmdBITOP(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdAPPEND(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.Append([]byte(args[1]), []byte(args[2]))
@@ -390,7 +378,7 @@ func cmdAPPEND(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 || len(args) > 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	key := []byte(args[1])
@@ -409,7 +397,7 @@ func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 // This is different from the redis standard. It needs to enrich the algorithm to support more atomic instructions.
 func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	if err := ldb.Set([]byte(args[1]), []byte(args[2])); err != nil {
@@ -422,7 +410,7 @@ func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
 // Setex is rewritten as setexat to avoid the exception of raft log playback
 func cmdSETEX(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	duration, err := ledis.StrInt64([]byte(args[2]), nil)
@@ -451,7 +439,7 @@ func cmdSETEX(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdSETEXAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 4 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 	timestamp, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
@@ -478,7 +466,7 @@ func cmdSETEXAT(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdSETNX(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	n, err := ldb.SetNX([]byte(args[1]), []byte(args[2]))
@@ -491,7 +479,7 @@ func cmdSETNX(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 	/*count, err := ldb.Exists([]byte(args[1]))
 	if err != nil || count == 0 {
@@ -508,7 +496,7 @@ func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
 // This is different from the redis standard. For the sake of transaction consistency, there is no key existence judgment.
 func cmdDEL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	keys := make([][]byte, len(args)-1)
@@ -526,7 +514,7 @@ func cmdDEL(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdMSET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 3 || (len(args)-1)%2 != 0 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	kvPairCount := (len(args) - 1) / 2
@@ -547,7 +535,7 @@ func cmdMSET(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdMGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	keys := make([][]byte, len(args)-1)
@@ -566,7 +554,7 @@ func cmdMGET(m uhaha.Machine, args []string) (interface{}, error) {
 
 func cmdTTL(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) < 2 {
-		return nil, rafthub.ErrWrongNumArgs
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	v, err := ldb.TTL([]byte(args[1]))
