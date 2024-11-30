@@ -481,25 +481,24 @@ func (db *DB) SetRange(key []byte, offset int, value []byte) (int64, error) {
 	return int64(len(oldValue)), nil
 }
 
-func getRange(start int, end int, valLen int) (int, int) {
+func getRange(start, end, valLen int) (int, int) {
 	if start < 0 {
 		start = valLen + start
 	}
-
 	if end < 0 {
 		end = valLen + end
 	}
-
 	if start < 0 {
 		start = 0
 	}
-
 	if end < 0 {
 		end = 0
 	}
-
 	if end >= valLen {
 		end = valLen - 1
+	}
+	if start > end {
+		start = end
 	}
 	return start, end
 }
@@ -805,6 +804,9 @@ func getBitRange(start, end, bitLength int) (int, int) {
 	if end >= bitLength {
 		end = bitLength - 1
 	}
+	if start > end {
+		start = end
+	}
 	return start, end
 }
 
@@ -814,13 +816,8 @@ func (db *DB) BitPos(key []byte, on int, start int, end int, bitMode string) (in
 		return 0, err
 	}
 
-	if (on & ^1) != 0 {
+	if on != 0 && on != 1 {
 		return 0, fmt.Errorf("bit must be 0 or 1, not %d", on)
-	}
-
-	var skipValue uint8
-	if on == 0 {
-		skipValue = 0xFF
 	}
 
 	key = db.encodeKVKey(key)
@@ -829,32 +826,47 @@ func (db *DB) BitPos(key []byte, on int, start int, end int, bitMode string) (in
 		return 0, err
 	}
 
+	var startByte, endByte, startBit, endBit int
 	if bitMode == "BIT" {
-		start, end = getBitRange(start, end, len(value)*8)
+		bitLen := len(value) * 8
+		start, end = getBitRange(start, end, bitLen)
+		startByte = start / 8
+		startBit = start % 8
+		endByte = end / 8
+		endBit = end % 8
 	} else {
-		start, end = getRange(start, end, len(value))
+		byteLen := len(value)
+		start, end = getRange(start, end, byteLen)
+		startByte = start
+		startBit = 0
+		endByte = end
+		endBit = 7
 	}
 
-	// Make sure end does not cross the boundary
-    if end >= len(value) {
-        end = len(value) - 1
-    }
-    
-    if start > end {
-        return -1, nil
-    }
+	if startByte > endByte {
+		return -1, nil
+	}
 
+	value = value[startByte : endByte+1]
 
-	value = value[start : end+1]
-
-	for i, v := range value {
-		if uint8(v) != skipValue {
-			for j := 0; j < 8; j++ {
-				isNull := uint8(v)&(1<<uint8(7-j)) == 0
-
-				if (on == 1 && !isNull) || (on == 0 && isNull) {
-					return int64((start+i)*8 + j), nil
-				}
+	for byteIdx, v := range value {
+		byteOffset := byteIdx + startByte
+		var bitStart, bitEnd int
+		if byteOffset == startByte {
+			bitStart = startBit
+			bitEnd = 7
+		} else if byteOffset == endByte {
+			bitStart = 0
+			bitEnd = endBit
+		} else {
+			bitStart = 0
+			bitEnd = 7
+		}
+		for bitIdx := bitStart; bitIdx <= bitEnd; bitIdx++ {
+			shift := uint(7 - bitIdx)
+			bitVal := (v >> shift) & 1
+			if int(bitVal) == on {
+				return int64(byteOffset*8 + bitIdx), nil
 			}
 		}
 	}
