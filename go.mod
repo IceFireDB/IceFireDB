@@ -15,7 +15,6 @@ require (
 	github.com/dgraph-io/badger v1.6.2
 	github.com/dgraph-io/badger/v3 v3.2103.5
 	github.com/dgraph-io/ristretto v0.2.0
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ipfs-api v0.3.0
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6
@@ -35,6 +34,7 @@ require (
 require (
 	github.com/joho/godotenv v1.5.1
 	github.com/multiformats/go-multiaddr v0.14.0
+	github.com/redis/go-redis/v9 v9.7.0
 	go.uber.org/zap v1.27.0
 )
 
