@@ -41,8 +41,8 @@ github.com/IceFireDB/icefiredb-crdt-kv v0.2.0 h1:ogj+LZgUF/o0aS+aELVvBAossSuXjs0
 github.com/IceFireDB/icefiredb-crdt-kv v0.2.0/go.mod h1:LZ7JRTsHIpUSTHrGq5b4AKjTNKMBw/B0VDH6d3kAHBY=
 github.com/IceFireDB/icefiredb-ipfs-log v0.5.0 h1:B+cR6yxBnahbbOR2UmUhAn+dSQrkgWBAHggedanbtyA=
 github.com/IceFireDB/icefiredb-ipfs-log v0.5.0/go.mod h1:qpxrnHXLgaqNoTgTkJ/rgTfzS7klQDsMwZN2Oy3C63g=
-github.com/IceFireDB/ledisdb v0.8.0 h1:HMiYIUwqV5c21eIBncGKHvGsqqSUP+cOn3u442HCFUs=
-github.com/IceFireDB/ledisdb v0.8.0/go.mod h1:n931TsDuKuq+uX4v1fulaMbA/7ZLLhjc85h7chZGBCQ=
+github.com/IceFireDB/ledisdb v0.8.1 h1:tsIzejtY2wK2TYxx381yXmECEXw58wr6kRCVEfMO+QE=
+github.com/IceFireDB/ledisdb v0.8.1/go.mod h1:n931TsDuKuq+uX4v1fulaMbA/7ZLLhjc85h7chZGBCQ=
 github.com/IceFireDB/uhaha v0.12.0 h1:+tsvz9r1SQ5ovsABSDlOTPf9r9SFjPfIlUfjvWx8iCs=
 github.com/IceFireDB/uhaha v0.12.0/go.mod h1:R4sNSeuX/t1wYXM4wRPnCBdDPHF/a9xSKGMNqoIVftE=
 github.com/Jorropo/jsync v1.0.1 h1:6HgRolFZnsdfzRUj+ImB9og1JYOxQoReSywkHOGSaUU=
