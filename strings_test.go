@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -125,29 +126,74 @@ func TestKV(t *testing.T) {
 		t.Fatal(v)
 	}
 
-	bitKey := "bit_key"
-	if n, err := c.SetBit(c.Context(), bitKey, 7, 1).Result(); err != nil {
+	// Set up test data
+	bitKey := "test:bitcount:key"
+
+	// Set bits at positions 0, 7, and 14
+	for _, pos := range []int{0, 7, 14} {
+		if n, err := client.SetBit(context.Background(), bitKey, int64(pos), 1).Result(); err != nil {
+			t.Fatal(err)
+		} else if n != 0 {
+			t.Fatal(n)
+		}
+	}
+
+	// Verify the bits at positions 0, 7, and 14
+	for _, pos := range []int{0, 7, 14} {
+		if n, err := client.GetBit(context.Background(), bitKey, int64(pos)).Result(); err != nil {
+			t.Fatal(err)
+		} else if n != 1 {
+			t.Fatal(n)
+		}
+	}
+
+	// Test BITCOUNT with no start or end
+	if n, err := client.BitCount(context.Background(), bitKey, nil).Result(); err != nil {
+		t.Fatal(err)
+	} else if n != 3 {
+		t.Fatalf("expected 3, got %d", n)
+	}
+
+	// Test BITCOUNT with start and end in BYTE mode
+	if n, err := client.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 0, End: 1, Mode: "BYTE"}).Result(); err != nil {
+		t.Fatal(err)
+	} else if n != 2 {
+		t.Fatalf("expected 2, got %d", n)
+	}
+
+	// Test BITCOUNT with start and end in BIT mode
+	if n, err := client.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 0, End: 15, Mode: "BIT"}).Result(); err != nil {
+		t.Fatal(err)
+	} else if n != 3 {
+		t.Fatalf("expected 3, got %d", n)
+	}
+
+	// Test BITPOS with only bit provided
+	if n, err := client.BitPos(context.Background(), bitKey, 1).Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 0 {
-		t.Fatal(n)
+		t.Fatalf("expected 0, got %d", n)
 	}
 
-	if n, err := c.GetBit(c.Context(), bitKey, 7).Result(); err != nil {
+	// Test BITPOS with start provided
+	if n, err := client.BitPos(context.Background(), bitKey, 1, 0).Result(); err != nil {
 		t.Fatal(err)
-	} else if n != 1 {
-		t.Fatal(n)
+	} else if n != 0 {
+		t.Fatalf("expected 0, got %d", n)
 	}
 
-	if n, err := c.BitCount(c.Context(), bitKey, &redis.BitCount{}).Result(); err != nil {
+	// Test BITPOS with start and end provided
+	if n, err := client.BitPos(context.Background(), bitKey, 1, 0, 15).Result(); err != nil {
 		t.Fatal(err)
-	} else if n != 1 {
-		t.Fatal(n)
+	} else if n != 0 {
+		t.Fatalf("expected 0, got %d", n)
 	}
 
-	if n, err := c.BitPos(c.Context(), bitKey, 1).Result(); err != nil {
+	// Test BITPOS with start, end, and bitMode provided
+	if n, err := client.BitPos(context.Background(), bitKey, 1, 0, 15, "8").Result(); err != nil {
 		t.Fatal(err)
-	} else if n != 7 {
-		t.Fatal(n)
+	} else if n != 0 {
+		t.Fatalf("expected 0, got %d", n)
 	}
 
 	c.Set(c.Context(), "key1", "foobar", 0)

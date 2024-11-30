@@ -95,8 +95,9 @@ func (db *DB) incr(key []byte, delta int64) (int64, error) {
 	return n, err
 }
 
-//	ps : here just focus on deleting the key-value data,
-//		 any other likes expire is ignore.
+// ps : here just focus on deleting the key-value data,
+//
+//	any other likes expire is ignore.
 func (db *DB) delete(t *batch, key []byte) int64 {
 	key = db.encodeKVKey(key)
 	t.Delete(key)
@@ -679,8 +680,57 @@ func numberBitCount(i uint32) uint32 {
 	return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24
 }
 
-// BitCount returns the bit count of data.
-func (db *DB) BitCount(key []byte, start int, end int) (int64, error) {
+// validateRange
+func validateRange(start, end, length int) (int, int, error) {
+	// deal with negative index
+	if start < 0 {
+		start = length + start
+	}
+	if end < 0 {
+		end = length + end
+	}
+
+	// check range
+	if start < 0 {
+		start = 0
+	}
+	if end >= length {
+		end = length - 1
+	}
+	if start > end {
+		return 0, 0, fmt.Errorf("ERR invalid range: start > end")
+	}
+
+	return start, end, nil
+}
+
+// validateBitRange
+func validateBitRange(start, end, bitLength int) (int, int, error) {
+	// deal with negative index
+	if start < 0 {
+		start = bitLength + start
+	}
+	if end < 0 {
+		end = bitLength + end
+	}
+
+	// check range
+	if start < 0 {
+		start = 0
+	}
+	if end >= bitLength {
+		end = bitLength - 1
+	}
+	if start > end {
+		return 0, 0, fmt.Errorf("ERR invalid bit range: start > end")
+	}
+
+	return start, end, nil
+}
+
+// BitCount counts the number of set bits (1s) in a string within the specified range.
+// The range can be specified in bytes or bits, and supports negative indices.
+func (db *DB) BitCount(key []byte, start int, end int, bitMode string) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -690,14 +740,47 @@ func (db *DB) BitCount(key []byte, start int, end int) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	if value == nil {
+		return 0, nil
+	}
 
-	start, end = getRange(start, end, len(value))
-	value = value[start : end+1]
+	// check bitMode
+	bitMode = strings.ToUpper(bitMode)
+	if bitMode != "BYTE" && bitMode != "BIT" {
+		return 0, fmt.Errorf("ERR invalid bit mode")
+	}
+
+	valueLen := len(value)
+	// Adjust range according to mode
+	if bitMode == "BYTE" {
+		if start, end, err = validateRange(start, end, valueLen); err != nil {
+			return 0, err
+		}
+		value = value[start : end+1]
+	} else {
+		bitLen := valueLen * 8
+		if start, end, err = validateBitRange(start, end, bitLen); err != nil {
+			return 0, err
+		}
+		startByte, startBit := start/8, start%8
+		endByte, endBit := end/8, end%8
+
+		if startByte >= valueLen || endByte >= valueLen {
+			return 0, fmt.Errorf("ERR bit range out of bounds")
+		}
+
+		value = value[startByte : endByte+1]
+		if startBit > 0 {
+			value[0] &= (0xFF >> uint(startBit))
+		}
+		if endBit < 7 {
+			value[len(value)-1] &= (0xFF << uint(7-endBit))
+		}
+	}
 
 	var n int64
-
 	pos := 0
-	for ; pos+4 <= len(value); pos = pos + 4 {
+	for ; pos+4 <= len(value); pos += 4 {
 		n += int64(numberBitCount(binary.BigEndian.Uint32(value[pos : pos+4])))
 	}
 
@@ -708,8 +791,25 @@ func (db *DB) BitCount(key []byte, start int, end int) (int64, error) {
 	return n, nil
 }
 
-// BitPos returns the pos of the data.
-func (db *DB) BitPos(key []byte, on int, start int, end int) (int64, error) {
+// getBitRange adjusts start and end bit indices to handle negative values and ensures they are within bounds.
+func getBitRange(start, end, bitLength int) (int, int) {
+	if start < 0 {
+		start = bitLength + start
+	}
+	if end < 0 {
+		end = bitLength + end
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end >= bitLength {
+		end = bitLength - 1
+	}
+	return start, end
+}
+
+// BitPos returns the position of the first occurrence of the specified bit in the key's value.
+func (db *DB) BitPos(key []byte, on int, start int, end int, bitMode string) (int64, error) {
 	if err := checkKeySize(key); err != nil {
 		return 0, err
 	}
@@ -729,7 +829,22 @@ func (db *DB) BitPos(key []byte, on int, start int, end int) (int64, error) {
 		return 0, err
 	}
 
-	start, end = getRange(start, end, len(value))
+	if bitMode == "BIT" {
+		start, end = getBitRange(start, end, len(value)*8)
+	} else {
+		start, end = getRange(start, end, len(value))
+	}
+
+	// Make sure end does not cross the boundary
+    if end >= len(value) {
+        end = len(value) - 1
+    }
+    
+    if start > end {
+        return -1, nil
+    }
+
+
 	value = value[start : end+1]
 
 	for i, v := range value {

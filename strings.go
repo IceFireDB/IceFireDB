@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ledisdb/ledisdb/ledis"
@@ -12,34 +14,36 @@ import (
 )
 
 func init() {
-	conf.AddWriteCommand("APPEND", cmdAPPEND)
+	// Read Commands
 	conf.AddReadCommand("BITCOUNT", cmdBITCOUNT)
-	conf.AddWriteCommand("BITOP", cmdBITOP)
 	conf.AddReadCommand("BITPOS", cmdBITPOS)
-	conf.AddWriteCommand("DECR", cmdDECR)
-	conf.AddWriteCommand("DECRBY", cmdDECRBY)
-	conf.AddWriteCommand("DEL", cmdDEL)
 	conf.AddReadCommand("EXISTS", cmdEXISTS)
 	conf.AddReadCommand("GET", cmdGET)
 	conf.AddReadCommand("GETBIT", cmdGETBIT)
-	conf.AddWriteCommand("SETBIT", cmdSETBIT)
 	conf.AddReadCommand("GETRANGE", cmdGETRANGE)
-	conf.AddWriteCommand("GETSET", cmdGETSET)
+	conf.AddReadCommand("MGET", cmdMGET)
+	conf.AddReadCommand("STRLEN", cmdSTRLEN)
+	conf.AddReadCommand("TTL", cmdTTL)
+
+	// Write Commands
+	conf.AddWriteCommand("APPEND", cmdAPPEND)
+	conf.AddWriteCommand("BITOP", cmdBITOP)
+	conf.AddWriteCommand("DECR", cmdDECR)
+	conf.AddWriteCommand("DECRBY", cmdDECRBY)
+	conf.AddWriteCommand("DEL", cmdDEL)
 	conf.AddWriteCommand("INCR", cmdINCR)
 	conf.AddWriteCommand("INCRBY", cmdINCRBY)
-	conf.AddReadCommand("MGET", cmdMGET)
 	conf.AddWriteCommand("MSET", cmdMSET)
 	conf.AddWriteCommand("SET", cmdSET)
+	conf.AddWriteCommand("SETBIT", cmdSETBIT)
+	conf.AddWriteCommand("GETSET", cmdGETSET)
 	conf.AddWriteCommand("SETNX", cmdSETNX)
-	//SETEX => SETEXAT : When the raft node is down and the log is played back, the setex command is still played back, so it needs to be intercepted at the network layer to modify the command
 	conf.AddWriteCommand("SETEX", cmdSETEX)
 	conf.AddWriteCommand("SETEXAT", cmdSETEXAT)
 	conf.AddWriteCommand("SETRANGE", cmdSETRANGE)
-	conf.AddReadCommand("STRLEN", cmdSTRLEN)
-	conf.AddWriteCommand("EXPIRE", cmdEXPIRE)     //EXPIRE => EXPIREAT
-	conf.AddWriteCommand("EXPIREAT", cmdEXPIREAT) // Timeout command
-	conf.AddReadCommand("TTL", cmdTTL)
-	// conf.AddWriteCommand("PERSIST", cmdPERSIST) //Prohibition: time persistence
+	conf.AddWriteCommand("EXPIRE", cmdEXPIRE)
+	conf.AddWriteCommand("EXPIREAT", cmdEXPIREAT)
+	// conf.AddWriteCommand("PERSIST", cmdPERSIST) // Prohibition: time persistence
 }
 
 // cmdEXPIREAT sets an expiration timestamp for a key.
@@ -330,12 +334,43 @@ func cmdBITPOS(m uhaha.Machine, args []string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	start, end, err := parseBitRange(args[3:])
-	if err != nil {
-		return nil, err
+
+	var start, end int
+	var bitMode string
+
+	if len(args) == 4 {
+		// Only start is provided
+		start, err = strconv.Atoi(args[3])
+		if err != nil {
+			return nil, err
+		}
+		end = -1 // Default end to -1 (end of the string)
+	} else if len(args) == 5 {
+		// Both start and end are provided
+		start, err = strconv.Atoi(args[3])
+		if err != nil {
+			return nil, err
+		}
+		end, err = strconv.Atoi(args[4])
+		if err != nil {
+			return nil, err
+		}
+	} else if len(args) == 6 {
+		// Both start, end, and bitMode are provided
+		start, err = strconv.Atoi(args[3])
+		if err != nil {
+			return nil, err
+		}
+		end, err = strconv.Atoi(args[4])
+		if err != nil {
+			return nil, err
+		}
+		bitMode = args[5]
+	} else {
+		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	n, err := ldb.BitPos(key, bit, start, end)
+	n, err := ldb.BitPos(key, bit, start, end, bitMode)
 	if err != nil {
 		return nil, err
 	}
@@ -376,21 +411,31 @@ func cmdAPPEND(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
+// cmdBITCOUNT handles the BITCOUNT command, which counts the number of set bits (1s) in a string.
+// The command can optionally take start and end indices to limit the range of bits to count,
+// and an additional argument to specify whether the indices are in bytes or bits.
 func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) < 2 || len(args) > 4 {
+	// Validate the number of arguments provided by the client.
+	if len(args) < 2 || len(args) > 5 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
+	// Convert the key from string to byte slice for database operations.
 	key := []byte(args[1])
-	start, end, err := parseBitRange(args[2:])
+
+	// Parse the optional start and end indices and the optional BYTE/BIT argument.
+	start, end, bitMode, err := parseBitRange(args[2:])
 	if err != nil {
 		return nil, err
 	}
 
-	n, err := ldb.BitCount(key, start, end)
+	// Count the number of set bits within the specified range using the ldb.BitCount function.
+	n, err := ldb.BitCount(key, start, end, bitMode)
 	if err != nil {
 		return nil, err
 	}
+
+	// Return the count as a simple integer response.
 	return redcon.SimpleInt(n), nil
 }
 
@@ -564,19 +609,40 @@ func cmdTTL(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(v), nil
 }
 
-func parseBitRange(args []string) (start int, end int, err error) {
+// parseBitRange parses the optional start and end indices and the optional BYTE/BIT argument from the command arguments.
+// It returns the parsed indices, the bit mode (BYTE or BIT), and any error encountered during parsing.
+func parseBitRange(args []string) (start int, end int, bitMode string, err error) {
+	// Default values for start and end indices.
 	start = 0
 	end = -1
+	bitMode = "BYTE" // Default to byte mode
+
+	// If only one additional argument is provided, it is treated as the start index.
 	if len(args) > 0 {
 		if start, err = strconv.Atoi(args[0]); err != nil {
-			return
+			return 0, 0, "", err
 		}
 	}
 
-	if len(args) == 2 {
+	// If two additional arguments are provided, they are treated as the start and end indices.
+	if len(args) > 1 {
 		if end, err = strconv.Atoi(args[1]); err != nil {
-			return
+			return 0, 0, "", err
 		}
 	}
-	return
+
+	// If a third additional argument is provided, it specifies the bit mode (BYTE or BIT).
+	if len(args) == 3 {
+		bitMode = strings.ToUpper(args[2])
+		if bitMode != "BYTE" && bitMode != "BIT" {
+			return 0, 0, "", fmt.Errorf("ERR syntax error")
+		}
+	}
+
+	// If more than three additional arguments are provided, return an error.
+	if len(args) > 3 {
+		return 0, 0, "", uhaha.ErrWrongNumArgs
+	}
+
+	return start, end, bitMode, nil
 }
