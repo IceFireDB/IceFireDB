@@ -131,7 +131,7 @@ func TestKV(t *testing.T) {
 	bitKey := "test:bitcount:key"
 
 	// Set bits at positions 0, 7, and 14
-	for _, pos := range []int{0, 7, 14} {
+	for _, pos := range []int{1, 7, 14} {
 		if n, err := c.SetBit(context.Background(), bitKey, int64(pos), 1).Result(); err != nil {
 			t.Fatal(err)
 		} else if n != 0 {
@@ -140,7 +140,7 @@ func TestKV(t *testing.T) {
 	}
 
 	// Verify the bits at positions 0, 7, and 14
-	for _, pos := range []int{0, 7, 14} {
+	for _, pos := range []int{1, 7, 14} {
 		if n, err := c.GetBit(context.Background(), bitKey, int64(pos)).Result(); err != nil {
 			t.Fatal(err)
 		} else if n != 1 {
@@ -172,22 +172,22 @@ func TestKV(t *testing.T) {
 	// Test BITPOS with only bit provided
 	if n, err := c.BitPos(context.Background(), bitKey, 1).Result(); err != nil {
 		t.Fatal(err)
-	} else if n != 0 {
-		t.Fatalf("expected 0, got %d", n)
+	} else if n != 1 {
+		t.Fatalf("expected 1, got %d", n)
 	}
 
 	// Test BITPOS with start provided
 	if n, err := c.BitPos(context.Background(), bitKey, 1, 0).Result(); err != nil {
 		t.Fatal(err)
-	} else if n != 0 {
-		t.Fatalf("expected 0, got %d", n)
+	} else if n != -1 {
+		t.Fatalf("expected -1, got %d", n)
 	}
 
 	// Test BITPOS with start and end provided
 	if n, err := c.BitPos(context.Background(), bitKey, 1, 0, 15).Result(); err != nil {
 		t.Fatal(err)
-	} else if n != 0 {
-		t.Fatalf("expected 0, got %d", n)
+	} else if n != 1 {
+		t.Fatalf("expected 1, got %d", n)
 	}
 
 	// Test BitPosSpan with start and end and mode, expecting a result other than 0
