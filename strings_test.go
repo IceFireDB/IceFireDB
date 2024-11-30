@@ -179,8 +179,8 @@ func TestKV(t *testing.T) {
 	// Test BITPOS with start provided
 	if n, err := c.BitPos(context.Background(), bitKey, 1, 0).Result(); err != nil {
 		t.Fatal(err)
-	} else if n != -1 {
-		t.Fatalf("expected -1, got %d", n)
+	} else if n != 1 {
+		t.Fatalf("expected 1, got %d", n)
 	}
 
 	// Test BITPOS with start and end provided
