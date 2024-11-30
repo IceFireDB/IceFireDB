@@ -155,7 +155,7 @@ func TestKV(t *testing.T) {
 		t.Fatalf("expected 3, got %d", n)
 	}
 
-	// Test BITCOUNT with start and end in BYTE mode
+	// Test BITCOUNT with start and end in BYTE mode :first byte
 	if n, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 0, End: 0, Unit: "BYTE"}).Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 2 {

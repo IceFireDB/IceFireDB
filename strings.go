@@ -325,56 +325,52 @@ func cmdDECR(m uhaha.Machine, args []string) (interface{}, error) {
 }
 
 func cmdBITPOS(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) < 3 {
+	// Validate the number of arguments provided by the client.
+	if len(args) < 3 || len(args) > 6 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
+	// Convert the key from string to byte slice for database operations.
 	key := []byte(args[1])
+
+	// Parse the bit value to search for.
 	bit, err := strconv.Atoi(args[2])
 	if err != nil {
 		return nil, err
 	}
 
-	var start, end int
-	var bitMode string
+	// Initialize default values for start, end, and bitMode.
+	start := 0
+	end := -1
+	bitMode := "BYTE" // Default to BYTE mode
 
-	if len(args) == 4 {
-		// Only start is provided
+	// Parse optional start and end parameters.
+	if len(args) >= 4 {
 		start, err = strconv.Atoi(args[3])
 		if err != nil {
 			return nil, err
 		}
-		end = -1 // Default end to -1 (end of the string)
-	} else if len(args) == 5 {
-		// Both start and end are provided
-		start, err = strconv.Atoi(args[3])
-		if err != nil {
-			return nil, err
-		}
+	}
+	if len(args) >= 5 {
 		end, err = strconv.Atoi(args[4])
 		if err != nil {
 			return nil, err
 		}
-	} else if len(args) == 6 {
-		// Both start, end, and bitMode are provided
-		start, err = strconv.Atoi(args[3])
-		if err != nil {
-			return nil, err
-		}
-		end, err = strconv.Atoi(args[4])
-		if err != nil {
-			return nil, err
-		}
+	}
+	if len(args) == 6 {
 		bitMode = args[5]
-	} else {
-		return nil, uhaha.ErrWrongNumArgs
+		if bitMode != "BYTE" && bitMode != "BIT" {
+			return nil, fmt.Errorf("invalid bit mode: %s", bitMode)
+		}
 	}
 
+	// Call the underlying BitPos function with the parsed parameters.
 	n, err := ldb.BitPos(key, bit, start, end, bitMode)
 	if err != nil {
 		return nil, err
 	}
 
+	// Return the result as a simple integer.
 	return redcon.SimpleInt(n), nil
 }
 
