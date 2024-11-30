@@ -156,14 +156,22 @@ func TestKV(t *testing.T) {
 	}
 
 	// Test BITCOUNT with start and end in BYTE mode
-	if n, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 0, End: 1, Unit: "BYTE"}).Result(); err != nil {
+	if n, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{
+		Start: 0,
+		End:   1,
+		Unit:  "BYTE",
+	}).Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 2 {
 		t.Fatalf("expected 2, got %d", n)
 	}
 
 	// Test BITCOUNT with start and end in BIT mode
-	if n, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 0, End: 15, Unit: "BIT"}).Result(); err != nil {
+	if n, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{
+		Start: 0,
+		End:   15,
+		Unit:  "BIT",
+	}).Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 3 {
 		t.Fatalf("expected 3, got %d", n)
@@ -177,24 +185,38 @@ func TestKV(t *testing.T) {
 	}
 
 	// Test BITPOS with start provided
-	if n, err := c.BitPos(context.Background(), bitKey, 1, 0).Result(); err != nil {
+	if n, err := c.BitPos(context.Background(), bitKey, 1, &redis.BitPosArgs{
+		Start: 0,
+	}).Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 0 {
 		t.Fatalf("expected 0, got %d", n)
 	}
 
 	// Test BITPOS with start and end provided
-	if n, err := c.BitPos(context.Background(), bitKey, 1, 0, 15).Result(); err != nil {
+	if n, err := c.BitPos(context.Background(), bitKey, 1, &redis.BitPosArgs{
+		Start: 0,
+		End:   15,
+	}).Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 0 {
 		t.Fatalf("expected 0, got %d", n)
 	}
 
-	// Test BITPOS with start, end, and bitMode provided
-	if n, err := c.BitPos(context.Background(), bitKey, 1, 0, 15, 8).Result(); err != nil {
+	// Test BITPOS with start, end, and unit provided
+	if n, err := c.BitPos(context.Background(), bitKey, 1, &redis.BitPosArgs{
+		Start: 0,
+		End:   15,
+		Unit:  "BIT",
+	}).Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 0 {
 		t.Fatalf("expected 0, got %d", n)
+	}
+
+	// Clean up
+	if err := c.Del(context.Background(), bitKey).Err(); err != nil {
+		t.Fatal(err)
 	}
 
 	c.Set(ctx, "key1", "foobar", 0)
