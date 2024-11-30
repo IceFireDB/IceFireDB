@@ -155,14 +155,14 @@ func TestKV(t *testing.T) {
 	}
 
 	// Test BITCOUNT with start and end in BYTE mode
-	if n, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 0, End: 1, Mode: "BYTE"}).Result(); err != nil {
+	if n, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 0, End: 1, Unit: "BYTE"}).Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 2 {
 		t.Fatalf("expected 2, got %d", n)
 	}
 
 	// Test BITCOUNT with start and end in BIT mode
-	if n, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 0, End: 15, Mode: "BIT"}).Result(); err != nil {
+	if n, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 0, End: 15, Unit: "BIT"}).Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 3 {
 		t.Fatalf("expected 3, got %d", n)
@@ -190,7 +190,7 @@ func TestKV(t *testing.T) {
 	}
 
 	// Test BITPOS with start, end, and bitMode provided
-	if n, err := c.BitPos(context.Background(), bitKey, 1, 0, 15, "8").Result(); err != nil {
+	if n, err := c.BitPos(context.Background(), bitKey, 1, 0, 15, 8).Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 0 {
 		t.Fatalf("expected 0, got %d", n)
