@@ -190,8 +190,8 @@ func TestKV(t *testing.T) {
 		t.Fatalf("expected 0, got %d", n)
 	}
 
-	// Test BITPOS with start and end provided, expecting a result other than 0
-	if n, err := c.BitPos(context.Background(), bitKey, 1, 8, 15).Result(); err != nil {
+	// Test BitPosSpan with start and end and mode, expecting a result other than 0
+	if n, err := c.BitPosSpan(context.Background(), bitKey, 1, 8, 15, "bit").Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 14 {
 		t.Fatalf("expected 14, got %d", n)

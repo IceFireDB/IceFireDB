@@ -342,7 +342,7 @@ func cmdBITPOS(m uhaha.Machine, args []string) (interface{}, error) {
 	// Initialize default values for start, end, and bitMode.
 	start := 0
 	end := -1
-	bitMode := "BIT" // Default to BIT mode
+	bitMode := "BYTE" // Default to BYTE mode
 
 	// Parse optional start and end parameters.
 	if len(args) >= 4 {
