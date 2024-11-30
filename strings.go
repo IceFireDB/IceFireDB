@@ -358,7 +358,7 @@ func cmdBITPOS(m uhaha.Machine, args []string) (interface{}, error) {
 		}
 	}
 	if len(args) == 6 {
-		bitMode = args[5]
+		bitMode = strings.ToUpper(args[5])
 		if bitMode != "BYTE" && bitMode != "BIT" {
 			return nil, fmt.Errorf("invalid bit mode: %s", bitMode)
 		}
