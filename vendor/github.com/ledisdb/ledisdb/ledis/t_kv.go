@@ -681,6 +681,14 @@ func numberBitCount(i uint32) uint32 {
 
 // validateRange
 func validateRange(start, end, length int) (int, int, error) {
+	// Check if start or end exceed length before dealing with negative index
+	if start >= length {
+		return 0, 0, fmt.Errorf("byte range out of bounds")
+	}
+	if end >= length {
+		return 0, 0, fmt.Errorf("byte range out of bounds")
+	}
+
 	// deal with negative index
 	if start < 0 {
 		start = length + start
@@ -697,7 +705,7 @@ func validateRange(start, end, length int) (int, int, error) {
 		end = length - 1
 	}
 	if start > end {
-		return 0, 0, fmt.Errorf("ERR invalid range: start > end")
+		return 0, 0, fmt.Errorf("byte invalid range: start > end")
 	}
 
 	return start, end, nil
@@ -705,6 +713,14 @@ func validateRange(start, end, length int) (int, int, error) {
 
 // validateBitRange
 func validateBitRange(start, end, bitLength int) (int, int, error) {
+	// Check if start or end exceed bitLength before dealing with negative index
+	if start >= bitLength {
+		return 0, 0, fmt.Errorf("bit range out of bounds")
+	}
+	if end >= bitLength {
+		return 0, 0, fmt.Errorf("bit range out of bounds")
+	}
+
 	// deal with negative index
 	if start < 0 {
 		start = bitLength + start
