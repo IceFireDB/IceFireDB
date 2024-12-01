@@ -180,10 +180,10 @@ func TestKV(t *testing.T) {
 	}
 
 	// Test BITCOUNT with start and end out of range
-	if n, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 100, End: 200, Unit: "BIT"}).Result(); err != nil {
-		t.Fatal(err)
-	} else if n != 0 {
-		t.Fatalf("expected 0, got %d", n)
+	if _, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 100, End: 200, Unit: "BIT"}).Result(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if err.Error() != "bit range out of bounds" {
+		t.Fatalf("expected 'bit range out of bounds' error, got %v", err)
 	}
 
 	// Test BITPOS with only bit=1
