@@ -481,6 +481,29 @@ func (db *DB) SetRange(key []byte, offset int, value []byte) (int64, error) {
 	return int64(len(oldValue)), nil
 }
 
+// getBitRange adjusts start and end bit indices to handle negative values and ensures they are within bounds.
+func getBitRange(start, end, bitLength int) (int, int) {
+	if start < 0 {
+		start = bitLength + start
+	}
+	if end < 0 {
+		end = bitLength + end
+	}
+
+	if start < 0 {
+		start = 0
+	}
+
+	if end < 0 {
+		end = 0
+	}
+
+	if end >= bitLength {
+		end = bitLength - 1
+	}
+	return start, end
+}
+
 func getRange(start, end, valLen int) (int, int) {
 	if start < 0 {
 		start = valLen + start
@@ -491,14 +514,13 @@ func getRange(start, end, valLen int) (int, int) {
 	if start < 0 {
 		start = 0
 	}
+
 	if end < 0 {
 		end = 0
 	}
+
 	if end >= valLen {
 		end = valLen - 1
-	}
-	if start > end {
-		start = end
 	}
 	return start, end
 }
@@ -804,26 +826,6 @@ func (db *DB) BitCount(key []byte, start int, end int, bitMode string) (int64, e
 	}
 
 	return n, nil
-}
-
-// getBitRange adjusts start and end bit indices to handle negative values and ensures they are within bounds.
-func getBitRange(start, end, bitLength int) (int, int) {
-	if start < 0 {
-		start = bitLength + start
-	}
-	if end < 0 {
-		end = bitLength + end
-	}
-	if start < 0 {
-		start = 0
-	}
-	if end >= bitLength {
-		end = bitLength - 1
-	}
-	if start > end {
-		start = end
-	}
-	return start, end
 }
 
 // BitPos returns the position of the first occurrence of the specified bit in the key's value.
