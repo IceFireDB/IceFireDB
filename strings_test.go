@@ -172,10 +172,11 @@ func TestKV(t *testing.T) {
 	}
 
 	// Test BITCOUNT with start > end
-	if n, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 1, End: 0, Unit: "BYTE"}).Result(); err != nil {
-		t.Fatal(err)
-	} else if n != 0 {
-		t.Fatalf("expected 0, got %d", n)
+	_, err := c.BitCount(context.Background(), bitKey, &redis.BitCount{Start: 1, End: 0, Unit: "BYTE"}).Result()
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	} else if err.Error() != "ERR invalid range: start > end" {
+		t.Fatalf("expected 'ERR invalid range: start > end', got '%s'", err.Error())
 	}
 
 	// Test BITCOUNT with start and end out of range
