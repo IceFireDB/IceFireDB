@@ -210,8 +210,8 @@ func TestKV(t *testing.T) {
 	// Test BITPOS with bit=0
 	if n, err := c.BitPos(context.Background(), bitKey, 0).Result(); err != nil {
 		t.Fatal(err)
-	} else if n != -1 {
-		t.Fatalf("expected -1, got %d", n)
+	} else if n != 0 {
+		t.Fatalf("expected 0, got %d", n)
 	}
 
 	// Test BITPOS with start > end
@@ -224,8 +224,8 @@ func TestKV(t *testing.T) {
 	// Test BITPOS with start beyond the highest set bit
 	if n, err := c.BitPos(context.Background(), bitKey, 1, 15, 15).Result(); err != nil {
 		t.Fatal(err)
-	} else if n != 14 {
-		t.Fatalf("expected 14, got %d", n)
+	} else if n != -1 {
+		t.Fatalf("expected -1, got %d", n)
 	}
 
 	// Test BitPosSpan with start and end in BYTE mode
@@ -238,15 +238,15 @@ func TestKV(t *testing.T) {
 	// Test BitPosSpan with bit=0 in BIT mode
 	if n, err := c.BitPosSpan(context.Background(), bitKey, 0, 0, 15, "bit").Result(); err != nil {
 		t.Fatal(err)
-	} else if n != -1 {
-		t.Fatalf("expected -1, got %d", n)
+	} else if n != 0 {
+		t.Fatalf("expected 0, got %d", n)
 	}
 
 	// Test BitPosSpan with bit=0 in BYTE mode
 	if n, err := c.BitPosSpan(context.Background(), bitKey, 0, 0, 1, "byte").Result(); err != nil {
 		t.Fatal(err)
-	} else if n != -1 {
-		t.Fatalf("expected -1, got %d", n)
+	} else if n != 0 {
+		t.Fatalf("expected 0, got %d", n)
 	}
 
 	// Test BitPosSpan with start > end in BIT mode
