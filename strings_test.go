@@ -68,6 +68,12 @@ func TestKV(t *testing.T) {
 		t.Fatal(n)
 	}
 
+	if n, err := c.Exists(ctx, "a", "a", "a").Result(); err != nil {
+		t.Fatal(err)
+	} else if n != 3 {
+		t.Fatal(n)
+	}
+
 	if n, err := c.Exists(ctx, "a", "b", "c", "d").Result(); err != nil {
 		t.Fatal(err)
 	} else if n != 2 {
