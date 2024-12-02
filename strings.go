@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ledisdb/ledisdb/ledis"
@@ -274,25 +275,103 @@ func cmdGETBIT(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
+// cmdEXISTS checks the existence of keys. no concurrent
+// Syntax: EXISTS key [key ...]
+// Time complexity: O(N) where N is the number of keys to check.
+// Returns the number of keys that exist from those specified as arguments.
+// If the same existing key is mentioned multiple times in the arguments, it will be counted multiple times.
+/*
 func cmdEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
+	// Check if the number of arguments is correct
 	if len(args) < 2 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
+	// Initialize a counter to keep track of existing keys
 	var counter int
+
+	// Iterate over all keys provided as arguments
 	for _, key := range args[1:] {
 		n, err := ldb.Exists([]byte(key))
 		if err != nil {
 			return nil, err
 		}
 
-		// exists
+		// If the key exists, increment the counter
 		if n > 0 {
 			counter++
 		}
 	}
 
 	return redcon.SimpleInt(counter), nil
+}
+*/
+
+// cmdEXISTS checks the existence of keys using concurrent checks for improved performance.
+// Syntax: EXISTS key [key ...]
+// Time complexity: O(N) where N is the number of keys to check.
+// Returns the number of keys that exist from those specified as arguments.
+// If the same existing key is mentioned multiple times in the arguments, it will be counted multiple times.
+// The function uses a concurrency limit to check keys in parallel, which can reduce the overall execution time.
+func cmdEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
+	if len(args) < 2 {
+		return nil, uhaha.ErrWrongNumArgs
+	}
+
+	keys := args[1:]
+	n := len(keys)
+
+	if n == 0 {
+		return redcon.SimpleInt(0), nil
+	}
+
+	results := make(chan bool, n)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var errret error
+
+	for _, key := range keys {
+		wg.Add(1)
+		go func(key string) {
+			defer wg.Done()
+			exists, err := existsKey(key)
+			if err != nil {
+				mu.Lock()
+				if errret == nil {
+					errret = err
+				}
+				mu.Unlock()
+				return
+			}
+			results <- exists
+		}(key)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	counter := 0
+	for res := range results {
+		if res {
+			counter++
+		}
+	}
+
+	if errret != nil {
+		return nil, errret
+	}
+
+	return redcon.SimpleInt(counter), nil
+}
+
+func existsKey(key string) (bool, error) {
+	n, err := ldb.Exists([]byte(key))
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 func cmdDECRBY(m uhaha.Machine, args []string) (interface{}, error) {
