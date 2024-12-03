@@ -69,11 +69,12 @@ func (ps *impl) Shutdown() {
 // corresponding to |keys|.
 func (ps *impl) Subscribe(ctx context.Context, keys ...cid.Cid) <-chan blocks.Block {
 	blocksCh := make(chan blocks.Block, len(keys))
-	valuesCh := make(chan interface{}, len(keys)) // provide our own channel to control buffer, prevent blocking
 	if len(keys) == 0 {
 		close(blocksCh)
 		return blocksCh
 	}
+
+	valuesCh := make(chan interface{}, len(keys)) // provide our own channel to control buffer, prevent blocking
 
 	// prevent shutdown
 	ps.lk.RLock()

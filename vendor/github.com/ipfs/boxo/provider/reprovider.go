@@ -183,6 +183,17 @@ func DatastorePrefix(k datastore.Key) Option {
 	}
 }
 
+// MaxBatchSize limit how big each batch is.
+// Some content routers like acceleratedDHTClient have sub linear scalling and
+// bigger sizes are thus faster per elements however smaller batch sizes can
+// limit memory usage spike.
+func MaxBatchSize(n uint) Option {
+	return func(system *reprovider) error {
+		system.maxReprovideBatchSize = n
+		return nil
+	}
+}
+
 // ThroughputReport will fire the callback synchronously once at least limit
 // multihashes have been advertised, it will then wait until a new set of at least
 // limit multihashes has been advertised.

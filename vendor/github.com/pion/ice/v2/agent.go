@@ -1055,16 +1055,16 @@ func (a *Agent) invalidatePendingBindingRequests(filterTime time.Time) {
 
 // Assert that the passed TransactionID is in our pendingBindingRequests and returns the destination
 // If the bindingRequest was valid remove it from our pending cache
-func (a *Agent) handleInboundBindingSuccess(id [stun.TransactionIDSize]byte) (bool, *bindingRequest) {
+func (a *Agent) handleInboundBindingSuccess(id [stun.TransactionIDSize]byte) (bool, *bindingRequest, time.Duration) {
 	a.invalidatePendingBindingRequests(time.Now())
 	for i := range a.pendingBindingRequests {
 		if a.pendingBindingRequests[i].transactionID == id {
 			validBindingRequest := a.pendingBindingRequests[i]
 			a.pendingBindingRequests = append(a.pendingBindingRequests[:i], a.pendingBindingRequests[i+1:]...)
-			return true, &validBindingRequest
+			return true, &validBindingRequest, time.Since(validBindingRequest.timestamp)
 		}
 	}
-	return false, nil
+	return false, nil, 0
 }
 
 // handleInbound processes STUN traffic from a remote candidate

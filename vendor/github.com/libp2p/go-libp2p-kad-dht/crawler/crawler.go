@@ -34,6 +34,7 @@ type (
 	DefaultCrawler struct {
 		parallelism          int
 		connectTimeout       time.Duration
+		queryTimeout         time.Duration
 		host                 host.Host
 		dhtRPC               *pb.ProtocolMessenger
 		dialAddressExtendDur time.Duration
@@ -60,6 +61,7 @@ func NewDefaultCrawler(host host.Host, opts ...Option) (*DefaultCrawler, error) 
 	return &DefaultCrawler{
 		parallelism:          o.parallelism,
 		connectTimeout:       o.connectTimeout,
+		queryTimeout:         3 * o.connectTimeout,
 		host:                 host,
 		dhtRPC:               pm,
 		dialAddressExtendDur: o.dialAddressExtendDur,
@@ -75,7 +77,10 @@ type messageSender struct {
 
 // SendRequest sends a peer a message and waits for its response
 func (ms *messageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Message) (*pb.Message, error) {
-	s, err := ms.h.NewStream(ctx, p, ms.protocols...)
+	tctx, cancel := context.WithTimeout(ctx, ms.timeout)
+	defer cancel()
+
+	s, err := ms.h.NewStream(tctx, p, ms.protocols...)
 	if err != nil {
 		return nil, err
 	}
@@ -86,8 +91,6 @@ func (ms *messageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Me
 	}
 
 	r := protoio.NewDelimitedReader(s, network.MessageSizeMax)
-	tctx, cancel := context.WithTimeout(ctx, ms.timeout)
-	defer cancel()
 	defer func() { _ = s.Close() }()
 
 	msg := new(pb.Message)
@@ -145,7 +148,9 @@ func (c *DefaultCrawler) Run(ctx context.Context, startingPeers []*peer.AddrInfo
 		go func() {
 			defer wg.Done()
 			for p := range jobs {
-				res := c.queryPeer(ctx, p)
+				qctx, cancel := context.WithTimeout(ctx, c.queryTimeout)
+				res := c.queryPeer(qctx, p)
+				cancel() // do not defer, cleanup after each job
 				results <- res
 			}
 		}()

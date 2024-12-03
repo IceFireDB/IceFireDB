@@ -355,7 +355,7 @@ func (rpm *receivedProviderMessage) debugMessage() {
 func (rpm *receivedProviderMessage) handle(pqm *ProviderQueryManager) {
 	requestStatus, ok := pqm.inProgressRequestStatuses[rpm.k]
 	if !ok {
-		log.Errorf("Received provider (%s) for cid (%s) not requested", rpm.p.String(), rpm.k.String())
+		log.Debugf("Received provider (%s) for cid (%s) not requested", rpm.p.String(), rpm.k.String())
 		return
 	}
 	requestStatus.providersSoFar = append(requestStatus.providersSoFar, rpm.p)

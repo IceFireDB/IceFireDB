@@ -33,6 +33,8 @@ import (
 var (
 	_      contentrouter.Client = &Client{}
 	logger                      = logging.Logger("routing/http/client")
+
+	DefaultProtocolFilter = []string{"unknown", "transport-bitswap"} // IPIP-484
 )
 
 const (
@@ -175,10 +177,11 @@ func WithStreamResultsRequired() Option {
 // The Provider and identity parameters are option. If they are nil, the [client.ProvideBitswap] method will not function.
 func New(baseURL string, opts ...Option) (*Client, error) {
 	client := &Client{
-		baseURL:    baseURL,
-		httpClient: newDefaultHTTPClient(defaultUserAgent),
-		clock:      clock.New(),
-		accepts:    strings.Join([]string{mediaTypeNDJSON, mediaTypeJSON}, ","),
+		baseURL:        baseURL,
+		httpClient:     newDefaultHTTPClient(defaultUserAgent),
+		clock:          clock.New(),
+		accepts:        strings.Join([]string{mediaTypeNDJSON, mediaTypeJSON}, ","),
+		protocolFilter: DefaultProtocolFilter, // can be customized via WithProtocolFilter
 	}
 
 	for _, opt := range opts {

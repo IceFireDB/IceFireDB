@@ -39,7 +39,13 @@ func AddFiltersToURL(baseURL string, protocolFilter, addrFilter []string) string
 		query.Set("filter-addrs", strings.Join(addrFilter, ","))
 	}
 
-	parsedURL.RawQuery = query.Encode()
+	// The comma is in the "sub-delims" set of characters that don't need to be
+	// encoded in most parts of a URL, including query parameters. Golang
+	// standard library percent-escapes it for consistency, but we prefer
+	// human-readable /routing/v1 URLs, and real comma is restored here to
+	// ensure human and machine requests hit the same HTTP cache keys.
+	parsedURL.RawQuery = strings.ReplaceAll(query.Encode(), "%2C", ",")
+
 	return parsedURL.String()
 }
 

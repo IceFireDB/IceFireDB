@@ -1,8 +1,8 @@
 package peermanager
 
 import (
-	"bytes"
 	"fmt"
+	"strings"
 
 	cid "github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -158,8 +158,6 @@ func (pwm *peerWantManager) broadcastWantHaves(wantHaves []cid.Cid) {
 // sendWants only sends the peer the want-blocks and want-haves that have not
 // already been sent to it.
 func (pwm *peerWantManager) sendWants(p peer.ID, wantBlocks []cid.Cid, wantHaves []cid.Cid) {
-	fltWantBlks := make([]cid.Cid, 0, len(wantBlocks))
-	fltWantHvs := make([]cid.Cid, 0, len(wantHaves))
 
 	// Get the existing want-blocks and want-haves for the peer
 	pws, ok := pwm.peerWants[p]
@@ -168,6 +166,8 @@ func (pwm *peerWantManager) sendWants(p peer.ID, wantBlocks []cid.Cid, wantHaves
 		log.Errorf("sendWants() called with peer %s but peer not found in peerWantManager", string(p))
 		return
 	}
+
+	fltWantBlks := make([]cid.Cid, 0, len(wantBlocks))
 
 	// Iterate over the requested want-blocks
 	for _, c := range wantBlocks {
@@ -197,6 +197,8 @@ func (pwm *peerWantManager) sendWants(p peer.ID, wantBlocks []cid.Cid, wantHaves
 		// Update the reverse index
 		pwm.reverseIndexAdd(c, p)
 	}
+
+	fltWantHvs := make([]cid.Cid, 0, len(wantHaves))
 
 	// Iterate over the requested want-haves
 	for _, c := range wantHaves {
@@ -450,7 +452,7 @@ func (pwm *peerWantManager) getWants() []cid.Cid {
 }
 
 func (pwm *peerWantManager) String() string {
-	var b bytes.Buffer
+	var b strings.Builder
 	for p, ws := range pwm.peerWants {
 		b.WriteString(fmt.Sprintf("Peer %s: %d want-have / %d want-block:\n", p, ws.wantHaves.Len(), ws.wantBlocks.Len()))
 		for _, c := range ws.wantHaves.Keys() {

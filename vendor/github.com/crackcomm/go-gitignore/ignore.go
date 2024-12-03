@@ -51,7 +51,6 @@
 package ignore
 
 import (
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -172,7 +171,7 @@ func CompileIgnoreLines(lines ...string) (*GitIgnore, error) {
 // Accepts a ignore file as the input, parses the lines out of the file
 // and invokes the CompileIgnoreLines method
 func CompileIgnoreFile(fpath string) (*GitIgnore, error) {
-	buffer, error := ioutil.ReadFile(fpath)
+	buffer, error := os.ReadFile(fpath)
 	if error == nil {
 		s := strings.Split(string(buffer), "\n")
 		return CompileIgnoreLines(s...)
@@ -183,7 +182,7 @@ func CompileIgnoreFile(fpath string) (*GitIgnore, error) {
 // Accepts a ignore file as the input, parses the lines out of the file
 // and invokes the CompileIgnoreLines method with additional lines
 func CompileIgnoreFileAndLines(fpath string, lines ...string) (*GitIgnore, error) {
-	buffer, error := ioutil.ReadFile(fpath)
+	buffer, error := os.ReadFile(fpath)
 	if error == nil {
 		s := strings.Split(string(buffer), "\n")
 		return CompileIgnoreLines(append(s, lines...)...)

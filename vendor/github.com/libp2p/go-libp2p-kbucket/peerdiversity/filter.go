@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strconv"
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -12,16 +13,12 @@ import (
 	"github.com/libp2p/go-cidranger"
 	asnutil "github.com/libp2p/go-libp2p-asn-util"
 
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 var dfLog = logging.Logger("diversityFilter")
-
-type asnStore interface {
-	AsnForIPv6(ip net.IP) (string, error)
-}
 
 // PeerIPGroupKey is a unique key that represents ONE of the IP Groups the peer belongs to.
 // A peer has one PeerIPGroupKey per address. Thus, a peer can belong to MULTIPLE Groups if it has
@@ -87,8 +84,6 @@ type Filter struct {
 	cplFnc func(peer.ID) int
 
 	cplPeerGroups map[int]map[peer.ID][]PeerIPGroupKey
-
-	asnStore asnStore
 }
 
 // NewFilter creates a Filter for Peer Diversity.
@@ -117,7 +112,6 @@ func NewFilter(pgm PeerIPGroupFilter, logKey string, cplFnc func(peer.ID) int) (
 		logKey:        logKey,
 		cplFnc:        cplFnc,
 		cplPeerGroups: make(map[int]map[peer.ID][]PeerIPGroupKey),
-		asnStore:      asnutil.Store,
 	}, nil
 }
 
@@ -167,12 +161,7 @@ func (f *Filter) TryAdd(p peer.ID) bool {
 		}
 
 		// reject the peer if we can't determine a grouping for one of it's address.
-		key, err := f.ipGroupKey(ip)
-		if err != nil {
-			dfLog.Errorw("failed to find Group Key", "appKey", f.logKey, "ip", ip.String(), "peer", p,
-				"err", err)
-			return false
-		}
+		key := f.ipGroupKey(ip)
 		if len(key) == 0 {
 			dfLog.Errorw("group key is empty", "appKey", f.logKey, "ip", ip.String(), "peer", p)
 			return false
@@ -211,34 +200,30 @@ func (f *Filter) WhitelistPeers(peers ...peer.ID) {
 }
 
 // returns the PeerIPGroupKey to which the given IP belongs.
-func (f *Filter) ipGroupKey(ip net.IP) (PeerIPGroupKey, error) {
+func (f *Filter) ipGroupKey(ip net.IP) PeerIPGroupKey {
 	switch bz := ip.To4(); bz {
 	case nil:
-		// TODO Clean up the ASN codebase
 		// ipv6 Address -> get ASN
-		s, err := f.asnStore.AsnForIPv6(ip)
-		if err != nil {
-			return "", fmt.Errorf("failed to fetch ASN for IPv6 addr %s: %w", ip.String(), err)
-		}
+		s := asnutil.AsnForIPv6(ip)
 
 		// if no ASN found then fallback on using the /32 prefix
-		if len(s) == 0 {
+		if s == 0 {
 			dfLog.Debugw("ASN not known", "appKey", f.logKey, "ip", ip)
-			s = fmt.Sprintf("unknown ASN: %s", net.CIDRMask(32, 128).String())
+			return PeerIPGroupKey(fmt.Sprintf("unknown ASN: %s", net.CIDRMask(32, 128).String()))
 		}
 
-		return PeerIPGroupKey(s), nil
+		return PeerIPGroupKey(strconv.FormatUint(uint64(s), 10))
 	default:
 		// If it belongs to a legacy Class 8, we return the /8 prefix as the key
 		rs, _ := f.legacyCidrs.ContainingNetworks(ip)
 		if len(rs) != 0 {
 			key := ip.Mask(net.IPv4Mask(255, 0, 0, 0)).String()
-			return PeerIPGroupKey(key), nil
+			return PeerIPGroupKey(key)
 		}
 
 		// otherwise -> /16 prefix
 		key := ip.Mask(net.IPv4Mask(255, 255, 0, 0)).String()
-		return PeerIPGroupKey(key), nil
+		return PeerIPGroupKey(key)
 	}
 }
 

@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/ucarion/urlpath"
 )
 
@@ -134,14 +133,14 @@ func Parse(r io.Reader) (rules []Rule, err error) {
 		// from (must parse as an absolute path)
 		from, err := parseFrom(fields[0])
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing 'from'")
+			return nil, fmt.Errorf("parsing 'from': %w", err)
 		}
 		rule.From = from
 
 		// to (must parse as an absolute path or an URL)
 		to, err := parseTo(fields[1])
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing 'to'")
+			return nil, fmt.Errorf("parsing 'to': %w", err)
 		}
 		rule.To = to
 
@@ -149,7 +148,7 @@ func Parse(r io.Reader) (rules []Rule, err error) {
 		if len(fields) > 2 {
 			code, err := parseStatus(fields[2])
 			if err != nil {
-				return nil, errors.Wrapf(err, "parsing status %q", fields[2])
+				return nil, fmt.Errorf("parsing status %q: %w", fields[2], err)
 			}
 
 			rule.Status = code

@@ -179,10 +179,13 @@ func (s *streamMessageSender) multiAttempt(ctx context.Context, fn func() error)
 			return err
 		}
 
+		timer := time.NewTimer(s.opts.SendErrorBackoff)
+		defer timer.Stop()
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(s.opts.SendErrorBackoff):
+		case <-timer.C:
 			// wait a short time in case disconnect notifications are still propagating
 			log.Infof("send message to %s failed but context was not Done: %s", s.to, err)
 		}

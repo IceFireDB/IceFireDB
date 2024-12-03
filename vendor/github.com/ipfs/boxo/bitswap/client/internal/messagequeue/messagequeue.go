@@ -93,7 +93,7 @@ type MessageQueue struct {
 
 	// Dont touch any of these variables outside of run loop
 	sender                bsnet.MessageSender
-	rebroadcastIntervalLk sync.RWMutex
+	rebroadcastIntervalLk sync.Mutex
 	rebroadcastInterval   time.Duration
 	rebroadcastTimer      *clock.Timer
 	// For performance reasons we just clear out the fields of the message
@@ -389,9 +389,9 @@ func (mq *MessageQueue) SetRebroadcastInterval(delay time.Duration) {
 
 // Startup starts the processing of messages and rebroadcasting.
 func (mq *MessageQueue) Startup() {
-	mq.rebroadcastIntervalLk.RLock()
+	mq.rebroadcastIntervalLk.Lock()
 	mq.rebroadcastTimer = mq.clock.Timer(mq.rebroadcastInterval)
-	mq.rebroadcastIntervalLk.RUnlock()
+	mq.rebroadcastIntervalLk.Unlock()
 	go mq.runQueue()
 }
 
@@ -422,7 +422,7 @@ func (mq *MessageQueue) runQueue() {
 	}
 
 	var workScheduled time.Time
-	for mq.ctx.Err() == nil {
+	for {
 		select {
 		case <-mq.rebroadcastTimer.C:
 			mq.rebroadcastWantlist()
@@ -471,9 +471,9 @@ func (mq *MessageQueue) runQueue() {
 
 // Periodically resend the list of wants to the peer
 func (mq *MessageQueue) rebroadcastWantlist() {
-	mq.rebroadcastIntervalLk.RLock()
+	mq.rebroadcastIntervalLk.Lock()
 	mq.rebroadcastTimer.Reset(mq.rebroadcastInterval)
-	mq.rebroadcastIntervalLk.RUnlock()
+	mq.rebroadcastIntervalLk.Unlock()
 
 	// If some wants were transferred from the rebroadcast list
 	if mq.transferRebroadcastWants() {

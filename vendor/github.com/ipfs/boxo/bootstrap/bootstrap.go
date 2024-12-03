@@ -304,15 +304,19 @@ func peersConnect(ctx context.Context, ph host.Host, availablePeers []peer.AddrI
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go func() {
+		timer := time.NewTimer(time.Second)
+		defer timer.Stop()
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(1 * time.Second):
+			case <-timer.C:
 				if int(atomic.LoadUint64(&connected)) >= needed {
 					cancel()
 					return
 				}
+				timer.Reset(time.Second)
 			}
 		}
 	}()
