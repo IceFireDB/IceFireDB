@@ -170,9 +170,9 @@ func (m *packetArrivalTimeMap) adjustToSize(newSize int) {
 		}
 		m.reallocate(newCapacity)
 	}
-	if m.capacity() > max(minCapacity, newSize*4) {
+	if m.capacity() > maxInt(minCapacity, newSize*4) {
 		newCapacity := m.capacity()
-		for newCapacity >= 2*max(newSize, minCapacity) {
+		for newCapacity >= 2*maxInt(newSize, minCapacity) {
 			newCapacity /= 2
 		}
 		m.reallocate(newCapacity)

@@ -78,7 +78,7 @@ func (m *packetManager) NewPacket(header *rtp.Header, payload []byte, rtxSsrc ui
 
 		// Remove padding if present.
 		paddingLength := 0
-		if p.header.Padding {
+		if p.header.Padding && p.payload != nil && len(p.payload) > 0 {
 			paddingLength = int(p.payload[len(p.payload)-1])
 			p.header.Padding = false
 		}

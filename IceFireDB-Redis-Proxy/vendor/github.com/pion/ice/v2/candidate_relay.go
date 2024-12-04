@@ -70,6 +70,23 @@ func NewCandidateRelay(config *CandidateRelayConfig) (*CandidateRelay, error) {
 	}, nil
 }
 
+// LocalPreference returns the local preference for this candidate
+func (c *CandidateRelay) LocalPreference() uint16 {
+	// These preference values come from libwebrtc
+	// https://github.com/mozilla/libwebrtc/blob/1389c76d9c79839a2ca069df1db48aa3f2e6a1ac/p2p/base/turn_port.cc#L61
+	var relayPreference uint16
+	switch c.relayProtocol {
+	case relayProtocolTLS, relayProtocolDTLS:
+		relayPreference = 2
+	case tcp:
+		relayPreference = 1
+	default:
+		relayPreference = 0
+	}
+
+	return c.candidateBase.LocalPreference() + relayPreference
+}
+
 // RelayProtocol returns the protocol used between the endpoint and the relay server.
 func (c *CandidateRelay) RelayProtocol() string {
 	return c.relayProtocol

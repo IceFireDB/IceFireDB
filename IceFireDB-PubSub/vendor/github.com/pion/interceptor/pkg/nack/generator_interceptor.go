@@ -21,6 +21,7 @@ type GeneratorInterceptorFactory struct {
 // NewInterceptor constructs a new ReceiverInterceptor
 func (g *GeneratorInterceptorFactory) NewInterceptor(_ string) (interceptor.Interceptor, error) {
 	i := &GeneratorInterceptor{
+		streamsFilter:     streamSupportNack,
 		size:              512,
 		skipLastN:         0,
 		maxNacksPerPacket: 0,
@@ -47,6 +48,7 @@ func (g *GeneratorInterceptorFactory) NewInterceptor(_ string) (interceptor.Inte
 // GeneratorInterceptor interceptor generates nack feedback messages.
 type GeneratorInterceptor struct {
 	interceptor.NoOp
+	streamsFilter     func(info *interceptor.StreamInfo) bool
 	size              uint16
 	skipLastN         uint16
 	maxNacksPerPacket uint16
@@ -86,7 +88,7 @@ func (n *GeneratorInterceptor) BindRTCPWriter(writer interceptor.RTCPWriter) int
 // BindRemoteStream lets you modify any incoming RTP packets. It is called once for per RemoteStream. The returned method
 // will be called once per rtp packet.
 func (n *GeneratorInterceptor) BindRemoteStream(info *interceptor.StreamInfo, reader interceptor.RTPReader) interceptor.RTPReader {
-	if !streamSupportNack(info) {
+	if !n.streamsFilter(info) {
 		return reader
 	}
 
