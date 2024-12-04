@@ -6,6 +6,7 @@ package nack
 import (
 	"time"
 
+	"github.com/pion/interceptor"
 	"github.com/pion/logging"
 )
 
@@ -51,6 +52,14 @@ func GeneratorLog(log logging.LeveledLogger) GeneratorOption {
 func GeneratorInterval(interval time.Duration) GeneratorOption {
 	return func(r *GeneratorInterceptor) error {
 		r.interval = interval
+		return nil
+	}
+}
+
+// GeneratorStreamsFilter sets filter for generator streams
+func GeneratorStreamsFilter(filter func(info *interceptor.StreamInfo) bool) GeneratorOption {
+	return func(r *GeneratorInterceptor) error {
+		r.streamsFilter = filter
 		return nil
 	}
 }

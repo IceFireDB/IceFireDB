@@ -42,7 +42,7 @@ type PeerManager struct {
 	createPeerQueue PeerQueueFactory
 	ctx             context.Context
 
-	psLk         sync.RWMutex
+	psLk         sync.Mutex
 	sessions     map[uint64]Session
 	peerSessions map[peer.ID]map[uint64]struct{}
 

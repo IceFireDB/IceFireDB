@@ -400,7 +400,7 @@ func (a *Agent) gatherCandidatesSrflxUDPMux(ctx context.Context, urls []*stun.UR
 					hostPort := fmt.Sprintf("%s:%d", url.Host, url.Port)
 					serverAddr, err := a.net.ResolveUDPAddr(network, hostPort)
 					if err != nil {
-						a.log.Debugf("Failed to resolve STUN host: %s: %v", hostPort, err)
+						a.log.Debugf("Failed to resolve STUN host: %s %s: %v", network, hostPort, err)
 						return
 					}
 
@@ -462,7 +462,7 @@ func (a *Agent) gatherCandidatesSrflx(ctx context.Context, urls []*stun.URI, net
 				hostPort := fmt.Sprintf("%s:%d", url.Host, url.Port)
 				serverAddr, err := a.net.ResolveUDPAddr(network, hostPort)
 				if err != nil {
-					a.log.Debugf("Failed to resolve STUN host: %s: %v", hostPort, err)
+					a.log.Debugf("Failed to resolve STUN host: %s %s: %v", network, hostPort, err)
 					return
 				}
 
@@ -616,7 +616,7 @@ func (a *Agent) gatherCandidatesRelay(ctx context.Context, urls []*stun.URI) { /
 
 				relAddr = conn.LocalAddr().(*net.UDPAddr).IP.String() //nolint:forcetypeassert
 				relPort = conn.LocalAddr().(*net.UDPAddr).Port        //nolint:forcetypeassert
-				relayProtocol = "dtls"
+				relayProtocol = relayProtocolDTLS
 				locConn = &fakenet.PacketConn{Conn: conn}
 			case url.Proto == stun.ProtoTypeTCP && url.Scheme == stun.SchemeTypeTURNS:
 				tcpAddr, resolvErr := a.net.ResolveTCPAddr(NetworkTypeTCP4.String(), turnServerAddr)
@@ -646,7 +646,7 @@ func (a *Agent) gatherCandidatesRelay(ctx context.Context, urls []*stun.URI) { /
 
 				relAddr = conn.LocalAddr().(*net.TCPAddr).IP.String() //nolint:forcetypeassert
 				relPort = conn.LocalAddr().(*net.TCPAddr).Port        //nolint:forcetypeassert
-				relayProtocol = "tls"
+				relayProtocol = relayProtocolTLS
 				locConn = turn.NewSTUNConn(conn)
 			default:
 				a.log.Warnf("Unable to handle URL in gatherCandidatesRelay %v", url)

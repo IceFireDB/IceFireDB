@@ -120,7 +120,7 @@ func (s *controllingSelector) HandleBindingRequest(m *stun.Message, local, remot
 }
 
 func (s *controllingSelector) HandleSuccessResponse(m *stun.Message, local, remote Candidate, remoteAddr net.Addr) {
-	ok, pendingRequest := s.agent.handleInboundBindingSuccess(m.TransactionID)
+	ok, pendingRequest, rtt := s.agent.handleInboundBindingSuccess(m.TransactionID)
 	if !ok {
 		s.log.Warnf("Discard message from (%s), unknown TransactionID 0x%x", remote, m.TransactionID)
 		return
@@ -149,6 +149,8 @@ func (s *controllingSelector) HandleSuccessResponse(m *stun.Message, local, remo
 	if pendingRequest.isUseCandidate && s.agent.getSelectedPair() == nil {
 		s.agent.setSelectedPair(p)
 	}
+
+	p.UpdateRoundTripTime(rtt)
 }
 
 func (s *controllingSelector) PingCandidate(local, remote Candidate) {
@@ -211,7 +213,7 @@ func (s *controlledSelector) HandleSuccessResponse(m *stun.Message, local, remot
 	// request with an appropriate error code response (e.g., 400)
 	// [RFC5389].
 
-	ok, pendingRequest := s.agent.handleInboundBindingSuccess(m.TransactionID)
+	ok, pendingRequest, rtt := s.agent.handleInboundBindingSuccess(m.TransactionID)
 	if !ok {
 		s.log.Warnf("Discard message from (%s), unknown TransactionID 0x%x", remote, m.TransactionID)
 		return
@@ -245,6 +247,8 @@ func (s *controlledSelector) HandleSuccessResponse(m *stun.Message, local, remot
 			s.log.Tracef("Ignore nominate new pair %s, already nominated pair %s", p, selectedPair)
 		}
 	}
+
+	p.UpdateRoundTripTime(rtt)
 }
 
 func (s *controlledSelector) HandleBindingRequest(m *stun.Message, local, remote Candidate) {

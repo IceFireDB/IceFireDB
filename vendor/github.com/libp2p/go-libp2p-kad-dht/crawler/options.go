@@ -3,6 +3,7 @@ package crawler
 import (
 	"time"
 
+	"github.com/libp2p/go-libp2p-kad-dht/amino"
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
@@ -20,7 +21,7 @@ type options struct {
 // defaults are the default crawler options. This option will be automatically
 // prepended to any options you pass to the crawler constructor.
 var defaults = func(o *options) error {
-	o.protocols = []protocol.ID{"/ipfs/kad/1.0.0"}
+	o.protocols = amino.Protocols
 	o.parallelism = 1000
 	o.connectTimeout = time.Second * 5
 	o.perMsgTimeout = time.Second * 5

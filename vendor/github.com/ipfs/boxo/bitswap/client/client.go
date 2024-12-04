@@ -167,7 +167,6 @@ func New(parent context.Context, network bsnet.BitSwapNetwork, bstore blockstore
 		network:                    network,
 		process:                    px,
 		pm:                         pm,
-		pqm:                        pqm,
 		sm:                         sm,
 		sim:                        sim,
 		notif:                      notif,
@@ -184,7 +183,7 @@ func New(parent context.Context, network bsnet.BitSwapNetwork, bstore blockstore
 		option(bs)
 	}
 
-	bs.pqm.Startup()
+	pqm.Startup()
 
 	// bind the context and process.
 	// do it over here to avoid closing before all setup is done.
@@ -202,9 +201,6 @@ func New(parent context.Context, network bsnet.BitSwapNetwork, bstore blockstore
 // Client instances implement the bitswap protocol.
 type Client struct {
 	pm *bspm.PeerManager
-
-	// the provider query manager manages requests to find providers
-	pqm *bspqm.ProviderQueryManager
 
 	// network delivers messages on behalf of the session
 	network bsnet.BitSwapNetwork

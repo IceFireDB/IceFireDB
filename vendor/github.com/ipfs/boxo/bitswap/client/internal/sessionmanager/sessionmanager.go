@@ -57,7 +57,7 @@ type SessionManager struct {
 	notif                  notifications.PubSub
 
 	// Sessions
-	sessLk   sync.RWMutex
+	sessLk   sync.Mutex
 	sessions map[uint64]Session
 
 	// Session Index
@@ -159,13 +159,13 @@ func (sm *SessionManager) ReceiveFrom(ctx context.Context, p peer.ID, blks []cid
 
 	// Notify each session that is interested in the blocks / HAVEs / DONT_HAVEs
 	for _, id := range sm.sessionInterestManager.InterestedSessions(blks, haves, dontHaves) {
-		sm.sessLk.RLock()
+		sm.sessLk.Lock()
 		if sm.sessions == nil { // check if SessionManager was shutdown
-			sm.sessLk.RUnlock()
+			sm.sessLk.Unlock()
 			return
 		}
 		sess, ok := sm.sessions[id]
-		sm.sessLk.RUnlock()
+		sm.sessLk.Unlock()
 
 		if ok {
 			sess.ReceiveFrom(p, blks, haves, dontHaves)

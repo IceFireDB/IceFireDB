@@ -13,7 +13,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-kbucket/peerdiversity"
 
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 )
 
 var log = logging.Logger("table")
@@ -72,8 +72,12 @@ func NewRoutingTable(bucketsize int, localID ID, latency time.Duration, m peerst
 
 		cplRefreshedAt: make(map[uint]time.Time),
 
-		PeerRemoved: func(peer.ID) {},
-		PeerAdded:   func(peer.ID) {},
+		PeerRemoved: func(p peer.ID) {
+			log.Debugw("peer removed", "peer", p)
+		},
+		PeerAdded: func(p peer.ID) {
+			log.Debugw("peer added", "peer", p)
+		},
 
 		usefulnessGracePeriod: usefulnessGracePeriod,
 

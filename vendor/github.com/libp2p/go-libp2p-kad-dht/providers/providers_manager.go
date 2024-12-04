@@ -14,6 +14,7 @@ import (
 	"github.com/ipfs/go-datastore/autobatch"
 	dsq "github.com/ipfs/go-datastore/query"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/libp2p/go-libp2p-kad-dht/amino"
 	"github.com/libp2p/go-libp2p-kad-dht/internal"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -30,12 +31,12 @@ const (
 	// peers around. Those addresses are returned alongside provider. After
 	// it expires, the returned records will require an extra lookup, to
 	// find the multiaddress associated with the returned peer id.
-	ProviderAddrTTL = 24 * time.Hour
+	ProviderAddrTTL = amino.DefaultProviderAddrTTL
 )
 
 // ProvideValidity is the default time that a Provider Record should last on DHT
 // This value is also known as Provider Record Expiration Interval.
-var ProvideValidity = time.Hour * 48
+var ProvideValidity = amino.DefaultProvideValidity
 var defaultCleanupInterval = time.Hour
 var lruCacheSize = 256
 var batchBufferSize = 256

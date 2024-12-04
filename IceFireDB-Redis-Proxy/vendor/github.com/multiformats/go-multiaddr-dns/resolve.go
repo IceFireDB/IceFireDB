@@ -246,6 +246,9 @@ func (r *Resolver) Resolve(ctx context.Context, maddr ma.Multiaddr) ([]ma.Multia
 			if postDNS != nil {
 				rmaddr = rmaddr.Decapsulate(postDNS)
 			}
+			if rmaddr == nil {
+				continue
+			}
 			resolved = append(resolved, rmaddr)
 		}
 	default:

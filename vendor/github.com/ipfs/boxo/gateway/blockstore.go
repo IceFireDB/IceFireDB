@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -18,13 +19,12 @@ import (
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/prometheus/client_golang/prometheus"
-	uatomic "go.uber.org/atomic"
 	"go.uber.org/zap/zapcore"
 )
 
 type cacheBlockStore struct {
 	cache               *lru.TwoQueueCache[string, []byte]
-	rehash              *uatomic.Bool
+	rehash              atomic.Bool
 	cacheHitsMetric     prometheus.Counter
 	cacheRequestsMetric prometheus.Counter
 }
@@ -73,7 +73,6 @@ func NewCacheBlockStore(size int, reg prometheus.Registerer) (blockstore.Blockst
 
 	return &cacheBlockStore{
 		cache:               c,
-		rehash:              uatomic.NewBool(false),
 		cacheHitsMetric:     cacheHitsMetric,
 		cacheRequestsMetric: cacheRequestsMetric,
 	}, nil

@@ -689,7 +689,7 @@ func (s *connection) nextIdleTimeoutTime() time.Time {
 // Time when the next keep-alive packet should be sent.
 // It returns a zero time if no keep-alive should be sent.
 func (s *connection) nextKeepAliveTime() time.Time {
-	if s.config.KeepAlivePeriod == 0 || s.keepAlivePingSent || !s.firstAckElicitingPacketAfterIdleSentTime.IsZero() {
+	if s.config.KeepAlivePeriod == 0 || s.keepAlivePingSent {
 		return time.Time{}
 	}
 	keepAliveInterval := max(s.keepAliveInterval, s.rttStats.PTO(true)*3/2)
@@ -864,7 +864,9 @@ func (s *connection) handlePacketImpl(rp receivedPacket) bool {
 			if counter > 0 {
 				p.buffer.Split()
 			}
-			processed = s.handleShortHeaderPacket(p)
+			if wasProcessed := s.handleShortHeaderPacket(p); wasProcessed {
+				processed = true
+			}
 			break
 		}
 	}
@@ -1766,8 +1768,9 @@ func (s *connection) applyTransportParameters() {
 	params := s.peerParams
 	// Our local idle timeout will always be > 0.
 	s.idleTimeout = s.config.MaxIdleTimeout
-	if s.idleTimeout > 0 && params.MaxIdleTimeout < s.idleTimeout {
-		s.idleTimeout = params.MaxIdleTimeout
+	// If the peer advertised an idle timeout, take the minimum of the values.
+	if params.MaxIdleTimeout > 0 {
+		s.idleTimeout = min(s.idleTimeout, params.MaxIdleTimeout)
 	}
 	s.keepAliveInterval = min(s.config.KeepAlivePeriod, min(s.idleTimeout/2, protocol.MaxKeepAliveInterval))
 	s.streamsMap.UpdateLimits(params)

@@ -83,3 +83,8 @@ func (t GatheringState) String() string {
 		return ErrUnknownType.Error()
 	}
 }
+
+const (
+	relayProtocolDTLS = "dtls"
+	relayProtocolTLS  = "tls"
+)

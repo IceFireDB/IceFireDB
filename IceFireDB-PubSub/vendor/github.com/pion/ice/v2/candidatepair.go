@@ -5,6 +5,8 @@ package ice
 
 import (
 	"fmt"
+	"sync/atomic"
+	"time"
 
 	"github.com/pion/stun"
 )
@@ -28,6 +30,11 @@ type CandidatePair struct {
 	state                    CandidatePairState
 	nominated                bool
 	nominateOnBindingSuccess bool
+
+	// stats
+	currentRoundTripTime int64 // in ns
+	totalRoundTripTime   int64 // in ns
+	responsesReceived    uint64
 }
 
 func (p *CandidatePair) String() string {
@@ -99,4 +106,31 @@ func (a *Agent) sendSTUN(msg *stun.Message, local, remote Candidate) {
 	if err != nil {
 		a.log.Tracef("Failed to send STUN message: %s", err)
 	}
+}
+
+// UpdateRoundTripTime sets the current round time of this pair and
+// accumulates total round trip time and responses received
+func (p *CandidatePair) UpdateRoundTripTime(rtt time.Duration) {
+	rttNs := rtt.Nanoseconds()
+	atomic.StoreInt64(&p.currentRoundTripTime, rttNs)
+	atomic.AddInt64(&p.totalRoundTripTime, rttNs)
+	atomic.AddUint64(&p.responsesReceived, 1)
+}
+
+// CurrentRoundTripTime returns the current round trip time in seconds
+// https://www.w3.org/TR/webrtc-stats/#dom-rtcicecandidatepairstats-currentroundtriptime
+func (p *CandidatePair) CurrentRoundTripTime() float64 {
+	return time.Duration(atomic.LoadInt64(&p.currentRoundTripTime)).Seconds()
+}
+
+// TotalRoundTripTime returns the current round trip time in seconds
+// https://www.w3.org/TR/webrtc-stats/#dom-rtcicecandidatepairstats-totalroundtriptime
+func (p *CandidatePair) TotalRoundTripTime() float64 {
+	return time.Duration(atomic.LoadInt64(&p.totalRoundTripTime)).Seconds()
+}
+
+// ResponsesReceived returns the total number of connectivity responses received
+// https://www.w3.org/TR/webrtc-stats/#dom-rtcicecandidatepairstats-responsesreceived
+func (p *CandidatePair) ResponsesReceived() uint64 {
+	return atomic.LoadUint64(&p.responsesReceived)
 }

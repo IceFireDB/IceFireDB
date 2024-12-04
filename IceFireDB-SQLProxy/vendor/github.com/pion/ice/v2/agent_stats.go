@@ -54,6 +54,56 @@ func (a *Agent) GetCandidatePairsStats() []CandidatePairStats {
 	return res
 }
 
+// GetSelectedCandidatePairStats returns a candidate pair stats for selected candidate pair.
+// Returns false if there is no selected pair
+func (a *Agent) GetSelectedCandidatePairStats() (CandidatePairStats, bool) {
+	isAvailable := false
+	var res CandidatePairStats
+	err := a.run(a.context(), func(ctx context.Context, agent *Agent) {
+		sp := agent.getSelectedPair()
+		if sp == nil {
+			return
+		}
+
+		isAvailable = true
+		res = CandidatePairStats{
+			Timestamp:         time.Now(),
+			LocalCandidateID:  sp.Local.ID(),
+			RemoteCandidateID: sp.Remote.ID(),
+			State:             sp.state,
+			Nominated:         sp.nominated,
+			// PacketsSent uint32
+			// PacketsReceived uint32
+			// BytesSent uint64
+			// BytesReceived uint64
+			// LastPacketSentTimestamp time.Time
+			// LastPacketReceivedTimestamp time.Time
+			// FirstRequestTimestamp time.Time
+			// LastRequestTimestamp time.Time
+			// LastResponseTimestamp time.Time
+			TotalRoundTripTime:   sp.TotalRoundTripTime(),
+			CurrentRoundTripTime: sp.CurrentRoundTripTime(),
+			// AvailableOutgoingBitrate float64
+			// AvailableIncomingBitrate float64
+			// CircuitBreakerTriggerCount uint32
+			// RequestsReceived uint64
+			// RequestsSent uint64
+			ResponsesReceived: sp.ResponsesReceived(),
+			// ResponsesSent uint64
+			// RetransmissionsReceived uint64
+			// RetransmissionsSent uint64
+			// ConsentRequestsSent uint64
+			// ConsentExpiredTimestamp time.Time
+		}
+	})
+	if err != nil {
+		a.log.Errorf("Failed to get selected candidate pair stats: %v", err)
+		return CandidatePairStats{}, false
+	}
+
+	return res, isAvailable
+}
+
 // GetLocalCandidatesStats returns a list of local candidates stats
 func (a *Agent) GetLocalCandidatesStats() []CandidateStats {
 	var res []CandidateStats

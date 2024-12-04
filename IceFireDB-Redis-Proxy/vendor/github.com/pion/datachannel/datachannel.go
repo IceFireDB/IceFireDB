@@ -118,12 +118,7 @@ func Client(stream *sctp.Stream, config *Config) (*DataChannel, error) {
 			return nil, fmt.Errorf("failed to send ChannelOpen %w", err)
 		}
 	}
-	dc := newDataChannel(stream, config)
-
-	if err := dc.commitReliabilityParams(); err != nil {
-		return nil, err
-	}
-	return dc, nil
+	return newDataChannel(stream, config), nil
 }
 
 // Accept is used to accept incoming data channels over SCTP
@@ -285,6 +280,9 @@ func (c *DataChannel) handleDCEP(data []byte) error {
 
 	switch msg := msg.(type) {
 	case *channelAck:
+		if err := c.commitReliabilityParams(); err != nil {
+			return err
+		}
 		c.onOpenComplete()
 	default:
 		return fmt.Errorf("%w, wanted ACK got %v", ErrUnexpectedDataChannelType, msg)

@@ -4,9 +4,12 @@ This is a parser for the IPFS Web Gateway's `_redirects` file format.
 
 ## Specification
 
-Follow specification work at https://github.com/ipfs/specs/pull/290
+This repository implements [Web _redirects File Specification](https://specs.ipfs.tech/http-gateways/web-redirects-file/) from <https://specs.ipfs.tech/http-gateways/web-redirects-file/>.
+
+For historical discussion see [ipfs/specs#290](https://github.com/ipfs/specs/pull/290) and [IPIP-0002: _redirects File Support on Web Gateways](https://specs.ipfs.tech/ipips/ipip-0002/).
 
 ## Format
+
 Currently only supports `from`, `to` and `status`.
 
 ```

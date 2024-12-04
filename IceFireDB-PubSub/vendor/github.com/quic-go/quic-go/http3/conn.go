@@ -3,8 +3,10 @@ package http3
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -112,8 +114,32 @@ func (c *connection) openRequestStream(
 	c.streams[str.StreamID()] = datagrams
 	c.streamMx.Unlock()
 	qstr := newStateTrackingStream(str, c, datagrams)
-	hstr := newStream(qstr, c, datagrams)
-	return newRequestStream(hstr, requestWriter, reqDone, c.decoder, disableCompression, maxHeaderBytes), nil
+	rsp := &http.Response{}
+	hstr := newStream(qstr, c, datagrams, func(r io.Reader, l uint64) error {
+		hdr, err := c.decodeTrailers(r, l, maxHeaderBytes)
+		if err != nil {
+			return err
+		}
+		rsp.Trailer = hdr
+		return nil
+	})
+	return newRequestStream(hstr, requestWriter, reqDone, c.decoder, disableCompression, maxHeaderBytes, rsp), nil
+}
+
+func (c *connection) decodeTrailers(r io.Reader, l, maxHeaderBytes uint64) (http.Header, error) {
+	if l > maxHeaderBytes {
+		return nil, fmt.Errorf("HEADERS frame too large: %d bytes (max: %d)", l, maxHeaderBytes)
+	}
+
+	b := make([]byte, l)
+	if _, err := io.ReadFull(r, b); err != nil {
+		return nil, err
+	}
+	fields, err := c.decoder.DecodeFull(b)
+	if err != nil {
+		return nil, err
+	}
+	return parseTrailers(fields)
 }
 
 func (c *connection) acceptStream(ctx context.Context) (quic.Stream, *datagrammer, error) {
@@ -144,7 +170,7 @@ func (c *connection) CloseWithError(code quic.ApplicationErrorCode, msg string) 
 	return c.Connection.CloseWithError(code, msg)
 }
 
-func (c *connection) HandleUnidirectionalStreams(hijack func(StreamType, quic.ConnectionTracingID, quic.ReceiveStream, error) (hijacked bool)) {
+func (c *connection) handleUnidirectionalStreams(hijack func(StreamType, quic.ConnectionTracingID, quic.ReceiveStream, error) (hijacked bool)) {
 	var (
 		rcvdControlStr      atomic.Bool
 		rcvdQPACKEncoderStr atomic.Bool
@@ -290,10 +316,12 @@ func (c *connection) receiveDatagrams() error {
 }
 
 // ReceivedSettings returns a channel that is closed once the peer's SETTINGS frame was received.
+// Settings can be optained from the Settings method after the channel was closed.
 func (c *connection) ReceivedSettings() <-chan struct{} { return c.receivedSettings }
 
 // Settings returns the settings received on this connection.
 // It is only valid to call this function after the channel returned by ReceivedSettings was closed.
 func (c *connection) Settings() *Settings { return c.settings }
 
+// Context returns the context of the underlying QUIC connection.
 func (c *connection) Context() context.Context { return c.ctx }

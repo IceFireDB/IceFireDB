@@ -26,6 +26,15 @@ func (e ErrNotSupported[T]) Is(target error) bool {
 	return ok
 }
 
+type ErrUnrecognizedResponse[T StringLike] struct {
+	Actual   T
+	Expected T
+}
+
+func (e ErrUnrecognizedResponse[T]) Error() string {
+	return fmt.Sprintf("unrecognized response. expected: %s (or na). got: %s", e.Expected, e.Actual)
+}
+
 // ErrNoProtocols is the error returned when the no protocols have been
 // specified.
 var ErrNoProtocols = errors.New("no protocols specified")
@@ -146,6 +155,9 @@ func readProto[T StringLike](proto T, r io.Reader) error {
 	case "na":
 		return ErrNotSupported[T]{[]T{proto}}
 	default:
-		return fmt.Errorf("unrecognized response: %s", tok)
+		return ErrUnrecognizedResponse[T]{
+			Actual:   tok,
+			Expected: proto,
+		}
 	}
 }

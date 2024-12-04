@@ -118,3 +118,9 @@ fe80::7e4f:4446:eb3:1eb8/64
 
 ## Other issues due to #40569
 - https://github.com/golang/go/issues/68082
+
+## How to build with Go 1.23.0 or later
+The `anet` library internally relies on `//go:linkname` directive. Since the usage of `//go:linkname` has been restricted since Go 1.23.0 ([Go 1.23 Release Notes](https://tip.golang.org/doc/go1.23#linker)), it is necessary to specify the `-checklinkname=0` linker flag when building the `anet` package with Go 1.23.0 or later. Without this flag, the following linker error will occur:
+```
+link: github.com/wlynxg/anet: invalid reference to net.zoneCache
+```

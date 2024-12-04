@@ -307,7 +307,7 @@ func (c *chunk) encode() rtcp.PacketStatusChunk {
 		}
 	}
 
-	minCap := min(maxTwoBitCap, len(c.deltas))
+	minCap := minInt(maxTwoBitCap, len(c.deltas))
 	svc := &rtcp.StatusVectorChunk{
 		SymbolSize: rtcp.TypeTCCSymbolSizeTwoBit,
 		SymbolList: c.deltas[:minCap],
@@ -337,14 +337,14 @@ func (c *chunk) reset() {
 	c.hasDifferentTypes = false
 }
 
-func max(a, b int) int {
+func maxInt(a, b int) int {
 	if a > b {
 		return a
 	}
 	return b
 }
 
-func min(a, b int) int {
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}

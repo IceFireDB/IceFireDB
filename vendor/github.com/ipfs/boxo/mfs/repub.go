@@ -169,18 +169,27 @@ func (rp *Republisher) Run(lastPublished cid.Cid) {
 
 		// 2. If we have a value to publish, publish it now.
 		if toPublish.Defined() {
+			var timer *time.Timer
 			for {
 				err := rp.pubfunc(rp.ctx, toPublish)
 				if err == nil {
 					break
 				}
+
+				if timer == nil {
+					timer = time.NewTimer(rp.RetryTimeout)
+					defer timer.Stop()
+				} else {
+					timer.Reset(rp.RetryTimeout)
+				}
+
 				// Keep retrying until we succeed or we abort.
 				// TODO(steb): We could try pulling new values
 				// off `update` but that's not critical (and
 				// complicates this code a bit). We'll pull off
 				// a new value on the next loop through.
 				select {
-				case <-time.After(rp.RetryTimeout):
+				case <-timer.C:
 				case <-rp.ctx.Done():
 					return
 				}

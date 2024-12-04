@@ -4,15 +4,21 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
 	"net"
 	"net/http"
 	"sync"
+
+	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/libp2p/go-libp2p/core/transport"
 
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
+
+var log = logging.Logger("websocket-transport")
+var stdLog = zap.NewStdLog(log.Desugar())
 
 type listener struct {
 	nl     net.Listener
@@ -82,7 +88,7 @@ func newListener(a ma.Multiaddr, tlsConf *tls.Config) (*listener, error) {
 		incoming: make(chan *Conn),
 		closed:   make(chan struct{}),
 	}
-	ln.server = http.Server{Handler: ln}
+	ln.server = http.Server{Handler: ln, ErrorLog: stdLog}
 	if parsed.isWSS {
 		ln.isWss = true
 		ln.server.TLSConfig = tlsConf
