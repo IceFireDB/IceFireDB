@@ -3,7 +3,7 @@
 bazil.org/fuse
 bazil.org/fuse/fs
 bazil.org/fuse/fuseutil
-# berty.tech/go-ipfs-log v1.10.2 => github.com/IceFireDB/berty-go-ipfs-log v1.21.0
+# berty.tech/go-ipfs-log v1.10.2 => github.com/IceFireDB/berty-go-ipfs-log v1.22.0
 ## explicit; go 1.23
 berty.tech/go-ipfs-log
 berty.tech/go-ipfs-log/accesscontroller
@@ -1271,7 +1271,7 @@ github.com/spf13/cast
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d
+# github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 ## explicit; go 1.14
 github.com/syndtr/goleveldb/leveldb
 github.com/syndtr/goleveldb/leveldb/cache

@@ -901,7 +901,7 @@ func (r *Reader) find(key []byte, filtered bool, ro *opt.ReadOptions, noValue bo
 		} else {
 			// Value does use block buffer, and since the buffer will be
 			// recycled, it need to be copied.
-			value = append([]byte(nil), data.Value()...)
+			value = append([]byte{}, data.Value()...)
 		}
 	}
 	data.Release()

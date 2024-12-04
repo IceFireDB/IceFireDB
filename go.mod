@@ -297,9 +297,11 @@ require (
 )
 
 replace (
-	berty.tech/go-ipfs-log v1.10.2 => github.com/IceFireDB/berty-go-ipfs-log v1.21.0
+	berty.tech/go-ipfs-log v1.10.2 => github.com/IceFireDB/berty-go-ipfs-log v1.22.0
 	github.com/ceramicnetwork/go-dag-jose v0.1.0 => github.com/IceFireDB/go-dag-jose v1.0.2
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6 => github.com/IceFireDB/ledisdb v0.8.3
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 => github.com/IceFireDB/golibs v0.1.0
+	//Fixed goleveldb version, new version fails unit test on SET instruction
+	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/tidwall/uhaha v0.11.2 => github.com/IceFireDB/uhaha v0.12.0
 )

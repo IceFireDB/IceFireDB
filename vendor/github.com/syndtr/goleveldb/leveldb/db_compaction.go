@@ -7,7 +7,6 @@
 package leveldb
 
 import (
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -273,7 +272,7 @@ func (db *DB) memCompaction() {
 	}
 	defer mdb.decref()
 
-	db.logf("memdb@flush N·%d S·%s", mdb.Len(), shortenb(int64(mdb.Size())))
+	db.logf("memdb@flush N·%d S·%s", mdb.Len(), shortenb(mdb.Size()))
 
 	// Don't compact empty memdb.
 	if mdb.Len() == 0 {
@@ -351,11 +350,11 @@ func (db *DB) memCompaction() {
 }
 
 type tableCompactionBuilder struct {
-	db    *DB
-	s     *session
-	c     *compaction
-	rec   *sessionRecord
-	stat1 *cStatStaging
+	db           *DB
+	s            *session
+	c            *compaction
+	rec          *sessionRecord
+	stat0, stat1 *cStatStaging
 
 	snapHasLastUkey bool
 	snapLastUkey    []byte
@@ -411,40 +410,29 @@ func (b *tableCompactionBuilder) flush() error {
 	}
 	b.rec.addTableFile(b.c.sourceLevel+1, t)
 	b.stat1.write += t.size
-	b.s.logf("table@build created L%d@%d N·%d S·%s %q:%q", b.c.sourceLevel+1, t.fd.Num, b.tw.tw.EntriesLen(), shortenb(t.size), t.imin, t.imax)
+	b.s.logf("table@build created L%d@%d N·%d S·%s %q:%q", b.c.sourceLevel+1, t.fd.Num, b.tw.tw.EntriesLen(), shortenb(int(t.size)), t.imin, t.imax)
 	b.tw = nil
 	return nil
 }
 
-func (b *tableCompactionBuilder) cleanup() error {
+func (b *tableCompactionBuilder) cleanup() {
 	if b.tw != nil {
-		if err := b.tw.drop(); err != nil {
-			return err
-		}
+		b.tw.drop()
 		b.tw = nil
 	}
-	return nil
 }
 
-func (b *tableCompactionBuilder) run(cnt *compactionTransactCounter) (err error) {
+func (b *tableCompactionBuilder) run(cnt *compactionTransactCounter) error {
 	snapResumed := b.snapIter > 0
 	hasLastUkey := b.snapHasLastUkey // The key might has zero length, so this is necessary.
-	lastUkey := append([]byte(nil), b.snapLastUkey...)
+	lastUkey := append([]byte{}, b.snapLastUkey...)
 	lastSeq := b.snapLastSeq
 	b.kerrCnt = b.snapKerrCnt
 	b.dropCnt = b.snapDropCnt
 	// Restore compaction state.
 	b.c.restore()
 
-	defer func() {
-		if cerr := b.cleanup(); cerr != nil {
-			if err == nil {
-				err = cerr
-			} else {
-				err = fmt.Errorf("tableCompactionBuilder error: %v, cleanup error (%v)", err, cerr)
-			}
-		}
-	}()
+	defer b.cleanup()
 
 	b.stat1.startTimer()
 	defer b.stat1.stopTimer()
@@ -575,7 +563,7 @@ func (db *DB) tableCompaction(c *compaction, noTrivial bool) {
 			rec.delTable(c.sourceLevel+i, t.fd.Num)
 		}
 	}
-	sourceSize := stats[0].read + stats[1].read
+	sourceSize := int(stats[0].read + stats[1].read)
 	minSeq := db.minSeq()
 	db.logf("table@compaction L%d·%d -> L%d·%d S·%s Q·%d", c.sourceLevel, len(c.levels[0]), c.sourceLevel+1, len(c.levels[1]), shortenb(sourceSize), minSeq)
 
@@ -596,7 +584,7 @@ func (db *DB) tableCompaction(c *compaction, noTrivial bool) {
 	db.compactionCommit("table", rec)
 	stats[1].stopTimer()
 
-	resultSize := stats[1].write
+	resultSize := int(stats[1].write)
 	db.logf("table@compaction committed F%s S%s Ke·%d D·%d T·%v", sint(len(rec.addedTables)-len(rec.deletedTables)), sshortenb(resultSize-sourceSize), b.kerrCnt, b.dropCnt, stats[1].duration)
 
 	// Save compaction stats
@@ -667,7 +655,10 @@ func (db *DB) tableNeedCompaction() bool {
 func (db *DB) resumeWrite() bool {
 	v := db.s.version()
 	defer v.release()
-	return v.tLen(0) < db.s.o.GetWriteL0PauseTrigger()
+	if v.tLen(0) < db.s.o.GetWriteL0PauseTrigger() {
+		return true
+	}
+	return false
 }
 
 func (db *DB) pauseCompaction(ch chan<- struct{}) {
@@ -690,7 +681,7 @@ type cAuto struct {
 func (r cAuto) ack(err error) {
 	if r.ackC != nil {
 		defer func() {
-			_ = recover()
+			recover()
 		}()
 		r.ackC <- err
 	}
@@ -705,7 +696,7 @@ type cRange struct {
 func (r cRange) ack(err error) {
 	if r.ackC != nil {
 		defer func() {
-			_ = recover()
+			recover()
 		}()
 		r.ackC <- err
 	}

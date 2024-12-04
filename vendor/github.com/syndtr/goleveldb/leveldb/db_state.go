@@ -137,12 +137,8 @@ func (db *DB) newMem(n int) (mem *memDB, err error) {
 	if db.journal == nil {
 		db.journal = journal.NewWriter(w)
 	} else {
-		if err := db.journal.Reset(w); err != nil {
-			return nil, err
-		}
-		if err := db.journalWriter.Close(); err != nil {
-			return nil, err
-		}
+		db.journal.Reset(w)
+		db.journalWriter.Close()
 		db.frozenJournalFd = db.journalFd
 	}
 	db.journalWriter = w
@@ -183,6 +179,13 @@ func (db *DB) getEffectiveMem() *memDB {
 		panic("nil effective mem")
 	}
 	return db.mem
+}
+
+// Check whether we has frozen memdb.
+func (db *DB) hasFrozenMem() bool {
+	db.memMu.RLock()
+	defer db.memMu.RUnlock()
+	return db.frozenMem != nil
 }
 
 // Get frozen memdb.

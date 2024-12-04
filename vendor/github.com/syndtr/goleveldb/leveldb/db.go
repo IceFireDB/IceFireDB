@@ -17,7 +17,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/syndtr/goleveldb/leveldb/cache"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/journal"
@@ -142,6 +141,7 @@ func openDB(s *session) (*DB, error) {
 			}
 			return nil, err
 		}
+
 	}
 
 	// Doesn't need to be included in the wait group.
@@ -149,9 +149,7 @@ func openDB(s *session) (*DB, error) {
 	go db.mpoolDrain()
 
 	if readOnly {
-		if err := db.SetReadOnly(); err != nil {
-			return nil, err
-		}
+		db.SetReadOnly()
 	} else {
 		db.closeW.Add(2)
 		go db.tCompaction()
@@ -313,17 +311,9 @@ func recoverTable(s *session, o *opt.Options) error {
 			return
 		}
 		defer func() {
-			if cerr := writer.Close(); cerr != nil {
-				if err == nil {
-					err = cerr
-				} else {
-					err = fmt.Errorf("error recovering table (%v); error closing (%v)", err, cerr)
-				}
-			}
+			writer.Close()
 			if err != nil {
-				if rerr := s.stor.Remove(tmpFd); rerr != nil {
-					err = fmt.Errorf("error recovering table (%v); error removing (%v)", err, rerr)
-				}
+				s.stor.Remove(tmpFd)
 				tmpFd = storage.FileDesc{}
 			}
 		}()
@@ -407,7 +397,7 @@ func recoverTable(s *session, o *opt.Options) error {
 				tSeq = seq
 			}
 			if imin == nil {
-				imin = append([]byte(nil), key...)
+				imin = append([]byte{}, key...)
 			}
 			imax = append(imax[:0], key...)
 		}
@@ -540,8 +530,7 @@ func (db *DB) recoverJournal() error {
 			if jr == nil {
 				jr = journal.NewReader(fr, dropper{db.s, fd}, strict, checksum)
 			} else {
-				// Ignore the error here
-				_ = jr.Reset(fr, dropper{db.s, fd}, strict, checksum)
+				jr.Reset(fr, dropper{db.s, fd}, strict, checksum)
 			}
 
 			// Flush memdb and remove obsolete journal file.
@@ -561,10 +550,7 @@ func (db *DB) recoverJournal() error {
 				}
 				rec.resetAddedTables()
 
-				if err := db.s.stor.Remove(ofd); err != nil {
-					fr.Close()
-					return err
-				}
+				db.s.stor.Remove(ofd)
 				ofd = storage.FileDesc{}
 			}
 
@@ -648,9 +634,7 @@ func (db *DB) recoverJournal() error {
 
 	// Remove the last obsolete journal file.
 	if !ofd.Zero() {
-		if err := db.s.stor.Remove(ofd); err != nil {
-			return err
-		}
+		db.s.stor.Remove(ofd)
 	}
 
 	return nil
@@ -704,9 +688,7 @@ func (db *DB) recoverJournalRO() error {
 			if jr == nil {
 				jr = journal.NewReader(fr, dropper{db.s, fd}, strict, checksum)
 			} else {
-				if err := jr.Reset(fr, dropper{db.s, fd}, strict, checksum); err != nil {
-					return err
-				}
+				jr.Reset(fr, dropper{db.s, fd}, strict, checksum)
 			}
 
 			// Replay journal to memdb.
@@ -783,7 +765,7 @@ func (db *DB) get(auxm *memdb.DB, auxt tFiles, key []byte, seq uint64, ro *opt.R
 
 	if auxm != nil {
 		if ok, mv, me := memGet(auxm, ikey, db.s.icmp); ok {
-			return append([]byte(nil), mv...), me
+			return append([]byte{}, mv...), me
 		}
 	}
 
@@ -795,7 +777,7 @@ func (db *DB) get(auxm *memdb.DB, auxt tFiles, key []byte, seq uint64, ro *opt.R
 		defer m.decref()
 
 		if ok, mv, me := memGet(m.DB, ikey, db.s.icmp); ok {
-			return append([]byte(nil), mv...), me
+			return append([]byte{}, mv...), me
 		}
 	}
 
@@ -1020,15 +1002,15 @@ func (db *DB) GetProperty(name string) (value string, err error) {
 			}
 		}
 	case p == "blockpool":
-		value = fmt.Sprintf("%v", db.s.tops.blockBuffer)
+		value = fmt.Sprintf("%v", db.s.tops.bpool)
 	case p == "cachedblock":
-		if db.s.tops.blockCache != nil {
-			value = fmt.Sprintf("%d", db.s.tops.blockCache.Size())
+		if db.s.tops.bcache != nil {
+			value = fmt.Sprintf("%d", db.s.tops.bcache.Size())
 		} else {
 			value = "<nil>"
 		}
 	case p == "openedtables":
-		value = fmt.Sprintf("%d", db.s.tops.fileCache.Size())
+		value = fmt.Sprintf("%d", db.s.tops.cache.Size())
 	case p == "alivesnaps":
 		value = fmt.Sprintf("%d", atomic.LoadInt32(&db.aliveSnaps))
 	case p == "aliveiters":
@@ -1055,9 +1037,6 @@ type DBStats struct {
 	BlockCacheSize    int
 	OpenedTablesCount int
 
-	FileCache  cache.Stats
-	BlockCache cache.Stats
-
 	LevelSizes        Sizes
 	LevelTablesCounts []int
 	LevelRead         Sizes
@@ -1083,18 +1062,11 @@ func (db *DB) Stats(s *DBStats) error {
 	s.WriteDelayDuration = time.Duration(atomic.LoadInt64(&db.cWriteDelay))
 	s.WritePaused = atomic.LoadInt32(&db.inWritePaused) == 1
 
-	s.OpenedTablesCount = db.s.tops.fileCache.Size()
-	if db.s.tops.blockCache != nil {
-		s.BlockCacheSize = db.s.tops.blockCache.Size()
+	s.OpenedTablesCount = db.s.tops.cache.Size()
+	if db.s.tops.bcache != nil {
+		s.BlockCacheSize = db.s.tops.bcache.Size()
 	} else {
 		s.BlockCacheSize = 0
-	}
-
-	s.FileCache = db.s.tops.fileCache.GetStats()
-	if db.s.tops.blockCache != nil {
-		s.BlockCache = db.s.tops.blockCache.GetStats()
-	} else {
-		s.BlockCache = cache.Stats{}
 	}
 
 	s.AliveIterators = atomic.LoadInt32(&db.aliveIters)
