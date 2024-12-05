@@ -3,8 +3,9 @@ package server
 import (
 	"bytes"
 	"fmt"
-	. "github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
 	"net"
+
+	. "github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
 
 	"github.com/siddontang/go/hack"
 )
@@ -61,32 +62,32 @@ func (c *Conn) HandleCommand() error {
 }
 
 /*
-func (c *Conn) HandleCommand() error {
-	if c.Conn == nil {
-		return fmt.Errorf("connection closed")
-	}
+	func (c *Conn) HandleCommand() error {
+		if c.Conn == nil {
+			return fmt.Errorf("connection closed")
+		}
 
-	data, err := c.ReadPacket()
-	if err != nil {
-		c.Close()
-		c.Conn = nil
+		data, err := c.ReadPacket()
+		if err != nil {
+			c.Close()
+			c.Conn = nil
+			return err
+		}
+
+		v := c.dispatch(data)
+
+		err = c.writeValue(v)
+
+		if c.Conn != nil {
+			c.ResetSequence()
+		}
+
+		if err != nil {
+			c.Close()
+			c.Conn = nil
+		}
 		return err
 	}
-
-	v := c.dispatch(data)
-
-	err = c.writeValue(v)
-
-	if c.Conn != nil {
-		c.ResetSequence()
-	}
-
-	if err != nil {
-		c.Close()
-		c.Conn = nil
-	}
-	return err
-}
 */
 func (c *Conn) dispatch(data []byte) interface{} {
 	cmd := data[0]

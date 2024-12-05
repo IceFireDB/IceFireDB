@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/server"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/server"
 
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"

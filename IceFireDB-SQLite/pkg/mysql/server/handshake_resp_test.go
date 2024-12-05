@@ -2,8 +2,9 @@ package server
 
 import (
 	"bytes"
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
 	"testing"
+
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
 )
 
 func TestReadAuthData(t *testing.T) {

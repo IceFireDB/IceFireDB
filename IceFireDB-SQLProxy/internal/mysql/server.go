@@ -7,10 +7,10 @@ import (
 	"io"
 	"net"
 
-	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/config"
-	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/client"
-	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/server"
-	"github.com/IceFireDB/IceFireDB-SQLProxy/utils"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/config"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/client"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/server"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/utils"
 	"github.com/sirupsen/logrus"
 )
 

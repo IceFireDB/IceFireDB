@@ -2,7 +2,8 @@ package mysql
 
 import (
 	"encoding/binary"
-	"github.com/IceFireDB/IceFireDB-SQLite/utils"
+
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/utils"
 )
 
 type FieldData []byte

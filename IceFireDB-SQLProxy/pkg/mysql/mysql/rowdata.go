@@ -1,8 +1,9 @@
 package mysql
 
 import (
-	"github.com/IceFireDB/IceFireDB-SQLProxy/utils"
 	"strconv"
+
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/utils"
 
 	"github.com/pingcap/errors"
 )

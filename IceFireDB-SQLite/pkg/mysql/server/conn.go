@@ -2,18 +2,19 @@ package server
 
 import (
 	"errors"
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/client"
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/packet"
 	"net"
 	"sync/atomic"
 
-	. "github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/client"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/packet"
+
+	. "github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
 
 	"github.com/siddontang/go/sync2"
 )
 
 /*
-   Conn acts like a MySQL server connection, you can use MySQL client to communicate with it.
+Conn acts like a MySQL server connection, you can use MySQL client to communicate with it.
 */
 type Conn struct {
 	*packet.Conn

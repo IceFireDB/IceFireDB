@@ -13,8 +13,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 
-	. "github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
-	"github.com/IceFireDB/IceFireDB-SQLProxy/utils"
+	. "github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/utils"
 	"github.com/pingcap/errors"
 )
 
@@ -46,7 +46,7 @@ func (b *BufPool) Return(buf *bytes.Buffer) {
 }
 
 /*
-	Conn is the base class to handle MySQL protocol.
+Conn is the base class to handle MySQL protocol.
 */
 type Conn struct {
 	net.Conn

@@ -3,9 +3,9 @@ package mysql
 import (
 	"errors"
 
-	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/client"
-	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
-	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/server"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/client"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/server"
 )
 
 type Handle struct {

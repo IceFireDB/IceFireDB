@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math"
 
-	. "github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
+	. "github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
 	"github.com/pingcap/errors"
 )
 

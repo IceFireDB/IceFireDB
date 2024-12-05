@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/config"
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/p2p"
-	"github.com/IceFireDB/IceFireDB-SQLite/utils"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/config"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/p2p"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/utils"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/sirupsen/logrus"
 )

@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/IceFireDB/IceFireDB-SQLite/utils"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/utils"
 )
 
 func (c *Conn) writeCommand(command byte) error {

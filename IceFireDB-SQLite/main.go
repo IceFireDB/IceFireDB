@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/IceFireDB/IceFireDB-SQLite/internal/mysql"
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/config"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/internal/mysql"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/config"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -18,7 +18,7 @@ import (
 func main() {
 	app := cli.NewApp()
 
-	app.Name = "github.com/IceFireDB/IceFireDB-SQLite"
+	app.Name = "github.com/IceFireDB/IceFireDB/IceFireDB-SQLite"
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
