@@ -3,14 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/IceFireDB/IceFireDB-SQLProxy/internal/mysql"
-	"github.com/IceFireDB/IceFireDB-SQLProxy/pkg/config"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/internal/mysql"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/config"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 )
 
 func main() {

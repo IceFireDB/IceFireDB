@@ -6,10 +6,10 @@ import (
 	"io"
 	"net"
 
-	"github.com/IceFireDB/IceFireDB-SQLite/internal/sqlite"
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/config"
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/server"
-	"github.com/IceFireDB/IceFireDB-SQLite/utils"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/internal/sqlite"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/config"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/server"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/utils"
 	"github.com/sirupsen/logrus"
 )
 

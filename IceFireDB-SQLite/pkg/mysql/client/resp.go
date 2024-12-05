@@ -6,9 +6,10 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/pem"
-	"github.com/IceFireDB/IceFireDB-SQLite/utils"
 
-	. "github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/utils"
+
+	. "github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
 	"github.com/pingcap/errors"
 	"github.com/siddontang/go/hack"
 )

@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/IceFireDB/IceFireDB-SQLProxy/utils"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/utils"
 )
 
 func (c *Conn) writeCommand(command byte) error {

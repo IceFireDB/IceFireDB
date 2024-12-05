@@ -5,10 +5,10 @@ import (
 	"log"
 	"strings"
 
-	"github.com/IceFireDB/IceFireDB-SQLite/internal/sqlite"
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/client"
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
-	"github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/server"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/internal/sqlite"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/client"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/server"
 )
 
 func (h *mysqlProxy) CloseConn(c *server.Conn) error {

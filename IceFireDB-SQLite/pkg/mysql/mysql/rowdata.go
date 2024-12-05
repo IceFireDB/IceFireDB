@@ -1,8 +1,9 @@
 package mysql
 
 import (
-	"github.com/IceFireDB/IceFireDB-SQLite/utils"
 	"strconv"
+
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/utils"
 
 	"github.com/pingcap/errors"
 )

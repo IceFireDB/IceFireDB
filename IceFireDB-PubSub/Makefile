@@ -26,7 +26,7 @@ export GOOS ?= $(TARGET_OS)
 # Default target: build the executable
 all: $(PROG)
 
-$(PROG): $(SRCS)
+$(PROG): $(SRCS) FORCE
 	@mkdir -p bin
 	GOPROXY=$(GOPROXY) GOOS=$(GOOS) GOARCH=amd64 go build $(CFLAGS) -o $@ $(SRCS)
 
@@ -46,4 +46,7 @@ run:
 run_dev:
 	GOPROXY=$(GOPROXY) go run cmd/pubsub/main.go -c config/config_dev.yaml
 
-.PHONY: all race clean run run_dev
+# Force target
+FORCE:
+
+.PHONY: all race clean run run_dev FORCE

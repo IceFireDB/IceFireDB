@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 
-	. "github.com/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
+	. "github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/mysql"
 	"github.com/pingcap/errors"
 )
 

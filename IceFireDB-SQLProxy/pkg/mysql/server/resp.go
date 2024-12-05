@@ -3,7 +3,7 @@ package server
 import (
 	"fmt"
 
-	. "github.com/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
+	. "github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
 )
 
 func (c *Conn) writeOK(r *Result) error {
