@@ -49,7 +49,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed
 	github.com/spf13/viper v1.3.2
-	github.com/urfave/cli v1.22.10
+	github.com/urfave/cli v1.22.16
 	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.27.0
 )
@@ -82,7 +82,7 @@ require (
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/crackcomm/go-gitignore v0.0.0-20241020182519-7843d2ba8fdf // indirect
 	github.com/cskr/pubsub v1.0.2 // indirect
 	github.com/cupcake/rdb v0.0.0-20161107195141-43ba34106c76 // indirect
