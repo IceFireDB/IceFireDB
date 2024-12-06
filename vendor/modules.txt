@@ -249,8 +249,8 @@ github.com/containerd/cgroups/stats/v1
 # github.com/coreos/go-systemd/v22 v22.5.0
 ## explicit; go 1.12
 github.com/coreos/go-systemd/v22/dbus
-# github.com/cpuguy83/go-md2man/v2 v2.0.0
-## explicit; go 1.12
+# github.com/cpuguy83/go-md2man/v2 v2.0.5
+## explicit; go 1.11
 github.com/cpuguy83/go-md2man/v2/md2man
 # github.com/crackcomm/go-gitignore v0.0.0-20241020182519-7843d2ba8fdf
 ## explicit
@@ -1400,7 +1400,7 @@ github.com/tidwall/uhaha
 # github.com/ucarion/urlpath v0.0.0-20200424170820-7ccc79b76bbb
 ## explicit; go 1.12
 github.com/ucarion/urlpath
-# github.com/urfave/cli v1.22.10
+# github.com/urfave/cli v1.22.16
 ## explicit; go 1.11
 github.com/urfave/cli
 # github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc
