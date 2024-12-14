@@ -601,15 +601,19 @@ func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
-	/*count, err := ldb.Exists([]byte(args[1]))
-	if err != nil || count == 0 {
-		return nil, nil
-	}*/
+
+	// Retrieve the value associated with the key
 	val, err := ldb.Get([]byte(args[1]))
 	if err != nil {
 		return nil, err
 	}
 
+	// If val is nil, the key does not exist
+	if val == nil {
+		return nil, nil
+	}
+
+	// Return the value if the key exists
 	return val, nil
 }
 
