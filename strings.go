@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -257,21 +258,47 @@ func cmdSETBIT(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
+// Retrieves the bit value at a specified offset in the string stored at the given key.
+// Returns:
+//
+//	The bit value (0 or 1), or an error if the number of arguments is incorrect or the offset is not a valid non-negative integer.
+//
+// Behavior:
+//
+//	Retrieves the bit value at the specified offset:
+//	  - Returns 0 if the key doesn't exist or the offset is out of range.
+//	  - Retrieves the bit at the specified offset if the key exists and the offset is within range.
+//	Uses ldb.GetBit to handle bit retrieval, which manages cases where the key doesn't exist or the offset exceeds the string length.
+//
+// Error Handling:
+//   - Returns an error for incorrect number of arguments.
+//   - Returns an error if the offset is not a valid non-negative integer.
 func cmdGETBIT(m uhaha.Machine, args []string) (interface{}, error) {
+	// Check if the number of arguments is correct; requires 3 arguments: key and offset
 	if len(args) != 3 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	key := []byte(args[1])
-	offset, err := strconv.Atoi(args[2])
+	key := []byte(args[1]) // Retrieve the key
+	offsetStr := args[2]   // Retrieve the offset string
+
+	// Convert the offset string to a non-negative integer
+	offset, err := strconv.Atoi(offsetStr)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("offset must be a non-negative integer")
+	}
+	if offset < 0 {
+		return nil, errors.New("offset must be a non-negative integer")
 	}
 
+	// Retrieve the bit value at the specified offset from the database
+	// If the key does not exist or the offset exceeds the string length, ldb.GetBit should return 0
 	n, err := ldb.GetBit(key, offset)
 	if err != nil {
 		return nil, err
 	}
+
+	// Return the bit value, which is either 0 or 1
 	return redcon.SimpleInt(n), nil
 }
 
