@@ -213,25 +213,40 @@ func cmdGETSET(m uhaha.Machine, args []string) (interface{}, error) {
 }
 
 func cmdGETRANGE(m uhaha.Machine, args []string) (interface{}, error) {
+	// Check if the number of arguments is correct
 	if len(args) != 4 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
 	key := []byte(args[1])
+
+	// Parse start index, returns error if not a valid integer
 	start, err := strconv.Atoi(args[2])
 	if err != nil {
 		return nil, err
 	}
 
+	// Parse end index, returns error if not a valid integer
 	end, err := strconv.Atoi(args[3])
 	if err != nil {
 		return nil, err
 	}
 
+	// Call underlying GetRange implementation
+	// Assumes ldb.GetRange handles:
+	// 1. Negative index conversion
+	// 2. Boundary checking
+	// 3. Non-existent key cases
 	v, err := ldb.GetRange(key, start, end)
 	if err != nil {
 		return nil, err
 	}
+
+	// Return empty string for nil value to match RESP behavior
+	if v == nil {
+		return "", nil
+	}
+
 	return v, nil
 }
 
