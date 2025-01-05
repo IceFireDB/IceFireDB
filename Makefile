@@ -106,3 +106,10 @@ build-linux-armv7 build-release-linux-armv7:
 	mkdir bin; \
 	fi
 	GOOS=linux GOARCH=arm GOARM=7 go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv7 $(SRCS)
+
+# Build for local environment
+localbuild:
+	if [ ! -d "./bin/" ]; then \
+	mkdir bin; \
+	fi
+	go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME) $(SRCS)
