@@ -313,32 +313,41 @@ func TestKV(t *testing.T) {
 	}
 }
 
-func TestKVM(t *testing.T) {
+func TestMGET(t *testing.T) {
 	c := getTestConn()
 	ctx := context.Background()
 
+	// Set up initial key-value pairs
 	if ok, err := c.MSet(ctx, "a", "1", "b", "2").Result(); err != nil {
-		t.Error(err)
+		t.Fatalf("MSET failed: %v", err)
 	} else if ok != "OK" {
-		t.Error(ok)
+		t.Fatalf("MSET returned unexpected result: %v", ok)
 	}
 
-	if v, err := c.MGet(ctx, "a", "b", "c").Result(); err != nil {
-		t.Error(err)
-	} else if len(v) != 3 {
-		t.Error(len(v))
-	} else {
-		if vv, ok := v[0].(string); !ok || vv != "1" {
-			t.Error("not 1")
-		}
+	// Retrieve values using MGET
+	values, err := c.MGet(ctx, "a", "b", "c").Result()
+	if err != nil {
+		t.Fatalf("MGET failed: %v", err)
+	}
 
-		if vv, ok := v[1].(string); !ok || vv != "2" {
-			t.Error("not 2")
-		}
+	// Validate the number of returned values
+	if len(values) != 3 {
+		t.Fatalf("Expected 3 values, got %d", len(values))
+	}
 
-		if v[2] != "" {
-			t.Error("must nil")
-		}
+	// Validate the value for key "a"
+	if v, ok := values[0].(string); !ok || v != "1" {
+		t.Errorf("Expected value '1' for key 'a', got %v", values[0])
+	}
+
+	// Validate the value for key "b"
+	if v, ok := values[1].(string); !ok || v != "2" {
+		t.Errorf("Expected value '2' for key 'b', got %v", values[1])
+	}
+
+	// Validate the value for non-existent key "c"
+	if values[2] != nil {
+		t.Errorf("Expected nil for non-existent key 'c', got %v", values[2])
 	}
 }
 
