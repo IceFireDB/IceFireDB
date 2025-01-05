@@ -700,22 +700,34 @@ func cmdMSET(m uhaha.Machine, args []string) (interface{}, error) {
 }
 
 func cmdMGET(m uhaha.Machine, args []string) (interface{}, error) {
+	// Check the number of arguments; at least one key is required
 	if len(args) < 2 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
+	// Extract all keys from the arguments
 	keys := make([][]byte, len(args)-1)
-
 	for i := 1; i < len(args); i++ {
 		keys[i-1] = []byte(args[i])
 	}
 
-	v, err := ldb.MGet(keys...)
+	// Retrieve the values for all specified keys
+	values, err := ldb.MGet(keys...)
 	if err != nil {
 		return nil, err
 	}
 
-	return v, nil
+	// Convert the result into a slice of interfaces for RESP compatibility
+	result := make([]interface{}, len(values))
+	for i, v := range values {
+		if v == nil {
+			result[i] = nil // If the value is nil, the key does not exist or is not a string
+		} else {
+			result[i] = v
+		}
+	}
+
+	return result, nil
 }
 
 func cmdTTL(m uhaha.Machine, args []string) (interface{}, error) {
