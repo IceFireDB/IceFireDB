@@ -107,15 +107,32 @@ func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 }
 
 // cmdSTRLEN returns the length of the string value stored at key.
+// If the key does not exist, it returns 0.
 func cmdSTRLEN(m uhaha.Machine, args []string) (interface{}, error) {
+	// 1. Validate the number of arguments
 	if len(args) != 2 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	n, err := ldb.StrLen([]byte(args[1]))
-	if err != nil {
-		return nil, err
+	// 2. Get the key name
+	key := []byte(args[1])
+
+	// 3. Check if the key exists
+	exists, err := ldb.Exists(key)
+
+	// If the key does not exist or an error occurs, return 0 and the error
+	if exists == 0 || err != nil {
+		return redcon.SimpleInt(0), err
 	}
+
+	// 4. Get the length of the string value stored at the key
+	n, err := ldb.StrLen(key)
+	if err != nil {
+		// If an error occurs, return 0 and the error
+		return redcon.SimpleInt(0), err
+	}
+
+	// 5. Return the length of the string
 	return redcon.SimpleInt(n), nil
 }
 
