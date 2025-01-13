@@ -748,15 +748,37 @@ func cmdMGET(m uhaha.Machine, args []string) (interface{}, error) {
 }
 
 func cmdTTL(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) < 2 {
+	// Validate the number of arguments
+	if len(args) != 2 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	v, err := ldb.TTL([]byte(args[1]))
+	key := []byte(args[1])
+
+	// Check if the key exists
+	exists, err := ldb.Exists(key)
 	if err != nil {
 		return nil, err
 	}
-	return redcon.SimpleInt(v), nil
+
+	// If the key does not exist, return -2
+	if exists == 0 {
+		return redcon.SimpleInt(-2), nil
+	}
+
+	// Get the TTL value for the key
+	ttl, err := ldb.TTL(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// If TTL is -1, the key exists but has no associated expiration
+	if ttl == -1 {
+		return redcon.SimpleInt(-1), nil
+	}
+
+	// Return the remaining TTL in seconds
+	return redcon.SimpleInt(ttl), nil
 }
 
 // parseBitRange parses the optional start and end indices and the optional BYTE/BIT argument from the command arguments.
