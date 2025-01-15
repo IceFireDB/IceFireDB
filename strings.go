@@ -534,14 +534,23 @@ func cmdBITOP(m uhaha.Machine, args []string) (interface{}, error) {
 }
 
 func cmdAPPEND(m uhaha.Machine, args []string) (interface{}, error) {
+	// Validate the number of arguments: APPEND requires exactly 3 arguments (command name, key, and value)
 	if len(args) != 3 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	n, err := ldb.Append([]byte(args[1]), []byte(args[2]))
+	// Extract the key and value from the arguments
+	key := []byte(args[1])   // Key is at index 1
+	value := []byte(args[2]) // Value is at index 2
+
+	// Perform the APPEND operation: append the value to the key's string
+	n, err := ldb.Append(key, value)
 	if err != nil {
+		// If an error occurs during the append operation, return the error
 		return nil, err
 	}
+
+	// Return the total length of the string after the append operation
 	return redcon.SimpleInt(n), nil
 }
 
