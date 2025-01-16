@@ -513,23 +513,45 @@ func cmdBITPOS(m uhaha.Machine, args []string) (interface{}, error) {
 }
 
 func cmdBITOP(m uhaha.Machine, args []string) (interface{}, error) {
+	// Check the number of arguments
 	if len(args) < 4 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	op := args[1]
-	destKey := args[2]
-	// srcKeys := args[3:]
-
-	srcKeys := make([][]byte, len(args)-3)
-	for i := 3; i < len(args); i++ {
-		srcKeys[i-3] = []byte(args[i])
+	// Get the operation type
+	op := strings.ToUpper(args[1])
+	if op != "AND" && op != "OR" && op != "XOR" && op != "NOT" {
+		return nil, fmt.Errorf("ERR syntax error, invalid operation: %s", op)
 	}
 
-	n, err := ldb.BitOP(op, []byte(destKey), srcKeys...)
+	// Get the destination key
+	destKey := []byte(args[2])
+
+	// Get the source keys
+	srcKeys := make([][]byte, 0)
+	if op == "NOT" {
+		// NOT operation requires exactly one source key
+		if len(args) != 3 {
+			return nil, uhaha.ErrWrongNumArgs
+		}
+		srcKeys = append(srcKeys, []byte(args[2]))
+	} else {
+		// AND, OR, XOR operations require at least one source key
+		if len(args) < 4 {
+			return nil, uhaha.ErrWrongNumArgs
+		}
+		for i := 3; i < len(args); i++ {
+			srcKeys = append(srcKeys, []byte(args[i]))
+		}
+	}
+
+	// Call the underlying BitOP function
+	n, err := ldb.BitOP(op, destKey, srcKeys...)
 	if err != nil {
 		return nil, err
 	}
+
+	// Return the length of the resulting string
 	return redcon.SimpleInt(n), nil
 }
 
