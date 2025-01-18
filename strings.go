@@ -451,14 +451,35 @@ func cmdDECRBY(m uhaha.Machine, args []string) (interface{}, error) {
 }
 
 func cmdDECR(m uhaha.Machine, args []string) (interface{}, error) {
+	// 1. Validate the number of arguments
 	if len(args) != 2 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	n, err := ldb.Decr([]byte(args[1]))
+	// 2. Get the key name
+	key := []byte(args[1])
+
+	// 3. Check if the key exists
+	exists, err := ldb.Exists(key)
 	if err != nil {
 		return nil, err
 	}
+
+	// 4. If the key does not exist, set its value to 0
+	if exists == 0 {
+		if err := ldb.Set(key, []byte("0")); err != nil {
+			return nil, err
+		}
+	}
+
+	// 5. Perform the decrement operation
+	n, err := ldb.Decr(key)
+	if err != nil {
+		// 6. If the key's value is not an integer or cannot be represented as a 64-bit signed integer, return an error
+		return nil, err
+	}
+
+	// 7. Return the value after decrementing
 	return redcon.SimpleInt(n), nil
 }
 
