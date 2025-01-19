@@ -434,19 +434,39 @@ func existsKey(key string) (bool, error) {
 }
 
 func cmdDECRBY(m uhaha.Machine, args []string) (interface{}, error) {
+	// 1. Validate the number of arguments
 	if len(args) != 3 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	delta, err := ledis.StrInt64([]byte(args[2]), nil)
+	// 2. Parse the decrement value
+	decrement, err := ledis.StrInt64([]byte(args[2]), nil)
+	if err != nil {
+		return nil, fmt.Errorf("ERR value is not an integer or out of range")
+	}
+
+	// 3. Check if the key exists
+	key := []byte(args[1])
+	exists, err := ldb.Exists(key)
 	if err != nil {
 		return nil, err
 	}
 
-	n, err := ldb.DecrBy([]byte(args[1]), delta)
-	if err != nil {
-		return nil, err
+	// 4. If the key does not exist, initialize it to 0
+	if exists == 0 {
+		if err := ldb.Set(key, []byte("0")); err != nil {
+			return nil, err
+		}
 	}
+
+	// 5. Perform the DECRBY operation
+	n, err := ldb.DecrBy(key, decrement)
+	if err != nil {
+		// Handle errors, such as the key containing a non-integer value
+		return nil, fmt.Errorf("ERR value is not an integer or out of range")
+	}
+
+	// 6. Return the new value after decrementing
 	return redcon.SimpleInt(n), nil
 }
 
