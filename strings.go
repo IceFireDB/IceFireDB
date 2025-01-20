@@ -750,42 +750,51 @@ func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
 
 // This is different from the redis standard. For the sake of transaction consistency, there is no key existence judgment.
 func cmdDEL(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) < 2 {
-		return nil, uhaha.ErrWrongNumArgs
-	}
+    // Check if the number of arguments is correct
+    if len(args) < 2 {
+        return nil, uhaha.ErrWrongNumArgs
+    }
 
-	keys := make([][]byte, len(args)-1)
+    // Convert the keys from string to byte slices
+    keys := make([][]byte, len(args)-1)
+    for i := 1; i < len(args); i++ {
+        keys[i-1] = []byte(args[i])
+    }
 
-	for i := 1; i < len(args); i++ {
-		keys[i-1] = []byte(args[i])
-	}
+    // Delete the keys and get the number of keys that were actually deleted
+    n, err := ldb.Del(keys...)
+    if err != nil {
+        return nil, err
+    }
 
-	n, err := ldb.Del(keys...)
-	if err != nil {
-		return nil, err
-	}
-	return redcon.SimpleInt(n), nil
+    // Return the number of keys that were deleted
+    return redcon.SimpleInt(n), nil
 }
 
 func cmdMSET(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) < 3 || (len(args)-1)%2 != 0 {
-		return nil, uhaha.ErrWrongNumArgs
-	}
+    // Check if the number of arguments is valid (must be at least 3 and odd)
+    if len(args) < 3 || (len(args)-1)%2 != 0 {
+        return nil, uhaha.ErrWrongNumArgs
+    }
 
-	kvPairCount := (len(args) - 1) / 2
-	batch := make([]ledis.KVPair, kvPairCount)
-	loopI := 0
-	for i := 1; i < len(args); i += 2 {
-		batch[loopI].Key = []byte(args[i])
-		batch[loopI].Value = []byte(args[i+1])
-		loopI++
-	}
+    // Create a slice to hold the key-value pairs
+    kvPairs := make([]ledis.KVPair, (len(args)-1)/2)
+    
+    // Iterate over the arguments and populate the key-value pairs
+    for i := 1; i < len(args); i += 2 {
+        kvPairs[(i-1)/2] = ledis.KVPair{
+            Key:   []byte(args[i]),
+            Value: []byte(args[i+1]),
+        }
+    }
 
-	if err := ldb.MSet(batch...); err != nil {
-		return nil, err
-	}
+    // Perform the MSET operation
+    if err := ldb.MSet(kvPairs...); err != nil {
+        return nil, err
+    }
 
-	return redcon.SimpleString("OK"), nil
+    // Return a simple string reply "OK" upon success
+    return redcon.SimpleString("OK"), nil
 }
 
 func cmdMGET(m uhaha.Machine, args []string) (interface{}, error) {
