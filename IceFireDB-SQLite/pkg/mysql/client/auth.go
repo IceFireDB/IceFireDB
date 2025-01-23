@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
+	"slices"
 
 	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/mysql/packet"
 
@@ -18,15 +19,6 @@ const defaultAuthPluginName = AUTH_NATIVE_PASSWORD
 // defines the supported auth plugins
 var supportedAuthPlugins = []string{AUTH_NATIVE_PASSWORD, AUTH_SHA256_PASSWORD, AUTH_CACHING_SHA2_PASSWORD}
 
-// helper function to determine what auth methods are allowed by this client
-func authPluginAllowed(pluginName string) bool {
-	for _, p := range supportedAuthPlugins {
-		if pluginName == p {
-			return true
-		}
-	}
-	return false
-}
 
 // See: http://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::Handshake
 func (c *Conn) readInitialHandshake() error {
@@ -140,7 +132,7 @@ func (c *Conn) genAuthResponse(authData []byte) ([]byte, bool, error) {
 
 // See: http://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::HandshakeResponse
 func (c *Conn) writeAuthHandshake() error {
-	if !authPluginAllowed(c.authPluginName) {
+	if !slices.Contains(supportedAuthPlugins, c.authPluginName) {
 		return fmt.Errorf("unknow auth plugin name '%s'", c.authPluginName)
 	}
 
