@@ -647,14 +647,135 @@ func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 
 // This is different from the redis standard. It needs to enrich the algorithm to support more atomic instructions.
 func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) != 3 {
+	// Minimum args required: SET key value
+	if len(args) < 3 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	if err := ldb.Set([]byte(args[1]), []byte(args[2])); err != nil {
+	key := []byte(args[1])
+	value := []byte(args[2])
+
+	var (
+		nx         bool // Only set if key doesn't exist
+		xx         bool // Only set if key exists
+		get        bool // Return old value
+		keepTTL    bool // Keep the existing TTL
+		hasExpire  bool
+		expireTime int64
+	)
+
+	// Parse options starting from the fourth argument
+	for i := 3; i < len(args); i++ {
+		switch strings.ToUpper(args[i]) {
+		case "NX":
+			nx = true
+			if xx {
+				return nil, errors.New("ERR syntax error")
+			}
+		case "XX":
+			xx = true
+			if nx {
+				return nil, errors.New("ERR syntax error")
+			}
+		case "GET":
+			get = true
+		case "KEEPTTL":
+			keepTTL = true
+		case "EX":
+			if i+1 >= len(args) {
+				return nil, errors.New("ERR wrong number of arguments for 'SET' command")
+			}
+			seconds, err := strconv.ParseInt(args[i+1], 10, 64)
+			if err != nil || seconds <= 0 {
+				return nil, errors.New("ERR invalid expire time in set")
+			}
+			expireTime = m.Now().Unix() + seconds
+			hasExpire = true
+			i++
+		case "PX":
+			if i+1 >= len(args) {
+				return nil, errors.New("ERR wrong number of arguments for 'SET' command")
+			}
+			milliseconds, err := strconv.ParseInt(args[i+1], 10, 64)
+			if err != nil || milliseconds <= 0 {
+				return nil, errors.New("ERR invalid expire time in set")
+			}
+			expireTime = m.Now().Unix() + (milliseconds / 1000)
+			hasExpire = true
+			i++
+		case "EXAT":
+			if i+1 >= len(args) {
+				return nil, errors.New("ERR wrong number of arguments for 'SET' command")
+			}
+			timestamp, err := strconv.ParseInt(args[i+1], 10, 64)
+			if err != nil {
+				return nil, errors.New("ERR invalid expire time in set")
+			}
+			expireTime = timestamp
+			hasExpire = true
+			i++
+		case "PXAT":
+			if i+1 >= len(args) {
+				return nil, errors.New("ERR wrong number of arguments for 'SET' command")
+			}
+			timestampMs, err := strconv.ParseInt(args[i+1], 10, 64)
+			if err != nil {
+				return nil, errors.New("ERR invalid expire time in set")
+			}
+			expireTime = timestampMs / 1000
+			hasExpire = true
+			i++
+		default:
+			return nil, errors.New("ERR syntax error")
+		}
+	}
+
+	// Handle GET option first - need to get the old value before any modifications
+	var oldVal []byte
+	if get {
+		var err error
+		oldVal, err = ldb.Get(key)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Check key existence for NX/XX conditions
+	exists, err := ldb.Exists(key)
+	if err != nil {
 		return nil, err
 	}
 
+	if (nx && exists > 0) || (xx && exists == 0) {
+		if get {
+			return oldVal, nil
+		}
+		return nil, nil
+	}
+
+	// If keepTTL is not set and we're not setting a new expire time,
+	// we need to remove any existing TTL
+	if !keepTTL && !hasExpire {
+		_, err = ldb.Persist(key) // Correctly handle both return values
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Set the value
+	if hasExpire {
+		if err := ldb.SetEXAT(key, expireTime, value); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := ldb.Set(key, value); err != nil {
+			return nil, err
+		}
+	}
+
+	if get {
+		return oldVal, nil
+	}
 	return redcon.SimpleString("OK"), nil
 }
 
@@ -750,51 +871,51 @@ func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
 
 // This is different from the redis standard. For the sake of transaction consistency, there is no key existence judgment.
 func cmdDEL(m uhaha.Machine, args []string) (interface{}, error) {
-    // Check if the number of arguments is correct
-    if len(args) < 2 {
-        return nil, uhaha.ErrWrongNumArgs
-    }
+	// Check if the number of arguments is correct
+	if len(args) < 2 {
+		return nil, uhaha.ErrWrongNumArgs
+	}
 
-    // Convert the keys from string to byte slices
-    keys := make([][]byte, len(args)-1)
-    for i := 1; i < len(args); i++ {
-        keys[i-1] = []byte(args[i])
-    }
+	// Convert the keys from string to byte slices
+	keys := make([][]byte, len(args)-1)
+	for i := 1; i < len(args); i++ {
+		keys[i-1] = []byte(args[i])
+	}
 
-    // Delete the keys and get the number of keys that were actually deleted
-    n, err := ldb.Del(keys...)
-    if err != nil {
-        return nil, err
-    }
+	// Delete the keys and get the number of keys that were actually deleted
+	n, err := ldb.Del(keys...)
+	if err != nil {
+		return nil, err
+	}
 
-    // Return the number of keys that were deleted
-    return redcon.SimpleInt(n), nil
+	// Return the number of keys that were deleted
+	return redcon.SimpleInt(n), nil
 }
 
 func cmdMSET(m uhaha.Machine, args []string) (interface{}, error) {
-    // Check if the number of arguments is valid (must be at least 3 and odd)
-    if len(args) < 3 || (len(args)-1)%2 != 0 {
-        return nil, uhaha.ErrWrongNumArgs
-    }
+	// Check if the number of arguments is valid (must be at least 3 and odd)
+	if len(args) < 3 || (len(args)-1)%2 != 0 {
+		return nil, uhaha.ErrWrongNumArgs
+	}
 
-    // Create a slice to hold the key-value pairs
-    kvPairs := make([]ledis.KVPair, (len(args)-1)/2)
-    
-    // Iterate over the arguments and populate the key-value pairs
-    for i := 1; i < len(args); i += 2 {
-        kvPairs[(i-1)/2] = ledis.KVPair{
-            Key:   []byte(args[i]),
-            Value: []byte(args[i+1]),
-        }
-    }
+	// Create a slice to hold the key-value pairs
+	kvPairs := make([]ledis.KVPair, (len(args)-1)/2)
 
-    // Perform the MSET operation
-    if err := ldb.MSet(kvPairs...); err != nil {
-        return nil, err
-    }
+	// Iterate over the arguments and populate the key-value pairs
+	for i := 1; i < len(args); i += 2 {
+		kvPairs[(i-1)/2] = ledis.KVPair{
+			Key:   []byte(args[i]),
+			Value: []byte(args[i+1]),
+		}
+	}
 
-    // Return a simple string reply "OK" upon success
-    return redcon.SimpleString("OK"), nil
+	// Perform the MSET operation
+	if err := ldb.MSet(kvPairs...); err != nil {
+		return nil, err
+	}
+
+	// Return a simple string reply "OK" upon success
+	return redcon.SimpleString("OK"), nil
 }
 
 func cmdMGET(m uhaha.Machine, args []string) (interface{}, error) {
