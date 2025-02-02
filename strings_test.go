@@ -108,6 +108,133 @@ func TestKV(t *testing.T) {
 		t.Fatal(n)
 	}
 
+
+		t.Run("SET command comprehensive tests", func(t *testing.T) {
+		// Basic SET/GET
+		t.Run("Basic SET", func(t *testing.T) {
+			key := "test:basic_set"
+			assert.Nil(t, c.Set(ctx, key, "value", 0).Err())
+			val, err := c.Get(ctx, key).Result()
+			assert.Nil(t, err)
+			assert.Equal(t, "value", val)
+		})
+
+		// Conditional SET
+		t.Run("Conditional SET", func(t *testing.T) {
+			key := "test:conditional_set"
+			
+			// NX on new key
+			assert.True(t, c.SetNX(ctx, key, "value1", 0).Val())
+			
+			// NX on existing key
+			assert.False(t, c.SetNX(ctx, key, "value2", 0).Val())
+			
+			// XX on existing key
+			assert.Nil(t, c.SetXX(ctx, key, "value3", 0).Err())
+			
+			// XX on non-existing key
+			assert.Equal(t, redis.Nil, c.SetXX(ctx, "test:nonexistent", "value", 0).Err())
+		})
+
+		// Expiration tests
+		t.Run("Expiration options", func(t *testing.T) {
+			key := "test:expiration"
+			now := time.Now()
+
+			// Test EX
+			assert.Nil(t, c.Set(ctx, key, "val", 10*time.Second).Err())
+			assert.InDelta(t, 10, c.TTL(ctx, key).Val().Seconds(), 1)
+
+			// Test PX
+			assert.Nil(t, c.Set(ctx, key, "val", 1500*time.Millisecond).Err())
+			assert.InDelta(t, 1500, c.PTTL(ctx, key).Val().Milliseconds(), 100)
+
+			// Test EXAT
+			exat := now.Add(15 * time.Second).Unix()
+			assert.Nil(t, c.Do(ctx, "SET", key, "val", "EXAT", exat).Err())
+			assert.InDelta(t, exat, time.Now().Unix()+int64(c.TTL(ctx, key).Val()), 1)
+
+			// Test PXAT
+			pxat := now.Add(20*time.Second).UnixNano() / 1e6
+			assert.Nil(t, c.Do(ctx, "SET", key, "val", "PXAT", pxat).Err())
+			assert.InDelta(t, pxat, time.Now().UnixNano()/1e6+int64(c.PTTL(ctx, key).Val()/1e6), 1000)
+		})
+
+		// GET option
+		t.Run("SET with GET", func(t *testing.T) {
+			key := "test:set_get"
+			assert.Nil(t, c.Set(ctx, key, "old", 0).Err())
+			
+			// GET existing value
+			oldVal := c.SetArgs(ctx, key, "new", redis.SetArgs{Get: true}).Val()
+			assert.Equal(t, "old", oldVal)
+			
+			// GET non-existing
+			result := c.SetArgs(ctx, "test:nonexist_get", "val", redis.SetArgs{Get: true}).Val()
+			assert.Equal(t, "", result)
+		})
+
+		// KEEPTTL tests
+		t.Run("KEEPTTL behavior", func(t *testing.T) {
+			key := "test:keepttl"
+			
+			// Set with TTL
+			assert.Nil(t, c.Set(ctx, key, "val", 10*time.Second).Err())
+			origTTL := c.TTL(ctx, key).Val()
+			
+			// Update with KEEPTTL
+			assert.Nil(t, c.SetArgs(ctx, key, "newval", redis.SetArgs{KeepTTL: true}).Err())
+			newTTL := c.TTL(ctx, key).Val()
+			assert.InDelta(t, origTTL, newTTL, 1)
+			
+			// Update without KEEPTTL
+			assert.Nil(t, c.Set(ctx, key, "newval", 0).Err())
+			assert.Equal(t, time.Duration(-1), c.TTL(ctx, key).Val())
+		})
+
+		// Error cases
+		t.Run("Error handling", func(t *testing.T) {
+			// Too few arguments
+			_, err := c.Do(ctx, "SET").Result()
+			assert.ErrorContains(t, err, "wrong number")
+
+			// Invalid expiration
+			_, err = c.Do(ctx, "SET", "key", "val", "EX", "invalid").Result()
+			assert.ErrorContains(t, err, "invalid expire")
+
+			// Both NX and XX
+			_, err = c.Do(ctx, "SET", "key", "val", "NX", "XX").Result()
+			assert.ErrorContains(t, err, "syntax error")
+
+			// Invalid option
+			_, err = c.Do(ctx, "SET", "key", "val", "INVALID").Result()
+			assert.ErrorContains(t, err, "syntax error")
+		})
+
+		// Type check
+		t.Run("Type check", func(t *testing.T) {
+			key := "test:type_check"
+			assert.Nil(t, c.HSet(ctx, key, "field", "value").Err())
+			
+			err := c.Set(ctx, key, "value", 0).Err()
+			assert.ErrorContains(t, err, "wrong kind")
+		})
+
+		// Expiration edge cases
+		t.Run("Expiration edge cases", func(t *testing.T) {
+			key := "test:expire_edge"
+			
+			// Set with past EXAT
+			_, err := c.Do(ctx, "SET", key, "val", "EXAT", time.Now().Unix()-10).Result()
+			assert.Nil(t, err)
+			assert.Equal(t, int64(0), c.Exists(ctx, key).Val())
+
+			// Set with 0 TTL
+			_, err = c.Do(ctx, "SET", key, "val", "EX", 0).Result()
+			assert.ErrorContains(t, err, "invalid expire")
+		})
+	})
+
 	rangeKey := "range_key"
 	if n, err := c.Append(ctx, rangeKey, "Hello ").Result(); err != nil {
 		t.Fatal(err)
