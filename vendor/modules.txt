@@ -1381,9 +1381,10 @@ github.com/spf13/viper/internal/features
 # github.com/spinlock/jemalloc-go v0.0.0-20201010032256-e81523fb8524
 ## explicit
 github.com/spinlock/jemalloc-go
-# github.com/stretchr/testify v1.9.0
+# github.com/stretchr/testify v1.10.0
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
+github.com/stretchr/testify/assert/yaml
 github.com/stretchr/testify/require
 # github.com/subosito/gotenv v1.6.0
 ## explicit; go 1.18

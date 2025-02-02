@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestKV(t *testing.T) {
@@ -108,8 +109,7 @@ func TestKV(t *testing.T) {
 		t.Fatal(n)
 	}
 
-
-		t.Run("SET command comprehensive tests", func(t *testing.T) {
+	t.Run("SET command comprehensive tests", func(t *testing.T) {
 		// Basic SET/GET
 		t.Run("Basic SET", func(t *testing.T) {
 			key := "test:basic_set"
@@ -122,16 +122,16 @@ func TestKV(t *testing.T) {
 		// Conditional SET
 		t.Run("Conditional SET", func(t *testing.T) {
 			key := "test:conditional_set"
-			
+
 			// NX on new key
 			assert.True(t, c.SetNX(ctx, key, "value1", 0).Val())
-			
+
 			// NX on existing key
 			assert.False(t, c.SetNX(ctx, key, "value2", 0).Val())
-			
+
 			// XX on existing key
 			assert.Nil(t, c.SetXX(ctx, key, "value3", 0).Err())
-			
+
 			// XX on non-existing key
 			assert.Equal(t, redis.Nil, c.SetXX(ctx, "test:nonexistent", "value", 0).Err())
 		})
@@ -164,11 +164,11 @@ func TestKV(t *testing.T) {
 		t.Run("SET with GET", func(t *testing.T) {
 			key := "test:set_get"
 			assert.Nil(t, c.Set(ctx, key, "old", 0).Err())
-			
+
 			// GET existing value
 			oldVal := c.SetArgs(ctx, key, "new", redis.SetArgs{Get: true}).Val()
 			assert.Equal(t, "old", oldVal)
-			
+
 			// GET non-existing
 			result := c.SetArgs(ctx, "test:nonexist_get", "val", redis.SetArgs{Get: true}).Val()
 			assert.Equal(t, "", result)
@@ -177,16 +177,16 @@ func TestKV(t *testing.T) {
 		// KEEPTTL tests
 		t.Run("KEEPTTL behavior", func(t *testing.T) {
 			key := "test:keepttl"
-			
+
 			// Set with TTL
 			assert.Nil(t, c.Set(ctx, key, "val", 10*time.Second).Err())
 			origTTL := c.TTL(ctx, key).Val()
-			
+
 			// Update with KEEPTTL
 			assert.Nil(t, c.SetArgs(ctx, key, "newval", redis.SetArgs{KeepTTL: true}).Err())
 			newTTL := c.TTL(ctx, key).Val()
 			assert.InDelta(t, origTTL, newTTL, 1)
-			
+
 			// Update without KEEPTTL
 			assert.Nil(t, c.Set(ctx, key, "newval", 0).Err())
 			assert.Equal(t, time.Duration(-1), c.TTL(ctx, key).Val())
@@ -215,7 +215,7 @@ func TestKV(t *testing.T) {
 		t.Run("Type check", func(t *testing.T) {
 			key := "test:type_check"
 			assert.Nil(t, c.HSet(ctx, key, "field", "value").Err())
-			
+
 			err := c.Set(ctx, key, "value", 0).Err()
 			assert.ErrorContains(t, err, "wrong kind")
 		})
@@ -223,7 +223,7 @@ func TestKV(t *testing.T) {
 		// Expiration edge cases
 		t.Run("Expiration edge cases", func(t *testing.T) {
 			key := "test:expire_edge"
-			
+
 			// Set with past EXAT
 			_, err := c.Do(ctx, "SET", key, "val", "EXAT", time.Now().Unix()-10).Result()
 			assert.Nil(t, err)
