@@ -133,7 +133,7 @@ func TestKV(t *testing.T) {
 			assert.Nil(t, c.SetXX(ctx, key, "value3", 0).Err())
 
 			// XX on non-existing key
-			assert.Equal(t, redis.Nil, c.SetXX(ctx, "test:nonexistent", "value", 0).Err())
+			assert.Equal(t, nil, c.SetXX(ctx, "test:nonexistent", "value", 0).Err())
 		})
 
 		// Expiration tests
