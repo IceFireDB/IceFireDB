@@ -647,7 +647,7 @@ func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 
 // This is different from the redis standard. It needs to enrich the algorithm to support more atomic instructions.
 func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
-	// Minimum args required: SET key value
+	// Validate minimum arguments: SET key value [options...]
 	if len(args) < 3 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
@@ -656,96 +656,113 @@ func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
 	value := []byte(args[2])
 
 	var (
-		nx         bool // Only set if key doesn't exist
-		xx         bool // Only set if key exists
-		get        bool // Return old value
-		keepTTL    bool // Keep the existing TTL
-		hasExpire  bool
-		expireTime int64
+		nx         bool  // NX: Only set if key does not exist
+		xx         bool  // XX: Only set if key exists
+		get        bool  // GET: Return old value before update
+		keepTTL    bool  // KEEPTTL: Preserve existing TTL
+		hasExpire  bool  // Flag for expiration time presence
+		expireTime int64 // Calculated expiration timestamp
 	)
 
-	// Parse options starting from the fourth argument
-	for i := 3; i < len(args); i++ {
-		switch strings.ToUpper(args[i]) {
+	// Parse optional arguments starting from index 3
+	for i := 3; i < len(args); {
+		arg := strings.ToUpper(args[i])
+		switch arg {
 		case "NX":
 			nx = true
-			if xx {
-				return nil, errors.New("ERR syntax error")
-			}
+			i++
 		case "XX":
 			xx = true
-			if nx {
-				return nil, errors.New("ERR syntax error")
-			}
+			i++
 		case "GET":
 			get = true
+			i++
 		case "KEEPTTL":
 			keepTTL = true
-		case "EX":
+			i++
+		case "EX": // Seconds-based expiration
 			if i+1 >= len(args) {
-				return nil, errors.New("ERR wrong number of arguments for 'SET' command")
+				return nil, errors.New("ERR syntax error")
 			}
 			seconds, err := strconv.ParseInt(args[i+1], 10, 64)
 			if err != nil || seconds <= 0 {
-				return nil, errors.New("ERR invalid expire time in set")
+				return nil, errors.New("ERR invalid expire time")
 			}
 			expireTime = m.Now().Unix() + seconds
 			hasExpire = true
-			i++
-		case "PX":
+			i += 2
+		case "PX": // Milliseconds-based expiration
 			if i+1 >= len(args) {
-				return nil, errors.New("ERR wrong number of arguments for 'SET' command")
+				return nil, errors.New("ERR syntax error")
 			}
-			milliseconds, err := strconv.ParseInt(args[i+1], 10, 64)
-			if err != nil || milliseconds <= 0 {
-				return nil, errors.New("ERR invalid expire time in set")
+			ms, err := strconv.ParseInt(args[i+1], 10, 64)
+			if err != nil || ms <= 0 {
+				return nil, errors.New("ERR invalid expire time")
 			}
-			expireTime = m.Now().Unix() + (milliseconds / 1000)
+			// Convert milliseconds to seconds with ceiling
+			seconds := (ms + 999) / 1000
+			expireTime = m.Now().Unix() + seconds
 			hasExpire = true
-			i++
-		case "EXAT":
+			i += 2
+		case "EXAT": // Absolute timestamp in seconds
 			if i+1 >= len(args) {
-				return nil, errors.New("ERR wrong number of arguments for 'SET' command")
+				return nil, errors.New("ERR syntax error")
 			}
-			timestamp, err := strconv.ParseInt(args[i+1], 10, 64)
+			ts, err := strconv.ParseInt(args[i+1], 10, 64)
 			if err != nil {
-				return nil, errors.New("ERR invalid expire time in set")
+				return nil, errors.New("ERR invalid expire time")
 			}
-			expireTime = timestamp
+			if ts <= m.Now().Unix() {
+				// Handle immediate expiration by deletion
+				if _, err := ldb.Del(key); err != nil {
+					return nil, err
+				}
+				if get {
+					oldVal, _ := ldb.Get(key)
+					return oldVal, nil
+				}
+				return redcon.SimpleString("OK"), nil
+			}
+			expireTime = ts
 			hasExpire = true
-			i++
-		case "PXAT":
+			i += 2
+		case "PXAT": // Absolute timestamp in milliseconds
 			if i+1 >= len(args) {
-				return nil, errors.New("ERR wrong number of arguments for 'SET' command")
+				return nil, errors.New("ERR syntax error")
 			}
-			timestampMs, err := strconv.ParseInt(args[i+1], 10, 64)
+			ts, err := strconv.ParseInt(args[i+1], 10, 64)
 			if err != nil {
-				return nil, errors.New("ERR invalid expire time in set")
+				return nil, errors.New("ERR invalid expire time")
 			}
-			expireTime = timestampMs / 1000
+			if ts <= m.Now().UnixNano()/1e9 {
+				if _, err := ldb.Del(key); err != nil {
+					return nil, err
+				}
+				if get {
+					oldVal, _ := ldb.Get(key)
+					return oldVal, nil
+				}
+				return redcon.SimpleString("OK"), nil
+			}
+			expireTime = ts / 1000
 			hasExpire = true
-			i++
+			i += 2
 		default:
 			return nil, errors.New("ERR syntax error")
 		}
 	}
 
-	// Handle GET option first - need to get the old value before any modifications
+	// Retrieve old value if GET option is specified
 	var oldVal []byte
 	if get {
 		var err error
-		oldVal, err = ldb.Get(key)
-		if err != nil {
+		if oldVal, err = ldb.Get(key); err != nil {
 			return nil, err
 		}
 	}
 
-	// Check key existence for NX/XX conditions
-	exists, err := ldb.Exists(key)
-	if err != nil {
-		return nil, err
-	}
-
+	// Conditional execution checks
+	exists, _ := ldb.Exists(key)
 	if (nx && exists > 0) || (xx && exists == 0) {
 		if get {
 			return oldVal, nil
@@ -753,26 +770,32 @@ func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, nil
 	}
 
-	// If keepTTL is not set and we're not setting a new expire time,
-	// we need to remove any existing TTL
-	if !keepTTL && !hasExpire {
-		_, err = ldb.Persist(key) // Correctly handle both return values
-		if err != nil {
-			return nil, err
+	// Handle KEEPTTL logic
+	if keepTTL && !hasExpire {
+		if ttl, err := ldb.TTL(key); err == nil && ttl > 0 {
+			expireTime = m.Now().Unix() + int64(ttl)
+			hasExpire = true
 		}
 	}
 
-	// Set the value
+	// Execute value storage with expiration handling
 	if hasExpire {
 		if err := ldb.SetEXAT(key, expireTime, value); err != nil {
 			return nil, err
 		}
 	} else {
+		// Clear existing TTL if not keeping it
+		if !keepTTL {
+			if _, err := ldb.Persist(key); err != nil {
+				return nil, err
+			}
+		}
 		if err := ldb.Set(key, value); err != nil {
 			return nil, err
 		}
 	}
 
+	// Return appropriate response
 	if get {
 		return oldVal, nil
 	}
