@@ -7,7 +7,7 @@ toolchain go1.23.3
 require (
 	github.com/IceFireDB/icefiredb-crdt-kv v0.2.0
 	github.com/IceFireDB/icefiredb-ipfs-log v0.5.0
-	github.com/aws/aws-sdk-go v1.55.5
+	github.com/aws/aws-sdk-go v1.55.6
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/dgraph-io/badger v1.6.2
