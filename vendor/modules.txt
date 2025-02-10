@@ -565,8 +565,8 @@ github.com/ipfs/go-block-format
 ## explicit; go 1.19
 github.com/ipfs/go-blockservice
 github.com/ipfs/go-blockservice/internal
-# github.com/ipfs/go-cid v0.4.1
-## explicit; go 1.19
+# github.com/ipfs/go-cid v0.5.0
+## explicit; go 1.22
 github.com/ipfs/go-cid
 # github.com/ipfs/go-cidutil v0.1.0
 ## explicit; go 1.17
