@@ -16,8 +16,6 @@ import (
 	"github.com/ipfs/boxo/ipns"
 	ds "github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/jbenet/goprocess"
-	gpctx "github.com/jbenet/goprocess/context"
 	ic "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -67,8 +65,17 @@ func NewRepublisher(ns namesys.Publisher, ds ds.Datastore, self ic.PrivKey, ks k
 	}
 }
 
-// Run starts the republisher facility. It can be stopped by stopping the provided proc.
-func (rp *Republisher) Run(proc goprocess.Process) {
+// Run starts the republisher facility. It can be stopped by calling the returned function..
+func (rp *Republisher) Run() func() {
+	ctx, cancel := context.WithCancel(context.Background())
+	go rp.run(ctx)
+	return func() {
+		log.Debug("stopping republisher")
+		cancel()
+	}
+}
+
+func (rp *Republisher) run(ctx context.Context) {
 	timer := time.NewTimer(InitialRebroadcastDelay)
 	defer timer.Stop()
 	if rp.Interval < InitialRebroadcastDelay {
@@ -79,21 +86,21 @@ func (rp *Republisher) Run(proc goprocess.Process) {
 		select {
 		case <-timer.C:
 			timer.Reset(rp.Interval)
-			err := rp.republishEntries(proc)
+			err := rp.republishEntries(ctx)
 			if err != nil {
 				log.Info("republisher failed to republish: ", err)
 				if FailureRetryInterval < rp.Interval {
 					timer.Reset(FailureRetryInterval)
 				}
 			}
-		case <-proc.Closing():
+		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (rp *Republisher) republishEntries(p goprocess.Process) error {
-	ctx, cancel := context.WithCancel(gpctx.OnClosingContext(p))
+func (rp *Republisher) republishEntries(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	ctx, span := startSpan(ctx, "Republisher.RepublishEntries")
 	defer span.End()
@@ -189,5 +196,5 @@ func (rp *Republisher) getLastIPNSRecord(ctx context.Context, name ipns.Name) (*
 var tracer = otel.Tracer("boxo/namesys/republisher")
 
 func startSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	return tracer.Start(ctx, "Namesys."+name)
+	return tracer.Start(ctx, "Namesys."+name, opts...)
 }

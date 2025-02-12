@@ -38,6 +38,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	"github.com/libp2p/go-libp2p/p2p/transport/quicreuse"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcpreuse"
 	libp2pwebrtc "github.com/libp2p/go-libp2p/p2p/transport/webrtc"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -145,6 +146,8 @@ type Config struct {
 	CustomIPv6BlackHoleSuccessCounter bool
 
 	UserFxOptions []fx.Option
+
+	ShareTCPListener bool
 }
 
 func (cfg *Config) makeSwarm(eventBus event.Bus, enableMetrics bool) (*swarm.Swarm, error) {
@@ -289,6 +292,12 @@ func (cfg *Config) addTransports() ([]fx.Option, error) {
 		fx.Provide(func() connmgr.ConnectionGater { return cfg.ConnectionGater }),
 		fx.Provide(func() pnet.PSK { return cfg.PSK }),
 		fx.Provide(func() network.ResourceManager { return cfg.ResourceManager }),
+		fx.Provide(func(gater connmgr.ConnectionGater, rcmgr network.ResourceManager) *tcpreuse.ConnMgr {
+			if !cfg.ShareTCPListener {
+				return nil
+			}
+			return tcpreuse.NewConnMgr(tcpreuse.EnvReuseportVal, gater, rcmgr)
+		}),
 		fx.Provide(func(cm *quicreuse.ConnManager, sw *swarm.Swarm) libp2pwebrtc.ListenUDPFn {
 			hasQuicAddrPortFor := func(network string, laddr *net.UDPAddr) bool {
 				quicAddrPorts := map[string]struct{}{}
@@ -437,12 +446,9 @@ func (cfg *Config) newBasicHost(swrm *swarm.Swarm, eventBus event.Bus) (*bhost.B
 	return h, nil
 }
 
-// NewNode constructs a new libp2p Host from the Config.
-//
-// This function consumes the config. Do not reuse it (really!).
-func (cfg *Config) NewNode() (host.Host, error) {
+func (cfg *Config) validate() error {
 	if cfg.EnableAutoRelay && !cfg.Relay {
-		return nil, fmt.Errorf("cannot enable autorelay; relay is not enabled")
+		return fmt.Errorf("cannot enable autorelay; relay is not enabled")
 	}
 	// If possible check that the resource manager conn limit is higher than the
 	// limit set in the conn manager.
@@ -451,6 +457,33 @@ func (cfg *Config) NewNode() (host.Host, error) {
 		if err != nil {
 			log.Warn(fmt.Sprintf("rcmgr limit conflicts with connmgr limit: %v", err))
 		}
+	}
+
+	if len(cfg.PSK) > 0 && cfg.ShareTCPListener {
+		return errors.New("cannot use shared TCP listener with PSK")
+	}
+
+	return nil
+}
+
+// NewNode constructs a new libp2p Host from the Config.
+//
+// This function consumes the config. Do not reuse it (really!).
+func (cfg *Config) NewNode() (host.Host, error) {
+
+	validateErr := cfg.validate()
+	if validateErr != nil {
+		if cfg.ResourceManager != nil {
+			cfg.ResourceManager.Close()
+		}
+		if cfg.ConnManager != nil {
+			cfg.ConnManager.Close()
+		}
+		if cfg.Peerstore != nil {
+			cfg.Peerstore.Close()
+		}
+
+		return nil, validateErr
 	}
 
 	if !cfg.DisableMetrics {
@@ -573,7 +606,7 @@ func (cfg *Config) addAutoNAT(h *bhost.BasicHost) error {
 	if cfg.AddrsFactory != nil {
 		addrFunc = func() []ma.Multiaddr {
 			return slices.DeleteFunc(
-				cfg.AddrsFactory(h.AllAddrs()),
+				slices.Clone(cfg.AddrsFactory(h.AllAddrs())),
 				func(a ma.Multiaddr) bool { return !manet.IsPublicAddr(a) })
 		}
 	}

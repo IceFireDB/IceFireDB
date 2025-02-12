@@ -3,7 +3,8 @@
 package wantlist
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 
 	pb "github.com/ipfs/boxo/bitswap/message/pb"
 
@@ -33,12 +34,6 @@ func NewRefEntry(c cid.Cid, p int32) Entry {
 		WantType: pb.Message_Wantlist_Block,
 	}
 }
-
-type entrySlice []Entry
-
-func (es entrySlice) Len() int           { return len(es) }
-func (es entrySlice) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
-func (es entrySlice) Less(i, j int) bool { return es[i].Priority > es[j].Priority }
 
 // New generates a new raw Wantlist
 func New() *Wantlist {
@@ -71,14 +66,8 @@ func (w *Wantlist) Add(c cid.Cid, priority int32, wantType pb.Message_Wantlist_W
 }
 
 // Remove removes the given cid from the wantlist.
-func (w *Wantlist) Remove(c cid.Cid) bool {
-	_, ok := w.set[c]
-	if !ok {
-		return false
-	}
-
+func (w *Wantlist) Remove(c cid.Cid) {
 	w.delete(c)
-	return true
 }
 
 // Remove removes the given cid from the wantlist, respecting the type:
@@ -108,9 +97,14 @@ func (w *Wantlist) put(c cid.Cid, e Entry) {
 	w.set[c] = e
 }
 
-// Contains returns the entry, if present, for the given CID, plus whether it
-// was present.
-func (w *Wantlist) Contains(c cid.Cid) (Entry, bool) {
+func (w *Wantlist) Has(c cid.Cid) bool {
+	_, ok := w.set[c]
+	return ok
+}
+
+// Get returns the entry, if present, for the given CID, plus whether it was
+// present.
+func (w *Wantlist) Get(c cid.Cid) (Entry, bool) {
 	e, ok := w.set[c]
 	return e, ok
 }
@@ -126,17 +120,9 @@ func (w *Wantlist) Entries() []Entry {
 	for _, e := range w.set {
 		es = append(es, e)
 	}
-	sort.Sort(entrySlice(es))
+	slices.SortFunc(es, func(a, b Entry) int {
+		return cmp.Compare(b.Priority, a.Priority)
+	})
 	w.cached = es
 	return es[0:len(es):len(es)]
-}
-
-// Absorb all the entries in other into this want list
-func (w *Wantlist) Absorb(other *Wantlist) {
-	// Invalidate the cache up-front to avoid doing any work trying to keep it up-to-date.
-	w.cached = nil
-
-	for _, e := range other.Entries() {
-		w.Add(e.Cid, e.Priority, e.WantType)
-	}
 }

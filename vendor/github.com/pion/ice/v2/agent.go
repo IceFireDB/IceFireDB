@@ -153,6 +153,8 @@ type Agent struct {
 	insecureSkipVerify bool
 
 	proxyDialer proxy.Dialer
+
+	enableUseCandidateCheckPriority bool
 }
 
 type task struct {
@@ -323,6 +325,8 @@ func NewAgent(config *AgentConfig) (*Agent, error) { //nolint:gocognit
 		disableActiveTCP: config.DisableActiveTCP,
 
 		userBindingRequestHandler: config.BindingRequestHandler,
+
+		enableUseCandidateCheckPriority: config.EnableUseCandidateCheckPriority,
 	}
 	a.connectionStateNotifier = &handlerNotifier{connectionStateFunc: a.onConnectionStateChange, done: make(chan struct{})}
 	a.candidateNotifier = &handlerNotifier{candidateFunc: a.onCandidate, done: make(chan struct{})}
@@ -1300,4 +1304,8 @@ func (a *Agent) setGatheringState(newState GatheringState) error {
 
 	<-done
 	return nil
+}
+
+func (a *Agent) needsToCheckPriorityOnNominated() bool {
+	return !a.lite || a.enableUseCandidateCheckPriority
 }

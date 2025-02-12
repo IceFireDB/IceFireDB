@@ -53,7 +53,7 @@ func (sim *SessionInterestManager) RemoveSession(ses uint64) []cid.Cid {
 	defer sim.lk.Unlock()
 
 	// The keys that no session is interested in
-	deletedKs := make([]cid.Cid, 0)
+	var deletedKs []cid.Cid
 
 	// For each known key
 	for c := range sim.wants {
@@ -119,18 +119,19 @@ func (sim *SessionInterestManager) RemoveSessionInterested(ses uint64, ks []cid.
 // The session calls FilterSessionInterested() to filter the sets of keys for
 // those that the session is interested in
 func (sim *SessionInterestManager) FilterSessionInterested(ses uint64, ksets ...[]cid.Cid) [][]cid.Cid {
+	kres := make([][]cid.Cid, len(ksets))
+
 	sim.lk.RLock()
 	defer sim.lk.RUnlock()
 
 	// For each set of keys
-	kres := make([][]cid.Cid, len(ksets))
 	for i, ks := range ksets {
 		// The set of keys that at least one session is interested in
-		has := make([]cid.Cid, 0, len(ks))
+		var has []cid.Cid
 
 		// For each key in the list
 		for _, c := range ks {
-			// If there is a session that's interested, add the key to the set
+			// If the session is interested, add the key to the set
 			if _, ok := sim.wants[c][ses]; ok {
 				has = append(has, c)
 			}
@@ -144,7 +145,6 @@ func (sim *SessionInterestManager) FilterSessionInterested(ses uint64, ksets ...
 // unwanted blocks
 func (sim *SessionInterestManager) SplitWantedUnwanted(blks []blocks.Block) ([]blocks.Block, []blocks.Block) {
 	sim.lk.RLock()
-	defer sim.lk.RUnlock()
 
 	// Get the wanted block keys as a set
 	wantedKs := cid.NewSet()
@@ -159,6 +159,8 @@ func (sim *SessionInterestManager) SplitWantedUnwanted(blks []blocks.Block) ([]b
 			}
 		}
 	}
+
+	sim.lk.RUnlock()
 
 	// Separate the blocks into wanted and unwanted
 	wantedBlks := make([]blocks.Block, 0, len(blks))
@@ -175,22 +177,21 @@ func (sim *SessionInterestManager) SplitWantedUnwanted(blks []blocks.Block) ([]b
 
 // When the SessionManager receives a message it calls InterestedSessions() to
 // find out which sessions are interested in the message.
-func (sim *SessionInterestManager) InterestedSessions(blks []cid.Cid, haves []cid.Cid, dontHaves []cid.Cid) []uint64 {
-	sim.lk.RLock()
-	defer sim.lk.RUnlock()
+func (sim *SessionInterestManager) InterestedSessions(keySets ...[]cid.Cid) []uint64 {
+	sesSet := make(map[uint64]struct{})
 
-	ks := make([]cid.Cid, 0, len(blks)+len(haves)+len(dontHaves))
-	ks = append(ks, blks...)
-	ks = append(ks, haves...)
-	ks = append(ks, dontHaves...)
+	sim.lk.RLock()
 
 	// Create a set of sessions that are interested in the keys
-	sesSet := make(map[uint64]struct{})
-	for _, c := range ks {
-		for s := range sim.wants[c] {
-			sesSet[s] = struct{}{}
+	for _, keySet := range keySets {
+		for _, c := range keySet {
+			for s := range sim.wants[c] {
+				sesSet[s] = struct{}{}
+			}
 		}
 	}
+
+	sim.lk.RUnlock()
 
 	// Convert the set into a list
 	ses := make([]uint64, 0, len(sesSet))

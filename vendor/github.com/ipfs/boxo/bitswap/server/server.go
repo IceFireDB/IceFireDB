@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 
@@ -20,20 +20,14 @@ import (
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipfs/go-metrics-interface"
-	process "github.com/jbenet/goprocess"
-	procctx "github.com/jbenet/goprocess/context"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 )
-
-var provideKeysBufferSize = 2048
 
 var (
 	log   = logging.Logger("bitswap/server")
 	sflog = log.Desugar()
 )
-
-const provideWorkerMax = 6
 
 type Option func(*Server)
 
@@ -57,46 +51,28 @@ type Server struct {
 	// the total number of simultaneous threads sending outgoing messages
 	taskWorkerCount int
 
-	process process.Process
-
-	// newBlocks is a channel for newly added blocks to be provided to the
-	// network.  blocks pushed down this channel get buffered and fed to the
-	// provideKeys channel later on to avoid too much network activity
-	newBlocks chan cid.Cid
-	// provideKeys directly feeds provide workers
-	provideKeys chan cid.Cid
+	// Cancel stops the server
+	cancel    context.CancelFunc
+	closing   chan struct{}
+	closeOnce sync.Once
+	// waitWorkers waits for all worker goroutines to exit.
+	waitWorkers sync.WaitGroup
 
 	// Extra options to pass to the decision manager
 	engineOptions []decision.Option
-
-	// the size of channel buffer to use
-	hasBlockBufferSize int
-	// whether or not to make provide announcements
-	provideEnabled bool
 }
 
 func New(ctx context.Context, network bsnet.BitSwapNetwork, bstore blockstore.Blockstore, options ...Option) *Server {
 	ctx, cancel := context.WithCancel(ctx)
 
-	px := process.WithTeardown(func() error {
-		return nil
-	})
-	go func() {
-		<-px.Closing() // process closes first
-		cancel()
-	}()
-
 	s := &Server{
-		sentHistogram:      bmetrics.SentHist(ctx),
-		sendTimeHistogram:  bmetrics.SendTimeHist(ctx),
-		taskWorkerCount:    defaults.BitswapTaskWorkerCount,
-		network:            network,
-		process:            px,
-		provideEnabled:     true,
-		hasBlockBufferSize: defaults.HasBlockBufferSize,
-		provideKeys:        make(chan cid.Cid, provideKeysBufferSize),
+		sentHistogram:     bmetrics.SentHist(ctx),
+		sendTimeHistogram: bmetrics.SendTimeHist(ctx),
+		taskWorkerCount:   defaults.BitswapTaskWorkerCount,
+		network:           network,
+		cancel:            cancel,
+		closing:           make(chan struct{}),
 	}
-	s.newBlocks = make(chan cid.Cid, s.hasBlockBufferSize)
 
 	for _, o := range options {
 		o(s)
@@ -111,7 +87,7 @@ func New(ctx context.Context, network bsnet.BitSwapNetwork, bstore blockstore.Bl
 	)
 	s.engineOptions = nil
 
-	s.startWorkers(ctx, px)
+	s.startWorkers(ctx)
 
 	return s
 }
@@ -128,13 +104,6 @@ func TaskWorkerCount(count int) Option {
 func WithTracer(tap tracer.Tracer) Option {
 	return func(bs *Server) {
 		bs.tracer = tap
-	}
-}
-
-// ProvideEnabled is an option for enabling/disabling provide announcements
-func ProvideEnabled(enabled bool) Option {
-	return func(bs *Server) {
-		bs.provideEnabled = enabled
 	}
 }
 
@@ -241,16 +210,6 @@ func MaxCidSize(n uint) Option {
 	}
 }
 
-// HasBlockBufferSize configure how big the new blocks buffer should be.
-func HasBlockBufferSize(count int) Option {
-	if count < 0 {
-		panic("cannot have negative buffer size")
-	}
-	return func(bs *Server) {
-		bs.hasBlockBufferSize = count
-	}
-}
-
 // WithWantHaveReplaceSize sets the maximum size of a block in bytes up to
 // which the bitswap server will replace a WantHave with a WantBlock response.
 //
@@ -293,33 +252,20 @@ func (bs *Server) WantlistForPeer(p peer.ID) []cid.Cid {
 	return out
 }
 
-func (bs *Server) startWorkers(ctx context.Context, px process.Process) {
-	bs.engine.StartWorkers(ctx, px)
-
+func (bs *Server) startWorkers(ctx context.Context) {
 	// Start up workers to handle requests from other nodes for the data on this node
+	bs.waitWorkers.Add(bs.taskWorkerCount)
 	for i := 0; i < bs.taskWorkerCount; i++ {
 		i := i
-		px.Go(func(px process.Process) {
-			bs.taskWorker(ctx, i)
-		})
-	}
-
-	if bs.provideEnabled {
-		// Start up a worker to manage sending out provides messages
-		px.Go(func(px process.Process) {
-			bs.provideCollector(ctx)
-		})
-
-		// Spawn up multiple workers to handle incoming blocks
-		// consider increasing number if providing blocks bottlenecks
-		// file transfers
-		px.Go(bs.provideWorker)
+		go bs.taskWorker(ctx, i)
 	}
 }
 
 func (bs *Server) taskWorker(ctx context.Context, id int) {
-	defer log.Debug("bitswap task worker shutting down...")
+	defer bs.waitWorkers.Done()
+
 	log := log.With("ID", id)
+	defer log.Debug("bitswap task worker shutting down...")
 	for {
 		log.Debug("Bitswap.TaskWorker.Loop")
 		select {
@@ -341,8 +287,7 @@ func (bs *Server) taskWorker(ctx context.Context, id int) {
 				}
 				bs.sendBlocks(ctx, envelope)
 
-				dur := time.Since(start)
-				bs.sendTimeHistogram.Observe(dur.Seconds())
+				bs.sendTimeHistogram.Observe(time.Since(start).Seconds())
 
 			case <-ctx.Done():
 				return
@@ -422,10 +367,9 @@ func (bs *Server) sendBlocks(ctx context.Context, env *decision.Envelope) {
 }
 
 type Stat struct {
-	Peers         []string
-	ProvideBufLen int
-	BlocksSent    uint64
-	DataSent      uint64
+	Peers      []string
+	BlocksSent uint64
+	DataSent   uint64
 }
 
 // Stat returns aggregated statistics about bitswap operations
@@ -433,14 +377,13 @@ func (bs *Server) Stat() (Stat, error) {
 	bs.counterLk.Lock()
 	s := bs.counters
 	bs.counterLk.Unlock()
-	s.ProvideBufLen = len(bs.newBlocks)
 
 	peers := bs.engine.Peers()
 	peersStr := make([]string, len(peers))
 	for i, p := range peers {
 		peersStr[i] = p.String()
 	}
-	sort.Strings(peersStr)
+	slices.Sort(peersStr)
 	s.Peers = peersStr
 
 	return s, nil
@@ -452,7 +395,7 @@ func (bs *Server) Stat() (Stat, error) {
 // that those blocks are available in the blockstore before calling this function.
 func (bs *Server) NotifyNewBlocks(ctx context.Context, blks ...blocks.Block) error {
 	select {
-	case <-bs.process.Closing():
+	case <-bs.closing:
 		return errors.New("bitswap is closed")
 	default:
 	}
@@ -460,105 +403,7 @@ func (bs *Server) NotifyNewBlocks(ctx context.Context, blks ...blocks.Block) err
 	// Send wanted blocks to decision engine
 	bs.engine.NotifyNewBlocks(blks)
 
-	// If the reprovider is enabled, send block to reprovider
-	if bs.provideEnabled {
-		for _, blk := range blks {
-			select {
-			case bs.newBlocks <- blk.Cid():
-				// send block off to be reprovided
-			case <-bs.process.Closing():
-				return bs.process.Close()
-			}
-		}
-	}
-
 	return nil
-}
-
-func (bs *Server) provideCollector(ctx context.Context) {
-	defer close(bs.provideKeys)
-	var toProvide []cid.Cid
-	var nextKey cid.Cid
-	var keysOut chan cid.Cid
-
-	for {
-		select {
-		case blkey, ok := <-bs.newBlocks:
-			if !ok {
-				log.Debug("newBlocks channel closed")
-				return
-			}
-
-			if keysOut == nil {
-				nextKey = blkey
-				keysOut = bs.provideKeys
-			} else {
-				toProvide = append(toProvide, blkey)
-			}
-		case keysOut <- nextKey:
-			if len(toProvide) > 0 {
-				nextKey = toProvide[0]
-				toProvide = toProvide[1:]
-			} else {
-				keysOut = nil
-			}
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (bs *Server) provideWorker(px process.Process) {
-	// FIXME: OnClosingContext returns a _custom_ context type.
-	// Unfortunately, deriving a new cancelable context from this custom
-	// type fires off a goroutine. To work around this, we create a single
-	// cancelable context up-front and derive all sub-contexts from that.
-	//
-	// See: https://github.com/ipfs/go-ipfs/issues/5810
-	ctx := procctx.OnClosingContext(px)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	limit := make(chan struct{}, provideWorkerMax)
-
-	limitedGoProvide := func(k cid.Cid, wid int) {
-		defer func() {
-			// replace token when done
-			<-limit
-		}()
-
-		log.Debugw("Bitswap.ProvideWorker.Start", "ID", wid, "cid", k)
-		defer log.Debugw("Bitswap.ProvideWorker.End", "ID", wid, "cid", k)
-
-		ctx, cancel := context.WithTimeout(ctx, defaults.ProvideTimeout) // timeout ctx
-		defer cancel()
-
-		if err := bs.network.Provide(ctx, k); err != nil {
-			log.Warn(err)
-		}
-	}
-
-	// worker spawner, reads from bs.provideKeys until it closes, spawning a
-	// _ratelimited_ number of workers to handle each key.
-	for wid := 2; ; wid++ {
-		log.Debug("Bitswap.ProvideWorker.Loop")
-
-		select {
-		case <-px.Closing():
-			return
-		case k, ok := <-bs.provideKeys:
-			if !ok {
-				log.Debug("provideKeys channel closed")
-				return
-			}
-			select {
-			case <-px.Closing():
-				return
-			case limit <- struct{}{}:
-				go limitedGoProvide(k, wid)
-			}
-		}
-	}
 }
 
 func (bs *Server) ReceiveMessage(ctx context.Context, p peer.ID, incoming message.BitSwapMessage) {
@@ -597,7 +442,13 @@ func (bs *Server) PeerDisconnected(p peer.ID) {
 	bs.engine.PeerDisconnected(p)
 }
 
-// Close is called to shutdown the Client
-func (bs *Server) Close() error {
-	return bs.process.Close()
+// Close is called to shutdown the Server. Returns when all workers and
+// decision engine have finished. Safe to calling multiple times/concurrently.
+func (bs *Server) Close() {
+	bs.closeOnce.Do(func() {
+		close(bs.closing)
+		bs.cancel()
+	})
+	bs.engine.Close()
+	bs.waitWorkers.Wait()
 }

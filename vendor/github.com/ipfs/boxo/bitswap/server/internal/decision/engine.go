@@ -25,7 +25,6 @@ import (
 	"github.com/ipfs/go-peertaskqueue"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	"github.com/ipfs/go-peertaskqueue/peertracker"
-	process "github.com/jbenet/goprocess"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mh "github.com/multiformats/go-multihash"
 )
@@ -195,6 +194,9 @@ type Engine struct {
 
 	taskWorkerLock  sync.Mutex
 	taskWorkerCount int
+	waitWorkers     sync.WaitGroup
+	cancel          context.CancelFunc
+	closeOnce       sync.Once
 
 	targetMessageSize int
 
@@ -382,6 +384,8 @@ func NewEngine(
 	self peer.ID,
 	opts ...Option,
 ) *Engine {
+	ctx, cancel := context.WithCancel(ctx)
+
 	e := &Engine{
 		scoreLedger:                     NewDefaultScoreLedger(),
 		bstoreWorkerCount:               defaults.BitswapEngineBlockstoreWorkerCount,
@@ -401,6 +405,7 @@ func NewEngine(
 		tagUseful:                       fmt.Sprintf(tagFormat, "useful", uuid.New().String()),
 		maxQueuedWantlistEntriesPerPeer: defaults.MaxQueuedWantlistEntiresPerPeer,
 		maxCidSize:                      defaults.MaximumAllowedCid,
+		cancel:                          cancel,
 	}
 
 	for _, opt := range opts {
@@ -437,6 +442,8 @@ func NewEngine(
 		log.Infow("Replace WantHave with WantBlock is enabled", "maxSize", e.wantHaveReplaceSize)
 	}
 
+	e.startWorkers(ctx)
+
 	return e
 }
 
@@ -462,7 +469,7 @@ func (e *Engine) SetSendDontHaves(send bool) {
 // Starts the score ledger. Before start the function checks and,
 // if it is unset, initializes the scoreLedger with the default
 // implementation.
-func (e *Engine) startScoreLedger(px process.Process) {
+func (e *Engine) startScoreLedger() {
 	e.scoreLedger.Start(func(p peer.ID, score int) {
 		if score == 0 {
 			e.peerTagger.UntagPeer(p, e.tagUseful)
@@ -470,33 +477,32 @@ func (e *Engine) startScoreLedger(px process.Process) {
 			e.peerTagger.TagPeer(p, e.tagUseful, score)
 		}
 	})
-	px.Go(func(ppx process.Process) {
-		<-ppx.Closing()
-		e.scoreLedger.Stop()
-	})
 }
 
-func (e *Engine) startBlockstoreManager(px process.Process) {
+// startWorkers starts workers to handle requests from other nodes for the data
+// on this node.
+func (e *Engine) startWorkers(ctx context.Context) {
 	e.bsm.start()
-	px.Go(func(ppx process.Process) {
-		<-ppx.Closing()
-		e.bsm.stop()
-	})
-}
-
-// Start up workers to handle requests from other nodes for the data on this node
-func (e *Engine) StartWorkers(ctx context.Context, px process.Process) {
-	e.startBlockstoreManager(px)
-	e.startScoreLedger(px)
+	e.startScoreLedger()
 
 	e.taskWorkerLock.Lock()
 	defer e.taskWorkerLock.Unlock()
 
+	e.waitWorkers.Add(e.taskWorkerCount)
 	for i := 0; i < e.taskWorkerCount; i++ {
-		px.Go(func(_ process.Process) {
-			e.taskWorker(ctx)
-		})
+		go e.taskWorker(ctx)
 	}
+}
+
+// Close shuts down the decision engine and returns after all workers have
+// finished. Safe to call multiple times/concurrently.
+func (e *Engine) Close() {
+	e.closeOnce.Do(func() {
+		e.cancel()
+		e.bsm.stop()
+		e.scoreLedger.Stop()
+	})
+	e.waitWorkers.Wait()
 }
 
 func (e *Engine) onPeerAdded(p peer.ID) {
@@ -524,6 +530,7 @@ func (e *Engine) LedgerForPeer(p peer.ID) *Receipt {
 // and adds them to an envelope that is passed off to the bitswap workers,
 // which send the message to the network.
 func (e *Engine) taskWorker(ctx context.Context) {
+	defer e.waitWorkers.Done()
 	defer e.taskWorkerExit()
 	for {
 		oneTimeUse := make(chan *Envelope, 1) // buffer to prevent blocking
@@ -909,7 +916,7 @@ func (e *Engine) handleOverflow(ctx context.Context, p peer.ID, overflow, wants 
 	return wants
 }
 
-// Split the want-havek entries from the cancel and deny entries.
+// Split the want, cancel, and deny entries.
 func (e *Engine) splitWantsCancelsDenials(p peer.ID, m bsmsg.BitSwapMessage) ([]bsmsg.Entry, []bsmsg.Entry, []bsmsg.Entry, error) {
 	entries := m.Wantlist() // creates copy; safe to modify
 	if len(entries) == 0 {

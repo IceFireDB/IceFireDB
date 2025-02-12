@@ -73,7 +73,7 @@ func NewCarBackend(f CarFetcher, opts ...BackendOption) (*CarBackend, error) {
 		return nil, err
 	}
 
-	var promReg prometheus.Registerer = prometheus.NewRegistry()
+	var promReg prometheus.Registerer = prometheus.DefaultRegisterer
 	if compiledOptions.promRegistry != nil {
 		promReg = compiledOptions.promRegistry
 	}
@@ -117,6 +117,11 @@ func NewRemoteCarBackend(gatewayURL []string, httpClient *http.Client, opts ...B
 }
 
 func registerCarBackendMetrics(promReg prometheus.Registerer) *CarBackendMetrics {
+	// make sure we have functional registry
+	if promReg == nil {
+		promReg = prometheus.DefaultRegisterer
+	}
+
 	// How many CAR Fetch attempts we had? Need this to calculate % of various car request types.
 	// We only count attempts here, because success/failure with/without retries are provided by caboose:
 	// - ipfs_caboose_fetch_duration_car_success_count
@@ -129,7 +134,7 @@ func registerCarBackendMetrics(promReg prometheus.Registerer) *CarBackendMetrics
 		Name:      "car_fetch_attempts",
 		Help:      "The number of times a CAR fetch was attempted by IPFSBackend.",
 	})
-	promReg.MustRegister(carFetchAttemptMetric)
+	registerMetric(promReg, carFetchAttemptMetric)
 
 	contextAlreadyCancelledMetric := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "ipfs",
@@ -137,7 +142,7 @@ func registerCarBackendMetrics(promReg prometheus.Registerer) *CarBackendMetrics
 		Name:      "car_fetch_context_already_cancelled",
 		Help:      "The number of times context is already cancelled when a CAR fetch was attempted by IPFSBackend.",
 	})
-	promReg.MustRegister(contextAlreadyCancelledMetric)
+	registerMetric(promReg, contextAlreadyCancelledMetric)
 
 	// How many blocks were read via CARs?
 	// Need this as a baseline to reason about error ratio vs raw_block_recovery_attempts.
@@ -147,7 +152,7 @@ func registerCarBackendMetrics(promReg prometheus.Registerer) *CarBackendMetrics
 		Name:      "car_blocks_fetched",
 		Help:      "The number of blocks successfully read via CAR fetch.",
 	})
-	promReg.MustRegister(carBlocksFetchedMetric)
+	registerMetric(promReg, carBlocksFetchedMetric)
 
 	carParamsMetric := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "ipfs",
@@ -155,7 +160,7 @@ func registerCarBackendMetrics(promReg prometheus.Registerer) *CarBackendMetrics
 		Name:      "car_fetch_params",
 		Help:      "How many times specific CAR parameter was used during CAR data fetch.",
 	}, []string{"dagScope", "entityRanges"}) // we use 'ranges' instead of 'bytes' here because we only count the number of ranges present
-	promReg.MustRegister(carParamsMetric)
+	registerMetric(promReg, carParamsMetric)
 
 	bytesRangeStartMetric := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: "ipfs",
@@ -164,7 +169,7 @@ func registerCarBackendMetrics(promReg prometheus.Registerer) *CarBackendMetrics
 		Help:      "Tracks where did the range request start.",
 		Buckets:   prometheus.ExponentialBuckets(1024, 2, 24), // 1024 bytes to 8 GiB
 	})
-	promReg.MustRegister(bytesRangeStartMetric)
+	registerMetric(promReg, bytesRangeStartMetric)
 
 	bytesRangeSizeMetric := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: "ipfs",
@@ -173,7 +178,7 @@ func registerCarBackendMetrics(promReg prometheus.Registerer) *CarBackendMetrics
 		Help:      "Tracks the size of range requests.",
 		Buckets:   prometheus.ExponentialBuckets(256*1024, 2, 10), // From 256KiB to 100MiB
 	})
-	promReg.MustRegister(bytesRangeSizeMetric)
+	registerMetric(promReg, bytesRangeSizeMetric)
 
 	return &CarBackendMetrics{
 		contextAlreadyCancelledMetric,

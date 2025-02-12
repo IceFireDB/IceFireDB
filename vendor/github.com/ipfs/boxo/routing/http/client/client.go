@@ -10,11 +10,11 @@ import (
 	"mime"
 	"net/http"
 	gourl "net/url"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/benbjohnson/clock"
+	"github.com/filecoin-project/go-clock"
 	ipns "github.com/ipfs/boxo/ipns"
 	"github.com/ipfs/boxo/routing/http/contentrouter"
 	"github.com/ipfs/boxo/routing/http/filters"
@@ -107,7 +107,7 @@ func WithDisabledLocalFiltering(val bool) Option {
 // The protocols are ordered alphabetically for cache key (url) consistency
 func WithProtocolFilter(protocolFilter []string) Option {
 	return func(c *Client) error {
-		sort.Strings(protocolFilter)
+		slices.Sort(protocolFilter)
 		c.protocolFilter = protocolFilter
 		return nil
 	}
@@ -118,7 +118,7 @@ func WithProtocolFilter(protocolFilter []string) Option {
 // The addresses are ordered alphabetically for cache key (url) consistency
 func WithAddrFilter(addrFilter []string) Option {
 	return func(c *Client) error {
-		sort.Strings(addrFilter)
+		slices.Sort(addrFilter)
 		c.addrFilter = addrFilter
 		return nil
 	}

@@ -3,7 +3,7 @@
 
 package codecs
 
-func min(a, b int) int {
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}

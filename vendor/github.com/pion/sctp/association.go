@@ -17,6 +17,7 @@ import (
 
 	"github.com/pion/logging"
 	"github.com/pion/randutil"
+	"github.com/pion/transport/v3/deadline"
 )
 
 // Port 5000 shows up in examples for SDPs used by WebRTC. Since this implementation
@@ -212,6 +213,9 @@ type Association struct {
 	partialBytesAcked    uint32
 	inFastRecovery       bool
 	fastRecoverExitPoint uint32
+	minCwnd              uint32 // Minimum congestion window
+	fastRtxWnd           uint32 // Send window for fast retransmit
+	cwndCAStep           uint32 // Step of congestion window increase at Congestion Avoidance
 
 	// RTX & Ack timer
 	rtoMgr     *rtoManager
@@ -248,6 +252,10 @@ type Association struct {
 	delayedAckTriggered   bool
 	immediateAckTriggered bool
 
+	blockWrite   bool
+	writePending bool
+	writeNotify  chan struct{}
+
 	name string
 	log  logging.LeveledLogger
 }
@@ -261,8 +269,17 @@ type Config struct {
 	MaxMessageSize       uint32
 	EnableZeroChecksum   bool
 	LoggerFactory        logging.LoggerFactory
+	BlockWrite           bool
+
+	// congestion control configuration
 	// RTOMax is the maximum retransmission timeout in milliseconds
 	RTOMax float64
+	// Minimum congestion window
+	MinCwnd uint32
+	// Send window for fast retransmit
+	FastRtxWnd uint32
+	// Step of congestion window increase at Congestion Avoidance
+	CwndCAStep uint32
 }
 
 // Server accepts a SCTP stream over a conn
@@ -325,6 +342,9 @@ func createAssociation(config Config) *Association {
 		netConn:              config.NetConn,
 		maxReceiveBufferSize: maxReceiveBufferSize,
 		maxMessageSize:       maxMessageSize,
+		minCwnd:              config.MinCwnd,
+		fastRtxWnd:           config.FastRtxWnd,
+		cwndCAStep:           config.CwndCAStep,
 
 		// These two max values have us not need to follow
 		// 5.1.1 where this peer may be incapable of supporting
@@ -361,6 +381,8 @@ func createAssociation(config Config) *Association {
 		stats:                   &associationStats{},
 		log:                     config.LoggerFactory.NewLogger("sctp"),
 		name:                    config.Name,
+		blockWrite:              config.BlockWrite,
+		writeNotify:             make(chan struct{}, 1),
 	}
 
 	if a.name == "" {
@@ -512,7 +534,7 @@ func (a *Association) Close() error {
 	a.log.Debugf("[%s] stats nPackets (out) : %d", a.name, a.stats.getNumPacketsSent())
 	a.log.Debugf("[%s] stats nDATAs (in) : %d", a.name, a.stats.getNumDATAs())
 	a.log.Debugf("[%s] stats nSACKs (in) : %d", a.name, a.stats.getNumSACKsReceived())
-	a.log.Debugf("[%s] stats nSACKs (out) : %d\n", a.name, a.stats.getNumSACKsSent())
+	a.log.Debugf("[%s] stats nSACKs (out) : %d", a.name, a.stats.getNumSACKsSent())
 	a.log.Debugf("[%s] stats nT3Timeouts : %d", a.name, a.stats.getNumT3Timeouts())
 	a.log.Debugf("[%s] stats nAckTimeouts: %d", a.name, a.stats.getNumAckTimeouts())
 	a.log.Debugf("[%s] stats nFastRetrans: %d", a.name, a.stats.getNumFastRetrans())
@@ -661,6 +683,20 @@ func (a *Association) awakeWriteLoop() {
 	}
 }
 
+func (a *Association) isBlockWrite() bool {
+	return a.blockWrite
+}
+
+// Mark the association is writable and unblock the waiting write,
+// the caller should hold the association write lock.
+func (a *Association) notifyBlockWritable() {
+	a.writePending = false
+	select {
+	case a.writeNotify <- struct{}{}:
+	default:
+	}
+}
+
 // unregisterStream un-registers a stream from the association
 // The caller should hold the association write lock.
 func (a *Association) unregisterStream(s *Stream, err error) {
@@ -803,9 +839,13 @@ func (a *Association) gatherOutboundFastRetransmissionPackets(rawPackets [][]byt
 	if a.willRetransmitFast {
 		a.willRetransmitFast = false
 
-		toFastRetrans := []chunk{}
+		toFastRetrans := []*chunkPayloadData{}
 		fastRetransSize := commonHeaderSize
 
+		fastRetransWnd := a.MTU()
+		if fastRetransWnd < a.fastRtxWnd {
+			fastRetransWnd = a.fastRtxWnd
+		}
 		for i := 0; ; i++ {
 			c, ok := a.inflightQueue.get(a.cumulativeTSNAckPoint + uint32(i) + 1)
 			if !ok {
@@ -831,7 +871,7 @@ func (a *Association) gatherOutboundFastRetransmissionPackets(rawPackets [][]byt
 			//		packet.
 
 			dataChunkSize := dataChunkHeaderSize + uint32(len(c.userData))
-			if a.MTU() < fastRetransSize+dataChunkSize {
+			if fastRetransWnd < fastRetransSize+dataChunkSize {
 				break
 			}
 
@@ -845,10 +885,12 @@ func (a *Association) gatherOutboundFastRetransmissionPackets(rawPackets [][]byt
 		}
 
 		if len(toFastRetrans) > 0 {
-			raw, err := a.marshalPacket(a.createPacket(toFastRetrans))
-			if err != nil {
-				a.log.Warnf("[%s] failed to serialize a DATA packet to be fast-retransmitted", a.name)
-			} else {
+			for _, p := range a.bundleDataChunksIntoPackets(toFastRetrans) {
+				raw, err := a.marshalPacket(p)
+				if err != nil {
+					a.log.Warnf("[%s] failed to serialize a DATA packet to be fast-retransmitted", a.name)
+					continue
+				}
 				rawPackets = append(rawPackets, raw)
 			}
 		}
@@ -1115,6 +1157,9 @@ func (a *Association) CWND() uint32 {
 }
 
 func (a *Association) setCWND(cwnd uint32) {
+	if cwnd < a.minCwnd {
+		cwnd = a.minCwnd
+	}
 	atomic.StoreUint32(&a.cwnd, cwnd)
 }
 
@@ -1532,6 +1577,7 @@ func (a *Association) createStream(streamIdentifier uint16, accept bool) *Stream
 		reassemblyQueue:  newReassemblyQueue(streamIdentifier),
 		log:              a.log,
 		name:             fmt.Sprintf("%d:%s", streamIdentifier, a.name),
+		writeDeadline:    deadline.New(),
 	}
 
 	s.readNotifier = sync.NewCond(&s.lock)
@@ -1720,7 +1766,11 @@ func (a *Association) onCumulativeTSNAckPointAdvanced(totalBytesAcked int) {
 		//      reset partial_bytes_acked to (partial_bytes_acked - cwnd).
 		if a.partialBytesAcked >= a.CWND() && a.pendingQueue.size() > 0 {
 			a.partialBytesAcked -= a.CWND()
-			a.setCWND(a.CWND() + a.MTU())
+			step := a.MTU()
+			if step < a.cwndCAStep {
+				step = a.cwndCAStep
+			}
+			a.setCWND(a.CWND() + step)
 			a.log.Tracef("[%s] updated cwnd=%d ssthresh=%d acked=%d (CA)",
 				a.name, a.CWND(), a.ssthresh, totalBytesAcked)
 		}
@@ -1728,7 +1778,7 @@ func (a *Association) onCumulativeTSNAckPointAdvanced(totalBytesAcked int) {
 }
 
 // The caller should hold the lock.
-func (a *Association) processFastRetransmission(cumTSNAckPoint, htna uint32, cumTSNAckPointAdvanced bool) error {
+func (a *Association) processFastRetransmission(cumTSNAckPoint uint32, gapAckBlocks []gapAckBlock, htna uint32, cumTSNAckPointAdvanced bool) error {
 	// HTNA algorithm - RFC 4960 Sec 7.2.4
 	// Increment missIndicator of each chunks that the SACK reported missing
 	// when either of the following is met:
@@ -1745,7 +1795,10 @@ func (a *Association) processFastRetransmission(cumTSNAckPoint, htna uint32, cum
 			maxTSN = htna
 		} else {
 			// b) increment for all TSNs reported missing
-			maxTSN = cumTSNAckPoint + uint32(a.inflightQueue.size()) + 1
+			maxTSN = cumTSNAckPoint
+			if len(gapAckBlocks) > 0 {
+				maxTSN += uint32(gapAckBlocks[len(gapAckBlocks)-1].end)
+			}
 		}
 
 		for tsn := cumTSNAckPoint + 1; sna32LT(tsn, maxTSN); tsn++ {
@@ -1855,7 +1908,7 @@ func (a *Association) handleSack(d *chunkSelectiveAck) error {
 		a.setRWND(d.advertisedReceiverWindowCredit - bytesOutstanding)
 	}
 
-	err = a.processFastRetransmission(d.cumulativeTSNAck, htna, cumTSNAckPointAdvanced)
+	err = a.processFastRetransmission(d.cumulativeTSNAck, d.gapAckBlocks, htna, cumTSNAckPointAdvanced)
 	if err != nil {
 		return err
 	}
@@ -2308,6 +2361,11 @@ func (a *Association) popPendingDataChunksToSend() ([]*chunkPayloadData, []uint1
 		}
 	}
 
+	if a.blockWrite && len(chunks) > 0 && a.pendingQueue.size() == 0 {
+		a.log.Tracef("[%s] all pending data have been sent, notify writable", a.name)
+		a.notifyBlockWritable()
+	}
+
 	return chunks, sisToReset
 }
 
@@ -2345,14 +2403,27 @@ func (a *Association) bundleDataChunksIntoPackets(chunks []*chunkPayloadData) []
 }
 
 // sendPayloadData sends the data chunks.
-func (a *Association) sendPayloadData(chunks []*chunkPayloadData) error {
+func (a *Association) sendPayloadData(ctx context.Context, chunks []*chunkPayloadData) error {
 	a.lock.Lock()
-	defer a.lock.Unlock()
 
 	state := a.getState()
 	if state != established {
+		a.lock.Unlock()
 		return fmt.Errorf("%w: state=%s", ErrPayloadDataStateNotExist,
 			getAssociationStateString(state))
+	}
+
+	if a.blockWrite {
+		for a.writePending {
+			a.lock.Unlock()
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-a.writeNotify:
+				a.lock.Lock()
+			}
+		}
+		a.writePending = true
 	}
 
 	// Push the chunks into the pending queue first.
@@ -2360,6 +2431,7 @@ func (a *Association) sendPayloadData(chunks []*chunkPayloadData) error {
 		a.pendingQueue.push(c)
 	}
 
+	a.lock.Unlock()
 	a.awakeWriteLoop()
 	return nil
 }

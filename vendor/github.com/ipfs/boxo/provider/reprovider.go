@@ -455,7 +455,7 @@ func (s *reprovider) Close() error {
 	return err
 }
 
-func (s *reprovider) Provide(cid cid.Cid) error {
+func (s *reprovider) Provide(ctx context.Context, cid cid.Cid, announce bool) error {
 	return s.q.Enqueue(cid)
 }
 

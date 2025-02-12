@@ -122,11 +122,11 @@ type Option struct {
 }
 
 // WriteThrough skips checking if the blockstore already has a block before
-// writing it.
-func WriteThrough() Option {
+// writing it, when enabled.
+func WriteThrough(enabled bool) Option {
 	return Option{
 		func(bs *blockstore) {
-			bs.writeThrough = true
+			bs.writeThrough = enabled
 		},
 	}
 }

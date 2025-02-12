@@ -8,8 +8,8 @@ package netroute
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 
@@ -58,7 +58,7 @@ func New() (routing.Router, error) {
 }
 
 func parseIPRoutes() (v4, v6 routeSlice, err error) {
-	buf, err := ioutil.ReadFile(netdir + "/iproute")
+	buf, err := os.ReadFile(netdir + "/iproute")
 	if err != nil {
 		return nil, nil, err
 	}

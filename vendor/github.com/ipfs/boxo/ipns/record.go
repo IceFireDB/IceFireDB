@@ -1,11 +1,12 @@
-//go:generate protoc -I=pb --go_out=pb pb/record.proto
 package ipns
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
+	"strings"
 	"time"
 
 	ipns_pb "github.com/ipfs/boxo/ipns/pb"
@@ -321,12 +322,12 @@ func createNode(value path.Path, seq uint64, eol time.Time, ttl time.Duration) (
 	m[cborTTLKey] = basicnode.NewInt(int64(ttl))
 	keys = append(keys, cborTTLKey)
 
-	sort.Slice(keys, func(i, j int) bool {
-		li, lj := len(keys[i]), len(keys[j])
-		if li == lj {
-			return keys[i] < keys[j]
+	slices.SortFunc(keys, func(a, b string) int {
+		la, lb := len(a), len(b)
+		if la == lb {
+			return strings.Compare(a, b)
 		}
-		return li < lj
+		return cmp.Compare(la, lb)
 	})
 
 	newNd := basicnode.Prototype__Map{}.NewBuilder()

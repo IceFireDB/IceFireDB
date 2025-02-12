@@ -25,6 +25,8 @@ import (
 // FilestorePrefix identifies the key prefix for FileManager blocks.
 var FilestorePrefix = ds.NewKey("filestore")
 
+type Option func(*FileManager)
+
 // FileManager is a blockstore implementation which stores special
 // blocks FilestoreNode type. These nodes only contain a reference
 // to the actual location of the block data in the filesystem
@@ -34,6 +36,7 @@ type FileManager struct {
 	AllowUrls  bool
 	ds         ds.Batching
 	root       string
+	makeReader func(path string) (FileReader, error)
 }
 
 // CorruptReferenceError implements the error interface.
@@ -51,11 +54,32 @@ func (c CorruptReferenceError) Error() string {
 	return c.Err.Error()
 }
 
+// WithMMapReader sets the FileManager's reader factory to use memory-mapped file I/O.
+// On Windows, when reading and writing to a file simultaneously, the system would consume
+// a significant amount of memory due to caching. This memory usage is not reflected in
+// the application but in the system. Using memory-mapped files (implemented with
+// CreateFileMapping on Windows) avoids this issue.
+func WithMMapReader() Option {
+	return func(f *FileManager) {
+		f.makeReader = newMmapReader
+	}
+}
+
 // NewFileManager initializes a new file manager with the given
 // datastore and root. All FilestoreNodes paths are relative to the
 // root path given here, which is prepended for any operations.
-func NewFileManager(ds ds.Batching, root string) *FileManager {
-	return &FileManager{ds: dsns.Wrap(ds, FilestorePrefix), root: root}
+func NewFileManager(ds ds.Batching, root string, options ...Option) *FileManager {
+	f := &FileManager{
+		ds:         dsns.Wrap(ds, FilestorePrefix),
+		root:       root,
+		makeReader: newStdReader,
+	}
+
+	for _, option := range options {
+		option(f)
+	}
+
+	return f
 }
 
 // AllKeysChan returns a channel from which to read the keys stored in
@@ -175,7 +199,7 @@ func (f *FileManager) readFileDataObj(m mh.Multihash, d *pb.DataObj) ([]byte, er
 	p := filepath.FromSlash(d.GetFilePath())
 	abspath := filepath.Join(f.root, p)
 
-	fi, err := os.Open(abspath)
+	fi, err := f.makeReader(abspath)
 	if os.IsNotExist(err) {
 		return nil, &CorruptReferenceError{StatusFileNotFound, err}
 	} else if err != nil {
@@ -183,13 +207,8 @@ func (f *FileManager) readFileDataObj(m mh.Multihash, d *pb.DataObj) ([]byte, er
 	}
 	defer fi.Close()
 
-	_, err = fi.Seek(int64(d.GetOffset()), io.SeekStart)
-	if err != nil {
-		return nil, &CorruptReferenceError{StatusFileError, err}
-	}
-
 	outbuf := make([]byte, d.GetSize_())
-	_, err = io.ReadFull(fi, outbuf)
+	_, err = fi.ReadAt(outbuf, int64(d.GetOffset()))
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		return nil, &CorruptReferenceError{StatusFileChanged, err}
 	} else if err != nil {

@@ -707,11 +707,19 @@ func (p *pinner) streamIndex(ctx context.Context, index dsindex.Indexer, detaile
 		defer p.lock.RUnlock()
 
 		cidSet := cid.NewSet()
+		send := func(sp ipfspinner.StreamedPin) (ok bool) {
+			select {
+			case <-ctx.Done():
+				return false
+			case out <- sp:
+				return true
+			}
+		}
 
 		err := index.ForEach(ctx, "", func(key, value string) bool {
 			c, err := cid.Cast([]byte(key))
 			if err != nil {
-				out <- ipfspinner.StreamedPin{Err: err}
+				send(ipfspinner.StreamedPin{Err: err})
 				return false
 			}
 
@@ -719,7 +727,7 @@ func (p *pinner) streamIndex(ctx context.Context, index dsindex.Indexer, detaile
 			if detailed {
 				pp, err := p.loadPin(ctx, value)
 				if err != nil {
-					out <- ipfspinner.StreamedPin{Err: err}
+					send(ipfspinner.StreamedPin{Err: err})
 					return false
 				}
 
@@ -731,17 +739,16 @@ func (p *pinner) streamIndex(ctx context.Context, index dsindex.Indexer, detaile
 			}
 
 			if !cidSet.Has(c) {
-				select {
-				case <-ctx.Done():
+				if !send(ipfspinner.StreamedPin{Pin: pin}) {
 					return false
-				case out <- ipfspinner.StreamedPin{Pin: pin}:
 				}
 				cidSet.Add(c)
 			}
 			return true
 		})
 		if err != nil {
-			out <- ipfspinner.StreamedPin{Err: err}
+			send(ipfspinner.StreamedPin{Err: err})
+			return
 		}
 	}()
 

@@ -270,10 +270,9 @@ func (fi *File) setNodeData(data []byte) error {
 	}
 
 	fi.nodeLock.Lock()
-	defer fi.nodeLock.Unlock()
 	fi.node = nd
 	parent := fi.inode.parent
 	name := fi.inode.name
-
+	fi.nodeLock.Unlock()
 	return parent.updateChildEntry(child{name, fi.node})
 }
