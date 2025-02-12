@@ -15,20 +15,21 @@ import (
 	"github.com/multiformats/go-multihash"
 
 	"github.com/libp2p/go-libp2p-routing-helpers/tracing"
+	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	swarm "github.com/libp2p/go-libp2p/p2p/net/swarm"
 
-	"github.com/gogo/protobuf/proto"
-	u "github.com/ipfs/boxo/util"
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	logging "github.com/ipfs/go-log/v2"
+	"google.golang.org/protobuf/proto"
 
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/crawler"
@@ -51,8 +52,10 @@ import (
 
 var logger = logging.Logger("fullrtdht")
 
-const tracer = tracing.Tracer("go-libp2p-kad-dht/fullrt")
-const dhtName = "FullRT"
+const (
+	tracer  = tracing.Tracer("go-libp2p-kad-dht/fullrt")
+	dhtName = "FullRT"
+)
 
 const rtRefreshLimitsMsg = `Accelerated DHT client was unable to fully refresh its routing table due to Resource Manager limits, which may degrade content routing. Consider increasing resource limits. See debug logs for the "dht-crawler" subsystem for details.`
 
@@ -98,6 +101,8 @@ type FullRT struct {
 	bulkSendParallelism int
 
 	self peer.ID
+
+	peerConnectednessSubscriber event.Subscription
 }
 
 // NewFullRT creates a DHT client that tracks the full network. It takes a protocol prefix for the given network,
@@ -151,6 +156,11 @@ func NewFullRT(h host.Host, protocolPrefix protocol.ID, options ...Option) (*Ful
 		}
 	}
 
+	sub, err := h.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged), eventbus.Name("fullrt-dht"))
+	if err != nil {
+		return nil, fmt.Errorf("peer connectedness subscription failed: %w", err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	self := h.ID()
@@ -195,20 +205,45 @@ func NewFullRT(h host.Host, protocolPrefix protocol.ID, options ...Option) (*Ful
 
 		crawlerInterval: fullrtcfg.crawlInterval,
 
-		bulkSendParallelism: fullrtcfg.bulkSendParallelism,
-
-		self: self,
+		bulkSendParallelism:         fullrtcfg.bulkSendParallelism,
+		self:                        self,
+		peerConnectednessSubscriber: sub,
 	}
 
-	rt.wg.Add(1)
+	rt.wg.Add(2)
 	go rt.runCrawler(ctx)
-
+	go rt.runSubscriber()
 	return rt, nil
 }
 
 type crawlVal struct {
 	addrs []multiaddr.Multiaddr
 	key   kadkey.Key
+}
+
+func (dht *FullRT) runSubscriber() {
+	defer dht.wg.Done()
+	ms, ok := dht.messageSender.(dht_pb.MessageSenderWithDisconnect)
+	defer dht.peerConnectednessSubscriber.Close()
+	if !ok {
+		return
+	}
+	for {
+		select {
+		case e := <-dht.peerConnectednessSubscriber.Out():
+			pc, ok := e.(event.EvtPeerConnectednessChanged)
+			if !ok {
+				logger.Errorf("invalid event message type: %T", e)
+				continue
+			}
+
+			if pc.Connectedness != network.Connected {
+				ms.OnDisconnect(dht.ctx, pc.Peer)
+			}
+		case <-dht.ctx.Done():
+			return
+		}
+	}
 }
 
 func (dht *FullRT) TriggerRefresh(ctx context.Context) error {
@@ -496,7 +531,7 @@ func (dht *FullRT) PutValue(ctx context.Context, key string, value []byte, opts 
 	}
 
 	rec := record.MakePutRecord(key, value)
-	rec.TimeReceived = u.FormatRFC3339(time.Now())
+	rec.TimeReceived = internal.FormatRFC3339(time.Now())
 	err = dht.putLocal(ctx, key, rec)
 	if err != nil {
 		return err
@@ -622,7 +657,8 @@ func (dht *FullRT) SearchValue(ctx context.Context, key string, opts ...routing.
 }
 
 func (dht *FullRT) searchValueQuorum(ctx context.Context, key string, valCh <-chan RecvdVal, stopCh chan struct{},
-	out chan<- []byte, nvals int) ([]byte, map[peer.ID]struct{}, bool) {
+	out chan<- []byte, nvals int,
+) ([]byte, map[peer.ID]struct{}, bool) {
 	numResponses := 0
 	return dht.processValues(ctx, key, valCh,
 		func(ctx context.Context, v RecvdVal, better bool) bool {
@@ -644,7 +680,8 @@ func (dht *FullRT) searchValueQuorum(ctx context.Context, key string, valCh <-ch
 }
 
 func (dht *FullRT) processValues(ctx context.Context, key string, vals <-chan RecvdVal,
-	newVal func(ctx context.Context, v RecvdVal, better bool) bool) (best []byte, peersWithBest map[peer.ID]struct{}, aborted bool) {
+	newVal func(ctx context.Context, v RecvdVal, better bool) bool,
+) (best []byte, peersWithBest map[peer.ID]struct{}, aborted bool) {
 loop:
 	for {
 		if aborted {

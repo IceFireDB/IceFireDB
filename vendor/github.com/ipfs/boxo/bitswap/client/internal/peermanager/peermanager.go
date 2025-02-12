@@ -42,7 +42,7 @@ type PeerManager struct {
 	createPeerQueue PeerQueueFactory
 	ctx             context.Context
 
-	psLk         sync.Mutex
+	psLk         sync.RWMutex
 	sessions     map[uint64]Session
 	peerSessions map[peer.ID]map[uint64]struct{}
 
@@ -121,9 +121,9 @@ func (pm *PeerManager) Disconnected(p peer.ID) {
 // ks is the set of blocks, HAVEs and DONT_HAVEs in the message
 // Note that this is just used to calculate latency.
 func (pm *PeerManager) ResponseReceived(p peer.ID, ks []cid.Cid) {
-	pm.pqLk.Lock()
+	pm.pqLk.RLock()
 	pq, ok := pm.peerQueues[p]
-	pm.pqLk.Unlock()
+	pm.pqLk.RUnlock()
 
 	if ok {
 		pq.ResponseReceived(ks)
@@ -143,13 +143,15 @@ func (pm *PeerManager) BroadcastWantHaves(ctx context.Context, wantHaves []cid.C
 
 // SendWants sends the given want-blocks and want-haves to the given peer.
 // It filters out wants that have previously been sent to the peer.
-func (pm *PeerManager) SendWants(ctx context.Context, p peer.ID, wantBlocks []cid.Cid, wantHaves []cid.Cid) {
+func (pm *PeerManager) SendWants(ctx context.Context, p peer.ID, wantBlocks []cid.Cid, wantHaves []cid.Cid) bool {
 	pm.pqLk.Lock()
 	defer pm.pqLk.Unlock()
 
-	if _, ok := pm.peerQueues[p]; ok {
-		pm.pwm.sendWants(p, wantBlocks, wantHaves)
+	if _, ok := pm.peerQueues[p]; !ok {
+		return false
 	}
+	pm.pwm.sendWants(p, wantBlocks, wantHaves)
+	return true
 }
 
 // SendCancels sends cancels for the given keys to all peers who had previously
@@ -231,8 +233,8 @@ func (pm *PeerManager) UnregisterSession(ses uint64) {
 // signalAvailability is called when a peer's connectivity changes.
 // It informs interested sessions.
 func (pm *PeerManager) signalAvailability(p peer.ID, isConnected bool) {
-	pm.psLk.Lock()
-	defer pm.psLk.Unlock()
+	pm.psLk.RLock()
+	defer pm.psLk.RUnlock()
 
 	sesIds, ok := pm.peerSessions[p]
 	if !ok {

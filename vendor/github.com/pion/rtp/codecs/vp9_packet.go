@@ -81,12 +81,12 @@ func (p *VP9Payloader) payloadFlexible(mtu uint16, payload []byte) [][]byte {
 	payloadDataIndex := 0
 	var payloads [][]byte
 
-	if min(maxFragmentSize, payloadDataRemaining) <= 0 {
+	if minInt(maxFragmentSize, payloadDataRemaining) <= 0 {
 		return [][]byte{}
 	}
 
 	for payloadDataRemaining > 0 {
-		currentFragmentSize := min(maxFragmentSize, payloadDataRemaining)
+		currentFragmentSize := minInt(maxFragmentSize, payloadDataRemaining)
 		out := make([]byte, headerSize+currentFragmentSize)
 
 		out[0] = 0x90 // F=1, I=1
@@ -149,7 +149,7 @@ func (p *VP9Payloader) payloadNonFlexible(mtu uint16, payload []byte) [][]byte {
 		}
 
 		maxFragmentSize := int(mtu) - headerSize
-		currentFragmentSize := min(maxFragmentSize, payloadDataRemaining)
+		currentFragmentSize := minInt(maxFragmentSize, payloadDataRemaining)
 		if currentFragmentSize <= 0 {
 			return [][]byte{}
 		}

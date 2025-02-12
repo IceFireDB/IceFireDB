@@ -138,12 +138,12 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 		naluLength := len(nalu) - naluIndex
 		naluRemaining := naluLength
 
-		if min(maxFragmentSize, naluRemaining) <= 0 {
+		if minInt(maxFragmentSize, naluRemaining) <= 0 {
 			return
 		}
 
 		for naluRemaining > 0 {
-			currentFragmentSize := min(maxFragmentSize, naluRemaining)
+			currentFragmentSize := minInt(maxFragmentSize, naluRemaining)
 			out := make([]byte, fuaHeaderSize+currentFragmentSize)
 
 			// +---------------+

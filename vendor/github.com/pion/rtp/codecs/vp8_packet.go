@@ -56,12 +56,12 @@ func (p *VP8Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 	var payloads [][]byte
 
 	// Make sure the fragment/payload size is correct
-	if min(maxFragmentSize, payloadDataRemaining) <= 0 {
+	if minInt(maxFragmentSize, payloadDataRemaining) <= 0 {
 		return payloads
 	}
 	first := true
 	for payloadDataRemaining > 0 {
-		currentFragmentSize := min(maxFragmentSize, payloadDataRemaining)
+		currentFragmentSize := minInt(maxFragmentSize, payloadDataRemaining)
 		out := make([]byte, usingHeaderSize+currentFragmentSize)
 
 		if first {

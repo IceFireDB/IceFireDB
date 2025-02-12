@@ -49,7 +49,7 @@ func AddFiltersToURL(baseURL string, protocolFilter, addrFilter []string) string
 	return parsedURL.String()
 }
 
-// applyFiltersToIter applies the filters to the given iterator and returns a new iterator.
+// ApplyFiltersToIter applies the filters to the given iterator and returns a new iterator.
 //
 // The function iterates over the input iterator, applying the specified filters to each record.
 // It supports both positive and negative filters for both addresses and protocols.

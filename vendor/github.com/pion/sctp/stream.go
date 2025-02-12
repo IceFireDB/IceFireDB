@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/pion/logging"
+	"github.com/pion/transport/v3/deadline"
 )
 
 const (
@@ -65,6 +66,8 @@ type Stream struct {
 	readNotifier        *sync.Cond
 	readErr             error
 	readTimeoutCancel   chan struct{}
+	writeDeadline       *deadline.Deadline
+	writeLock           sync.Mutex
 	unordered           bool
 	reliabilityType     byte
 	reliabilityValue    uint32
@@ -272,16 +275,45 @@ func (s *Stream) WriteSCTP(p []byte, ppi PayloadProtocolIdentifier) (int, error)
 		return 0, ErrStreamClosed
 	}
 
-	chunks := s.packetize(p, ppi)
-	n := len(p)
-	err := s.association.sendPayloadData(chunks)
-	if err != nil {
-		return n, ErrStreamClosed
+	// the send could fail if the association is blocked for writing (timeout), it will left a hole
+	// in the stream sequence number space, so we need to lock the write to avoid concurrent send and decrement
+	// the sequence number in case of failure
+	if s.association.isBlockWrite() {
+		s.writeLock.Lock()
 	}
-	return n, nil
+	chunks, unordered := s.packetize(p, ppi)
+	n := len(p)
+	err := s.association.sendPayloadData(s.writeDeadline, chunks)
+	if err != nil {
+		s.lock.Lock()
+		s.bufferedAmount -= uint64(n)
+		if !unordered {
+			s.sequenceNumber--
+		}
+		s.lock.Unlock()
+		n = 0
+	}
+	if s.association.isBlockWrite() {
+		s.writeLock.Unlock()
+	}
+	return n, err
 }
 
-func (s *Stream) packetize(raw []byte, ppi PayloadProtocolIdentifier) []*chunkPayloadData {
+// SetWriteDeadline sets the write deadline in an identical way to net.Conn, it will only work for blocking writes
+func (s *Stream) SetWriteDeadline(deadline time.Time) error {
+	s.writeDeadline.Set(deadline)
+	return nil
+}
+
+// SetDeadline sets the read and write deadlines in an identical way to net.Conn
+func (s *Stream) SetDeadline(t time.Time) error {
+	if err := s.SetReadDeadline(t); err != nil {
+		return err
+	}
+	return s.SetWriteDeadline(t)
+}
+
+func (s *Stream) packetize(raw []byte, ppi PayloadProtocolIdentifier) ([]*chunkPayloadData, bool) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -336,7 +368,7 @@ func (s *Stream) packetize(raw []byte, ppi PayloadProtocolIdentifier) []*chunkPa
 	s.bufferedAmount += uint64(len(raw))
 	s.log.Tracef("[%s] bufferedAmount = %d", s.name, s.bufferedAmount)
 
-	return chunks
+	return chunks, unordered
 }
 
 // Close closes the write-direction of the stream.

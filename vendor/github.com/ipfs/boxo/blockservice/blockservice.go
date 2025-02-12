@@ -85,10 +85,10 @@ type blockService struct {
 type Option func(*blockService)
 
 // WriteThrough disable cache checks for writes and make them go straight to
-// the blockstore.
-func WriteThrough() Option {
+// the blockstore, when enabled.
+func WriteThrough(enabled bool) Option {
 	return func(bs *blockService) {
-		bs.checkFirst = false
+		bs.checkFirst = !enabled
 	}
 }
 

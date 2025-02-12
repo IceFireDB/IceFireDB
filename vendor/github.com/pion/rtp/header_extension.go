@@ -163,7 +163,7 @@ type TwoByteHeaderExtension struct {
 
 // Set sets the extension payload for the specified ID.
 func (e *TwoByteHeaderExtension) Set(id uint8, buf []byte) error {
-	if id < 1 || id > 255 {
+	if id < 1 {
 		return fmt.Errorf("%w actual(%d)", errRFC8285TwoByteHeaderIDRange, id)
 	}
 	if len(buf) > 255 {

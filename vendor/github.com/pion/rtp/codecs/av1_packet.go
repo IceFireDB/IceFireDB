@@ -61,7 +61,7 @@ func (p *AV1Payloader) Payload(mtu uint16, payload []byte) (payloads [][]byte) {
 			metadataSize += leb128Size + len(p.sequenceHeader)
 		}
 
-		out := make([]byte, min(int(mtu), payloadDataRemaining+metadataSize))
+		out := make([]byte, minInt(int(mtu), payloadDataRemaining+metadataSize))
 		outOffset := av1PayloaderHeadersize
 		out[0] = obuCount << wBitshift
 

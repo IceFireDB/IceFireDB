@@ -170,10 +170,15 @@ func (i *handler) serveCodecHTML(ctx context.Context, w http.ResponseWriter, r *
 		suffix := "/"
 		// preserve query parameters
 		if r.URL.RawQuery != "" {
-			suffix = suffix + "?" + r.URL.RawQuery
+			suffix = suffix + "?" + url.PathEscape(r.URL.RawQuery)
+		}
+		// Re-escape path instead of reusing RawPath to avod mix of lawer
+		// and upper hex that may come from RawPath.
+		if strings.ContainsRune(requestURI.RawPath, '%') {
+			requestURI.RawPath = ""
 		}
 		// /ipfs/cid/foo?bar must be redirected to /ipfs/cid/foo/?bar
-		redirectURL := requestURI.Path + suffix
+		redirectURL := requestURI.EscapedPath() + suffix
 		http.Redirect(w, r, redirectURL, http.StatusMovedPermanently)
 		return true
 	}
