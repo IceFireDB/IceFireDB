@@ -2,8 +2,6 @@ package query
 
 import (
 	"path"
-
-	goprocess "github.com/jbenet/goprocess"
 )
 
 // NaiveFilter applies a filter to the results.
@@ -84,35 +82,32 @@ func NaiveOrder(qr Results, orders ...Order) Results {
 		return qr
 	}
 
-	return ResultsWithProcess(qr.Query(), func(worker goprocess.Process, out chan<- Result) {
-		defer qr.Close()
-		var entries []Entry
-	collect:
-		for {
-			select {
-			case <-worker.Closing():
-				return
-			case e, ok := <-qr.Next():
-				if !ok {
-					break collect
-				}
-				if e.Error != nil {
-					out <- e
-					continue
-				}
-				entries = append(entries, e.Entry)
-			}
+	var entries []Entry
+	var errs []Result
+	for res := range qr.Next() {
+		if res.Error != nil {
+			errs = append(errs, res)
+			continue
 		}
+		entries = append(entries, res.Entry)
+	}
 
-		Sort(orders, entries)
+	Sort(orders, entries)
 
-		for _, e := range entries {
-			select {
-			case <-worker.Closing():
-				return
-			case out <- Result{Entry: e}:
+	return ResultsFromIterator(qr.Query(), Iterator{
+		Next: func() (Result, bool) {
+			if len(errs) != 0 {
+				errResult := errs[0]
+				errs = errs[1:]
+				return errResult, true
 			}
-		}
+			if len(entries) == 0 {
+				return Result{}, false
+			}
+			next := entries[0]
+			entries = entries[1:]
+			return Result{Entry: next}, true
+		},
 	})
 }
 

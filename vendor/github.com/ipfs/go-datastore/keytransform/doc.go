@@ -6,20 +6,19 @@
 // A KeyTransform is simply an interface with two functions, a conversion and
 // its inverse. For example:
 //
-//   import (
-//     ktds "github.com/ipfs/go-datastore/keytransform"
-//     ds "github.com/ipfs/go-datastore"
-//   )
+//	import (
+//	  ktds "github.com/ipfs/go-datastore/keytransform"
+//	  ds "github.com/ipfs/go-datastore"
+//	)
 //
-//   func reverseKey(k ds.Key) ds.Key {
-//     return k.Reverse()
-//   }
+//	func reverseKey(k ds.Key) ds.Key {
+//	  return k.Reverse()
+//	}
 //
-//   func invertKeys(d ds.Datastore) {
-//     return ktds.Wrap(d, &ktds.Pair{
-//       Convert: reverseKey,
-//       Invert: reverseKey,  // reverse is its own inverse.
-//     })
-//   }
-//
+//	func invertKeys(d ds.Datastore) {
+//	  return ktds.Wrap(d, &ktds.Pair{
+//	    Convert: reverseKey,
+//	    Invert: reverseKey,  // reverse is its own inverse.
+//	  })
+//	}
 package keytransform
