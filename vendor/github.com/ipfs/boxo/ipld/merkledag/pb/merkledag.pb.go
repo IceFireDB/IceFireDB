@@ -448,7 +448,7 @@ func (m *PBLink) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if m.Tsize != nil {
-		i = encodeVarintMerkledag(dAtA, i, uint64(*m.Tsize))
+		i = encodeVarintMerkledag(dAtA, i, *m.Tsize)
 		i--
 		dAtA[i] = 0x18
 	}
@@ -539,11 +539,11 @@ func NewPopulatedPBLink(r randyMerkledag, easy bool) *PBLink {
 		}
 	}
 	if r.Intn(5) != 0 {
-		v2 := string(randStringMerkledag(r))
+		v2 := randStringMerkledag(r)
 		this.Name = &v2
 	}
 	if r.Intn(5) != 0 {
-		v3 := uint64(uint64(r.Uint32()))
+		v3 := uint64(r.Uint32())
 		this.Tsize = &v3
 	}
 	if !easy && r.Intn(10) != 0 {
@@ -644,7 +644,7 @@ func randFieldMerkledag(dAtA []byte, r randyMerkledag, fieldNumber int, wire int
 
 func encodeVarintPopulateMerkledag(dAtA []byte, v uint64) []byte {
 	for v >= 1<<7 {
-		dAtA = append(dAtA, uint8(uint64(v)&0x7f|0x80))
+		dAtA = append(dAtA, uint8(v&0x7f|0x80))
 		v >>= 7
 	}
 	dAtA = append(dAtA, uint8(v))
@@ -666,7 +666,7 @@ func (m *PBLink) Size() (n int) {
 		n += 1 + l + sovMerkledag(uint64(l))
 	}
 	if m.Tsize != nil {
-		n += 1 + sovMerkledag(uint64(*m.Tsize))
+		n += 1 + sovMerkledag(*m.Tsize)
 	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)

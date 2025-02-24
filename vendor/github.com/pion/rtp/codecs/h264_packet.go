@@ -9,7 +9,7 @@ import (
 	"fmt"
 )
 
-// H264Payloader payloads H264 packets
+// H264Payloader payloads H264 packets.
 type H264Payloader struct {
 	spsNalu, ppsNalu []byte
 }
@@ -54,6 +54,7 @@ func emitNalus(nals []byte, emit func([]byte)) {
 		}
 		if end == -1 {
 			emit(nals[start:])
+
 			break
 		}
 
@@ -64,8 +65,8 @@ func emitNalus(nals []byte, emit func([]byte)) {
 	}
 }
 
-// Payload fragments a H264 packet across one or more byte arrays
-func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
+// Payload fragments a H264 packet across one or more byte arrays.
+func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte { //nolint:cyclop
 	var payloads [][]byte
 	if len(payload) == 0 {
 		return payloads
@@ -84,17 +85,19 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 			return
 		case naluType == spsNALUType:
 			p.spsNalu = nalu
+
 			return
 		case naluType == ppsNALUType:
 			p.ppsNalu = nalu
+
 			return
 		case p.spsNalu != nil && p.ppsNalu != nil:
 			// Pack current NALU with SPS and PPS as STAP-A
 			spsLen := make([]byte, 2)
-			binary.BigEndian.PutUint16(spsLen, uint16(len(p.spsNalu)))
+			binary.BigEndian.PutUint16(spsLen, uint16(len(p.spsNalu))) // nolint: gosec // G115
 
 			ppsLen := make([]byte, 2)
-			binary.BigEndian.PutUint16(ppsLen, uint16(len(p.ppsNalu)))
+			binary.BigEndian.PutUint16(ppsLen, uint16(len(p.ppsNalu))) // nolint: gosec // G115
 
 			stapANalu := []byte{outputStapAHeader}
 			stapANalu = append(stapANalu, spsLen...)
@@ -116,6 +119,7 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 			out := make([]byte, len(nalu))
 			copy(out, nalu)
 			payloads = append(payloads, out)
+
 			return
 		}
 
@@ -138,12 +142,12 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 		naluLength := len(nalu) - naluIndex
 		naluRemaining := naluLength
 
-		if min(maxFragmentSize, naluRemaining) <= 0 {
+		if minInt(maxFragmentSize, naluRemaining) <= 0 {
 			return
 		}
 
 		for naluRemaining > 0 {
-			currentFragmentSize := min(maxFragmentSize, naluRemaining)
+			currentFragmentSize := minInt(maxFragmentSize, naluRemaining)
 			out := make([]byte, fuaHeaderSize+currentFragmentSize)
 
 			// +---------------+
@@ -180,7 +184,7 @@ func (p *H264Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 	return payloads
 }
 
-// H264Packet represents the H264 header that is stored in the payload of an RTP Packet
+// H264Packet represents the H264 header that is stored in the payload of an RTP Packet.
 type H264Packet struct {
 	IsAVC     bool
 	fuaBuffer []byte
@@ -190,23 +194,25 @@ type H264Packet struct {
 
 func (p *H264Packet) doPackaging(buf, nalu []byte) []byte {
 	if p.IsAVC {
-		buf = binary.BigEndian.AppendUint32(buf, uint32(len(nalu)))
+		buf = binary.BigEndian.AppendUint32(buf, uint32(len(nalu))) // nolint: gosec // G115 false positive
 		buf = append(buf, nalu...)
+
 		return buf
 	}
 
 	buf = append(buf, annexbNALUStartCode...)
 	buf = append(buf, nalu...)
+
 	return buf
 }
 
 // IsDetectedFinalPacketInSequence returns true of the packet passed in has the
-// marker bit set indicated the end of a packet sequence
+// marker bit set indicated the end of a packet sequence.
 func (p *H264Packet) IsDetectedFinalPacketInSequence(rtpPacketMarketBit bool) bool {
 	return rtpPacketMarketBit
 }
 
-// Unmarshal parses the passed byte slice and stores the result in the H264Packet this method is called upon
+// Unmarshal parses the passed byte slice and stores the result in the H264Packet this method is called upon.
 func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 	if p.zeroAllocation {
 		return payload, nil
@@ -215,7 +221,7 @@ func (p *H264Packet) Unmarshal(payload []byte) ([]byte, error) {
 	return p.parseBody(payload)
 }
 
-func (p *H264Packet) parseBody(payload []byte) ([]byte, error) {
+func (p *H264Packet) parseBody(payload []byte) ([]byte, error) { //nolint:cyclop
 	if len(payload) == 0 {
 		return nil, fmt.Errorf("%w: %d <=0", errShortPacket, len(payload))
 	}
@@ -239,12 +245,18 @@ func (p *H264Packet) parseBody(payload []byte) ([]byte, error) {
 			currOffset += stapaNALULengthSize
 
 			if len(payload) < currOffset+naluSize {
-				return nil, fmt.Errorf("%w STAP-A declared size(%d) is larger than buffer(%d)", errShortPacket, naluSize, len(payload)-currOffset)
+				return nil, fmt.Errorf(
+					"%w STAP-A declared size(%d) is larger than buffer(%d)",
+					errShortPacket,
+					naluSize,
+					len(payload)-currOffset,
+				)
 			}
 
 			result = p.doPackaging(result, payload[currOffset:currOffset+naluSize])
 			currOffset += naluSize
 		}
+
 		return result, nil
 
 	case naluType == fuaNALUType:
@@ -265,6 +277,7 @@ func (p *H264Packet) parseBody(payload []byte) ([]byte, error) {
 			nalu := append([]byte{}, naluRefIdc|fragmentedNaluType)
 			nalu = append(nalu, p.fuaBuffer...)
 			p.fuaBuffer = nil
+
 			return p.doPackaging(nil, nalu), nil
 		}
 
@@ -276,12 +289,12 @@ func (p *H264Packet) parseBody(payload []byte) ([]byte, error) {
 
 // H264PartitionHeadChecker checks H264 partition head.
 //
-// Deprecated: replaced by H264Packet.IsPartitionHead()
+// Deprecated: replaced by H264Packet.IsPartitionHead().
 type H264PartitionHeadChecker struct{}
 
 // IsPartitionHead checks if this is the head of a packetized nalu stream.
 //
-// Deprecated: replaced by H264Packet.IsPartitionHead()
+// Deprecated: replaced by H264Packet.IsPartitionHead().
 func (*H264PartitionHeadChecker) IsPartitionHead(packet []byte) bool {
 	return (&H264Packet{}).IsPartitionHead(packet)
 }

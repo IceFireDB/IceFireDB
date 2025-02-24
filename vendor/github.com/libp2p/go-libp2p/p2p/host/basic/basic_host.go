@@ -271,7 +271,7 @@ func NewHost(n network.Network, opts *HostOpts) (*BasicHost, error) {
 		h.hps, err = holepunch.NewService(h, h.ids, func() []ma.Multiaddr {
 			addrs := h.AllAddrs()
 			if opts.AddrsFactory != nil {
-				addrs = opts.AddrsFactory(addrs)
+				addrs = slices.Clone(opts.AddrsFactory(addrs))
 			}
 			// AllAddrs may ignore observed addresses in favour of NAT mappings. Use both for hole punching.
 			addrs = append(addrs, h.ids.OwnObservedAddrs()...)
@@ -464,7 +464,7 @@ func (h *BasicHost) newStreamHandler(s network.Stream) {
 		} else {
 			log.Debugf("protocol mux failed: %s (took %s, id:%s, remote peer:%s, remote addr:%v)", err, took, s.ID(), s.Conn().RemotePeer(), s.Conn().RemoteMultiaddr())
 		}
-		s.Reset()
+		s.ResetWithError(network.StreamProtocolNegotiationFailed)
 		return
 	}
 
@@ -478,7 +478,7 @@ func (h *BasicHost) newStreamHandler(s network.Stream) {
 
 	if err := s.SetProtocol(protoID); err != nil {
 		log.Debugf("error setting stream protocol: %s", err)
-		s.Reset()
+		s.ResetWithError(network.StreamResourceLimitExceeded)
 		return
 	}
 
@@ -717,7 +717,7 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 	}
 	defer func() {
 		if strErr != nil && s != nil {
-			s.Reset()
+			s.ResetWithError(network.StreamProtocolNegotiationFailed)
 		}
 	}()
 
@@ -761,13 +761,14 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 			return nil, fmt.Errorf("failed to negotiate protocol: %w", err)
 		}
 	case <-ctx.Done():
-		s.Reset()
+		s.ResetWithError(network.StreamProtocolNegotiationFailed)
 		// wait for `SelectOneOf` to error out because of resetting the stream.
 		<-errCh
 		return nil, fmt.Errorf("failed to negotiate protocol: %w", ctx.Err())
 	}
 
 	if err := s.SetProtocol(selected); err != nil {
+		s.ResetWithError(network.StreamResourceLimitExceeded)
 		return nil, err
 	}
 	_ = h.Peerstore().AddProtocols(p, selected) // adding the protocol to the peerstore isn't critical
@@ -841,12 +842,10 @@ func (h *BasicHost) ConnManager() connmgr.ConnManager {
 // When used with AutoRelay, and if the host is not publicly reachable,
 // this will only have host's private, relay, and no public addresses.
 func (h *BasicHost) Addrs() []ma.Multiaddr {
-	addrs := h.AddrsFactory(h.AllAddrs())
 	// Make a copy. Consumers can modify the slice elements
-	res := make([]ma.Multiaddr, len(addrs))
-	copy(res, addrs)
+	addrs := slices.Clone(h.AddrsFactory(h.AllAddrs()))
 	// Add certhashes for the addresses provided by the user via address factory.
-	return h.addCertHashes(ma.Unique(res))
+	return h.addCertHashes(ma.Unique(addrs))
 }
 
 // NormalizeMultiaddr returns a multiaddr suitable for equality checks.

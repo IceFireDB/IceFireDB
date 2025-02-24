@@ -19,6 +19,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/record"
 	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
+	useragent "github.com/libp2p/go-libp2p/p2p/protocol/identify/internal/user-agent"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify/pb"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -53,8 +54,6 @@ const (
 	recentlyConnectedPeerMaxAddrs = 20
 	connectedPeerMaxAddrs         = 500
 )
-
-var defaultUserAgent = "github.com/libp2p/go-libp2p"
 
 type identifySnapshot struct {
 	seq       uint64
@@ -188,7 +187,7 @@ func NewIDService(h host.Host, opts ...Option) (*idService, error) {
 		opt(&cfg)
 	}
 
-	userAgent := defaultUserAgent
+	userAgent := useragent.DefaultUserAgent()
 	if cfg.userAgent != "" {
 		userAgent = cfg.userAgent
 	}
@@ -347,7 +346,8 @@ func (ids *idService) sendPushes(ctx context.Context) {
 			defer func() { <-sem }()
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			str, err := ids.Host.NewStream(ctx, c.RemotePeer(), IDPush)
+
+			str, err := newStreamAndNegotiate(ctx, c, IDPush)
 			if err != nil { // connection might have been closed recently
 				return
 			}
@@ -437,25 +437,37 @@ func (ids *idService) IdentifyWait(c network.Conn) <-chan struct{} {
 	return e.IdentifyWaitChan
 }
 
-func (ids *idService) identifyConn(c network.Conn) error {
-	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
-	defer cancel()
+// newStreamAndNegotiate opens a new stream on the given connection and negotiates the given protocol.
+func newStreamAndNegotiate(ctx context.Context, c network.Conn, proto protocol.ID) (network.Stream, error) {
 	s, err := c.NewStream(network.WithAllowLimitedConn(ctx, "identify"))
 	if err != nil {
 		log.Debugw("error opening identify stream", "peer", c.RemotePeer(), "error", err)
-		return err
+		return nil, err
 	}
-	s.SetDeadline(time.Now().Add(Timeout))
 
-	if err := s.SetProtocol(ID); err != nil {
+	// Ignore the error. Consistent with our previous behavior. (See https://github.com/libp2p/go-libp2p/issues/3109)
+	_ = s.SetDeadline(time.Now().Add(Timeout))
+
+	if err := s.SetProtocol(proto); err != nil {
 		log.Warnf("error setting identify protocol for stream: %s", err)
-		s.Reset()
+		_ = s.Reset()
 	}
 
 	// ok give the response to our handler.
-	if err := msmux.SelectProtoOrFail(ID, s); err != nil {
+	if err := msmux.SelectProtoOrFail(proto, s); err != nil {
 		log.Infow("failed negotiate identify protocol with peer", "peer", c.RemotePeer(), "error", err)
-		s.Reset()
+		_ = s.Reset()
+		return nil, err
+	}
+	return s, nil
+}
+
+func (ids *idService) identifyConn(c network.Conn) error {
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+	s, err := newStreamAndNegotiate(network.WithAllowLimitedConn(ctx, "identify"), c, ID)
+	if err != nil {
+		log.Debugw("error opening identify stream", "peer", c.RemotePeer(), "error", err)
 		return err
 	}
 

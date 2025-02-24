@@ -10,11 +10,11 @@ import (
 	"mime"
 	"net/http"
 	gourl "net/url"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/benbjohnson/clock"
+	"github.com/filecoin-project/go-clock"
 	ipns "github.com/ipfs/boxo/ipns"
 	"github.com/ipfs/boxo/routing/http/contentrouter"
 	"github.com/ipfs/boxo/routing/http/filters"
@@ -55,6 +55,7 @@ type Client struct {
 
 	// Called immediately after signing a provide request. It is used
 	// for testing, e.g., testing the server with a mangled signature.
+	//nolint:staticcheck
 	//lint:ignore SA1019 // ignore staticcheck
 	afterSignCallback func(req *types.WriteBitswapRecord)
 
@@ -107,7 +108,7 @@ func WithDisabledLocalFiltering(val bool) Option {
 // The protocols are ordered alphabetically for cache key (url) consistency
 func WithProtocolFilter(protocolFilter []string) Option {
 	return func(c *Client) error {
-		sort.Strings(protocolFilter)
+		slices.Sort(protocolFilter)
 		c.protocolFilter = protocolFilter
 		return nil
 	}
@@ -118,7 +119,7 @@ func WithProtocolFilter(protocolFilter []string) Option {
 // The addresses are ordered alphabetically for cache key (url) consistency
 func WithAddrFilter(addrFilter []string) Option {
 	return func(c *Client) error {
-		sort.Strings(addrFilter)
+		slices.Sort(addrFilter)
 		c.addrFilter = addrFilter
 		return nil
 	}
@@ -353,8 +354,10 @@ func (c *Client) ProvideBitswap(ctx context.Context, keys []cid.Cid, ttl time.Du
 
 // ProvideAsync makes a provide request to a delegated router
 //
+//nolint:staticcheck
 //lint:ignore SA1019 // ignore staticcheck
 func (c *Client) provideSignedBitswapRecord(ctx context.Context, bswp *types.WriteBitswapRecord) (time.Duration, error) {
+	//nolint:staticcheck
 	//lint:ignore SA1019 // ignore staticcheck
 	req := jsontypes.WriteProvidersRequest{Providers: []types.Record{bswp}}
 

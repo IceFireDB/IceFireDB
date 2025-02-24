@@ -5,7 +5,7 @@ import (
 	"math/bits"
 	"sync"
 
-	"github.com/benbjohnson/clock"
+	"github.com/filecoin-project/go-clock"
 	pq "github.com/ipfs/go-ipfs-pq"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	"github.com/libp2p/go-libp2p/core/peer"

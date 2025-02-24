@@ -11,8 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 
 	logging "github.com/ipfs/go-log/v2"
-	//lint:ignore SA1019 TODO migrate away from gogo pb
-	"github.com/libp2p/go-msgio/protoio"
+	"github.com/libp2p/go-msgio/pbio"
 
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
@@ -85,12 +84,12 @@ func (ms *messageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Me
 		return nil, err
 	}
 
-	w := protoio.NewDelimitedWriter(s)
+	w := pbio.NewDelimitedWriter(s)
 	if err := w.WriteMsg(pmes); err != nil {
 		return nil, err
 	}
 
-	r := protoio.NewDelimitedReader(s, network.MessageSizeMax)
+	r := pbio.NewDelimitedReader(s, network.MessageSizeMax)
 	defer func() { _ = s.Close() }()
 
 	msg := new(pb.Message)
@@ -102,9 +101,9 @@ func (ms *messageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Me
 	return msg, nil
 }
 
-func ctxReadMsg(ctx context.Context, rc protoio.ReadCloser, mes *pb.Message) error {
+func ctxReadMsg(ctx context.Context, rc pbio.ReadCloser, mes *pb.Message) error {
 	errc := make(chan error, 1)
-	go func(r protoio.ReadCloser) {
+	go func(r pbio.ReadCloser) {
 		defer close(errc)
 		err := r.ReadMsg(mes)
 		errc <- err
@@ -126,7 +125,7 @@ func (ms *messageSender) SendMessage(ctx context.Context, p peer.ID, pmes *pb.Me
 	}
 	defer func() { _ = s.Close() }()
 
-	w := protoio.NewDelimitedWriter(s)
+	w := pbio.NewDelimitedWriter(s)
 	return w.WriteMsg(pmes)
 }
 

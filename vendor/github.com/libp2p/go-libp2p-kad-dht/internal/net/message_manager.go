@@ -15,9 +15,8 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-msgio"
-
-	//lint:ignore SA1019 TODO migrate away from gogo pb
-	"github.com/libp2p/go-msgio/protoio"
+	"github.com/libp2p/go-msgio/pbio"
+	"google.golang.org/protobuf/proto"
 
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
@@ -85,6 +84,12 @@ func (m *messageSenderImpl) SendRequest(ctx context.Context, p peer.ID, pmes *pb
 		return nil, err
 	}
 
+	marshalled, err := proto.Marshal(pmes)
+	if err != nil {
+		logger.Debugw("failed to marshal request", "error", err, "to", p)
+		return nil, err
+	}
+
 	start := time.Now()
 
 	rpmes, err := ms.SendRequest(ctx, pmes)
@@ -99,7 +104,7 @@ func (m *messageSenderImpl) SendRequest(ctx context.Context, p peer.ID, pmes *pb
 
 	stats.Record(ctx,
 		metrics.SentRequests.M(1),
-		metrics.SentBytes.M(int64(pmes.Size())),
+		metrics.SentBytes.M(int64(len(marshalled))),
 		metrics.OutboundRequestLatency.M(float64(time.Since(start))/float64(time.Millisecond)),
 	)
 	m.host.Peerstore().RecordLatency(p, time.Since(start))
@@ -120,6 +125,12 @@ func (m *messageSenderImpl) SendMessage(ctx context.Context, p peer.ID, pmes *pb
 		return err
 	}
 
+	marshalled, err := proto.Marshal(pmes)
+	if err != nil {
+		logger.Debugw("failed to marshal message", "error", err, "to", p)
+		return err
+	}
+
 	if err := ms.SendMessage(ctx, pmes); err != nil {
 		stats.Record(ctx,
 			metrics.SentMessages.M(1),
@@ -131,7 +142,7 @@ func (m *messageSenderImpl) SendMessage(ctx context.Context, p peer.ID, pmes *pb
 
 	stats.Record(ctx,
 		metrics.SentMessages.M(1),
-		metrics.SentBytes.M(int64(pmes.Size())),
+		metrics.SentBytes.M(int64(len(marshalled))),
 	)
 	return nil
 }
@@ -336,7 +347,7 @@ func (ms *peerMessageSender) ctxReadMsg(ctx context.Context, mes *pb.Message) er
 			errc <- err
 			return
 		}
-		errc <- mes.Unmarshal(bytes)
+		errc <- proto.Unmarshal(bytes, mes)
 	}(ms.r)
 
 	t := time.NewTimer(dhtReadMessageTimeout)
@@ -357,7 +368,7 @@ func (ms *peerMessageSender) ctxReadMsg(ctx context.Context, mes *pb.Message) er
 // packet for every single write.
 type bufferedDelimitedWriter struct {
 	*bufio.Writer
-	protoio.WriteCloser
+	pbio.WriteCloser
 }
 
 var writerPool = sync.Pool{
@@ -365,7 +376,7 @@ var writerPool = sync.Pool{
 		w := bufio.NewWriter(nil)
 		return &bufferedDelimitedWriter{
 			Writer:      w,
-			WriteCloser: protoio.NewDelimitedWriter(w),
+			WriteCloser: pbio.NewDelimitedWriter(w),
 		}
 	},
 }

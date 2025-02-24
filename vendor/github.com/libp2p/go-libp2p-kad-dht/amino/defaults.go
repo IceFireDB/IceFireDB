@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	// ProtocolPrefix is the base prefix for Amono DHT protocols.
+	// ProtocolPrefix is the base prefix for Amino DHT protocols.
 	ProtocolPrefix protocol.ID = "/ipfs"
 
 	// ProtocolID is the latest protocol identifier for the Amino DHT.
@@ -49,9 +49,7 @@ const (
 	DefaultProviderAddrTTL = 24 * time.Hour
 )
 
-var (
-	// Protocols is a slice containing all supported protocol IDs for Amino DHT.
-	// Currently, it only includes the main ProtocolID, but it's defined as a slice
-	// to allow for potential future protocol versions or variants.
-	Protocols = []protocol.ID{ProtocolID}
-)
+// Protocols is a slice containing all supported protocol IDs for Amino DHT.
+// Currently, it only includes the main ProtocolID, but it's defined as a slice
+// to allow for potential future protocol versions or variants.
+var Protocols = []protocol.ID{ProtocolID}

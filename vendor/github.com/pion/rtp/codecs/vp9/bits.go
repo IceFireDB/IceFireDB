@@ -11,6 +11,7 @@ func hasSpace(buf []byte, pos int, n int) error {
 	if n > ((len(buf) * 8) - pos) {
 		return errNotEnoughBits
 	}
+
 	return nil
 }
 
@@ -26,6 +27,7 @@ func readFlag(buf []byte, pos *int) (bool, error) {
 func readFlagUnsafe(buf []byte, pos *int) bool {
 	b := (buf[*pos>>0x03] >> (7 - (*pos & 0x07))) & 0x01
 	*pos++
+
 	return b == 1
 }
 
@@ -41,25 +43,26 @@ func readBits(buf []byte, pos *int, n int) (uint64, error) {
 func readBitsUnsafe(buf []byte, pos *int, n int) uint64 {
 	res := 8 - (*pos & 0x07)
 	if n < res {
-		v := uint64((buf[*pos>>0x03] >> (res - n)) & (1<<n - 1))
+		bits := uint64((buf[*pos>>0x03] >> (res - n)) & (1<<n - 1))
 		*pos += n
-		return v
+
+		return bits
 	}
 
-	v := uint64(buf[*pos>>0x03] & (1<<res - 1))
+	bits := uint64(buf[*pos>>0x03] & (1<<res - 1))
 	*pos += res
 	n -= res
 
 	for n >= 8 {
-		v = (v << 8) | uint64(buf[*pos>>0x03])
+		bits = (bits << 8) | uint64(buf[*pos>>0x03])
 		*pos += 8
 		n -= 8
 	}
 
 	if n > 0 {
-		v = (v << n) | uint64(buf[*pos>>0x03]>>(8-n))
+		bits = (bits << n) | uint64(buf[*pos>>0x03]>>(8-n))
 		*pos += n
 	}
 
-	return v
+	return bits
 }

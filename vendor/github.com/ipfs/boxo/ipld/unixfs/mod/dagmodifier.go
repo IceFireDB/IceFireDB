@@ -9,13 +9,12 @@ import (
 	"io"
 	"time"
 
+	chunker "github.com/ipfs/boxo/chunker"
+	mdag "github.com/ipfs/boxo/ipld/merkledag"
 	ft "github.com/ipfs/boxo/ipld/unixfs"
 	help "github.com/ipfs/boxo/ipld/unixfs/importer/helpers"
 	trickle "github.com/ipfs/boxo/ipld/unixfs/importer/trickle"
 	uio "github.com/ipfs/boxo/ipld/unixfs/io"
-
-	chunker "github.com/ipfs/boxo/chunker"
-	mdag "github.com/ipfs/boxo/ipld/merkledag"
 	cid "github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
 )
@@ -498,13 +497,13 @@ func (dm *DagModifier) Truncate(size int64) error {
 	if err != nil {
 		return err
 	}
-	if size == int64(realSize) {
+	if size == realSize {
 		return nil
 	}
 
 	// Truncate can also be used to expand the file
-	if size > int64(realSize) {
-		return dm.expandSparse(int64(size) - realSize)
+	if size > realSize {
+		return dm.expandSparse(size - realSize)
 	}
 
 	nnode, err := dm.dagTruncate(dm.ctx, dm.curNode, uint64(size))
