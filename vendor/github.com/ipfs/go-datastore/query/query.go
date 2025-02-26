@@ -12,9 +12,9 @@ Query represents storage for any key-value pair.
 
 tl;dr:
 
-  queries are supported across datastores.
-  Cheap on top of relational dbs, and expensive otherwise.
-  Pick the right tool for the job!
+	queries are supported across datastores.
+	Cheap on top of relational dbs, and expensive otherwise.
+	Pick the right tool for the job!
 
 In addition to the key-value store get and set semantics, datastore
 provides an interface to retrieve multiple records at a time through
@@ -24,11 +24,11 @@ database research, let’s summarize the operations datastore supports.
 
 Query Operations, applied in-order:
 
-  * prefix - scope the query to a given path prefix
-  * filters - select a subset of values by applying constraints
-  * orders - sort the results by applying sort conditions, hierarchically.
-  * offset - skip a number of results (for efficient pagination)
-  * limit - impose a numeric limit on the number of results
+  - prefix - scope the query to a given path prefix
+  - filters - select a subset of values by applying constraints
+  - orders - sort the results by applying sort conditions, hierarchically.
+  - offset - skip a number of results (for efficient pagination)
+  - limit - impose a numeric limit on the number of results
 
 Datastore combines these operations into a simple Query class that allows
 applications to define their constraints in a simple, generic, way without
@@ -41,13 +41,13 @@ backed datastore.
 
 Notes:
 
-  * Prefix: When a query filters by prefix, it selects keys that are strict
+  - Prefix: When a query filters by prefix, it selects keys that are strict
     children of the prefix. For example, a prefix "/foo" would select "/foo/bar"
     but not "/foobar" or "/foo",
-  * Orders: Orders are applied hierarchically. Results are sorted by the first
+  - Orders: Orders are applied hierarchically. Results are sorted by the first
     ordering, then entries equal under the first ordering are sorted with the
     second ordering, etc.
-  * Limits & Offset: Limits and offsets are applied after everything else.
+  - Limits & Offset: Limits and offsets are applied after everything else.
 */
 type Query struct {
 	Prefix            string   // namespaces the query to results whose keys have Prefix
@@ -127,24 +127,23 @@ type Result struct {
 // Results is a set of Query results. This is the interface for clients.
 // Example:
 //
-//   qr, _ := myds.Query(q)
-//   for r := range qr.Next() {
-//     if r.Error != nil {
-//       // handle.
-//       break
-//     }
+//	qr, _ := myds.Query(q)
+//	for r := range qr.Next() {
+//	  if r.Error != nil {
+//	    // handle.
+//	    break
+//	  }
 //
-//     fmt.Println(r.Entry.Key, r.Entry.Value)
-//   }
+//	  fmt.Println(r.Entry.Key, r.Entry.Value)
+//	}
 //
 // or, wait on all results at once:
 //
-//   qr, _ := myds.Query(q)
-//   es, _ := qr.Rest()
-//   for _, e := range es {
-//     	fmt.Println(e.Key, e.Value)
-//   }
-//
+//	qr, _ := myds.Query(q)
+//	es, _ := qr.Rest()
+//	for _, e := range es {
+//	  	fmt.Println(e.Key, e.Value)
+//	}
 type Results interface {
 	Query() Query             // the query these Results correspond to
 	Next() <-chan Result      // returns a channel to wait for the next result
@@ -203,13 +202,12 @@ func (r *results) Query() Query {
 // Implementors of datastores and their clients must respect the
 // Process of the Request:
 //
-//   * clients must call r.Process().Close() on an early exit, so
+//   - clients must call r.Process().Close() on an early exit, so
 //     implementations can reclaim resources.
-//   * if the Entries are read to completion (channel closed), Process
+//   - if the Entries are read to completion (channel closed), Process
 //     should be closed automatically.
-//   * datastores must respect <-Process.Closing(), which intermediates
+//   - datastores must respect <-Process.Closing(), which intermediates
 //     an early close signal from the client.
-//
 type ResultBuilder struct {
 	Query   Query
 	Process goprocess.Process

@@ -201,9 +201,9 @@ var ErrNotFound error = &dsError{error: errors.New("datastore: key not found"), 
 // GetBackedHas provides a default Datastore.Has implementation.
 // It exists so Datastore.Has implementations can use it, like so:
 //
-// func (*d SomeDatastore) Has(key Key) (exists bool, err error) {
-//   return GetBackedHas(d, key)
-// }
+//	func (*d SomeDatastore) Has(key Key) (exists bool, err error) {
+//	  return GetBackedHas(d, key)
+//	}
 func GetBackedHas(ctx context.Context, ds Read, key Key) (bool, error) {
 	_, err := ds.Get(ctx, key)
 	switch err {
@@ -219,9 +219,9 @@ func GetBackedHas(ctx context.Context, ds Read, key Key) (bool, error) {
 // GetBackedSize provides a default Datastore.GetSize implementation.
 // It exists so Datastore.GetSize implementations can use it, like so:
 //
-// func (*d SomeDatastore) GetSize(key Key) (size int, err error) {
-//   return GetBackedSize(d, key)
-// }
+//	func (*d SomeDatastore) GetSize(key Key) (size int, err error) {
+//	  return GetBackedSize(d, key)
+//	}
 func GetBackedSize(ctx context.Context, ds Read, key Key) (int, error) {
 	value, err := ds.Get(ctx, key)
 	if err == nil {
