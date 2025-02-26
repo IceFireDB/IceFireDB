@@ -14,7 +14,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	u "github.com/ipfs/boxo/util"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-kad-dht/internal"
 	internalConfig "github.com/libp2p/go-libp2p-kad-dht/internal/config"
@@ -65,7 +64,7 @@ func (dht *IpfsDHT) PutValue(ctx context.Context, key string, value []byte, opts
 	}
 
 	rec := record.MakePutRecord(key, value)
-	rec.TimeReceived = u.FormatRFC3339(time.Now())
+	rec.TimeReceived = internal.FormatRFC3339(time.Now())
 	err = dht.putLocal(ctx, key, rec)
 	if err != nil {
 		return err
@@ -195,7 +194,8 @@ func (dht *IpfsDHT) SearchValue(ctx context.Context, key string, opts ...routing
 }
 
 func (dht *IpfsDHT) searchValueQuorum(ctx context.Context, key string, valCh <-chan recvdVal, stopCh chan struct{},
-	out chan<- []byte, nvals int) ([]byte, map[peer.ID]struct{}, bool) {
+	out chan<- []byte, nvals int,
+) ([]byte, map[peer.ID]struct{}, bool) {
 	numResponses := 0
 	return dht.processValues(ctx, key, valCh,
 		func(ctx context.Context, v recvdVal, better bool) bool {
@@ -217,7 +217,8 @@ func (dht *IpfsDHT) searchValueQuorum(ctx context.Context, key string, valCh <-c
 }
 
 func (dht *IpfsDHT) processValues(ctx context.Context, key string, vals <-chan recvdVal,
-	newVal func(ctx context.Context, v recvdVal, better bool) bool) (best []byte, peersWithBest map[peer.ID]struct{}, aborted bool) {
+	newVal func(ctx context.Context, v recvdVal, better bool) bool,
+) (best []byte, peersWithBest map[peer.ID]struct{}, aborted bool) {
 loop:
 	for {
 		if aborted {
@@ -357,7 +358,6 @@ func (dht *IpfsDHT) getValues(ctx context.Context, key string, stopQuery chan st
 				}
 			},
 		)
-
 		if err != nil {
 			return
 		}
@@ -496,13 +496,11 @@ func (dht *IpfsDHT) FindProvidersAsync(ctx context.Context, key cid.Cid, count i
 	ctx, end := tracer.FindProvidersAsync(dhtName, ctx, key, count)
 	defer func() { ch = end(ch, nil) }()
 
+	peerOut := make(chan peer.AddrInfo)
 	if !dht.enableProviders || !key.Defined() {
-		peerOut := make(chan peer.AddrInfo)
 		close(peerOut)
 		return peerOut
 	}
-
-	peerOut := make(chan peer.AddrInfo)
 
 	keyMH := key.Hash()
 
@@ -547,9 +545,12 @@ func (dht *IpfsDHT) findProvidersAsyncRoutine(ctx context.Context, key multihash
 		if psTryAdd(p) {
 			select {
 			case peerOut <- p:
+				// Add tracing event for finding a provider
 				span.AddEvent("found provider", trace.WithAttributes(
 					attribute.Stringer("peer", p.ID),
 					attribute.Stringer("from", dht.self),
+					attribute.Int("provider_addrs_count", len(p.Addrs)),
+					attribute.Bool("found_in_provider_store", true),
 				))
 			case <-ctx.Done():
 				return
@@ -565,7 +566,6 @@ func (dht *IpfsDHT) findProvidersAsyncRoutine(ctx context.Context, key multihash
 
 	lookupRes, err := dht.runLookupWithFollowup(ctx, string(key),
 		func(ctx context.Context, p peer.ID) ([]*peer.AddrInfo, error) {
-
 			// For DHT query command
 			routing.PublishQueryEvent(ctx, &routing.QueryEvent{
 				Type: routing.SendingQuery,
@@ -590,6 +590,7 @@ func (dht *IpfsDHT) findProvidersAsyncRoutine(ctx context.Context, key multihash
 						span.AddEvent("found provider", trace.WithAttributes(
 							attribute.Stringer("peer", prov.ID),
 							attribute.Stringer("from", p),
+							attribute.Int("provider_addrs_count", len(prov.Addrs)),
 						))
 					case <-ctx.Done():
 						logger.Debug("context timed out sending more providers")
@@ -666,7 +667,6 @@ func (dht *IpfsDHT) FindPeer(ctx context.Context, id peer.ID) (pi peer.AddrInfo,
 			return hasValidConnectedness(dht.host, id)
 		},
 	)
-
 	if err != nil {
 		return peer.AddrInfo{}, err
 	}

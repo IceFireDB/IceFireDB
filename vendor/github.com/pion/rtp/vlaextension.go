@@ -13,12 +13,18 @@ import (
 )
 
 var (
-	ErrVLATooShort             = errors.New("VLA payload too short")           // ErrVLATooShort is returned when payload is too short
-	ErrVLAInvalidStreamCount   = errors.New("invalid RTP stream count in VLA") // ErrVLAInvalidStreamCount is returned when RTP stream count is invalid
-	ErrVLAInvalidStreamID      = errors.New("invalid RTP stream ID in VLA")    // ErrVLAInvalidStreamID is returned when RTP stream ID is invalid
-	ErrVLAInvalidSpatialID     = errors.New("invalid spatial ID in VLA")       // ErrVLAInvalidSpatialID is returned when spatial ID is invalid
-	ErrVLADuplicateSpatialID   = errors.New("duplicate spatial ID in VLA")     // ErrVLADuplicateSpatialID is returned when spatial ID is invalid
-	ErrVLAInvalidTemporalLayer = errors.New("invalid temporal layer in VLA")   // ErrVLAInvalidTemporalLayer is returned when temporal layer is invalid
+	// ErrVLATooShort is returned when payload is too short.
+	ErrVLATooShort = errors.New("VLA payload too short")
+	// ErrVLAInvalidStreamCount is returned when RTP stream count is invalid.
+	ErrVLAInvalidStreamCount = errors.New("invalid RTP stream count in VLA")
+	// ErrVLAInvalidStreamID is returned when RTP stream ID is invalid.
+	ErrVLAInvalidStreamID = errors.New("invalid RTP stream ID in VLA")
+	// ErrVLAInvalidSpatialID is returned when spatial ID is invalid.
+	ErrVLAInvalidSpatialID = errors.New("invalid spatial ID in VLA")
+	// ErrVLADuplicateSpatialID is returned when spatial ID is invalid.
+	ErrVLADuplicateSpatialID = errors.New("duplicate spatial ID in VLA")
+	// ErrVLAInvalidTemporalLayer is returned when temporal layer is invalid.
+	ErrVLAInvalidTemporalLayer = errors.New("invalid temporal layer in VLA")
 )
 
 // SpatialLayer is a spatial layer in VLA.
@@ -68,6 +74,7 @@ func (v VLA) preprocessForMashaling(ctx *vlaMarshalingContext) error {
 		}
 		ctx.sls[sl.RTPStreamID][sl.SpatialID] = &sl
 	}
+
 	return nil
 }
 
@@ -76,7 +83,7 @@ func (v VLA) encodeTargetBitrates(ctx *vlaMarshalingContext) {
 		for spatialID := 0; spatialID < 4; spatialID++ {
 			if sl := ctx.sls[rtpStreamID][spatialID]; sl != nil {
 				for _, kbps := range sl.TargetBitrates {
-					leb128 := obu.WriteToLeb128(uint(kbps))
+					leb128 := obu.WriteToLeb128(uint(kbps)) // nolint: gosec
 					ctx.encodedTargetBitrates = append(ctx.encodedTargetBitrates, leb128)
 					ctx.requiredLen += len(leb128)
 				}
@@ -123,7 +130,7 @@ func (v VLA) analyzeVLAForMarshaling() (*vlaMarshalingContext, error) {
 }
 
 // Marshal encodes VLA into a byte slice.
-func (v VLA) Marshal() ([]byte, error) {
+func (v VLA) Marshal() ([]byte, error) { // nolint: cyclop
 	ctx, err := v.analyzeVLAForMarshaling()
 	if err != nil {
 		return nil, err
@@ -174,8 +181,8 @@ func (v VLA) Marshal() ([]byte, error) {
 	// Resolution & framerate fields
 	if v.HasResolutionAndFramerate {
 		for _, sl := range v.ActiveSpatialLayer {
-			binary.BigEndian.PutUint16(payload[offset+0:], uint16(sl.Width-1))
-			binary.BigEndian.PutUint16(payload[offset+2:], uint16(sl.Height-1))
+			binary.BigEndian.PutUint16(payload[offset+0:], uint16(sl.Width-1))  // nolint: gosec
+			binary.BigEndian.PutUint16(payload[offset+2:], uint16(sl.Height-1)) // nolint: gosec
 			payload[offset+4] = byte(sl.Framerate)
 			offset += 5
 		}
@@ -192,12 +199,14 @@ func commonSLBMValues(slMBs []uint8) uint8 {
 		}
 		if common == 0 {
 			common = slMBs[i]
+
 			continue
 		}
 		if slMBs[i] != common {
 			return 0
 		}
 	}
+
 	return common
 }
 
@@ -247,7 +256,7 @@ func (v *VLA) unmarshalSpatialLayers(ctx *vlaUnmarshalingContext) error {
 	return nil
 }
 
-func (v *VLA) unmarshalTemporalLayers(ctx *vlaUnmarshalingContext) error {
+func (v *VLA) unmarshalTemporalLayers(ctx *vlaUnmarshalingContext) error { // nolint: cyclop
 	if !ctx.checkRemainingLen(1) {
 		return fmt.Errorf("failed to unmarshal VLA (offset=%d): %w", ctx.offset, ErrVLATooShort)
 	}
@@ -284,11 +293,14 @@ func (v *VLA) unmarshalTemporalLayers(ctx *vlaUnmarshalingContext) error {
 			if err != nil {
 				return err
 			}
-			if !ctx.checkRemainingLen(int(n)) {
+
+			in := int(n) // nolint: gosec
+
+			if !ctx.checkRemainingLen(in) {
 				return fmt.Errorf("failed to unmarshal VLA (offset=%d): %w", ctx.offset, ErrVLATooShort)
 			}
-			v.ActiveSpatialLayer[i].TargetBitrates[j] = int(kbps)
-			ctx.offset += int(n)
+			v.ActiveSpatialLayer[i].TargetBitrates[j] = int(kbps) // nolint: gosec
+			ctx.offset += in
 		}
 	}
 
@@ -356,5 +368,6 @@ func (v VLA) String() string {
 		slOut = append(slOut, out2)
 	}
 	out += fmt.Sprintf(",ActiveSpatialLayers:{%s}", strings.Join(slOut, ","))
+
 	return out
 }

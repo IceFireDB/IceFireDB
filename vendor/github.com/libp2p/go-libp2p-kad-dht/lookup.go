@@ -14,11 +14,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// GetClosestPeers is a Kademlia 'node lookup' operation. Returns a channel of
+// GetClosestPeers is a Kademlia 'node lookup' operation. Returns a slice of
 // the K closest peers to the given key.
 //
-// If the context is canceled, this function will return the context error along
-// with the closest K peers it has found so far.
+// If the context is canceled, this function will return the context error
+// along with the closest K peers it has found so far.
 func (dht *IpfsDHT) GetClosestPeers(ctx context.Context, key string) ([]peer.ID, error) {
 	ctx, span := internal.StartSpan(ctx, "IpfsDHT.GetClosestPeers", trace.WithAttributes(internal.KeyAsAttribute("Key", key)))
 	defer span.End()
@@ -27,9 +27,8 @@ func (dht *IpfsDHT) GetClosestPeers(ctx context.Context, key string) ([]peer.ID,
 		return nil, fmt.Errorf("can't lookup empty key")
 	}
 
-	//TODO: I can break the interface! return []peer.ID
+	// TODO: I can break the interface! return []peer.ID
 	lookupRes, err := dht.runLookupWithFollowup(ctx, key, dht.pmGetClosestPeers(key), func(*qpeerset.QueryPeerset) bool { return false })
-
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +46,8 @@ func (dht *IpfsDHT) GetClosestPeers(ctx context.Context, key string) ([]peer.ID,
 		metrics.NetworkSize.M(int64(ns))
 	}
 
-	// refresh the cpl for this key as the query was successful
+	// Reset the refresh timer for this key's bucket since we've just
+	// successfully interacted with the closest peers to key
 	dht.routingTable.ResetCplRefreshedAtForID(kb.ConvertKey(key), time.Now())
 
 	return lookupRes.peers, nil

@@ -35,6 +35,11 @@ type Writer interface {
 	WriteDataChannel([]byte, bool) (int, error)
 }
 
+// WriteDeadliner extends an io.Writer to expose setting a write deadline.
+type WriteDeadliner interface {
+	SetWriteDeadline(time.Time) error
+}
+
 // ReadWriteCloser is an extended io.ReadWriteCloser
 // that also implements our Reader and Writer.
 type ReadWriteCloser interface {
@@ -43,6 +48,14 @@ type ReadWriteCloser interface {
 	Reader
 	Writer
 	io.Closer
+}
+
+// ReadWriteCloserDeadliner is an extended ReadWriteCloser
+// that also implements r/w deadline.
+type ReadWriteCloserDeadliner interface {
+	ReadWriteCloser
+	ReadDeadliner
+	WriteDeadliner
 }
 
 // DataChannel represents a data channel
@@ -222,6 +235,12 @@ func (c *DataChannel) ReadDataChannel(p []byte) (int, bool, error) {
 // SetReadDeadline sets a deadline for reads to return
 func (c *DataChannel) SetReadDeadline(t time.Time) error {
 	return c.stream.SetReadDeadline(t)
+}
+
+// SetWriteDeadline sets a deadline for writes to return,
+// only available if the BlockWrite is enabled for sctp
+func (c *DataChannel) SetWriteDeadline(t time.Time) error {
+	return c.stream.SetWriteDeadline(t)
 }
 
 // MessagesSent returns the number of messages sent

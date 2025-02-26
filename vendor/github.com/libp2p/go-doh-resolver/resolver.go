@@ -2,6 +2,7 @@ package doh
 
 import (
 	"context"
+	"errors"
 	"math"
 	"net"
 	"strings"
@@ -52,7 +53,14 @@ func WithCacheDisabled() Option {
 }
 
 func NewResolver(url string, opts ...Option) (*Resolver, error) {
-	if !strings.HasPrefix(url, "https:") {
+	if strings.HasPrefix(url, "http:") &&
+		!strings.HasPrefix(url, "http://localhost") &&
+		!strings.HasPrefix(url, "http://127.0.0.1") &&
+		!strings.HasPrefix(url, "http://[::1]") {
+		return nil, errors.New("insecure URL: non-local DoH resolvers must use HTTPS")
+	}
+
+	if !strings.HasPrefix(url, "http:") && !strings.HasPrefix(url, "https:") {
 		url = "https://" + url
 	}
 

@@ -30,7 +30,6 @@ import (
 	record "github.com/libp2p/go-libp2p-record"
 	recpb "github.com/libp2p/go-libp2p-record/pb"
 
-	"github.com/gogo/protobuf/proto"
 	ds "github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/multiformats/go-base32"
@@ -38,10 +37,13 @@ import (
 	"go.opencensus.io/tag"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
-const tracer = tracing.Tracer("go-libp2p-kad-dht")
-const dhtName = "IpfsDHT"
+const (
+	tracer  = tracing.Tracer("go-libp2p-kad-dht")
+	dhtName = "IpfsDHT"
+)
 
 var (
 	logger     = logging.Logger("dht")
@@ -163,6 +165,8 @@ type IpfsDHT struct {
 	// addrFilter is used to filter the addresses we put into the peer store.
 	// Mostly used to filter out localhost and local addresses.
 	addrFilter func([]ma.Multiaddr) []ma.Multiaddr
+
+	onRequestHook func(ctx context.Context, s network.Stream, req *pb.Message)
 }
 
 // Assert that IPFS assumptions about interfaces aren't broken. These aren't a
@@ -306,6 +310,7 @@ func makeDHT(h host.Host, cfg dhtcfg.Config) (*IpfsDHT, error) {
 		routingTablePeerFilter: cfg.RoutingTable.PeerFilter,
 		rtPeerDiversityFilter:  cfg.RoutingTable.DiversityFilter,
 		addrFilter:             cfg.AddressFilter,
+		onRequestHook:          cfg.OnRequestHook,
 
 		fixLowPeersChan: make(chan struct{}, 1),
 
@@ -331,7 +336,7 @@ func makeDHT(h host.Host, cfg dhtcfg.Config) (*IpfsDHT, error) {
 	}
 
 	// construct routing table
-	// use twice the theoritical usefulness threhold to keep older peers around longer
+	// use twice the theoretical usefulness threshold to keep older peers around longer
 	rt, err := makeRoutingTable(dht, cfg, 2*maxLastSuccessfulOutboundThreshold)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct routing table,err=%s", err)
@@ -417,7 +422,6 @@ func makeRoutingTable(dht *IpfsDHT, cfg dhtcfg.Config, maxLastSuccessfulOutbound
 		df, err := peerdiversity.NewFilter(dht.rtPeerDiversityFilter, "rt/diversity", func(p peer.ID) int {
 			return kb.CommonPrefixLen(dht.selfKey, kb.ConvertPeerID(p))
 		})
-
 		if err != nil {
 			return nil, fmt.Errorf("failed to construct peer diversity filter: %w", err)
 		}
@@ -716,7 +720,7 @@ func (dht *IpfsDHT) validPeerFound(p peer.ID) {
 	}
 }
 
-// peerStoppedDHT signals the routing table that a peer is unable to responsd to DHT queries anymore.
+// peerStoppedDHT signals the routing table that a peer is unable to respond to DHT queries anymore.
 func (dht *IpfsDHT) peerStoppedDHT(p peer.ID) {
 	logger.Debugw("peer stopped dht", "peer", p)
 	// A peer that does not support the DHT protocol is dead for us.

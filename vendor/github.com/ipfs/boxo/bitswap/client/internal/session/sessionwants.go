@@ -35,13 +35,13 @@ func newSessionWants(broadcastLimit int) sessionWants {
 }
 
 func (sw *sessionWants) String() string {
-	return fmt.Sprintf("%d pending / %d live", sw.toFetch.Len(), len(sw.liveWants))
+	return fmt.Sprintf("%d pending / %d live", sw.toFetch.len(), len(sw.liveWants))
 }
 
 // BlocksRequested is called when the client makes a request for blocks
 func (sw *sessionWants) BlocksRequested(newWants []cid.Cid) {
 	for _, k := range newWants {
-		sw.toFetch.Push(k)
+		sw.toFetch.push(k)
 	}
 }
 
@@ -56,14 +56,14 @@ func (sw *sessionWants) GetNextWants() []cid.Cid {
 	// limit)
 	currentLiveCount := len(sw.liveWants)
 	toAdd := sw.broadcastLimit - currentLiveCount
-	liveSize := min(toAdd, sw.toFetch.Len())
+	liveSize := min(toAdd, sw.toFetch.len())
 	if liveSize <= 0 {
 		return nil
 	}
 
 	live := make([]cid.Cid, 0, liveSize)
-	for ; toAdd > 0 && sw.toFetch.Len() > 0; toAdd-- {
-		c := sw.toFetch.Pop()
+	for ; toAdd > 0 && sw.toFetch.len() > 0; toAdd-- {
+		c := sw.toFetch.pop()
 		live = append(live, c)
 		sw.liveWantsOrder = append(sw.liveWantsOrder, c)
 		sw.liveWants[c] = now
@@ -76,12 +76,13 @@ func (sw *sessionWants) GetNextWants() []cid.Cid {
 func (sw *sessionWants) WantsSent(ks []cid.Cid) {
 	now := time.Now()
 	for _, c := range ks {
-		if _, ok := sw.liveWants[c]; !ok && sw.toFetch.Has(c) {
-			sw.toFetch.Remove(c)
+		if _, ok := sw.liveWants[c]; !ok && sw.toFetch.has(c) {
+			sw.toFetch.remove(c)
 			sw.liveWantsOrder = append(sw.liveWantsOrder, c)
 			sw.liveWants[c] = now
 		}
 	}
+	sw.toFetch.gc()
 }
 
 // BlocksReceived removes received block CIDs from the live wants list and
@@ -108,9 +109,10 @@ func (sw *sessionWants) BlocksReceived(ks []cid.Cid) ([]cid.Cid, time.Duration) 
 
 			// Remove the CID from the live wants / toFetch queue
 			delete(sw.liveWants, c)
-			sw.toFetch.Remove(c)
+			sw.toFetch.remove(c)
 		}
 	}
+	sw.toFetch.gc()
 
 	// If the live wants ordering array is a long way out of sync with the
 	// live wants map, clean up the ordering array
@@ -152,9 +154,10 @@ func (sw *sessionWants) PrepareBroadcast() []cid.Cid {
 // CancelPending removes the given CIDs from the fetch queue.
 func (sw *sessionWants) CancelPending(keys []cid.Cid) {
 	for _, k := range keys {
-		sw.toFetch.Remove(k)
+		sw.toFetch.remove(k)
 		delete(sw.liveWants, k)
 	}
+	sw.toFetch.gc()
 }
 
 // LiveWants returns a list of live wants
@@ -193,7 +196,7 @@ func (sw *sessionWants) HasLiveWants() bool {
 func (sw *sessionWants) isWanted(c cid.Cid) bool {
 	_, ok := sw.liveWants[c]
 	if !ok {
-		ok = sw.toFetch.Has(c)
+		ok = sw.toFetch.has(c)
 	}
 	return ok
 }
