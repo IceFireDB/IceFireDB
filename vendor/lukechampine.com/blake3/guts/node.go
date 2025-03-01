@@ -2,6 +2,11 @@
 // function.
 package guts
 
+import (
+	"math/bits"
+	"sync"
+)
+
 // Various constants.
 const (
 	FlagChunkStart = 1 << iota
@@ -45,4 +50,53 @@ func ParentNode(left, right [8]uint32, key *[8]uint32, flags uint32) Node {
 	copy(n.Block[:8], left[:])
 	copy(n.Block[8:], right[:])
 	return n
+}
+
+// Eigentrees returns the sequence of eigentree heights that increment counter
+// to counter+chunks.
+func Eigentrees(counter uint64, chunks uint64) (trees []int) {
+	for i := counter; i < counter+chunks; {
+		bite := min(bits.TrailingZeros64(i), bits.Len64(counter+chunks-i)-1)
+		trees = append(trees, bite)
+		i += 1 << bite
+	}
+	return
+}
+
+// CompressEigentree compresses a buffer of 2^n chunks in parallel, returning
+// their root node.
+func CompressEigentree(buf []byte, key *[8]uint32, counter uint64, flags uint32) Node {
+	if numChunks := uint64(len(buf) / ChunkSize); bits.OnesCount64(numChunks) != 1 {
+		panic("non-power-of-two eigentree size")
+	} else if numChunks == 1 {
+		return CompressChunk(buf, key, counter, flags)
+	} else if numChunks <= MaxSIMD {
+		buflen := len(buf)
+		if cap(buf) < MaxSIMD*ChunkSize {
+			buf = append(buf, make([]byte, MaxSIMD*ChunkSize-len(buf))...)
+		}
+		return CompressBuffer((*[MaxSIMD * ChunkSize]byte)(buf[:MaxSIMD*ChunkSize]), buflen, key, counter, flags)
+	} else {
+		cvs := make([][8]uint32, numChunks/MaxSIMD)
+		var wg sync.WaitGroup
+		for i := range cvs {
+			wg.Add(1)
+			go func(i uint64) {
+				defer wg.Done()
+				cvs[i] = ChainingValue(CompressBuffer((*[MaxSIMD * ChunkSize]byte)(buf[i*MaxSIMD*ChunkSize:]), MaxSIMD*ChunkSize, key, counter+(MaxSIMD*i), flags))
+			}(uint64(i))
+		}
+		wg.Wait()
+
+		var rec func(cvs [][8]uint32) Node
+		rec = func(cvs [][8]uint32) Node {
+			if len(cvs) == 2 {
+				return ParentNode(cvs[0], cvs[1], key, flags)
+			} else if len(cvs) == MaxSIMD {
+				return mergeSubtrees((*[MaxSIMD][8]uint32)(cvs), MaxSIMD, key, flags)
+			}
+			return ParentNode(ChainingValue(rec(cvs[:len(cvs)/2])), ChainingValue(rec(cvs[len(cvs)/2:])), key, flags)
+		}
+		return rec(cvs)
+	}
 }

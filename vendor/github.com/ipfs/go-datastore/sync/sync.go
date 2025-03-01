@@ -90,13 +90,10 @@ func (d *MutexDatastore) Query(ctx context.Context, q dsq.Query) (dsq.Results, e
 		return nil, err
 	}
 
-	entries, err1 := results.Rest()
-	err2 := results.Close()
-	switch {
-	case err1 != nil:
-		return nil, err1
-	case err2 != nil:
-		return nil, err2
+	entries, err := results.Rest()
+	results.Close()
+	if err != nil {
+		return nil, err
 	}
 	return dsq.ResultsWithEntries(q, entries), nil
 }

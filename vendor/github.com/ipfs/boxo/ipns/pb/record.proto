@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package github.com.boxo.ipns.pb;
 
-option go_package = ".;pb";
+option go_package = "github.com/ipfs/boxo/ipns/pb";
 
 // https://specs.ipfs.tech/ipns/ipns-record/#record-serialization-format
 message IpnsRecord {

@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/libp2p/go-libp2p-kad-dht/metrics"
+	"github.com/libp2p/go-libp2p-kad-dht/internal/metrics"
 	"github.com/libp2p/go-libp2p-kad-dht/netsize"
 	"github.com/libp2p/go-libp2p-kad-dht/qpeerset"
 	kb "github.com/libp2p/go-libp2p-kbucket"
@@ -173,7 +173,7 @@ func (dht *IpfsDHT) optimisticProvide(outerCtx context.Context, keyMH multihash.
 	}
 
 	if ns, err := dht.nsEstimator.NetworkSize(); err == nil {
-		metrics.NetworkSize.M(int64(ns))
+		metrics.RecordNetworkSize(int64(ns))
 	}
 
 	// refresh the cpl for this key as the query was successful

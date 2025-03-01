@@ -3,7 +3,7 @@
 
 package rtp
 
-// Depacketizer depacketizes a RTP payload, removing any RTP specific data from the payload
+// Depacketizer depacketizes a RTP payload, removing any RTP specific data from the payload.
 type Depacketizer interface {
 	// Unmarshal parses the RTP payload and returns media.
 	// Metadata may be stored on the Depacketizer itself

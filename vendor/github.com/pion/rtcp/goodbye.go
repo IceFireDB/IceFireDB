@@ -133,7 +133,11 @@ func (g *Goodbye) Header() Header {
 // MarshalSize returns the size of the packet once marshaled
 func (g *Goodbye) MarshalSize() int {
 	srcsLength := len(g.Sources) * ssrcLength
-	reasonLength := len(g.Reason) + 1
+	// reason is optional
+	reasonLength := len(g.Reason)
+	if reasonLength > 0 {
+		reasonLength++
+	}
 
 	l := headerLength + srcsLength + reasonLength
 

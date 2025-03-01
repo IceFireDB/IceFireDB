@@ -6,13 +6,13 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/gammazero/deque"
 	bserv "github.com/ipfs/boxo/blockservice"
 	blocks "github.com/ipfs/go-block-format"
 	cid "github.com/ipfs/go-cid"
 	format "github.com/ipfs/go-ipld-format"
 	legacy "github.com/ipfs/go-ipld-legacy"
 	dagpb "github.com/ipld/go-codec-dagpb"
-
 	// blank import is used to register the IPLD raw codec
 	_ "github.com/ipld/go-ipld-prime/codec/raw"
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
@@ -535,7 +535,7 @@ func parallelWalkDepth(ctx context.Context, getLinks GetLinks, root cid.Cid, vis
 	defer close(feed)
 
 	send := feed
-	var todoQueue []cidDepth
+	var todoQueue deque.Deque[cidDepth]
 	var inProgress int
 
 	next := cidDepth{
@@ -547,9 +547,8 @@ func parallelWalkDepth(ctx context.Context, getLinks GetLinks, root cid.Cid, vis
 		select {
 		case send <- next:
 			inProgress++
-			if len(todoQueue) > 0 {
-				next = todoQueue[0]
-				todoQueue = todoQueue[1:]
+			if todoQueue.Len() > 0 {
+				next = todoQueue.PopFront()
 			} else {
 				next = cidDepth{}
 				send = nil
@@ -570,7 +569,7 @@ func parallelWalkDepth(ctx context.Context, getLinks GetLinks, root cid.Cid, vis
 					next = cd
 					send = feed
 				} else {
-					todoQueue = append(todoQueue, cd)
+					todoQueue.PushBack(cd)
 				}
 			}
 		case err := <-errChan:

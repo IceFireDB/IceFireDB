@@ -15,6 +15,7 @@ func (c *unmarshalCache) reset() {
 
 func (c *unmarshalCache) getSessionAttribute() *Attribute {
 	c.sessionAttributes = append(c.sessionAttributes, Attribute{})
+
 	return &c.sessionAttributes[len(c.sessionAttributes)-1]
 }
 
@@ -25,11 +26,13 @@ func (c *unmarshalCache) cloneSessionAttributes() []Attribute {
 	s := make([]Attribute, len(c.sessionAttributes))
 	copy(s, c.sessionAttributes)
 	c.sessionAttributes = c.sessionAttributes[:0]
+
 	return s
 }
 
 func (c *unmarshalCache) getMediaAttribute() *Attribute {
 	c.mediaAttributes = append(c.mediaAttributes, Attribute{})
+
 	return &c.mediaAttributes[len(c.mediaAttributes)-1]
 }
 
@@ -40,5 +43,6 @@ func (c *unmarshalCache) cloneMediaAttributes() []Attribute {
 	s := make([]Attribute, len(c.mediaAttributes))
 	copy(s, c.mediaAttributes)
 	c.mediaAttributes = c.mediaAttributes[:0]
+
 	return s
 }
