@@ -6,11 +6,10 @@ import (
 	"os"
 	"time"
 
-	ft "github.com/ipfs/boxo/ipld/unixfs"
-	uio "github.com/ipfs/boxo/ipld/unixfs/io"
-
 	"github.com/ipfs/boxo/files"
 	dag "github.com/ipfs/boxo/ipld/merkledag"
+	ft "github.com/ipfs/boxo/ipld/unixfs"
+	uio "github.com/ipfs/boxo/ipld/unixfs/io"
 	ipld "github.com/ipfs/go-ipld-format"
 )
 

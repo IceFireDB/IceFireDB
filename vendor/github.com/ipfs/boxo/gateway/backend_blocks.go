@@ -29,6 +29,11 @@ import (
 	"github.com/ipld/go-car/v2/storage"
 	dagpb "github.com/ipld/go-codec-dagpb"
 	"github.com/ipld/go-ipld-prime"
+	// Ensure basic codecs are registered.
+	_ "github.com/ipld/go-ipld-prime/codec/cbor"
+	_ "github.com/ipld/go-ipld-prime/codec/dagcbor"
+	_ "github.com/ipld/go-ipld-prime/codec/dagjson"
+	_ "github.com/ipld/go-ipld-prime/codec/json"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
@@ -37,12 +42,6 @@ import (
 	"github.com/ipld/go-ipld-prime/traversal/selector"
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
 	mc "github.com/multiformats/go-multicodec"
-
-	// Ensure basic codecs are registered.
-	_ "github.com/ipld/go-ipld-prime/codec/cbor"
-	_ "github.com/ipld/go-ipld-prime/codec/dagcbor"
-	_ "github.com/ipld/go-ipld-prime/codec/dagjson"
-	_ "github.com/ipld/go-ipld-prime/codec/json"
 )
 
 // BlocksBackend is an [IPFSBackend] implementation based on a [blockservice.BlockService].
@@ -514,7 +513,6 @@ func walkGatewaySimpleSelector(ctx context.Context, lastCid cid.Cid, terminalBlk
 					if err != nil {
 						return err
 					}
-					foundFileLength = true
 				}
 				to = fileLength + *entityRange.To
 			}

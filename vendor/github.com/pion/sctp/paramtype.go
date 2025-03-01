@@ -9,7 +9,7 @@ import (
 	"fmt"
 )
 
-// paramType represents a SCTP INIT/INITACK parameter
+// paramType represents a SCTP INIT/INITACK parameter.
 type paramType uint16
 
 const (
@@ -43,7 +43,7 @@ const (
 	adaptLayerInd          paramType = 49158 // Adaptation Layer Indication (0xC006)	[RFC5061]
 )
 
-// Parameter packet errors
+// Parameter packet errors.
 var (
 	ErrParamPacketTooShort = errors.New("packet to short")
 )
@@ -52,10 +52,11 @@ func parseParamType(raw []byte) (paramType, error) {
 	if len(raw) < 2 {
 		return paramType(0), ErrParamPacketTooShort
 	}
+
 	return paramType(binary.BigEndian.Uint16(raw)), nil
 }
 
-func (p paramType) String() string {
+func (p paramType) String() string { //nolint:cyclop
 	switch p {
 	case heartbeatInfo:
 		return "Heartbeat Info"

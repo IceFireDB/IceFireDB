@@ -111,7 +111,7 @@ func FolderPBDataWithStat(mode os.FileMode, mtime time.Time) []byte {
 
 	data, err := proto.Marshal(pbfile)
 	if err != nil {
-		//this really shouldnt happen, i promise
+		// this really shouldnt happen, i promise
 		panic(err)
 	}
 	return data
