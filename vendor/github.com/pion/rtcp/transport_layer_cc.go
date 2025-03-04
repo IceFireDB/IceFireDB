@@ -491,7 +491,7 @@ func (t *TransportLayerCC) Unmarshal(rawPacket []byte) error { //nolint:gocognit
 				return err
 			}
 
-			packetNumberToProcess := min(t.PacketStatusCount-processedPacketNum, packetStatus.RunLength)
+			packetNumberToProcess := localMin(t.PacketStatusCount-processedPacketNum, packetStatus.RunLength)
 			if packetStatus.PacketStatusSymbol == TypeTCCPacketReceivedSmallDelta ||
 				packetStatus.PacketStatusSymbol == TypeTCCPacketReceivedLargeDelta {
 				for j := uint16(0); j < packetNumberToProcess; j++ {
@@ -558,7 +558,7 @@ func (t TransportLayerCC) DestinationSSRC() []uint32 {
 	return []uint32{t.MediaSSRC}
 }
 
-func min(x, y uint16) uint16 {
+func localMin(x, y uint16) uint16 {
 	if x < y {
 		return x
 	}

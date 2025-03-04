@@ -58,7 +58,7 @@ func (r *RTTStats) PTO(includeMaxAckDelay bool) time.Duration {
 }
 
 // UpdateRTT updates the RTT based on a new sample.
-func (r *RTTStats) UpdateRTT(sendDelta, ackDelay time.Duration, now time.Time) {
+func (r *RTTStats) UpdateRTT(sendDelta, ackDelay time.Duration) {
 	if sendDelta <= 0 {
 		return
 	}
@@ -107,4 +107,13 @@ func (r *RTTStats) SetInitialRTT(t time.Duration) {
 	}
 	r.smoothedRTT = t
 	r.latestRTT = t
+}
+
+func (r *RTTStats) ResetForPathMigration() {
+	r.hasMeasurement = false
+	r.minRTT = 0
+	r.latestRTT = 0
+	r.smoothedRTT = 0
+	r.meanDeviation = 0
+	// max_ack_delay remains valid
 }

@@ -3,10 +3,10 @@
 
 package codecs
 
-// G722Payloader payloads G722 packets
+// G722Payloader payloads G722 packets.
 type G722Payloader struct{}
 
-// Payload fragments an G722 packet across one or more byte arrays
+// Payload fragments an G722 packet across one or more byte arrays.
 func (p *G722Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 	var out [][]byte
 	if payload == nil || mtu == 0 {
@@ -21,5 +21,6 @@ func (p *G722Payloader) Payload(mtu uint16, payload []byte) [][]byte {
 	}
 	o := make([]byte, len(payload))
 	copy(o, payload)
+
 	return append(out, o)
 }
