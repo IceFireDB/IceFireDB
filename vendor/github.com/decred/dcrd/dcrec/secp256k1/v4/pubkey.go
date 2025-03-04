@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2022 The Decred developers
+// Copyright (c) 2015-2024 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -177,7 +177,6 @@ func ParsePubKey(serialized []byte) (key *PublicKey, err error) {
 				"the secp256k1 curve", x)
 			return nil, makeError(ErrPubKeyNotOnCurve, str)
 		}
-		y.Normalize()
 
 	default:
 		str := fmt.Sprintf("malformed public key: invalid length: %d",

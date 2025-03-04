@@ -19,6 +19,9 @@ type newConnID struct {
 type connIDManager struct {
 	queue list.List[newConnID]
 
+	highestProbingID uint64
+	pathProbing      map[pathID]newConnID // initialized lazily
+
 	handshakeComplete         bool
 	activeSequenceNumber      uint64
 	highestRetired            uint64
@@ -35,6 +38,8 @@ type connIDManager struct {
 	addStatelessResetToken    func(protocol.StatelessResetToken)
 	removeStatelessResetToken func(protocol.StatelessResetToken)
 	queueControlFrame         func(wire.Frame)
+
+	closed bool
 }
 
 func newConnIDManager(
@@ -66,15 +71,31 @@ func (h *connIDManager) Add(f *wire.NewConnectionIDFrame) error {
 }
 
 func (h *connIDManager) add(f *wire.NewConnectionIDFrame) error {
+	if h.activeConnectionID.Len() == 0 {
+		return &qerr.TransportError{
+			ErrorCode:    qerr.ProtocolViolation,
+			ErrorMessage: "received NEW_CONNECTION_ID frame but zero-length connection IDs are in use",
+		}
+	}
 	// If the NEW_CONNECTION_ID frame is reordered, such that its sequence number is smaller than the currently active
 	// connection ID or if it was already retired, send the RETIRE_CONNECTION_ID frame immediately.
-	if f.SequenceNumber < h.activeSequenceNumber || f.SequenceNumber < h.highestRetired {
+	if f.SequenceNumber < max(h.activeSequenceNumber, h.highestProbingID) || f.SequenceNumber < h.highestRetired {
 		h.queueControlFrame(&wire.RetireConnectionIDFrame{
 			SequenceNumber: f.SequenceNumber,
 		})
 		return nil
 	}
 
+	if f.RetirePriorTo != 0 && h.pathProbing != nil {
+		for id, entry := range h.pathProbing {
+			if entry.SequenceNumber < f.RetirePriorTo {
+				h.queueControlFrame(&wire.RetireConnectionIDFrame{
+					SequenceNumber: entry.SequenceNumber,
+				})
+				delete(h.pathProbing, id)
+			}
+		}
+	}
 	// Retire elements in the queue.
 	// Doesn't retire the active connection ID.
 	if f.RetirePriorTo > h.highestRetired {
@@ -142,6 +163,7 @@ func (h *connIDManager) addConnectionID(seq uint64, connID protocol.ConnectionID
 }
 
 func (h *connIDManager) updateConnectionID() {
+	h.assertNotClosed()
 	h.queueControlFrame(&wire.RetireConnectionIDFrame{
 		SequenceNumber: h.activeSequenceNumber,
 	})
@@ -160,6 +182,7 @@ func (h *connIDManager) updateConnectionID() {
 }
 
 func (h *connIDManager) Close() {
+	h.closed = true
 	if h.activeStatelessResetToken != nil {
 		h.removeStatelessResetToken(*h.activeStatelessResetToken)
 	}
@@ -176,6 +199,7 @@ func (h *connIDManager) ChangeInitialConnID(newConnID protocol.ConnectionID) {
 
 // is called when the server provides a stateless reset token in the transport parameters
 func (h *connIDManager) SetStatelessResetToken(token protocol.StatelessResetToken) {
+	h.assertNotClosed()
 	if h.activeSequenceNumber != 0 {
 		panic("expected first connection ID to have sequence number 0")
 	}
@@ -203,6 +227,7 @@ func (h *connIDManager) shouldUpdateConnID() bool {
 }
 
 func (h *connIDManager) Get() protocol.ConnectionID {
+	h.assertNotClosed()
 	if h.shouldUpdateConnID() {
 		h.updateConnectionID()
 	}
@@ -211,4 +236,58 @@ func (h *connIDManager) Get() protocol.ConnectionID {
 
 func (h *connIDManager) SetHandshakeComplete() {
 	h.handshakeComplete = true
+}
+
+// GetConnIDForPath retrieves a connection ID for a new path (i.e. not the active one).
+// Once a connection ID is allocated for a path, it cannot be used for a different path.
+// When called with the same pathID, it will return the same connection ID,
+// unless the peer requested that this connection ID be retired.
+func (h *connIDManager) GetConnIDForPath(id pathID) (protocol.ConnectionID, bool) {
+	h.assertNotClosed()
+	// if we're using zero-length connection IDs, we don't need to change the connection ID
+	if h.activeConnectionID.Len() == 0 {
+		return protocol.ConnectionID{}, true
+	}
+
+	if h.pathProbing == nil {
+		h.pathProbing = make(map[pathID]newConnID)
+	}
+	entry, ok := h.pathProbing[id]
+	if ok {
+		return entry.ConnectionID, true
+	}
+	if h.queue.Len() == 0 {
+		return protocol.ConnectionID{}, false
+	}
+	front := h.queue.Remove(h.queue.Front())
+	h.pathProbing[id] = front
+	h.highestProbingID = front.SequenceNumber
+	return front.ConnectionID, true
+}
+
+func (h *connIDManager) RetireConnIDForPath(pathID pathID) {
+	h.assertNotClosed()
+	// if we're using zero-length connection IDs, we don't need to change the connection ID
+	if h.activeConnectionID.Len() == 0 {
+		return
+	}
+
+	entry, ok := h.pathProbing[pathID]
+	if !ok {
+		return
+	}
+	h.queueControlFrame(&wire.RetireConnectionIDFrame{
+		SequenceNumber: entry.SequenceNumber,
+	})
+	delete(h.pathProbing, pathID)
+}
+
+// Using the connIDManager after it has been closed can have disastrous effects:
+// If the connection ID is rotated, a new entry would be inserted into the packet handler map,
+// leading to a memory leak of the connection struct.
+// See https://github.com/quic-go/quic-go/pull/4852 for more details.
+func (h *connIDManager) assertNotClosed() {
+	if h.closed {
+		panic("connection ID manager is closed")
+	}
 }

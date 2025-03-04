@@ -101,13 +101,8 @@ func (qr *queryResults) advance() bool {
 	qr.next = query.Result{}
 	r, more := qr.results.NextSync()
 	if !more {
-		err := qr.results.Close()
+		qr.results.Close()
 		qr.results = nil
-		if err != nil {
-			// One more result, the error.
-			qr.next = query.Result{Error: err}
-			return true
-		}
 		return false
 	}
 
@@ -145,19 +140,11 @@ func (h *querySet) Pop() interface{} {
 	return last
 }
 
-func (h *querySet) close() error {
-	var errs []error
+func (h *querySet) close() {
 	for _, qr := range h.heads {
-		err := qr.results.Close()
-		if err != nil {
-			errs = append(errs, err)
-		}
+		qr.results.Close()
 	}
 	h.heads = nil
-	if len(errs) > 0 {
-		return errs[0]
-	}
-	return nil
 }
 
 func (h *querySet) addResults(mount ds.Key, results query.Results) {
@@ -339,7 +326,7 @@ func (d *Datastore) Query(ctx context.Context, master query.Query) (query.Result
 		results, err := dstore.Query(ctx, qi)
 
 		if err != nil {
-			_ = queries.close()
+			queries.close()
 			return nil, err
 		}
 		queries.addResults(mount, results)

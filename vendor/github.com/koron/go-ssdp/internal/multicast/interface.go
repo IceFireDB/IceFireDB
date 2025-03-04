@@ -10,6 +10,10 @@ type InterfacesProviderFunc func() []net.Interface
 // If no provider are given, all possible interfaces will be used.
 var InterfacesProvider InterfacesProviderFunc
 
+// SystemAssignedInterface indicates use the system assigned multicast interface or not.
+// InterfacesProvider will be ignored when this is true.
+var SystemAssignedInterface bool = false
+
 // interfaces gets list of net.Interface to multicast UDP packet.
 func interfaces() ([]net.Interface, error) {
 	if p := InterfacesProvider; p != nil {

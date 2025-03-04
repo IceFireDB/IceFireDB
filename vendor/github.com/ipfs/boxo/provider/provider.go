@@ -18,7 +18,7 @@ var logR = logging.Logger("reprovider.simple")
 // Provider announces blocks to the network
 type Provider interface {
 	// Provide takes a cid and makes an attempt to announce it to the network
-	Provide(cid.Cid) error
+	Provide(context.Context, cid.Cid, bool) error
 }
 
 // Reprovider reannounces blocks to the network

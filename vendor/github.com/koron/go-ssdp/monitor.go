@@ -20,13 +20,19 @@ type Monitor struct {
 	Bye    ByeHandler
 	Search SearchHandler
 
+	Options []Option
+
 	conn *multicast.Conn
 	wg   sync.WaitGroup
 }
 
 // Start starts to monitor SSDP messages.
 func (m *Monitor) Start() error {
-	conn, err := multicast.Listen(multicast.RecvAddrResolver)
+	cfg, err := opts2config(m.Options)
+	if err != nil {
+		return err
+	}
+	conn, err := multicast.Listen(multicast.RecvAddrResolver, cfg.multicastConfig.options()...)
 	if err != nil {
 		return err
 	}

@@ -33,6 +33,7 @@ func (t Timing) String() string {
 
 func (t Timing) marshalInto(b []byte) []byte {
 	b = append(strconv.AppendUint(b, t.StartTime, 10), ' ')
+
 	return strconv.AppendUint(b, t.StopTime, 10)
 }
 

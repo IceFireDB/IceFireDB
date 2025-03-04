@@ -71,7 +71,7 @@ func newCertManager(hostKey ic.PrivKey, clock clock.Clock) (*certManager, error)
 	return m, nil
 }
 
-// getCurrentTimeBucket returns the canonical start time of the given time as
+// getCurrentBucketStartTime returns the canonical start time of the given time as
 // bucketed by ranges of certValidity since unix epoch (plus an offset). This
 // lets you get the same time ranges across reboots without having to persist
 // state.
@@ -191,16 +191,18 @@ func (m *certManager) cacheSerializedCertHashes() error {
 }
 
 func (m *certManager) cacheAddrComponent() error {
-	addr, err := addrComponentForCert(m.currentConfig.sha256[:])
+	var addr ma.Multiaddr
+	c, err := addrComponentForCert(m.currentConfig.sha256[:])
 	if err != nil {
 		return err
 	}
+	addr = addr.AppendComponent(c)
 	if m.nextConfig != nil {
 		comp, err := addrComponentForCert(m.nextConfig.sha256[:])
 		if err != nil {
 			return err
 		}
-		addr = addr.Encapsulate(comp)
+		addr = addr.AppendComponent(comp)
 	}
 	m.addrComp = addr
 	return nil

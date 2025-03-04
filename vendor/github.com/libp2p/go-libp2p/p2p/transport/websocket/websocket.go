@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/transport"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcpreuse"
 
 	ma "github.com/multiformats/go-multiaddr"
 	mafmt "github.com/multiformats/go-multiaddr-fmt"
@@ -38,10 +39,10 @@ var dialMatcher = mafmt.And(
 		mafmt.Base(ma.P_WSS)))
 
 var (
-	wssComponent   = ma.StringCast("/wss")
-	tlsWsComponent = ma.StringCast("/tls/ws")
-	tlsComponent   = ma.StringCast("/tls")
-	wsComponent    = ma.StringCast("/ws")
+	wssComponent, _ = ma.NewComponent("wss", "")
+	tlsComponent, _ = ma.NewComponent("tls", "")
+	wsComponent, _  = ma.NewComponent("ws", "")
+	tlsWsAddr       = ma.Multiaddr{*tlsComponent, *wsComponent}
 )
 
 func init() {
@@ -87,11 +88,13 @@ type WebsocketTransport struct {
 
 	tlsClientConf *tls.Config
 	tlsConf       *tls.Config
+
+	sharedTcp *tcpreuse.ConnMgr
 }
 
 var _ transport.Transport = (*WebsocketTransport)(nil)
 
-func New(u transport.Upgrader, rcmgr network.ResourceManager, opts ...Option) (*WebsocketTransport, error) {
+func New(u transport.Upgrader, rcmgr network.ResourceManager, sharedTCP *tcpreuse.ConnMgr, opts ...Option) (*WebsocketTransport, error) {
 	if rcmgr == nil {
 		rcmgr = &network.NullResourceManager{}
 	}
@@ -99,6 +102,7 @@ func New(u transport.Upgrader, rcmgr network.ResourceManager, opts ...Option) (*
 		upgrader:      u,
 		rcmgr:         rcmgr,
 		tlsClientConf: &tls.Config{},
+		sharedTcp:     sharedTCP,
 	}
 	for _, opt := range opts {
 		if err := opt(t); err != nil {
@@ -134,15 +138,15 @@ func (t *WebsocketTransport) Resolve(_ context.Context, maddr ma.Multiaddr) ([]m
 	if parsed.sni == nil {
 		var err error
 		// We don't have an sni component, we'll use dns
-		ma.ForEach(parsed.restMultiaddr, func(c ma.Component) bool {
+	loop:
+		for _, c := range parsed.restMultiaddr {
 			switch c.Protocol().Code {
 			case ma.P_DNS, ma.P_DNS4, ma.P_DNS6:
 				// err shouldn't happen since this means we couldn't parse a dns hostname for an sni value.
 				parsed.sni, err = ma.NewComponent("sni", c.Value())
-				return false
+				break loop
 			}
-			return true
-		})
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -156,6 +160,8 @@ func (t *WebsocketTransport) Resolve(_ context.Context, maddr ma.Multiaddr) ([]m
 	return []ma.Multiaddr{parsed.toMultiaddr()}, nil
 }
 
+// Dial will dial the given multiaddr and expect the given peer. If an
+// HTTPS_PROXY env is set, it will use that for the dial out.
 func (t *WebsocketTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
 	connScope, err := t.rcmgr.OpenConnection(network.DirOutbound, true, raddr)
 	if err != nil {
@@ -187,7 +193,11 @@ func (t *WebsocketTransport) maDial(ctx context.Context, raddr ma.Multiaddr) (ma
 		return nil, err
 	}
 	isWss := wsurl.Scheme == "wss"
-	dialer := ws.Dialer{HandshakeTimeout: 30 * time.Second}
+	dialer := ws.Dialer{
+		HandshakeTimeout: 30 * time.Second,
+		// Inherit the default proxy behavior
+		Proxy: ws.DefaultDialer.Proxy,
+	}
 	if isWss {
 		sni := ""
 		sni, err = raddr.ValueForProtocol(ma.P_SNI)
@@ -199,17 +209,23 @@ func (t *WebsocketTransport) maDial(ctx context.Context, raddr ma.Multiaddr) (ma
 			copytlsClientConf := t.tlsClientConf.Clone()
 			copytlsClientConf.ServerName = sni
 			dialer.TLSClientConfig = copytlsClientConf
-			ipAddr := wsurl.Host
-			// Setting the NetDial because we already have the resolved IP address, so we don't want to do another resolution.
+			ipPortAddr := wsurl.Host
 			// We set the `.Host` to the sni field so that the host header gets properly set.
+			wsurl.Host = sni + ":" + wsurl.Port()
+			// Setting the NetDial because we already have the resolved IP address, so we can avoid another resolution.
 			dialer.NetDial = func(network, address string) (net.Conn, error) {
-				tcpAddr, err := net.ResolveTCPAddr(network, ipAddr)
+				var tcpAddr *net.TCPAddr
+				var err error
+				if address == wsurl.Host {
+					tcpAddr, err = net.ResolveTCPAddr(network, ipPortAddr) // Use our already resolved IP address
+				} else {
+					tcpAddr, err = net.ResolveTCPAddr(network, address)
+				}
 				if err != nil {
 					return nil, err
 				}
 				return net.DialTCP("tcp", nil, tcpAddr)
 			}
-			wsurl.Host = sni + ":" + wsurl.Port()
 		} else {
 			dialer.TLSClientConfig = t.tlsClientConf
 		}
@@ -233,7 +249,7 @@ func (t *WebsocketTransport) maListen(a ma.Multiaddr) (manet.Listener, error) {
 	if t.tlsConf != nil {
 		tlsConf = t.tlsConf.Clone()
 	}
-	l, err := newListener(a, tlsConf)
+	l, err := newListener(a, tlsConf, t.sharedTcp)
 	if err != nil {
 		return nil, err
 	}

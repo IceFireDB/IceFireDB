@@ -175,10 +175,12 @@ func (t *transport) dialWithScope(ctx context.Context, raddr ma.Multiaddr, p pee
 	sconn, err := t.upgrade(ctx, sess, p, certHashes)
 	if err != nil {
 		sess.CloseWithError(1, "")
+		qconn.CloseWithError(1, "")
 		return nil, err
 	}
 	if t.gater != nil && !t.gater.InterceptSecured(network.DirOutbound, p, sconn) {
 		sess.CloseWithError(errorCodeConnectionGating, "")
+		qconn.CloseWithError(errorCodeConnectionGating, "")
 		return nil, fmt.Errorf("secured connection gated")
 	}
 	conn := newConn(t, sess, sconn, scope, qconn)
@@ -412,12 +414,21 @@ func (t *transport) Resolve(_ context.Context, maddr ma.Multiaddr) ([]ma.Multiad
 	beforeQuicMA, afterIncludingQuicMA := ma.SplitFunc(maddr, func(c ma.Component) bool {
 		return c.Protocol().Code == ma.P_QUIC_V1
 	})
+	if len(afterIncludingQuicMA) == 0 {
+		return nil, fmt.Errorf("no quic component found in %s", maddr)
+	}
 	quicComponent, afterQuicMA := ma.SplitFirst(afterIncludingQuicMA)
+	if quicComponent == nil {
+		// Should not happen since we split on P_QUIC_V1 already
+		return nil, fmt.Errorf("no quic component found in %s", maddr)
+	}
 	sniComponent, err := ma.NewComponent(ma.ProtocolWithCode(ma.P_SNI).Name, sni)
 	if err != nil {
 		return nil, err
 	}
-	return []ma.Multiaddr{beforeQuicMA.Encapsulate(quicComponent).Encapsulate(sniComponent).Encapsulate(afterQuicMA)}, nil
+	result := beforeQuicMA.AppendComponent(quicComponent, sniComponent)
+	result = append(result, afterQuicMA...)
+	return []ma.Multiaddr{result}, nil
 }
 
 // AddCertHashes adds the current certificate hashes to a multiaddress.

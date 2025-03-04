@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"io"
 	"net"
 	"sync"
 
+	"github.com/libp2p/go-netroute"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,10 +17,29 @@ import (
 	quicmetrics "github.com/quic-go/quic-go/metrics"
 )
 
+type QUICListener interface {
+	Accept(ctx context.Context) (quic.Connection, error)
+	Close() error
+	Addr() net.Addr
+}
+
+var _ QUICListener = &quic.Listener{}
+
+type QUICTransport interface {
+	Listen(tlsConf *tls.Config, conf *quic.Config) (QUICListener, error)
+	Dial(ctx context.Context, addr net.Addr, tlsConf *tls.Config, conf *quic.Config) (quic.Connection, error)
+	WriteTo(b []byte, addr net.Addr) (int, error)
+	ReadNonQUICPacket(ctx context.Context, b []byte) (int, net.Addr, error)
+	io.Closer
+}
+
 type ConnManager struct {
 	reuseUDP4       *reuse
 	reuseUDP6       *reuse
 	enableReuseport bool
+
+	listenUDP          listenUDP
+	sourceIPSelectorFn func() (SourceIPSelector, error)
 
 	enableMetrics bool
 	registerer    prometheus.Registerer
@@ -38,13 +59,24 @@ type quicListenerEntry struct {
 	ln       *quicListener
 }
 
+func defaultListenUDP(network string, laddr *net.UDPAddr) (net.PacketConn, error) {
+	return net.ListenUDP(network, laddr)
+}
+
+func defaultSourceIPSelectorFn() (SourceIPSelector, error) {
+	r, err := netroute.New()
+	return &netrouteSourceIPSelector{routes: r}, err
+}
+
 func NewConnManager(statelessResetKey quic.StatelessResetKey, tokenKey quic.TokenGeneratorKey, opts ...Option) (*ConnManager, error) {
 	cm := &ConnManager{
-		enableReuseport: true,
-		quicListeners:   make(map[string]quicListenerEntry),
-		srk:             statelessResetKey,
-		tokenKey:        tokenKey,
-		registerer:      prometheus.DefaultRegisterer,
+		enableReuseport:    true,
+		quicListeners:      make(map[string]quicListenerEntry),
+		srk:                statelessResetKey,
+		tokenKey:           tokenKey,
+		registerer:         prometheus.DefaultRegisterer,
+		listenUDP:          defaultListenUDP,
+		sourceIPSelectorFn: defaultSourceIPSelectorFn,
 	}
 	for _, o := range opts {
 		if err := o(cm); err != nil {
@@ -59,8 +91,8 @@ func NewConnManager(statelessResetKey quic.StatelessResetKey, tokenKey quic.Toke
 	cm.clientConfig = quicConf
 	cm.serverConfig = serverConfig
 	if cm.enableReuseport {
-		cm.reuseUDP4 = newReuse(&statelessResetKey, &tokenKey)
-		cm.reuseUDP6 = newReuse(&statelessResetKey, &tokenKey)
+		cm.reuseUDP4 = newReuse(&statelessResetKey, &tokenKey, cm.listenUDP, cm.sourceIPSelectorFn)
+		cm.reuseUDP6 = newReuse(&statelessResetKey, &tokenKey, cm.listenUDP, cm.sourceIPSelectorFn)
 	}
 	return cm, nil
 }
@@ -99,6 +131,32 @@ func (c *ConnManager) getReuse(network string) (*reuse, error) {
 	default:
 		return nil, errors.New("invalid network: must be either udp4 or udp6")
 	}
+}
+
+// LendTransport is an advanced method used to lend an existing QUICTransport
+// to the ConnManager. The ConnManager will close the returned channel when it
+// is done with the transport, so that the owner may safely close the transport.
+func (c *ConnManager) LendTransport(network string, tr QUICTransport, conn net.PacketConn) (<-chan struct{}, error) {
+	c.quicListenersMu.Lock()
+	defer c.quicListenersMu.Unlock()
+
+	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		return nil, errors.New("expected a conn.LocalAddr() to return a *net.UDPAddr")
+	}
+
+	refCountedTr := &refcountedTransport{
+		QUICTransport:    tr,
+		packetConn:       conn,
+		borrowDoneSignal: make(chan struct{}),
+	}
+
+	var reuse *reuse
+	reuse, err := c.getReuse(network)
+	if err != nil {
+		return nil, err
+	}
+	return refCountedTr.borrowDoneSignal, reuse.AddTransport(refCountedTr, localAddr)
 }
 
 func (c *ConnManager) ListenQUIC(addr ma.Multiaddr, tlsConf *tls.Config, allowWindowIncrease func(conn quic.Connection, delta uint64) bool) (Listener, error) {
@@ -175,7 +233,7 @@ func (c *ConnManager) SharedNonQUICPacketConn(network string, laddr *net.UDPAddr
 			ctx:             ctx,
 			ctxCancel:       cancel,
 			owningTransport: t,
-			tr:              &t.Transport,
+			tr:              t.QUICTransport,
 		}, nil
 	}
 	return nil, errors.New("expected to be able to share with a QUIC listener, but the QUIC listener is not using a refcountedTransport. `DisableReuseport` should not be set")
@@ -195,16 +253,18 @@ func (c *ConnManager) transportForListen(association any, network string, laddr 
 		return tr, nil
 	}
 
-	conn, err := net.ListenUDP(network, laddr)
+	conn, err := c.listenUDP(network, laddr)
 	if err != nil {
 		return nil, err
 	}
 	return &singleOwnerTransport{
 		packetConn: conn,
-		Transport: quic.Transport{
-			Conn:              conn,
-			StatelessResetKey: &c.srk,
-			TokenGeneratorKey: &c.tokenKey,
+		Transport: &wrappedQUICTransport{
+			&quic.Transport{
+				Conn:              conn,
+				StatelessResetKey: &c.srk,
+				TokenGeneratorKey: &c.tokenKey,
+			},
 		},
 	}, nil
 }
@@ -275,11 +335,12 @@ func (c *ConnManager) TransportWithAssociationForDial(association any, network s
 	case "udp6":
 		laddr = &net.UDPAddr{IP: net.IPv6zero, Port: 0}
 	}
-	conn, err := net.ListenUDP(network, laddr)
+	conn, err := c.listenUDP(network, laddr)
+
 	if err != nil {
 		return nil, err
 	}
-	return &singleOwnerTransport{Transport: quic.Transport{Conn: conn, StatelessResetKey: &c.srk}, packetConn: conn}, nil
+	return &singleOwnerTransport{Transport: &wrappedQUICTransport{&quic.Transport{Conn: conn, StatelessResetKey: &c.srk}}, packetConn: conn}, nil
 }
 
 func (c *ConnManager) Protocols() []int {
@@ -298,4 +359,12 @@ func (c *ConnManager) Close() error {
 
 func (c *ConnManager) ClientConfig() *quic.Config {
 	return c.clientConfig
+}
+
+type wrappedQUICTransport struct {
+	*quic.Transport
+}
+
+func (t *wrappedQUICTransport) Listen(tlsConf *tls.Config, conf *quic.Config) (QUICListener, error) {
+	return t.Transport.Listen(tlsConf, conf)
 }
