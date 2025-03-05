@@ -10,16 +10,12 @@ import (
 
 	bsmsg "github.com/ipfs/boxo/bitswap/message"
 	"github.com/ipfs/boxo/bitswap/network/internal"
-
-	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/libp2p/go-msgio"
 	ma "github.com/multiformats/go-multiaddr"
@@ -36,12 +32,11 @@ var (
 )
 
 // NewFromIpfsHost returns a BitSwapNetwork supported by underlying IPFS host.
-func NewFromIpfsHost(host host.Host, r routing.ContentRouting, opts ...NetOpt) BitSwapNetwork {
+func NewFromIpfsHost(host host.Host, opts ...NetOpt) BitSwapNetwork {
 	s := processSettings(opts...)
 
 	bitswapNetwork := impl{
-		host:    host,
-		routing: r,
+		host: host,
 
 		protocolBitswapNoVers:  s.ProtocolPrefix + ProtocolBitswapNoVers,
 		protocolBitswapOneZero: s.ProtocolPrefix + ProtocolBitswapOneZero,
@@ -73,7 +68,6 @@ type impl struct {
 	stats Stats
 
 	host          host.Host
-	routing       routing.ContentRouting
 	connectEvtMgr *connectEventManager
 
 	protocolBitswapNoVers  protocol.ID
@@ -87,24 +81,51 @@ type impl struct {
 	receivers []Receiver
 }
 
+// interfaceWrapper is concrete type that wraps an interface. Necessary because
+// atomic.Value needs the same type and can not Store(nil). This indirection
+// allows us to store nil.
+type interfaceWrapper[T any] struct {
+	t T
+}
+type atomicInterface[T any] struct {
+	iface atomic.Value
+}
+
+func (a *atomicInterface[T]) Load() T {
+	var v T
+	x := a.iface.Load()
+	if x != nil {
+		return x.(interfaceWrapper[T]).t
+	}
+	return v
+}
+
+func (a *atomicInterface[T]) Store(v T) {
+	a.iface.Store(interfaceWrapper[T]{v})
+}
+
 type streamMessageSender struct {
-	to        peer.ID
-	stream    network.Stream
-	connected bool
-	bsnet     *impl
-	opts      *MessageSenderOpts
+	to     peer.ID
+	stream atomicInterface[network.Stream]
+	bsnet  *impl
+	opts   *MessageSenderOpts
+}
+
+type HasContext interface {
+	Context() context.Context
 }
 
 // Open a stream to the remote peer
 func (s *streamMessageSender) Connect(ctx context.Context) (network.Stream, error) {
-	if s.connected {
-		return s.stream, nil
+	stream := s.stream.Load()
+	if stream != nil {
+		return stream, nil
 	}
 
 	tctx, cancel := context.WithTimeout(ctx, s.opts.SendTimeout)
 	defer cancel()
 
-	if err := s.bsnet.ConnectTo(tctx, s.to); err != nil {
+	if err := s.bsnet.Connect(ctx, peer.AddrInfo{ID: s.to}); err != nil {
 		return nil, err
 	}
 
@@ -112,17 +133,22 @@ func (s *streamMessageSender) Connect(ctx context.Context) (network.Stream, erro
 	if err != nil {
 		return nil, err
 	}
+	if withCtx, ok := stream.Conn().(HasContext); ok {
+		context.AfterFunc(withCtx.Context(), func() {
+			s.stream.Store(nil)
+		})
+	}
 
-	s.stream = stream
-	s.connected = true
-	return s.stream, nil
+	s.stream.Store(stream)
+	return stream, nil
 }
 
 // Reset the stream
 func (s *streamMessageSender) Reset() error {
-	if s.stream != nil {
-		err := s.stream.Reset()
-		s.connected = false
+	stream := s.stream.Load()
+	if stream != nil {
+		err := stream.Reset()
+		s.stream.Store(nil)
 		return err
 	}
 	return nil
@@ -130,12 +156,22 @@ func (s *streamMessageSender) Reset() error {
 
 // Close the stream
 func (s *streamMessageSender) Close() error {
-	return s.stream.Close()
+	stream := s.stream.Load()
+	if stream != nil {
+		err := stream.Close()
+		s.stream.Store(nil)
+		return err
+	}
+	return nil
 }
 
 // Indicates whether the peer supports HAVE / DONT_HAVE messages
 func (s *streamMessageSender) SupportsHave() bool {
-	return s.bsnet.SupportsHave(s.stream.Protocol())
+	stream := s.stream.Load()
+	if stream == nil {
+		return false
+	}
+	return s.bsnet.SupportsHave(stream.Protocol())
 }
 
 // Send a message to the peer, attempting multiple times
@@ -147,8 +183,10 @@ func (s *streamMessageSender) SendMsg(ctx context.Context, msg bsmsg.BitSwapMess
 
 // Perform a function with multiple attempts, and a timeout
 func (s *streamMessageSender) multiAttempt(ctx context.Context, fn func() error) error {
-	// Try to call the function repeatedly
 	var err error
+	var timer *time.Timer
+
+	// Try to call the function repeatedly
 	for i := 0; i < s.opts.MaxRetries; i++ {
 		if err = fn(); err == nil {
 			// Attempt was successful
@@ -179,8 +217,12 @@ func (s *streamMessageSender) multiAttempt(ctx context.Context, fn func() error)
 			return err
 		}
 
-		timer := time.NewTimer(s.opts.SendErrorBackoff)
-		defer timer.Stop()
+		if timer == nil {
+			timer = time.NewTimer(s.opts.SendErrorBackoff)
+			defer timer.Stop()
+		} else {
+			timer.Reset(s.opts.SendErrorBackoff)
+		}
 
 		select {
 		case <-ctx.Done():
@@ -363,38 +405,15 @@ func (bsnet *impl) Stop() {
 	bsnet.host.Network().StopNotify((*netNotifiee)(bsnet))
 }
 
-func (bsnet *impl) ConnectTo(ctx context.Context, p peer.ID) error {
-	return bsnet.host.Connect(ctx, peer.AddrInfo{ID: p})
+func (bsnet *impl) Connect(ctx context.Context, p peer.AddrInfo) error {
+	if p.ID == bsnet.host.ID() {
+		return nil
+	}
+	return bsnet.host.Connect(ctx, p)
 }
 
 func (bsnet *impl) DisconnectFrom(ctx context.Context, p peer.ID) error {
 	return bsnet.host.Network().ClosePeer(p)
-}
-
-// FindProvidersAsync returns a channel of providers for the given key.
-func (bsnet *impl) FindProvidersAsync(ctx context.Context, k cid.Cid, max int) <-chan peer.ID {
-	out := make(chan peer.ID, max)
-	go func() {
-		defer close(out)
-		providers := bsnet.routing.FindProvidersAsync(ctx, k, max)
-		for info := range providers {
-			if info.ID == bsnet.host.ID() {
-				continue // ignore self as provider
-			}
-			bsnet.host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.TempAddrTTL)
-			select {
-			case <-ctx.Done():
-				return
-			case out <- info.ID:
-			}
-		}
-	}()
-	return out
-}
-
-// Provide provides the key to the network
-func (bsnet *impl) Provide(ctx context.Context, k cid.Cid) error {
-	return bsnet.routing.Provide(ctx, k, true)
 }
 
 // handleNewStream receives a new stream from the network.
