@@ -124,7 +124,6 @@ func (e eventConnectionClosed) MarshalJSONObject(enc *gojay.Encoder) {
 	case errors.As(e.e, &statelessResetErr):
 		enc.StringKey("owner", ownerRemote.String())
 		enc.StringKey("trigger", "stateless_reset")
-		enc.StringKey("stateless_reset_token", fmt.Sprintf("%x", statelessResetErr.Token))
 	case errors.As(e.e, &handshakeTimeoutErr):
 		enc.StringKey("owner", ownerLocal.String())
 		enc.StringKey("trigger", "handshake_timeout")
@@ -337,7 +336,7 @@ func (e eventMetricsUpdated) MarshalJSONObject(enc *gojay.Encoder) {
 		enc.Uint64Key("bytes_in_flight", uint64(e.Current.BytesInFlight))
 	}
 	if e.Last == nil || e.Last.PacketsInFlight != e.Current.PacketsInFlight {
-		enc.Uint64KeyOmitEmpty("packets_in_flight", uint64(e.Current.PacketsInFlight))
+		enc.Uint64Key("packets_in_flight", uint64(e.Current.PacketsInFlight))
 	}
 }
 

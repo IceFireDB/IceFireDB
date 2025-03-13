@@ -2,12 +2,15 @@
 package blake3 // import "lukechampine.com/blake3"
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"hash"
 	"io"
 	"math"
 	"math/bits"
+	"runtime"
+	"sync"
 
 	"lukechampine.com/blake3/bao"
 	"lukechampine.com/blake3/guts"
@@ -20,10 +23,10 @@ type Hasher struct {
 	size  int // output size, for Sum
 
 	// log(n) set of Merkle subtree roots, at most one per height.
-	stack   [64 - (guts.MaxSIMD + 10)][8]uint32 // 10 = log2(guts.ChunkSize)
-	counter uint64                              // number of buffers hashed; also serves as a bit vector indicating which stack elems are occupied
+	stack   [64][8]uint32
+	counter uint64 // number of buffers hashed; also serves as a bit vector indicating which stack elems are occupied
 
-	buf    [guts.MaxSIMD * guts.ChunkSize]byte
+	buf    [guts.ChunkSize]byte
 	buflen int
 }
 
@@ -31,21 +34,21 @@ func (h *Hasher) hasSubtreeAtHeight(i int) bool {
 	return h.counter&(1<<i) != 0
 }
 
-func (h *Hasher) pushSubtree(cv [8]uint32) {
+func (h *Hasher) pushSubtree(cv [8]uint32, height int) {
 	// seek to first open stack slot, merging subtrees as we go
-	i := 0
+	i := height
 	for h.hasSubtreeAtHeight(i) {
 		cv = guts.ChainingValue(guts.ParentNode(h.stack[i], cv, &h.key, h.flags))
 		i++
 	}
 	h.stack[i] = cv
-	h.counter++
+	h.counter += 1 << height
 }
 
 // rootNode computes the root of the Merkle tree. It does not modify the
 // stack.
 func (h *Hasher) rootNode() guts.Node {
-	n := guts.CompressBuffer(&h.buf, h.buflen, &h.key, h.counter*guts.MaxSIMD, h.flags)
+	n := guts.CompressChunk(h.buf[:h.buflen], &h.key, h.counter, h.flags)
 	for i := bits.TrailingZeros64(h.counter); i < bits.Len64(h.counter); i++ {
 		if h.hasSubtreeAtHeight(i) {
 			n = guts.ParentNode(h.stack[i], guts.ChainingValue(n), &h.key, h.flags)
@@ -58,16 +61,49 @@ func (h *Hasher) rootNode() guts.Node {
 // Write implements hash.Hash.
 func (h *Hasher) Write(p []byte) (int, error) {
 	lenp := len(p)
-	for len(p) > 0 {
-		if h.buflen == len(h.buf) {
-			n := guts.CompressBuffer(&h.buf, h.buflen, &h.key, h.counter*guts.MaxSIMD, h.flags)
-			h.pushSubtree(guts.ChainingValue(n))
-			h.buflen = 0
-		}
+
+	// align to chunk boundary
+	if h.buflen > 0 {
 		n := copy(h.buf[h.buflen:], p)
 		h.buflen += n
 		p = p[n:]
 	}
+	if h.buflen == len(h.buf) {
+		n := guts.CompressChunk(h.buf[:], &h.key, h.counter, h.flags)
+		h.pushSubtree(guts.ChainingValue(n), 0)
+		h.buflen = 0
+	}
+
+	// process full chunks
+	if len(p) > len(h.buf) {
+		rem := len(p) % len(h.buf)
+		if rem == 0 {
+			rem = len(h.buf) // don't prematurely compress
+		}
+		eigenbuf := bytes.NewBuffer(p[:len(p)-rem])
+		trees := guts.Eigentrees(h.counter, uint64(eigenbuf.Len()/guts.ChunkSize))
+		cvs := make([][8]uint32, len(trees))
+		counter := h.counter
+		var wg sync.WaitGroup
+		for i, height := range trees {
+			wg.Add(1)
+			go func(i int, buf []byte, counter uint64) {
+				defer wg.Done()
+				cvs[i] = guts.ChainingValue(guts.CompressEigentree(buf, &h.key, counter, h.flags))
+			}(i, eigenbuf.Next((1<<height)*guts.ChunkSize), counter)
+			counter += 1 << height
+		}
+		wg.Wait()
+		for i, height := range trees {
+			h.pushSubtree(cvs[i], height)
+		}
+		p = p[len(p)-rem:]
+	}
+
+	// buffer remaining partial chunk
+	n := copy(h.buf[h.buflen:], p)
+	h.buflen += n
+
 	return lenp, nil
 }
 
@@ -211,14 +247,46 @@ func (or *OutputReader) Read(p []byte) (int, error) {
 		p = p[:rem]
 	}
 	lenp := len(p)
-	for len(p) > 0 {
-		if or.off%(guts.MaxSIMD*guts.BlockSize) == 0 {
-			or.n.Counter = or.off / guts.BlockSize
-			guts.CompressBlocks(&or.buf, or.n)
-		}
-		n := copy(p, or.buf[or.off%(guts.MaxSIMD*guts.BlockSize):])
+
+	// drain existing buffer
+	const bufsize = guts.MaxSIMD * guts.BlockSize
+	if or.off%bufsize != 0 {
+		n := copy(p, or.buf[or.off%bufsize:])
 		p = p[n:]
 		or.off += uint64(n)
+	}
+
+	for len(p) > 0 {
+		or.n.Counter = or.off / guts.BlockSize
+		if numBufs := len(p) / len(or.buf); numBufs < 1 {
+			guts.CompressBlocks(&or.buf, or.n)
+			n := copy(p, or.buf[or.off%bufsize:])
+			p = p[n:]
+			or.off += uint64(n)
+		} else if numBufs == 1 {
+			guts.CompressBlocks((*[bufsize]byte)(p), or.n)
+			p = p[bufsize:]
+			or.off += bufsize
+		} else {
+			// parallelize
+			par := min(numBufs, runtime.NumCPU())
+			per := uint64(numBufs / par)
+			var wg sync.WaitGroup
+			for range par {
+				wg.Add(1)
+				go func(p []byte, n guts.Node) {
+					defer wg.Done()
+					for i := range per {
+						guts.CompressBlocks((*[bufsize]byte)(p[i*bufsize:]), n)
+						n.Counter += bufsize / guts.BlockSize
+					}
+				}(p, or.n)
+				p = p[per*bufsize:]
+				or.off += per * bufsize
+				or.n.Counter = or.off / guts.BlockSize
+			}
+			wg.Wait()
+		}
 	}
 	return lenp, nil
 }
