@@ -7,12 +7,12 @@ import (
 	"time"
 )
 
-// Payloader payloads a byte array for use as rtp.Packet payloads
+// Payloader payloads a byte array for use as rtp.Packet payloads.
 type Payloader interface {
 	Payload(mtu uint16, payload []byte) [][]byte
 }
 
-// Packetizer packetizes a payload
+// Packetizer packetizes a payload.
 type Packetizer interface {
 	Packetize(payload []byte, samples uint32) []*Packet
 	GeneratePadding(samples uint32) []*Packet
@@ -31,14 +31,22 @@ type packetizer struct {
 	// Deprecated: will be removed in a future version.
 	ClockRate uint32
 
-	extensionNumbers struct { // put extension numbers in here. If they're 0, the extension is disabled (0 is not a legal extension number)
+	// put extension numbers in here. If they're 0, the extension is disabled (0 is not a legal extension number)
+	extensionNumbers struct {
 		AbsSendTime int // http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
 	}
 	timegen func() time.Time
 }
 
-// NewPacketizer returns a new instance of a Packetizer for a specific payloader
-func NewPacketizer(mtu uint16, pt uint8, ssrc uint32, payloader Payloader, sequencer Sequencer, clockRate uint32) Packetizer {
+// NewPacketizer returns a new instance of a Packetizer for a specific payloader.
+func NewPacketizer(
+	mtu uint16,
+	pt uint8,
+	ssrc uint32,
+	payloader Payloader,
+	sequencer Sequencer,
+	clockRate uint32,
+) Packetizer {
 	return &packetizer{
 		MTU:         mtu,
 		PayloadType: pt,
@@ -55,7 +63,7 @@ func (p *packetizer) EnableAbsSendTime(value int) {
 	p.extensionNumbers.AbsSendTime = value
 }
 
-// Packetize packetizes the payload of an RTP packet and returns one or more RTP packets
+// Packetize packetizes the payload of an RTP packet and returns one or more RTP packets.
 func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 	// Guard against an empty payload
 	if len(payload) == 0 {
@@ -90,7 +98,7 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 		if err != nil {
 			return nil // never happens
 		}
-		err = packets[len(packets)-1].SetExtension(uint8(p.extensionNumbers.AbsSendTime), b)
+		err = packets[len(packets)-1].SetExtension(uint8(p.extensionNumbers.AbsSendTime), b) // nolint: gosec // G115
 		if err != nil {
 			return nil // never happens
 		}
@@ -99,7 +107,7 @@ func (p *packetizer) Packetize(payload []byte, samples uint32) []*Packet {
 	return packets
 }
 
-// GeneratePadding returns required padding-only packages
+// GeneratePadding returns required padding-only packages.
 func (p *packetizer) GeneratePadding(samples uint32) []*Packet {
 	// Guard against an empty payload
 	if samples == 0 {
@@ -132,7 +140,7 @@ func (p *packetizer) GeneratePadding(samples uint32) []*Packet {
 }
 
 // SkipSamples causes a gap in sample count between Packetize requests so the
-// RTP payloads produced have a gap in timestamps
+// RTP payloads produced have a gap in timestamps.
 func (p *packetizer) SkipSamples(skippedSamples uint32) {
 	p.Timestamp += skippedSamples
 }

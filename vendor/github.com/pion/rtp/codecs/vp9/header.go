@@ -25,7 +25,7 @@ type HeaderColorConfig struct {
 	SubsamplingY   bool
 }
 
-func (c *HeaderColorConfig) unmarshal(profile uint8, buf []byte, pos *int) error {
+func (c *HeaderColorConfig) unmarshal(profile uint8, buf []byte, pos *int) error { // nolint:cyclop
 	if profile >= 2 {
 		var err error
 		c.TenOrTwelveBit, err = readFlag(buf, pos)
@@ -46,9 +46,9 @@ func (c *HeaderColorConfig) unmarshal(profile uint8, buf []byte, pos *int) error
 	if err != nil {
 		return err
 	}
-	c.ColorSpace = uint8(tmp)
+	c.ColorSpace = uint8(tmp) // nolint: gosec // G115, no overflow we read 3 bits
 
-	if c.ColorSpace != 7 {
+	if c.ColorSpace != 7 { // nolint: nestif
 		var err error
 		c.ColorRange, err = readFlag(buf, pos)
 		if err != nil {
@@ -98,8 +98,9 @@ func (s *HeaderFrameSize) unmarshal(buf []byte, pos *int) error {
 		return err
 	}
 
-	s.FrameWidthMinus1 = uint16(readBitsUnsafe(buf, pos, 16))
-	s.FrameHeightMinus1 = uint16(readBitsUnsafe(buf, pos, 16))
+	s.FrameWidthMinus1 = uint16(readBitsUnsafe(buf, pos, 16))  // nolint: gosec // G115 no overflow, we read 16 bits
+	s.FrameHeightMinus1 = uint16(readBitsUnsafe(buf, pos, 16)) // nolint: gosec // G115
+
 	return nil
 }
 
@@ -118,7 +119,7 @@ type Header struct {
 }
 
 // Unmarshal decodes a Header.
-func (h *Header) Unmarshal(buf []byte) error {
+func (h *Header) Unmarshal(buf []byte) error { //nolint:cyclop
 	pos := 0
 
 	err := hasSpace(buf, pos, 4)
@@ -131,8 +132,8 @@ func (h *Header) Unmarshal(buf []byte) error {
 		return errInvalidFrameMarker
 	}
 
-	profileLowBit := uint8(readBitsUnsafe(buf, &pos, 1))
-	profileHighBit := uint8(readBitsUnsafe(buf, &pos, 1))
+	profileLowBit := uint8(readBitsUnsafe(buf, &pos, 1))  // nolint: gosec // no overflow, we read 1 bit
+	profileHighBit := uint8(readBitsUnsafe(buf, &pos, 1)) // nolint: gosec // G115
 	h.Profile = profileHighBit<<1 + profileLowBit
 
 	if h.Profile == 3 {
@@ -154,7 +155,8 @@ func (h *Header) Unmarshal(buf []byte) error {
 		if err != nil {
 			return err
 		}
-		h.FrameToShowMapIdx = uint8(tmp)
+		h.FrameToShowMapIdx = uint8(tmp) // nolint: gosec // no overflow, we read 3 bits
+
 		return nil
 	}
 
@@ -167,23 +169,23 @@ func (h *Header) Unmarshal(buf []byte) error {
 	h.ShowFrame = readFlagUnsafe(buf, &pos)
 	h.ErrorResilientMode = readFlagUnsafe(buf, &pos)
 
-	if !h.NonKeyFrame {
+	if !h.NonKeyFrame { // nolint: nestif
 		err := hasSpace(buf, pos, 24)
 		if err != nil {
 			return err
 		}
 
-		frameSyncByte0 := uint8(readBitsUnsafe(buf, &pos, 8))
+		frameSyncByte0 := uint8(readBitsUnsafe(buf, &pos, 8)) // nolint: gosec // no overflow, we read 8 bits
 		if frameSyncByte0 != 0x49 {
 			return errWrongFrameSyncByte0
 		}
 
-		frameSyncByte1 := uint8(readBitsUnsafe(buf, &pos, 8))
+		frameSyncByte1 := uint8(readBitsUnsafe(buf, &pos, 8)) // nolint: gosec // no overflow, we read 8 bits
 		if frameSyncByte1 != 0x83 {
 			return errWrongFrameSyncByte1
 		}
 
-		frameSyncByte2 := uint8(readBitsUnsafe(buf, &pos, 8))
+		frameSyncByte2 := uint8(readBitsUnsafe(buf, &pos, 8)) // nolint: gosec // no overflow, we read 8 bits
 		if frameSyncByte2 != 0x42 {
 			return errWrongFrameSyncByte2
 		}
@@ -209,6 +211,7 @@ func (h Header) Width() uint16 {
 	if h.FrameSize == nil {
 		return 0
 	}
+
 	return h.FrameSize.FrameWidthMinus1 + 1
 }
 
@@ -217,5 +220,6 @@ func (h Header) Height() uint16 {
 	if h.FrameSize == nil {
 		return 0
 	}
+
 	return h.FrameSize.FrameHeightMinus1 + 1
 }

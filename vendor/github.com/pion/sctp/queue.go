@@ -40,11 +40,16 @@ func (q *queue[T]) PopFront() T {
 	q.buf[q.head] = zeroVal
 	q.head = (q.head + 1) % len(q.buf)
 	q.count--
+
 	return ele
 }
 
 func (q *queue[T]) Front() T {
 	return q.buf[q.head]
+}
+
+func (q *queue[T]) Back() T {
+	return q.buf[(q.tail-1+len(q.buf))%len(q.buf)]
 }
 
 func (q *queue[T]) At(i int) T {
