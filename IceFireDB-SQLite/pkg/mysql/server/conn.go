@@ -107,7 +107,7 @@ func NewCustomizedConn(conn net.Conn, serverConf *Server, p CredentialProvider, 
 	return c, nil
 }
 
-// NewCustomizedConn: create connection with customized server settings
+// NewClientConn: create connection with customized server settings
 func NewClientConn(conn net.Conn, serverConf *Server, p CredentialProvider, hp Handler) (*Conn, error) {
 	var packetConn *packet.Conn
 	if serverConf.tlsConfig != nil {
