@@ -25,12 +25,9 @@ import (
 func toIPAddr(a route.Addr) (net.IP, error) {
 	switch t := a.(type) {
 	case *route.Inet4Addr:
-		ip := net.IPv4(t.IP[0], t.IP[1], t.IP[2], t.IP[3])
-		return ip, nil
+		return t.IP[:], nil
 	case *route.Inet6Addr:
-		ip := make(net.IP, net.IPv6len)
-		copy(ip, t.IP[:])
-		return ip, nil
+		return t.IP[:], nil
 	default:
 		return net.IP{}, fmt.Errorf("unknown family: %v", t)
 	}

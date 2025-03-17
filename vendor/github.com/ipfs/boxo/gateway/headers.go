@@ -2,7 +2,7 @@ package gateway
 
 import (
 	"net/http"
-	"sort"
+	"slices"
 )
 
 // Headers is an HTTP middleware that sets the configured headers in all requests.
@@ -106,7 +106,6 @@ func cleanHeaderSet(headers []string) []string {
 		result = append(result, k)
 	}
 
-	// Sort
-	sort.Strings(result)
+	slices.Sort(result)
 	return result
 }
