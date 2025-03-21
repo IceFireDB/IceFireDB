@@ -3,6 +3,7 @@ package network
 import (
 	"sync"
 
+	"github.com/gammazero/deque"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
@@ -25,7 +26,7 @@ type connectEventManager struct {
 	cond          sync.Cond
 	peers         map[peer.ID]*peerState
 
-	changeQueue []peer.ID
+	changeQueue deque.Deque[peer.ID]
 	stop        bool
 	done        chan struct{}
 }
@@ -75,7 +76,7 @@ func (c *connectEventManager) setState(p peer.ID, newState state) {
 	state.newState = newState
 	if !state.pending && state.newState != state.curState {
 		state.pending = true
-		c.changeQueue = append(c.changeQueue, p)
+		c.changeQueue.PushBack(p)
 		c.cond.Broadcast()
 	}
 }
@@ -83,7 +84,7 @@ func (c *connectEventManager) setState(p peer.ID, newState state) {
 // Waits for a change to be enqueued, or for the event manager to be stopped. Returns false if the
 // connect event manager has been stopped.
 func (c *connectEventManager) waitChange() bool {
-	for !c.stop && len(c.changeQueue) == 0 {
+	for !c.stop && c.changeQueue.Len() == 0 {
 		c.cond.Wait()
 	}
 	return !c.stop
@@ -95,9 +96,7 @@ func (c *connectEventManager) worker() {
 	defer close(c.done)
 
 	for c.waitChange() {
-		pid := c.changeQueue[0]
-		c.changeQueue[0] = peer.ID("") // free the peer ID (slicing won't do that)
-		c.changeQueue = c.changeQueue[1:]
+		pid := c.changeQueue.PopFront()
 
 		state, ok := c.peers[pid]
 		// If we've disconnected and forgotten, continue.

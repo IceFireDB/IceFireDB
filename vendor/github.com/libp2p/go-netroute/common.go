@@ -46,6 +46,11 @@ func (rt rtInfo) IsMoreSpecThan(mostSpecificRt *rtInfo) bool {
 		return false
 	}
 
+	// if all else is equal, prefer a route with a gateway.
+	if mostSpecificRt.Priority == rt.Priority && rt.Gateway == nil && mostSpecificRt.Gateway != nil {
+		return false
+	}
+
 	// Windows and MacOS hasn't metric/priority on rule entry,
 	// But the interface device has the priority property.
 	//

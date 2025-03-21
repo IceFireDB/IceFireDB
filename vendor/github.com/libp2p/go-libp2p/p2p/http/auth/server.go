@@ -7,6 +7,7 @@ import (
 	"errors"
 	"hash"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +15,30 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/http/auth/internal/handshake"
 )
+
+type hmacPool struct {
+	p sync.Pool
+}
+
+func newHmacPool(key []byte) *hmacPool {
+	return &hmacPool{
+		p: sync.Pool{
+			New: func() any {
+				return hmac.New(sha256.New, key)
+			},
+		},
+	}
+}
+
+func (p *hmacPool) Get() hash.Hash {
+	h := p.p.Get().(hash.Hash)
+	h.Reset()
+	return h
+}
+
+func (p *hmacPool) Put(h hash.Hash) {
+	p.p.Put(h)
+}
 
 type ServerPeerIDAuth struct {
 	PrivKey  crypto.PrivKey
@@ -26,8 +51,9 @@ type ServerPeerIDAuth struct {
 	// which the Host header returns true.
 	ValidHostnameFn func(hostname string) bool
 
-	Hmac     hash.Hash
+	HmacKey  []byte
 	initHmac sync.Once
+	hmacPool *hmacPool
 }
 
 // ServeHTTP implements the http.Handler interface for PeerIDAuth. It will
@@ -35,15 +61,20 @@ type ServerPeerIDAuth struct {
 // scheme. If a Next handler is set, it will be called on authenticated
 // requests.
 func (a *ServerPeerIDAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	a.ServeHTTPWithNextHandler(w, r, a.Next)
+}
+
+func (a *ServerPeerIDAuth) ServeHTTPWithNextHandler(w http.ResponseWriter, r *http.Request, next func(peer.ID, http.ResponseWriter, *http.Request)) {
 	a.initHmac.Do(func() {
-		if a.Hmac == nil {
+		if a.HmacKey == nil {
 			key := make([]byte, 32)
 			_, err := rand.Read(key)
 			if err != nil {
 				panic(err)
 			}
-			a.Hmac = hmac.New(sha256.New, key)
+			a.HmacKey = key
 		}
+		a.hmacPool = newHmacPool(a.HmacKey)
 	})
 
 	hostname := r.Host
@@ -76,11 +107,13 @@ func (a *ServerPeerIDAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	hmac := a.hmacPool.Get()
+	defer a.hmacPool.Put(hmac)
 	hs := handshake.PeerIDAuthHandshakeServer{
 		Hostname: hostname,
 		PrivKey:  a.PrivKey,
 		TokenTTL: a.TokenTTL,
-		Hmac:     a.Hmac,
+		Hmac:     hmac,
 	}
 	err := hs.ParseHeaderVal([]byte(r.Header.Get("Authorization")))
 	if err != nil {
@@ -95,13 +128,14 @@ func (a *ServerPeerIDAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			errors.Is(err, handshake.ErrExpiredChallenge),
 			errors.Is(err, handshake.ErrExpiredToken):
 
+			hmac.Reset()
 			hs := handshake.PeerIDAuthHandshakeServer{
 				Hostname: hostname,
 				PrivKey:  a.PrivKey,
 				TokenTTL: a.TokenTTL,
-				Hmac:     a.Hmac,
+				Hmac:     hmac,
 			}
-			hs.Run()
+			_ = hs.Run() // First run will never err
 			hs.SetHeader(w.Header())
 			w.WriteHeader(http.StatusUnauthorized)
 
@@ -120,9 +154,16 @@ func (a *ServerPeerIDAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if a.Next == nil {
+	if next == nil {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	a.Next(peer, w, r)
+	next(peer, w, r)
+}
+
+// HasAuthHeader checks if the HTTP request contains an Authorization header
+// that starts with the PeerIDAuthScheme prefix.
+func HasAuthHeader(r *http.Request) bool {
+	h := r.Header.Get("Authorization")
+	return h != "" && strings.HasPrefix(h, handshake.PeerIDAuthScheme)
 }

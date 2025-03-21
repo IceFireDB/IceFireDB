@@ -69,9 +69,13 @@ const (
 )
 
 // Search searches services by SSDP.
-func Search(searchType string, waitSec int, localAddr string) ([]Service, error) {
+func Search(searchType string, waitSec int, localAddr string, opts ...Option) ([]Service, error) {
+	cfg, err := opts2config(opts)
+	if err != nil {
+		return nil, err
+	}
 	// dial multicast UDP packet.
-	conn, err := multicast.Listen(&multicast.AddrResolver{Addr: localAddr})
+	conn, err := multicast.Listen(&multicast.AddrResolver{Addr: localAddr}, cfg.multicastConfig.options()...)
 	if err != nil {
 		return nil, err
 	}
