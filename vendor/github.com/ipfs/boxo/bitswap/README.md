@@ -23,7 +23,7 @@ contain wantlists or blocks.
 
 A node sends a wantlist to tell peers which blocks it wants. When a node receives
 a wantlist it should check which blocks it has from the wantlist, and consider
-sending the matching blocks to the requestor.
+sending the matching blocks to the requester.
 
 When a node receives blocks that it asked for, the node should send out a
 notification called a 'Cancel' to tell its peers that the node no longer
@@ -74,7 +74,7 @@ block, err := exchange.GetBlock(ctx, c)
 
 Parameter Notes:
 
-1. `ctx` is the context for this request, which can be cancelled to cancel the request
+1. `ctx` is the context for this request, which can be canceled to cancel the request
 2. `c` is the content ID of the block you're requesting
 
 ### Get Several Blocks Asynchronously
@@ -89,7 +89,7 @@ blockChannel, err := exchange.GetBlocks(ctx, cids)
 
 Parameter Notes:
 
-1. `ctx` is the context for this request, which can be cancelled to cancel the request
+1. `ctx` is the context for this request, which can be canceled to cancel the request
 2. `cids` is a slice of content IDs for the blocks you're requesting
 
 ### Get Related Blocks Faster With Sessions

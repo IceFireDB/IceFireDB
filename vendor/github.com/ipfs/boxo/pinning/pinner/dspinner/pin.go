@@ -10,6 +10,10 @@ import (
 	"path"
 	"sync"
 
+	"github.com/ipfs/boxo/ipld/merkledag"
+	"github.com/ipfs/boxo/ipld/merkledag/dagutils"
+	ipfspinner "github.com/ipfs/boxo/pinning/pinner"
+	"github.com/ipfs/boxo/pinning/pinner/dsindex"
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
@@ -17,11 +21,6 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/polydawn/refmt/cbor"
 	"github.com/polydawn/refmt/obj/atlas"
-
-	"github.com/ipfs/boxo/ipld/merkledag"
-	"github.com/ipfs/boxo/ipld/merkledag/dagutils"
-	ipfspinner "github.com/ipfs/boxo/pinning/pinner"
-	"github.com/ipfs/boxo/pinning/pinner/dsindex"
 )
 
 const (
@@ -707,11 +706,19 @@ func (p *pinner) streamIndex(ctx context.Context, index dsindex.Indexer, detaile
 		defer p.lock.RUnlock()
 
 		cidSet := cid.NewSet()
+		send := func(sp ipfspinner.StreamedPin) (ok bool) {
+			select {
+			case <-ctx.Done():
+				return false
+			case out <- sp:
+				return true
+			}
+		}
 
 		err := index.ForEach(ctx, "", func(key, value string) bool {
 			c, err := cid.Cast([]byte(key))
 			if err != nil {
-				out <- ipfspinner.StreamedPin{Err: err}
+				send(ipfspinner.StreamedPin{Err: err})
 				return false
 			}
 
@@ -719,7 +726,7 @@ func (p *pinner) streamIndex(ctx context.Context, index dsindex.Indexer, detaile
 			if detailed {
 				pp, err := p.loadPin(ctx, value)
 				if err != nil {
-					out <- ipfspinner.StreamedPin{Err: err}
+					send(ipfspinner.StreamedPin{Err: err})
 					return false
 				}
 
@@ -731,17 +738,16 @@ func (p *pinner) streamIndex(ctx context.Context, index dsindex.Indexer, detaile
 			}
 
 			if !cidSet.Has(c) {
-				select {
-				case <-ctx.Done():
+				if !send(ipfspinner.StreamedPin{Pin: pin}) {
 					return false
-				case out <- ipfspinner.StreamedPin{Pin: pin}:
 				}
 				cidSet.Add(c)
 			}
 			return true
 		})
 		if err != nil {
-			out <- ipfspinner.StreamedPin{Err: err}
+			send(ipfspinner.StreamedPin{Err: err})
+			return
 		}
 	}()
 

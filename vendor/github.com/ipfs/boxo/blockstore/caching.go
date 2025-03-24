@@ -8,7 +8,7 @@ import (
 )
 
 // CacheOpts wraps options for CachedBlockStore().
-// Next to each option is it aproximate memory usage per unit
+// Next to each option is it approximate memory usage per unit
 type CacheOpts struct {
 	HasBloomFilterSize   int // 1 byte
 	HasBloomFilterHashes int // No size, 7 is usually best, consult bloom papers

@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	mc "github.com/multiformats/go-multicodec"
-
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
