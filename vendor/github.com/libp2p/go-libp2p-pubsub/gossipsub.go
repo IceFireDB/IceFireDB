@@ -1196,11 +1196,11 @@ func (gs *GossipSubRouter) Publish(msg *Message) {
 			gs.lastpub[topic] = time.Now().UnixNano()
 		}
 
+		csum := computeChecksum(gs.p.idGen.ID(msg))
 		for p := range gmap {
-			mid := gs.p.idGen.ID(msg)
 			// Check if it has already received an IDONTWANT for the message.
 			// If so, don't send it to the peer
-			if _, ok := gs.unwanted[p][computeChecksum(mid)]; ok {
+			if _, ok := gs.unwanted[p][csum]; ok {
 				continue
 			}
 			tosend[p] = struct{}{}

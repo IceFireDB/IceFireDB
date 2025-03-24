@@ -490,6 +490,12 @@ func (s *Session) sendMsg(hdr header, body []byte, deadline <-chan struct{}) err
 	default:
 	}
 
+	select {
+	case <-deadline:
+		return ErrTimeout
+	default:
+	}
+
 	// duplicate as we're sending this async.
 	buf := pool.Get(headerSize + len(body))
 	copy(buf[:headerSize], hdr[:])
@@ -711,17 +717,13 @@ func (s *Session) handleStreamMessage(hdr header) error {
 	stream := s.streams[id]
 	s.streamLock.Unlock()
 
-	// If we do not have a stream, likely we sent a RST
+	// If we do not have a stream, likely we sent a RST and/or closed the stream for reading.
 	if stream == nil {
 		// Drain any data on the wire
 		if hdr.MsgType() == typeData && hdr.Length() > 0 {
-			s.logger.Printf("[WARN] yamux: Discarding data for stream: %d", id)
 			if _, err := io.CopyN(io.Discard, s.reader, int64(hdr.Length())); err != nil {
-				s.logger.Printf("[ERR] yamux: Failed to discard data: %v", err)
 				return nil
 			}
-		} else {
-			s.logger.Printf("[WARN] yamux: frame for missing stream: %v", hdr)
 		}
 		return nil
 	}

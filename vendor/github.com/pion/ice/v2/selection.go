@@ -241,7 +241,7 @@ func (s *controlledSelector) HandleSuccessResponse(m *stun.Message, local, remot
 	s.log.Tracef("Found valid candidate pair: %s", p)
 	if p.nominateOnBindingSuccess {
 		if selectedPair := s.agent.getSelectedPair(); selectedPair == nil ||
-			(selectedPair != p && selectedPair.priority() <= p.priority()) {
+			(selectedPair != p && (!s.agent.needsToCheckPriorityOnNominated() || selectedPair.priority() <= p.priority())) {
 			s.agent.setSelectedPair(p)
 		} else if selectedPair != p {
 			s.log.Tracef("Ignore nominate new pair %s, already nominated pair %s", p, selectedPair)
@@ -266,7 +266,7 @@ func (s *controlledSelector) HandleBindingRequest(m *stun.Message, local, remote
 			// generated a valid pair (Section 7.2.5.3.2).  The agent sets the
 			// nominated flag value of the valid pair to true.
 			selectedPair := s.agent.getSelectedPair()
-			if selectedPair == nil || (selectedPair != p && selectedPair.priority() <= p.priority()) {
+			if selectedPair == nil || (selectedPair != p && (!s.agent.needsToCheckPriorityOnNominated() || selectedPair.priority() <= p.priority())) {
 				s.agent.setSelectedPair(p)
 			} else if selectedPair != p {
 				s.log.Tracef("Ignore nominate new pair %s, already nominated pair %s", p, selectedPair)

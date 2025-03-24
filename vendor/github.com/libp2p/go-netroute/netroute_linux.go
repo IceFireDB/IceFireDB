@@ -20,22 +20,6 @@ import (
 	"github.com/google/gopacket/routing"
 )
 
-// Pulled from http://man7.org/linux/man-pages/man7/rtnetlink.7.html
-// See the section on RTM_NEWROUTE, specifically 'struct rtmsg'.
-type routeInfoInMemory struct {
-	Family byte
-	DstLen byte
-	SrcLen byte
-	TOS    byte
-
-	Table    byte
-	Protocol byte
-	Scope    byte
-	Type     byte
-
-	Flags uint32
-}
-
 func New() (routing.Router, error) {
 	rtr := &router{}
 	rtr.ifaces = make(map[int]net.Interface)
@@ -54,18 +38,13 @@ loop:
 		case syscall.NLMSG_DONE:
 			break loop
 		case syscall.RTM_NEWROUTE:
-			rt := (*routeInfoInMemory)(unsafe.Pointer(&m.Data[0]))
+			rt := (*syscall.RtMsg)(unsafe.Pointer(&m.Data[0]))
 			routeInfo := rtInfo{}
 			attrs, err := syscall.ParseNetlinkRouteAttr(&m)
 			if err != nil {
 				return nil, err
 			}
-			switch rt.Family {
-			case syscall.AF_INET:
-				rtr.v4 = append(rtr.v4, &routeInfo)
-			case syscall.AF_INET6:
-				rtr.v6 = append(rtr.v6, &routeInfo)
-			default:
+			if rt.Family != syscall.AF_INET && rt.Family != syscall.AF_INET6 {
 				continue loop
 			}
 			for _, attr := range attrs {
@@ -73,12 +52,12 @@ loop:
 				case syscall.RTA_DST:
 					routeInfo.Dst = &net.IPNet{
 						IP:   net.IP(attr.Value),
-						Mask: net.CIDRMask(int(rt.DstLen), len(attr.Value)*8),
+						Mask: net.CIDRMask(int(rt.Dst_len), len(attr.Value)*8),
 					}
 				case syscall.RTA_SRC:
 					routeInfo.Src = &net.IPNet{
 						IP:   net.IP(attr.Value),
-						Mask: net.CIDRMask(int(rt.SrcLen), len(attr.Value)*8),
+						Mask: net.CIDRMask(int(rt.Src_len), len(attr.Value)*8),
 					}
 				case syscall.RTA_GATEWAY:
 					routeInfo.Gateway = net.IP(attr.Value)
@@ -91,6 +70,18 @@ loop:
 				case syscall.RTA_PRIORITY:
 					routeInfo.Priority = *(*uint32)(unsafe.Pointer(&attr.Value[0]))
 				}
+			}
+			if routeInfo.Dst == nil && routeInfo.Src == nil && routeInfo.Gateway == nil {
+				continue loop
+			}
+			switch rt.Family {
+			case syscall.AF_INET:
+				rtr.v4 = append(rtr.v4, &routeInfo)
+			case syscall.AF_INET6:
+				rtr.v6 = append(rtr.v6, &routeInfo)
+			default:
+				// should not happen.
+				continue loop
 			}
 		}
 	}
