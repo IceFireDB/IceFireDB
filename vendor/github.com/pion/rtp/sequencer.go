@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-// Sequencer generates sequential sequence numbers for building RTP packets
+// Sequencer generates sequential sequence numbers for building RTP packets.
 type Sequencer interface {
 	NextSequenceNumber() uint16
 	RollOverCount() uint64
@@ -21,15 +21,15 @@ type Sequencer interface {
 const maxInitialRandomSequenceNumber = 1<<15 - 1
 
 // NewRandomSequencer returns a new sequencer starting from a random sequence
-// number
+// number.
 func NewRandomSequencer() Sequencer {
 	return &sequencer{
-		sequenceNumber: uint16(globalMathRandomGenerator.Intn(maxInitialRandomSequenceNumber)),
+		sequenceNumber: uint16(globalMathRandomGenerator.Intn(maxInitialRandomSequenceNumber)), // nolint: gosec // G115
 	}
 }
 
 // NewFixedSequencer returns a new sequencer starting from a specific
-// sequence number
+// sequence number.
 func NewFixedSequencer(s uint16) Sequencer {
 	return &sequencer{
 		sequenceNumber: s - 1, // -1 because the first sequence number prepends 1
@@ -43,7 +43,7 @@ type sequencer struct {
 }
 
 // NextSequenceNumber increment and returns a new sequence number for
-// building RTP packets
+// building RTP packets.
 func (s *sequencer) NextSequenceNumber() uint16 {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -57,7 +57,7 @@ func (s *sequencer) NextSequenceNumber() uint16 {
 }
 
 // RollOverCount returns the amount of times the 16bit sequence number
-// has wrapped
+// has wrapped.
 func (s *sequencer) RollOverCount() uint64 {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
