@@ -11,7 +11,7 @@ jobs:
   osstest:
     strategy:
       matrix:
-        go-version: [1.23.x]
+        go-version: [1.24.1]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
@@ -38,7 +38,7 @@ jobs:
   ipfstest:
     strategy:
       matrix:
-        go-version: [1.23.x]
+        go-version: [1.24.1]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
@@ -71,7 +71,7 @@ jobs:
   goleveldbtest:
     strategy:
       matrix:
-        go-version: [1.23.x]
+        go-version: [1.24.1]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
@@ -97,7 +97,7 @@ jobs:
   crdtdbtest:
     strategy:
       matrix:
-        go-version: [1.23.x]
+        go-version: [1.24.1]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
@@ -123,7 +123,7 @@ jobs:
   ipfslogdbtest:
     strategy:
       matrix:
-        go-version: [1.23.x]
+        go-version: [1.24.1]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
