@@ -1,7 +1,6 @@
 module github.com/IceFireDB/IceFireDB
 
-go 1.23
-toolchain go1.24.1
+go 1.24.1
 
 require (
 	github.com/IceFireDB/icefiredb-crdt-kv v0.2.0
