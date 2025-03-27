@@ -29,10 +29,10 @@ import (
 	"os"
 	"sync"
 
+	"github.com/gammazero/deque"
+	dag "github.com/ipfs/boxo/ipld/merkledag"
 	format "github.com/ipfs/boxo/ipld/unixfs"
 	"github.com/ipfs/boxo/ipld/unixfs/internal"
-
-	dag "github.com/ipfs/boxo/ipld/merkledag"
 	bitfield "github.com/ipfs/go-bitfield"
 	cid "github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
@@ -563,7 +563,7 @@ func parallelShardWalk(ctx context.Context, root *Shard, dserv ipld.DAGService, 
 	}
 
 	send := feed
-	var todoQueue []*listCidsAndShards
+	var todoQueue deque.Deque[*listCidsAndShards]
 	var inProgress int
 
 	next := &listCidsAndShards{
@@ -575,9 +575,8 @@ dispatcherLoop:
 		select {
 		case send <- next:
 			inProgress++
-			if len(todoQueue) > 0 {
-				next = todoQueue[0]
-				todoQueue = todoQueue[1:]
+			if todoQueue.Len() > 0 {
+				next = todoQueue.PopFront()
 			} else {
 				next = nil
 				send = nil
@@ -592,7 +591,7 @@ dispatcherLoop:
 				next = nextNodes
 				send = feed
 			} else {
-				todoQueue = append(todoQueue, nextNodes)
+				todoQueue.PushBack(nextNodes)
 			}
 		case <-errGrpCtx.Done():
 			break dispatcherLoop
