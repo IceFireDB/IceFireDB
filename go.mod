@@ -46,7 +46,7 @@ require (
 	github.com/redis/go-redis/v9 v9.7.3
 	github.com/satori/go.uuid v1.2.0
 	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed
-	github.com/spf13/viper v1.20.0
+	github.com/spf13/viper v1.20.1
 	github.com/urfave/cli v1.22.16
 	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.27.0
