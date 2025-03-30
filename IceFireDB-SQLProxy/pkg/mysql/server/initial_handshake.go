@@ -41,7 +41,7 @@ func (c *Conn) writeInitialHandshake() error {
 
 	// auth-plugin-data-part-2
 	data = append(data, c.salt[8:]...)
-	// second part of the password cipher [mininum 13 bytes],
+	// second part of the password cipher [minimum 13 bytes],
 	// where len=MAX(13, length of auth-plugin-data - 8)
 	// add \NUL to terminate the string
 	data = append(data, 0x00)
