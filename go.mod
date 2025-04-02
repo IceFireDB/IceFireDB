@@ -1,7 +1,6 @@
 module github.com/IceFireDB/IceFireDB
 
 go 1.24.1
-
 require (
 	github.com/IceFireDB/icefiredb-crdt-kv v0.2.0
 	github.com/IceFireDB/icefiredb-ipfs-log v0.5.0
@@ -37,7 +36,7 @@ require (
 	github.com/libp2p/go-libp2p v0.39.1
 	github.com/libp2p/go-libp2p-kad-dht v0.28.1
 	github.com/libp2p/go-libp2p-pubsub v0.13.1
-	github.com/mattn/go-sqlite3 v1.14.24
+	github.com/mattn/go-sqlite3 v1.14.26
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.14.0
 	github.com/multiformats/go-multihash v0.2.3
