@@ -1,6 +1,6 @@
 package metrics
 
-// Also implements the Counter interface
+// Also implements the Counter and CounterVec interfaces
 type noop struct{}
 
 func (g *noop) Set(v float64) {
@@ -27,9 +27,17 @@ func (g *noop) Observe(v float64) {
 	// Noop
 }
 
+func (g *noop) WithLabelValues(lvs ...string) Counter {
+	return g
+}
+
 // Creator functions
 
 func (g *noop) Counter() Counter {
+	return g
+}
+
+func (g *noop) CounterVec(lvs []string) CounterVec {
 	return g
 }
 
