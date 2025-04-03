@@ -6,7 +6,6 @@ import (
 	dag "github.com/ipfs/boxo/ipld/merkledag"
 	ft "github.com/ipfs/boxo/ipld/unixfs"
 	hamt "github.com/ipfs/boxo/ipld/unixfs/hamt"
-
 	ipld "github.com/ipfs/go-ipld-format"
 )
 

@@ -34,7 +34,7 @@ type chunkAbort struct {
 	errorCauses []errorCause
 }
 
-// Abort chunk errors
+// Abort chunk errors.
 var (
 	ErrChunkTypeNotAbort     = errors.New("ChunkType is not of type ABORT")
 	ErrBuildAbortChunkFailed = errors.New("failed build Abort Chunk")
@@ -63,6 +63,7 @@ func (a *chunkAbort) unmarshal(raw []byte) error {
 		offset += int(e.length())
 		a.errorCauses = append(a.errorCauses, e)
 	}
+
 	return nil
 }
 
@@ -77,6 +78,7 @@ func (a *chunkAbort) marshal() ([]byte, error) {
 		}
 		a.raw = append(a.raw, raw...)
 	}
+
 	return a.chunkHeader.marshal()
 }
 
@@ -84,7 +86,7 @@ func (a *chunkAbort) check() (abort bool, err error) {
 	return false, nil
 }
 
-// String makes chunkAbort printable
+// String makes chunkAbort printable.
 func (a *chunkAbort) String() string {
 	res := a.chunkHeader.String()
 

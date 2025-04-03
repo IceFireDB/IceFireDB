@@ -363,7 +363,5 @@ func (ptq *PeerTaskQueue) Clear(p peer.ID) {
 		ptq.pQueue.Remove(peerTracker.Index())
 	}
 
-	if _, ok := ptq.frozenPeers[p]; ok {
-		delete(ptq.frozenPeers, p)
-	}
+	delete(ptq.frozenPeers, p)
 }

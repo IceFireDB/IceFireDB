@@ -58,9 +58,21 @@ type CandidatePairStats struct {
 	// (LastRequestTimestamp - FirstRequestTimestamp) / RequestsSent.
 	LastRequestTimestamp time.Time
 
+	// FirstResponseTimestamp represents the timestamp at which the first STUN response
+	// was received on this particular candidate pair.
+	FirstResponseTimestamp time.Time
+
 	// LastResponseTimestamp represents the timestamp at which the last STUN response
 	// was received on this particular candidate pair.
 	LastResponseTimestamp time.Time
+
+	// FirstRequestReceivedTimestamp represents the timestamp at which the first
+	// connectivity check request was received.
+	FirstRequestReceivedTimestamp time.Time
+
+	// LastRequestReceivedTimestamp represents the timestamp at which the last
+	// connectivity check request was received.
+	LastRequestReceivedTimestamp time.Time
 
 	// TotalRoundTripTime represents the sum of all round trip time measurements
 	// in seconds since the beginning of the session, based on STUN connectivity
