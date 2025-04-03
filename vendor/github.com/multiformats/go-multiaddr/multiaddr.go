@@ -1,17 +1,28 @@
 package multiaddr
 
 import (
-	"bytes"
+	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"golang.org/x/exp/slices"
 )
 
-// multiaddr is the data structure representing a Multiaddr
-type multiaddr struct {
-	bytes []byte
+var errNilPtr = errors.New("nil ptr")
+
+// Multiaddr is the data structure representing a Multiaddr
+type Multiaddr []Component
+
+func (m Multiaddr) copy() Multiaddr {
+	if m == nil {
+		return nil
+	}
+	out := make(Multiaddr, len(m))
+	copy(out, m)
+	return out
 }
 
 // NewMultiaddr parses and validates an input string, returning a *Multiaddr
@@ -26,7 +37,7 @@ func NewMultiaddr(s string) (a Multiaddr, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return &multiaddr{bytes: b}, nil
+	return NewMultiaddrBytes(b)
 }
 
 // NewMultiaddrBytes initializes a Multiaddr from a byte representation.
@@ -38,131 +49,159 @@ func NewMultiaddrBytes(b []byte) (a Multiaddr, err error) {
 			err = fmt.Errorf("%v", e)
 		}
 	}()
-
-	if err := validateBytes(b); err != nil {
+	bytesRead, m, err := readMultiaddr(b)
+	if err != nil {
 		return nil, err
 	}
-
-	return &multiaddr{bytes: b}, nil
+	if bytesRead != len(b) {
+		return nil, fmt.Errorf("unexpected extra data. %v bytes leftover", len(b)-bytesRead)
+	}
+	if len(m) == 0 {
+		return nil, nil
+	}
+	return m, nil
 }
 
 // Equal tests whether two multiaddrs are equal
-func (m *multiaddr) Equal(m2 Multiaddr) bool {
-	if m2 == nil {
+func (m Multiaddr) Equal(m2 Multiaddr) bool {
+	if len(m) != len(m2) {
 		return false
 	}
-	return bytes.Equal(m.bytes, m2.Bytes())
+	for i, c := range m {
+		if !c.Equal(&m2[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (m Multiaddr) Compare(o Multiaddr) int {
+	for i := 0; i < len(m) && i < len(o); i++ {
+		if cmp := m[i].Compare(&o[i]); cmp != 0 {
+			return cmp
+		}
+	}
+	return cmp.Compare(len(m), len(o))
 }
 
 // Bytes returns the []byte representation of this Multiaddr
-//
-// Do not modify the returned buffer, it may be shared.
-func (m *multiaddr) Bytes() []byte {
-	return m.bytes
+func (m Multiaddr) Bytes() []byte {
+	size := 0
+	for _, c := range m {
+		size += len(c.bytes)
+	}
+
+	out := make([]byte, 0, size)
+	for _, c := range m {
+		out = append(out, c.bytes...)
+	}
+
+	return out
 }
 
 // String returns the string representation of a Multiaddr
-func (m *multiaddr) String() string {
-	s, err := bytesToString(m.bytes)
-	if err != nil {
-		panic(fmt.Errorf("multiaddr failed to convert back to string. corrupted? %s", err))
+func (m Multiaddr) String() string {
+	var buf strings.Builder
+
+	for _, c := range m {
+		c.writeTo(&buf)
 	}
-	return s
+	return buf.String()
 }
 
-func (m *multiaddr) MarshalBinary() ([]byte, error) {
+func (m Multiaddr) MarshalBinary() ([]byte, error) {
 	return m.Bytes(), nil
 }
 
-func (m *multiaddr) UnmarshalBinary(data []byte) error {
+func (m *Multiaddr) UnmarshalBinary(data []byte) error {
+	if m == nil {
+		return errNilPtr
+	}
 	new, err := NewMultiaddrBytes(data)
 	if err != nil {
 		return err
 	}
-	*m = *(new.(*multiaddr))
+	*m = new
 	return nil
 }
 
-func (m *multiaddr) MarshalText() ([]byte, error) {
+func (m Multiaddr) MarshalText() ([]byte, error) {
 	return []byte(m.String()), nil
 }
 
-func (m *multiaddr) UnmarshalText(data []byte) error {
+func (m *Multiaddr) UnmarshalText(data []byte) error {
+	if m == nil {
+		return errNilPtr
+	}
+
 	new, err := NewMultiaddr(string(data))
 	if err != nil {
 		return err
 	}
-	*m = *(new.(*multiaddr))
+	*m = new
 	return nil
 }
 
-func (m *multiaddr) MarshalJSON() ([]byte, error) {
+func (m Multiaddr) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m.String())
 }
 
-func (m *multiaddr) UnmarshalJSON(data []byte) error {
+func (m *Multiaddr) UnmarshalJSON(data []byte) error {
+	if m == nil {
+		return errNilPtr
+	}
 	var v string
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}
 	new, err := NewMultiaddr(v)
-	*m = *(new.(*multiaddr))
+	*m = new
 	return err
 }
 
 // Protocols returns the list of protocols this Multiaddr has.
 // will panic in case we access bytes incorrectly.
-func (m *multiaddr) Protocols() []Protocol {
-	ps := make([]Protocol, 0, 8)
-	b := m.bytes
-	for len(b) > 0 {
-		code, n, err := ReadVarintCode(b)
-		if err != nil {
-			panic(err)
-		}
-
-		p := ProtocolWithCode(code)
-		if p.Code == 0 {
-			// this is a panic (and not returning err) because this should've been
-			// caught on constructing the Multiaddr
-			panic(fmt.Errorf("no protocol with code %d", b[0]))
-		}
-		ps = append(ps, p)
-		b = b[n:]
-
-		n, size, err := sizeForAddr(p, b)
-		if err != nil {
-			panic(err)
-		}
-
-		b = b[n+size:]
+func (m Multiaddr) Protocols() []Protocol {
+	out := make([]Protocol, 0, len(m))
+	for _, c := range m {
+		out = append(out, c.Protocol())
 	}
-	return ps
+	return out
+}
+
+type Multiaddrer interface {
+	// Multiaddr returns the Multiaddr representation
+	Multiaddr() Multiaddr
+}
+
+func (m Multiaddr) Multiaddr() Multiaddr {
+	return m
+}
+
+// AppendComponent is the same as using `append(m, *c)`, but with a safety check
+// for a nil Component.
+func (m Multiaddr) AppendComponent(cs ...*Component) Multiaddr {
+	for _, c := range cs {
+		if c == nil {
+			continue
+		}
+		m = append(m, *c)
+	}
+	return m
 }
 
 // Encapsulate wraps a given Multiaddr, returning the resulting joined Multiaddr
-func (m *multiaddr) Encapsulate(o Multiaddr) Multiaddr {
-	if o == nil {
-		return m
-	}
-
-	mb := m.bytes
-	ob := o.Bytes()
-
-	b := make([]byte, len(mb)+len(ob))
-	copy(b, mb)
-	copy(b[len(mb):], ob)
-	return &multiaddr{bytes: b}
+func (m Multiaddr) Encapsulate(other Multiaddrer) Multiaddr {
+	return Join(m, other)
 }
 
 // Decapsulate unwraps Multiaddr up until the given Multiaddr is found.
-func (m *multiaddr) Decapsulate(right Multiaddr) Multiaddr {
-	if right == nil {
+func (m Multiaddr) Decapsulate(rightPartsAny Multiaddrer) Multiaddr {
+	if rightPartsAny == nil {
 		return m
 	}
-
-	leftParts := Split(m)
-	rightParts := Split(right)
+	rightParts := rightPartsAny.Multiaddr()
+	leftParts := m
 
 	lastIndex := -1
 	for i := range leftParts {
@@ -173,7 +212,7 @@ func (m *multiaddr) Decapsulate(right Multiaddr) Multiaddr {
 				break
 			}
 
-			foundMatch = rightC.Equal(leftParts[i+j])
+			foundMatch = rightC.Equal(&leftParts[i+j])
 			if !foundMatch {
 				break
 			}
@@ -189,28 +228,20 @@ func (m *multiaddr) Decapsulate(right Multiaddr) Multiaddr {
 	}
 
 	if lastIndex < 0 {
-		// if multiaddr not contained, returns a copy.
-		cpy := make([]byte, len(m.bytes))
-		copy(cpy, m.bytes)
-		return &multiaddr{bytes: cpy}
+		return m
 	}
-
-	return Join(leftParts[:lastIndex]...)
+	return leftParts[:lastIndex]
 }
 
 var ErrProtocolNotFound = fmt.Errorf("protocol not found in multiaddr")
 
-func (m *multiaddr) ValueForProtocol(code int) (value string, err error) {
-	err = ErrProtocolNotFound
-	ForEach(m, func(c Component) bool {
+func (m Multiaddr) ValueForProtocol(code int) (value string, err error) {
+	for _, c := range m {
 		if c.Protocol().Code == code {
-			value = c.Value()
-			err = nil
-			return false
+			return c.Value(), nil
 		}
-		return true
-	})
-	return
+	}
+	return "", ErrProtocolNotFound
 }
 
 // FilterAddrs is a filter that removes certain addresses, according to the given filters.
@@ -246,7 +277,7 @@ func Unique(addrs []Multiaddr) []Multiaddr {
 		return addrs
 	}
 	// Use the new slices package here, as the sort function doesn't allocate (sort.Slice does).
-	slices.SortFunc(addrs, func(a, b Multiaddr) int { return bytes.Compare(a.Bytes(), b.Bytes()) })
+	slices.SortFunc(addrs, func(a, b Multiaddr) int { return a.Compare(b) })
 	idx := 1
 	for i := 1; i < len(addrs); i++ {
 		if !addrs[i-1].Equal(addrs[i]) {
