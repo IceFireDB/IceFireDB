@@ -76,7 +76,7 @@ func (gtid *MariadbGTID) Clone() *MariadbGTID {
 
 func (gtid *MariadbGTID) forward(newer *MariadbGTID) error {
 	if newer.DomainID != gtid.DomainID {
-		return errors.Errorf("%s is not same with doamin of %s", newer, gtid)
+		return errors.Errorf("%s is not same with domain of %s", newer, gtid)
 	}
 
 	/*
@@ -224,8 +224,8 @@ func (s *MariadbGTIDSet) Contain(o GTIDSet) bool {
 		return false
 	}
 
-	for doaminID, gtid := range other.Sets {
-		o, ok := s.Sets[doaminID]
+	for domainID, gtid := range other.Sets {
+		o, ok := s.Sets[domainID]
 		if !ok {
 			return false
 		}
