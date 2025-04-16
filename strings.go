@@ -48,6 +48,23 @@ func init() {
 	// conf.AddWriteCommand("PERSIST", cmdPERSIST) // Prohibition: time persistence
 }
 
+// handleExpiration handles common expiration logic for EXPIRE/EXPIREAT/SETEX/SETEXAT
+func handleExpiration(key []byte, timestamp int64) (interface{}, error) {
+	// If the timestamp is in the past, delete the key
+	if timestamp < time.Now().Unix() {
+		if _, err := ldb.Del(key); err != nil {
+			return nil, err
+		}
+		return redcon.SimpleInt(1), nil
+	}
+	
+	v, err := ldb.ExpireAt(key, timestamp)
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(v), nil
+}
+
 // cmdEXPIREAT sets an expiration timestamp for a key.
 func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
@@ -56,25 +73,10 @@ func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 
 	timestamp, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ERR invalid timestamp: %v", err)
 	}
 
-	// If the timestamp is less than the current time, delete the key
-	if timestamp < time.Now().Unix() {
-		keys := [][]byte{[]byte(args[1])}
-		_, err := ldb.Del(keys...)
-		if err != nil {
-			return nil, err
-		}
-		return redcon.SimpleInt(1), nil
-	}
-
-	v, err := ldb.ExpireAt([]byte(args[1]), timestamp)
-	if err != nil {
-		return nil, err
-	}
-
-	return redcon.SimpleInt(v), nil
+	return handleExpiration([]byte(args[1]), timestamp)
 }
 
 // cmdEXPIRE sets an expiration time for a key.
@@ -85,25 +87,10 @@ func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 
 	duration, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
-		return nil, err
-	}
-	timestamp := m.Now().Unix() + duration
-
-	// If the timestamp is less than the current time, delete the key
-	if timestamp < time.Now().Unix() {
-		keys := [][]byte{[]byte(args[1])}
-		_, err := ldb.Del(keys...)
-		if err != nil {
-			return nil, err
-		}
-		return redcon.SimpleInt(1), nil
+		return nil, fmt.Errorf("ERR invalid duration: %v", err)
 	}
 
-	v, err := ldb.ExpireAt([]byte(args[1]), timestamp)
-	if err != nil {
-		return nil, err
-	}
-	return redcon.SimpleInt(v), nil
+	return handleExpiration([]byte(args[1]), m.Now().Unix() + duration)
 }
 
 // cmdSTRLEN returns the length of the string value stored at key.
