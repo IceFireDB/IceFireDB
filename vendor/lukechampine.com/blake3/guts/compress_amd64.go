@@ -1,6 +1,8 @@
 package guts
 
-import "unsafe"
+import (
+	"unsafe"
+)
 
 //go:generate go run avo/gen.go -out blake3_amd64.s
 

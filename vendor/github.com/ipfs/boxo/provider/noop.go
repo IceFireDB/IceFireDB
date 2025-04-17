@@ -19,7 +19,7 @@ func (op *noopProvider) Close() error {
 	return nil
 }
 
-func (op *noopProvider) Provide(cid.Cid) error {
+func (op *noopProvider) Provide(context.Context, cid.Cid, bool) error {
 	return nil
 }
 

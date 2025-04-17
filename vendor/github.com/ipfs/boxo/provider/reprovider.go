@@ -42,7 +42,10 @@ type reprovider struct {
 	ctx     context.Context
 	close   context.CancelFunc
 	closewg sync.WaitGroup
+	mu      sync.Mutex
 
+	// reprovideInterval is the time between 2 reprovides. A value of 0 means
+	// that no automatic reprovide will be performed.
 	reprovideInterval        time.Duration
 	initalReprovideDelay     time.Duration
 	initialReprovideDelaySet bool
@@ -62,6 +65,7 @@ type reprovider struct {
 	statLk                                    sync.Mutex
 	totalProvides, lastReprovideBatchSize     uint64
 	avgProvideDuration, lastReprovideDuration time.Duration
+	lastRun                                   time.Time
 
 	throughputCallback ThroughputCallback
 	// throughputProvideCurrentCount counts how many provides has been done since the last call to throughputCallback
@@ -355,7 +359,7 @@ func (s *reprovider) run() {
 			recentAvgProvideDuration := dur / time.Duration(len(keys))
 
 			s.statLk.Lock()
-			s.avgProvideDuration = time.Duration((totalProvideTime + dur) / (time.Duration(s.totalProvides) + time.Duration(len(keys))))
+			s.avgProvideDuration = (totalProvideTime + dur) / (time.Duration(s.totalProvides) + time.Duration(len(keys)))
 			s.totalProvides += uint64(len(keys))
 
 			log.Debugf("finished providing of %d keys. It took %v with an average of %v per provide", len(keys), dur, recentAvgProvideDuration)
@@ -363,6 +367,7 @@ func (s *reprovider) run() {
 			if performedReprovide {
 				s.lastReprovideBatchSize = uint64(len(keys))
 				s.lastReprovideDuration = dur
+				s.lastRun = time.Now()
 
 				s.statLk.Unlock()
 
@@ -455,7 +460,7 @@ func (s *reprovider) Close() error {
 	return err
 }
 
-func (s *reprovider) Provide(cid cid.Cid) error {
+func (s *reprovider) Provide(ctx context.Context, cid cid.Cid, announce bool) error {
 	return s.q.Enqueue(cid)
 }
 
@@ -467,6 +472,12 @@ func (s *reprovider) reprovide(ctx context.Context, force bool) error {
 	if !s.shouldReprovide() && !force {
 		return nil
 	}
+
+	ok := s.mu.TryLock()
+	if !ok {
+		return fmt.Errorf("instance of reprovide already running")
+	}
+	defer s.mu.Unlock()
 
 	kch, err := s.keyProvider(ctx)
 	if err != nil {
@@ -524,6 +535,9 @@ func (s *reprovider) getLastReprovideTime() (time.Time, error) {
 }
 
 func (s *reprovider) shouldReprovide() bool {
+	if s.reprovideInterval == 0 {
+		return false
+	}
 	t, err := s.getLastReprovideTime()
 	if err != nil {
 		log.Debugf("getting last reprovide time failed: %s", err)
@@ -537,8 +551,9 @@ func (s *reprovider) shouldReprovide() bool {
 }
 
 type ReproviderStats struct {
-	TotalProvides, LastReprovideBatchSize     uint64
-	AvgProvideDuration, LastReprovideDuration time.Duration
+	TotalProvides, LastReprovideBatchSize                        uint64
+	ReprovideInterval, AvgProvideDuration, LastReprovideDuration time.Duration
+	LastRun                                                      time.Time
 }
 
 // Stat returns various stats about this provider system
@@ -548,8 +563,10 @@ func (s *reprovider) Stat() (ReproviderStats, error) {
 	return ReproviderStats{
 		TotalProvides:          s.totalProvides,
 		LastReprovideBatchSize: s.lastReprovideBatchSize,
+		ReprovideInterval:      s.reprovideInterval,
 		AvgProvideDuration:     s.avgProvideDuration,
 		LastReprovideDuration:  s.lastReprovideDuration,
+		LastRun:                s.lastRun,
 	}, nil
 }
 
