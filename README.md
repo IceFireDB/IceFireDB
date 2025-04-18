@@ -61,7 +61,6 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
 | Support decentralized consistent KV storage engine ([icefiredb-crdt-kv](https://github.com/IceFireDB/icefiredb-crdt-kv) and [icefiredb-ipfs-log](https://github.com/IceFireDB/icefiredb-ipfs-log)) | Beta version                  |
 | Support AI vector database storage and instructions                                                        | In progress                         |
 | Integrate with [NATS](https://nats.io/) for high-performance decentralized networking                      | In progress                  |
-| Support KV and SQL immutable storage engine (combined with [immudb](https://github.com/codenotary/immudb)) | In progress                  |
 | Supports scalable, auditable, and high-performance tamper-resistant logging (combined with [qed](https://github.com/BBVA/qed)) | Planned                    |
 | Build an immutable transparent log witness layer between Web2 and Web3, build a data hot and cold hybrid structure, and an immutable data bridge layer (inspired by Google Trillian-Witness and IPLD) | Planned             |
 | Support KV metadata layer and mixed storage structure of hot and cold                                      | Planned                    |
