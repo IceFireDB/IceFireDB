@@ -46,6 +46,8 @@ type P2PS struct {
 	ServiceDiscoverMode string `json:"service_discover_mode"`
 	NodeHostIP          string `json:"node_host_ip"`
 	NodeHostPort        int    `json:"node_host_port"`
+	AdminTopic          string `json:"admin_topic"`
+	ReadonlyTopic       string `json:"readonly_topic"`
 }
 
 func init() {

@@ -28,6 +28,7 @@ import (
 )
 
 // P2P A structure that represents a P2P Host
+
 type P2P struct {
 	// Represents the host context layer
 	Ctx context.Context

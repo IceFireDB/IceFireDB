@@ -26,27 +26,27 @@ func initP2P(m *mysqlProxy) {
 	p2pChans = &p2pChannels{}
 	
 	// Initialize admin P2P
-	p2pChans.adminHost = p2p.NewP2P(config.Get().P2P.Admin.ServiceDiscoveryID, 
-		config.Get().P2P.Admin.NodeHostIP, config.Get().P2P.Admin.NodeHostPort)
+	p2pChans.adminHost = p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID, 
+		config.Get().P2P.NodeHostIP, config.Get().P2P.NodeHostPort)
 	
 	// Initialize readonly P2P
-	p2pChans.readonlyHost = p2p.NewP2P(config.Get().P2P.Readonly.ServiceDiscoveryID,
-		config.Get().P2P.Readonly.NodeHostIP, config.Get().P2P.Readonly.NodeHostPort)
+	p2pChans.readonlyHost = p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID,
+		config.Get().P2P.NodeHostIP, config.Get().P2P.NodeHostPort)
 
 	// Connect both to their networks
-	connectP2PNetwork(p2pChans.adminHost, config.Get().P2P.Admin.ServiceDiscoverMode)
-	connectP2PNetwork(p2pChans.readonlyHost, config.Get().P2P.Readonly.ServiceDiscoverMode)
+	connectP2PNetwork(p2pChans.adminHost, config.Get().P2P.ServiceDiscoverMode)
+	connectP2PNetwork(p2pChans.readonlyHost, config.Get().P2P.ServiceDiscoverMode)
 
 	// Join pubsub channels
 	var err error
 	p2pChans.adminPubSub, err = p2p.JoinPubSub(p2pChans.adminHost, "mysql-admin", 
-		config.Get().P2P.Admin.ServiceCommandTopic)
+		config.Get().P2P.AdminTopic)
 	if err != nil {
 		panic(err)
 	}
 
 	p2pChans.readonlyPubSub, err = p2p.JoinPubSub(p2pChans.readonlyHost, "mysql-readonly",
-		config.Get().P2P.Readonly.ServiceCommandTopic)
+		config.Get().P2P.ReadonlyTopic)
 	if err != nil {
 		panic(err)
 	}
@@ -84,11 +84,19 @@ func asyncSQL(m *mysqlProxy) {
 				return
 				
 			// Handle admin channel messages
-			case s := <-p2pChans.adminPubSub.Inbound:
+			case msg := <-p2pChans.adminPubSub.Inbound:
+				s := &p2p.Message{
+					SenderID: msg.GetFrom(),
+					Content:  string(msg.GetData()),
+				}
 				handleInboundSQL(m, s, adminTxConn, "admin")
 				
 			// Handle readonly channel messages
-			case s := <-p2pChans.readonlyPubSub.Inbound:
+			case msg := <-p2pChans.readonlyPubSub.Inbound:
+				s := &p2p.Message{
+					SenderID: msg.GetFrom(),
+					Content:  string(msg.GetData()),
+				}
 				handleInboundSQL(m, s, readonlyTxConn, "readonly")
 			}
 		}
@@ -116,12 +124,12 @@ func handleInboundSQL(m *mysqlProxy, s *p2p.Message, txConn map[string]*client.C
 	}
 
 	// Execute query
-	_, err = conn.Execute(s.Message)
+	_, err = conn.Execute(s.Content)
 	if err != nil {
-		logrus.Infof("Inbound %s sql: %s err: %v", accessType, s.Message, err)
+		logrus.Infof("Inbound %s sql: %s err: %v", accessType, s.Content, err)
 		return
 	}
-	logrus.Infof("Inbound %s id: %s, sql: %s", accessType, s.SenderID, s.Message)
+	logrus.Infof("Inbound %s id: %s, sql: %s", accessType, s.SenderID, s.Content)
 
 	if !ok {
 		if conn.IsInTransaction() {
