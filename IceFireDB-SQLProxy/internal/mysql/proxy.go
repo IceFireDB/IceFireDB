@@ -38,26 +38,36 @@ func NewMySQLProxy(ctx context.Context, server *server.Server, credential server
 	}
 
 	// Initialize admin connection pool
-	proxy.adminPool = client.NewPool(
-		config.Get().MySQL.Admin.Addr,
-		config.Get().MySQL.Admin.User,
-		config.Get().MySQL.Admin.Password,
-		config.Get().MySQL.Admin.DBName,
-		config.Get().MySQL.Admin.MinAlive,
-		config.Get().MySQL.Admin.MaxAlive,
-		config.Get().MySQL.Admin.MaxIdle,
+	adminPool, err := client.NewPool(
+		logrus.Infof,
+		config.Get().Mysql.MinAlive,
+		config.Get().Mysql.MaxAlive,
+		config.Get().Mysql.MaxIdle,
+		config.Get().Mysql.Addr,
+		config.Get().Mysql.User,
+		config.Get().Mysql.Password,
+		config.Get().Mysql.DBName,
 	)
+	if err != nil {
+		logrus.Fatalf("Failed to create admin pool: %v", err)
+	}
+	proxy.adminPool = adminPool
 
 	// Initialize readonly connection pool
-	proxy.readonlyPool = client.NewPool(
-		config.Get().MySQL.Readonly.Addr,
-		config.Get().MySQL.Readonly.User,
-		config.Get().MySQL.Readonly.Password,
-		config.Get().MySQL.Readonly.DBName,
-		config.Get().MySQL.Readonly.MinAlive,
-		config.Get().MySQL.Readonly.MaxAlive,
-		config.Get().MySQL.Readonly.MaxIdle,
+	readonlyPool, err := client.NewPool(
+		logrus.Infof,
+		config.Get().Mysql.MinAlive,
+		config.Get().Mysql.MaxAlive,
+		config.Get().Mysql.MaxIdle,
+		config.Get().Mysql.Addr,
+		config.Get().Mysql.ReadonlyUser,
+		config.Get().Mysql.Password,
+		config.Get().Mysql.DBName,
 	)
+	if err != nil {
+		logrus.Fatalf("Failed to create readonly pool: %v", err)
+	}
+	proxy.readonlyPool = readonlyPool
 
 	return proxy
 }
