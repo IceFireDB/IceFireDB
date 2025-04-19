@@ -296,6 +296,11 @@ func (c *Conn) GetConnectionID() uint32 {
 	return c.connectionID
 }
 
+// GetUser returns the username for this connection
+func (c *Conn) GetUser() string {
+	return c.user
+}
+
 func (c *Conn) HandleOKPacket(data []byte) *Result {
 	r, _ := c.handleOKPacket(data)
 	return r

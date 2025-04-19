@@ -19,13 +19,14 @@ type ServerC struct {
 }
 
 type MysqlS struct {
-	Addr     string `json:"addr"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-	DBName   string `json:"dbname"`
-	MinAlive int    `json:"minAlive"`
-	MaxAlive int    `json:"maxAlive"`
-	MaxIdle  int    `json:"maxIdle"`
+	Addr        string `json:"addr"`
+	User        string `json:"user"`
+	Password    string `json:"password"`
+	DBName      string `json:"dbname"`
+	MinAlive    int    `json:"minAlive"`
+	MaxAlive    int    `json:"maxAlive"`
+	MaxIdle     int    `json:"maxIdle"`
+	ReadonlyUser string `json:"readonlyUser"`
 }
 
 type UserInfo struct {
