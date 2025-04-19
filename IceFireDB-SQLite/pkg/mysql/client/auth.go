@@ -133,7 +133,7 @@ func (c *Conn) genAuthResponse(authData []byte) ([]byte, bool, error) {
 // See: http://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::HandshakeResponse
 func (c *Conn) writeAuthHandshake() error {
 	if !slices.Contains(supportedAuthPlugins, c.authPluginName) {
-		return fmt.Errorf("unknow auth plugin name '%s'", c.authPluginName)
+		return fmt.Errorf("unknown auth plugin name '%s'", c.authPluginName)
 	}
 
 	// Set default client capabilities that reflect the abilities of this library

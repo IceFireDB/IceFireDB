@@ -93,7 +93,7 @@ func fieldType(value interface{}) (typ uint8, err error) {
 	case nil:
 		typ = MYSQL_TYPE_NULL
 	default:
-		err = errors.Errorf("unsupport type %T for resultset", value)
+		err = errors.Errorf("unsupported type %T for resultset", value)
 	}
 	return
 }
@@ -114,7 +114,7 @@ func formatField(field *Field, value interface{}) error {
 	case nil:
 		field.Charset = 33
 	default:
-		return errors.Errorf("unsupport type %T for resultset", value)
+		return errors.Errorf("unsupported type %T for resultset", value)
 	}
 	return nil
 }
