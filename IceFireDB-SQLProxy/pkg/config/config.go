@@ -19,13 +19,14 @@ type ServerC struct {
 }
 
 type MysqlS struct {
-	Addr     string `json:"addr"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-	DBName   string `json:"dbname"`
-	MinAlive int    `json:"minAlive"`
-	MaxAlive int    `json:"maxAlive"`
-	MaxIdle  int    `json:"maxIdle"`
+	Addr        string `json:"addr"`
+	User        string `json:"user"`
+	Password    string `json:"password"`
+	DBName      string `json:"dbname"`
+	MinAlive    int    `json:"minAlive"`
+	MaxAlive    int    `json:"maxAlive"`
+	MaxIdle     int    `json:"maxIdle"`
+	ReadonlyUser string `json:"readonlyUser"`
 }
 
 type UserInfo struct {
@@ -45,6 +46,8 @@ type P2PS struct {
 	ServiceDiscoverMode string `json:"service_discover_mode"`
 	NodeHostIP          string `json:"node_host_ip"`
 	NodeHostPort        int    `json:"node_host_port"`
+	AdminTopic          string `json:"admin_topic"`
+	ReadonlyTopic       string `json:"readonly_topic"`
 }
 
 func init() {

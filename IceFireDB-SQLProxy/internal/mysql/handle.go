@@ -3,6 +3,7 @@ package mysql
 import (
 	"errors"
 
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/config"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/client"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/server"
@@ -24,9 +25,19 @@ func (h *Handle) UseDB(c *server.Conn, dbName string) error {
 }
 
 func (h *Handle) HandleQuery(c *server.Conn, query string) (res *mysql.Result, err error) {
+	// Check if this is a readonly connection attempting a write
+	if h.conn.GetUser() == config.Get().Mysql.ReadonlyUser && isDML(query) {
+		return nil, errors.New("readonly user cannot execute write operations")
+	}
+
 	res, err = h.conn.Execute(query)
-	if err == nil {
-		broadcast(query)
+	if err == nil && isDML(query) {
+		// Determine access type based on connection user
+		accessType := "admin"
+		if h.conn.GetUser() == config.Get().Mysql.ReadonlyUser {
+			accessType = "readonly"
+		}
+		broadcast(query, accessType)
 	}
 	return
 }
@@ -44,13 +55,23 @@ func (h *Handle) HandleStmtPrepare(c *server.Conn, query string) (int, int, inte
 }
 
 func (h *Handle) HandleStmtExecute(c *server.Conn, context interface{}, query string, args []interface{}) (*mysql.Result, error) {
+	// Check if this is a readonly connection attempting a write
+	if h.conn.GetUser() == config.Get().Mysql.ReadonlyUser && isDML(query) {
+		return nil, errors.New("readonly user cannot execute write operations")
+	}
+
 	stmt, ok := context.(*client.Stmt)
 	if !ok {
 		return nil, errors.New("other error")
 	}
 	res, err := stmt.Execute(args...)
-	if err == nil {
-		broadcast(query)
+	if err == nil && isDML(query) {
+		// Determine access type based on connection user
+		accessType := "admin"
+		if h.conn.GetUser() == config.Get().Mysql.ReadonlyUser {
+			accessType = "readonly"
+		}
+		broadcast(query, accessType)
 	}
 	return res, err
 }

@@ -5,26 +5,43 @@ debug:  # Control to enable debug mode
   enable: true
   port: 17878
 
-# mysql
+# mysql configurations for different access levels
 mysql:
-  addr: "192.168.2.80:3306"
-  user: "root"
-  password: "123456"
-  dbname: "exampledb"
-  minAlive: 1 # Specifies the minimum number of open connections the pool will attempt to maintain
-  maxAlive: 64 # Specifies the maximum number of open connections the pool will attempt to maintain
-  maxIdle: 4 # Maximum number of idle connections
+  admin:
+    addr: "192.168.2.80:3306"
+    user: "admin_user"
+    password: "admin_pass"
+    dbname: "exampledb"
+    minAlive: 1
+    maxAlive: 64
+    maxIdle: 4
+  readonly:
+    addr: "192.168.2.80:3306"
+    user: "readonly_user"
+    password: "readonly_pass"
+    dbname: "exampledb"
+    minAlive: 1
+    maxAlive: 64
+    maxIdle: 4
 
 # Tenant list
 userlist:
   - user: root
     password: 123456
 
-# p2p config
+# p2p config for different access levels
 p2p:
-  enable: false
-  service_discovery_id: "p2p_sqlproxy_service_test"
-  service_command_topic: "p2p_sqlproxy_service_topic_test"
-  service_discover_mode: "advertise" # advertise or announce
-  node_host_ip: "127.0.0.1" #local ipv4 ip
-  node_host_port: 0 # any port 
+  admin:
+    enable: false
+    service_discovery_id: "p2p_sqlproxy_admin_service"
+    service_command_topic: "p2p_sqlproxy_admin_topic"
+    service_discover_mode: "advertise"
+    node_host_ip: "127.0.0.1"
+    node_host_port: 0
+  readonly:
+    enable: false
+    service_discovery_id: "p2p_sqlproxy_readonly_service"
+    service_command_topic: "p2p_sqlproxy_readonly_topic"
+    service_discover_mode: "advertise"
+    node_host_ip: "127.0.0.1"
+    node_host_port: 0
