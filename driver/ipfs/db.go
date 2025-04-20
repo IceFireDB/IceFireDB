@@ -221,17 +221,20 @@ func (db *DB) Put(key, value []byte) error {
 	db.versions[string(key)] = db.versions[string(key)] + 1
 	version := db.versions[string(key)]
 
-	// Create versioned value
-	versionedValue := append([]byte{byte(version)}, value...)
-
-	// Write to both stores
-	localErr := db.localDB.Put(key, versionedValue, nil)
-	ipfsErr := db.ipfsDB.Put(db.ctx, key, versionedValue)
-	if localErr != nil || ipfsErr != nil {
-		return fmt.Errorf("local error: %v, ipfs error: %v", localErr, ipfsErr)
+	// Store version separately in metadata
+	metaKey := append([]byte("_meta:"), key...)
+	versionBytes := []byte(fmt.Sprintf("%d", version))
+	
+	// Write data and version separately
+	localErr := db.localDB.Put(key, value, nil)
+	ipfsErr := db.ipfsDB.Put(db.ctx, key, value)
+	metaErr := db.localDB.Put(metaKey, versionBytes, nil)
+	
+	if localErr != nil || ipfsErr != nil || metaErr != nil {
+		return fmt.Errorf("local error: %v, ipfs error: %v, meta error: %v", localErr, ipfsErr, metaErr)
 	}
 
-	db.cache.Set(key, versionedValue, 0)
+	db.cache.Set(key, value, 0)
 	return nil
 }
 
@@ -240,20 +243,24 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	defer db.versionMu.RUnlock()
 
 	if v, ok := db.cache.Get(key); ok {
-		// Strip version byte
-		return v.([]byte)[1:], nil
+		return v.([]byte), nil
 	}
 
-	// Try ipfs-log first
+	// Get values from both stores
 	ipfsValue, ipfsErr := db.ipfsDB.Get(key)
 	localValue, localErr := db.localDB.Get(key, nil)
-
-	// Resolve conflicts
+	
+	// Get versions
+	metaKey := append([]byte("_meta:"), key...)
+	ipfsVersion, _ := db.ipfsDB.Get(metaKey)
+	localVersion, _ := db.localDB.Get(metaKey, nil)
+	
+	// Resolve conflicts based on version
 	var value []byte
 	switch {
 	case ipfsErr == nil && ipfsValue != nil && localErr == nil && localValue != nil:
 		// Both have value - pick higher version
-		if ipfsValue[0] > localValue[0] {
+		if string(ipfsVersion) > string(localVersion) {
 			value = ipfsValue
 		} else {
 			value = localValue
@@ -267,12 +274,10 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("ipfs error: %v, local error: %v", ipfsErr, localErr)
 	}
-
-	// Cache the result (with version)
-	db.cache.Set(key, value, 0)
 	
-	// Return value without version byte
-	return value[1:], nil
+	// Cache the result
+	db.cache.Set(key, value, 0)
+	return value, nil
 }
 
 func (db *DB) Delete(key []byte) error {
