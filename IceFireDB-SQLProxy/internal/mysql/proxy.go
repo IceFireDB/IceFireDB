@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/config"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/client"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/mysql"
 	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/server"
@@ -20,22 +21,66 @@ const (
 )
 
 type mysqlProxy struct {
-	ctx        context.Context
-	server     *server.Server
-	credential server.CredentialProvider
-	pLock      sync.RWMutex
-	closed     atomic.Value
-	pool       *client.Pool
+	ctx          context.Context
+	server       *server.Server
+	credential   server.CredentialProvider
+	pLock        sync.RWMutex
+	closed       atomic.Value
+	adminPool    *client.Pool
+	readonlyPool *client.Pool
+}
+
+func NewMySQLProxy(ctx context.Context, server *server.Server, credential server.CredentialProvider) *mysqlProxy {
+	proxy := &mysqlProxy{
+		ctx:        ctx,
+		server:     server,
+		credential: credential,
+	}
+
+	// Initialize admin connection pool
+	adminPool, err := client.NewPool(
+		logrus.Infof,
+		config.Get().Mysql.MinAlive,
+		config.Get().Mysql.MaxAlive,
+		config.Get().Mysql.MaxIdle,
+		config.Get().Mysql.Addr,
+		config.Get().Mysql.User,
+		config.Get().Mysql.Password,
+		config.Get().Mysql.DBName,
+	)
+	if err != nil {
+		logrus.Fatalf("Failed to create admin pool: %v", err)
+	}
+	proxy.adminPool = adminPool
+
+	// Initialize readonly connection pool
+	readonlyPool, err := client.NewPool(
+		logrus.Infof,
+		config.Get().Mysql.MinAlive,
+		config.Get().Mysql.MaxAlive,
+		config.Get().Mysql.MaxIdle,
+		config.Get().Mysql.Addr,
+		config.Get().Mysql.ReadonlyUser,
+		config.Get().Mysql.Password,
+		config.Get().Mysql.DBName,
+	)
+	if err != nil {
+		logrus.Fatalf("Failed to create readonly pool: %v", err)
+	}
+	proxy.readonlyPool = readonlyPool
+
+	return proxy
 }
 
 func (m *mysqlProxy) onConn(c net.Conn) {
-	clientConn, err := m.popMysqlConn()
+	// Default to admin connection for direct connections
+	clientConn, err := m.popAdminConn()
 	if err != nil {
 		logrus.Errorf("get remote conn err:", err)
 		return
 	}
 	defer func() {
-		m.pushMysqlConn(clientConn, err)
+		m.pushAdminConn(clientConn, err)
 	}()
 	h := &Handle{conn: clientConn}
 
@@ -70,11 +115,19 @@ func (m *mysqlProxy) onConn(c net.Conn) {
 	}
 }
 
-func (m *mysqlProxy) popMysqlConn() (*client.Conn, error) {
+func (m *mysqlProxy) popAdminConn() (*client.Conn, error) {
+	return m.popConn(m.adminPool)
+}
+
+func (m *mysqlProxy) popReadonlyConn() (*client.Conn, error) {
+	return m.popConn(m.readonlyPool)
+}
+
+func (m *mysqlProxy) popConn(pool *client.Pool) (*client.Conn, error) {
 	var mysqlConn *client.Conn
 	var err error
 	for i := 0; i < GetConnRetry; i++ {
-		mysqlConn, err = m.pool.GetConn(m.ctx)
+		mysqlConn, err = pool.GetConn(m.ctx)
 		if err != nil {
 			continue
 		}
@@ -107,7 +160,15 @@ func (m *mysqlProxy) popMysqlConn() (*client.Conn, error) {
 	return mysqlConn, nil
 }
 
-func (m *mysqlProxy) pushMysqlConn(mysqlConn *client.Conn, err error) {
+func (m *mysqlProxy) pushAdminConn(mysqlConn *client.Conn, err error) {
+	m.pushConn(mysqlConn, err, m.adminPool)
+}
+
+func (m *mysqlProxy) pushReadonlyConn(mysqlConn *client.Conn, err error) {
+	m.pushConn(mysqlConn, err, m.readonlyPool)
+}
+
+func (m *mysqlProxy) pushConn(mysqlConn *client.Conn, err error, pool *client.Pool) {
 	if errors.Is(err, mysql.ErrBadConn) {
 		mysqlConn.Close()
 		return
@@ -126,6 +187,6 @@ func (m *mysqlProxy) pushMysqlConn(mysqlConn *client.Conn, err error) {
 		return
 	}
 	if mysqlConn.Conn != nil {
-		m.pool.PutConn(mysqlConn)
+		pool.PutConn(mysqlConn)
 	}
 }

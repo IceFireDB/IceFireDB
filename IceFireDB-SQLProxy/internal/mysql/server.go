@@ -65,10 +65,40 @@ func newMysqlProxy() *mysqlProxy {
 
 func (m *mysqlProxy) initClientPool() error {
 	mc := config.Get().Mysql
-	pool, err := client.NewPool(logrus.Infof, mc.MinAlive, mc.MaxAlive, mc.MaxIdle, mc.Addr, mc.User, mc.Password, mc.DBName)
+	
+	// Initialize admin pool
+	adminPool, err := client.NewPool(
+		logrus.Infof,
+		mc.MinAlive,
+		mc.MaxAlive,
+		mc.MaxIdle,
+		mc.Addr,
+		mc.User,
+		mc.Password,
+		mc.DBName,
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create admin pool: %v", err)
 	}
-	m.pool = pool
+	m.adminPool = adminPool
+
+	// Initialize readonly pool if configured
+	if mc.ReadonlyUser != "" {
+		readonlyPool, err := client.NewPool(
+			logrus.Infof,
+			mc.MinAlive,
+			mc.MaxAlive,
+			mc.MaxIdle,
+			mc.Addr,
+			mc.ReadonlyUser,
+			mc.Password,
+			mc.DBName,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create readonly pool: %v", err)
+		}
+		m.readonlyPool = readonlyPool
+	}
+
 	return nil
 }
