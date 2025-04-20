@@ -32,13 +32,6 @@ type Reader struct {
 	WritePosition int
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 func NewReader(reader io.Reader) *Reader {
 	return &Reader{reader: reader, Buffer: make([]byte, bufStepSize)}
 }

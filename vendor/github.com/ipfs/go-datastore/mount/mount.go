@@ -191,11 +191,11 @@ func (h *querySet) next() (query.Result, bool) {
 //
 // Specifically, this function will return three slices:
 //
-// * The matching datastores.
-// * The prefixes where each matching datastore has been mounted.
-// * The prefix within these datastores at which descendants of the passed key
-//   live. If the mounted datastore is fully contained within the given key,
-//   this will be /.
+//   - The matching datastores.
+//   - The prefixes where each matching datastore has been mounted.
+//   - The prefix within these datastores at which descendants of the passed key
+//     live. If the mounted datastore is fully contained within the given key,
+//     this will be /.
 //
 // By example, given the datastores:
 //

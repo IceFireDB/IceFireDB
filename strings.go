@@ -48,6 +48,23 @@ func init() {
 	// conf.AddWriteCommand("PERSIST", cmdPERSIST) // Prohibition: time persistence
 }
 
+// handleExpiration handles common expiration logic for EXPIRE/EXPIREAT/SETEX/SETEXAT
+func handleExpiration(key []byte, timestamp int64) (interface{}, error) {
+	// If the timestamp is in the past, delete the key
+	if timestamp < time.Now().Unix() {
+		if _, err := ldb.Del(key); err != nil {
+			return nil, err
+		}
+		return redcon.SimpleInt(1), nil
+	}
+	
+	v, err := ldb.ExpireAt(key, timestamp)
+	if err != nil {
+		return nil, err
+	}
+	return redcon.SimpleInt(v), nil
+}
+
 // cmdEXPIREAT sets an expiration timestamp for a key.
 func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 	if len(args) != 3 {
@@ -56,25 +73,10 @@ func cmdEXPIREAT(m uhaha.Machine, args []string) (interface{}, error) {
 
 	timestamp, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ERR invalid timestamp: %v", err)
 	}
 
-	// If the timestamp is less than the current time, delete the key
-	if timestamp < time.Now().Unix() {
-		keys := [][]byte{[]byte(args[1])}
-		_, err := ldb.Del(keys...)
-		if err != nil {
-			return nil, err
-		}
-		return redcon.SimpleInt(1), nil
-	}
-
-	v, err := ldb.ExpireAt([]byte(args[1]), timestamp)
-	if err != nil {
-		return nil, err
-	}
-
-	return redcon.SimpleInt(v), nil
+	return handleExpiration([]byte(args[1]), timestamp)
 }
 
 // cmdEXPIRE sets an expiration time for a key.
@@ -85,25 +87,10 @@ func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 
 	duration, err := ledis.StrInt64([]byte(args[2]), nil)
 	if err != nil {
-		return nil, err
-	}
-	timestamp := m.Now().Unix() + duration
-
-	// If the timestamp is less than the current time, delete the key
-	if timestamp < time.Now().Unix() {
-		keys := [][]byte{[]byte(args[1])}
-		_, err := ldb.Del(keys...)
-		if err != nil {
-			return nil, err
-		}
-		return redcon.SimpleInt(1), nil
+		return nil, fmt.Errorf("ERR invalid duration: %v", err)
 	}
 
-	v, err := ldb.ExpireAt([]byte(args[1]), timestamp)
-	if err != nil {
-		return nil, err
-	}
-	return redcon.SimpleInt(v), nil
+	return handleExpiration([]byte(args[1]), m.Now().Unix() + duration)
 }
 
 // cmdSTRLEN returns the length of the string value stored at key.
@@ -267,26 +254,52 @@ func cmdGETRANGE(m uhaha.Machine, args []string) (interface{}, error) {
 	return v, nil
 }
 
+// cmdSETBIT sets or clears the bit at offset in the string value stored at key.
+// Syntax: SETBIT key offset value
+// The bit is either set or cleared depending on value, which can be either 0 or 1.
+// When key does not exist, a new string value is created.
+// The string is grown to make sure it can hold a bit at offset.
+// The offset argument is required to be greater than or equal to 0.
+// Returns the original bit value stored at offset.
 func cmdSETBIT(m uhaha.Machine, args []string) (interface{}, error) {
+	// Check the number of arguments.  It must be exactly 4: SETBIT, key, offset, value.
 	if len(args) != 4 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	key := args[1]
+	// Extract the key from the arguments and convert it to a byte slice.
+	key := []byte(args[1])
+
+	// Extract the offset from the arguments and convert it to an integer.
 	offset, err := strconv.Atoi(args[2])
 	if err != nil {
-		return nil, err
+		return nil, err // Return the error if the offset is not a valid integer.
 	}
 
+	// Validate that the offset is not negative. SETBIT requires a non-negative offset.
+	if offset < 0 {
+		return nil, errors.New("offset must be a non-negative integer")
+	}
+
+	// Extract the value from the arguments and convert it to an integer.
 	value, err := strconv.Atoi(args[3])
 	if err != nil {
-		return nil, err
+		return nil, err // Return the error if the value is not a valid integer.
 	}
 
-	n, err := ldb.SetBit([]byte(key), offset, value)
-	if err != nil {
-		return nil, err
+	// Validate that the value is either 0 or 1. SETBIT only accepts 0 or 1 as values.
+	if value != 0 && value != 1 {
+		return nil, errors.New("value must be 0 or 1")
 	}
+
+	// Call the ldb.SetBit function to set the bit at the specified offset.
+	// This function returns the original bit value at the offset.
+	n, err := ldb.SetBit(key, offset, value)
+	if err != nil {
+		return nil, err // Return any error from the ldb.SetBit function.
+	}
+
+	// Return the original bit value as a redcon.SimpleInt.
 	return redcon.SimpleInt(n), nil
 }
 
@@ -645,7 +658,7 @@ func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-// This is different from the redis standard. It needs to enrich the algorithm to support more atomic instructions.
+// This is different from the RESP standard. It needs to enrich the algorithm to support more atomic instructions.
 func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
 	// Validate minimum arguments: SET key value [options...]
 	if len(args) < 3 {
@@ -892,7 +905,7 @@ func cmdGET(m uhaha.Machine, args []string) (interface{}, error) {
 	return val, nil
 }
 
-// This is different from the redis standard. For the sake of transaction consistency, there is no key existence judgment.
+// This is different from the RESP standard. For the sake of transaction consistency, there is no key existence judgment.
 func cmdDEL(m uhaha.Machine, args []string) (interface{}, error) {
 	// Check if the number of arguments is correct
 	if len(args) < 2 {

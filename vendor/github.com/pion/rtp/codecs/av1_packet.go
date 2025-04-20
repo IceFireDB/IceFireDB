@@ -30,13 +30,13 @@ const (
 	leb128Size = 1
 )
 
-// AV1Payloader payloads AV1 packets
+// AV1Payloader payloads AV1 packets.
 type AV1Payloader struct {
 	sequenceHeader []byte
 }
 
-// Payload fragments a AV1 packet across one or more byte arrays
-// See AV1Packet for description of AV1 Payload Header
+// Payload fragments a AV1 packet across one or more byte arrays.
+// See AV1Packet for description of AV1 Payload Header.
 func (p *AV1Payloader) Payload(mtu uint16, payload []byte) (payloads [][]byte) {
 	payloadDataIndex := 0
 	payloadDataRemaining := len(payload)
@@ -50,7 +50,8 @@ func (p *AV1Payloader) Payload(mtu uint16, payload []byte) (payloads [][]byte) {
 	frameType := (payload[0] & obuFrameTypeMask) >> obuFrameTypeBitshift
 	if frameType == obuFameTypeSequenceHeader {
 		p.sequenceHeader = payload
-		return
+
+		return payloads
 	}
 
 	for payloadDataRemaining > 0 {
@@ -61,7 +62,7 @@ func (p *AV1Payloader) Payload(mtu uint16, payload []byte) (payloads [][]byte) {
 			metadataSize += leb128Size + len(p.sequenceHeader)
 		}
 
-		out := make([]byte, min(int(mtu), payloadDataRemaining+metadataSize))
+		out := make([]byte, minInt(int(mtu), payloadDataRemaining+metadataSize))
 		outOffset := av1PayloaderHeadersize
 		out[0] = obuCount << wBitshift
 
@@ -138,7 +139,7 @@ type AV1Packet struct {
 	videoDepacketizer
 }
 
-// Unmarshal parses the passed byte slice and stores the result in the AV1Packet this method is called upon
+// Unmarshal parses the passed byte slice and stores the result in the AV1Packet this method is called upon.
 func (p *AV1Packet) Unmarshal(payload []byte) ([]byte, error) {
 	if payload == nil {
 		return nil, errNilPacket

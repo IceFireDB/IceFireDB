@@ -213,9 +213,10 @@ type RouterReady func(rt PubSubRouter, topic string) (bool, error)
 type ProvideKey func() (crypto.PrivKey, peer.ID)
 
 type PublishOptions struct {
-	ready     RouterReady
-	customKey ProvideKey
-	local     bool
+	ready         RouterReady
+	customKey     ProvideKey
+	local         bool
+	validatorData any
 }
 
 type PubOpt func(pub *PublishOptions) error
@@ -308,7 +309,7 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 		}
 	}
 
-	return t.p.val.PushLocal(&Message{m, "", t.p.host.ID(), nil, pub.local})
+	return t.p.val.PushLocal(&Message{m, "", t.p.host.ID(), pub.validatorData, pub.local})
 }
 
 // WithReadiness returns a publishing option for only publishing when the router is ready.
@@ -328,6 +329,15 @@ func WithReadiness(ready RouterReady) PubOpt {
 func WithLocalPublication(local bool) PubOpt {
 	return func(pub *PublishOptions) error {
 		pub.local = local
+		return nil
+	}
+}
+
+// WithValidatorData returns a publishing option to set custom validator data for the message.
+// This allows users to avoid deserialization of the message data when validating the message locally.
+func WithValidatorData(data any) PubOpt {
+	return func(pub *PublishOptions) error {
+		pub.validatorData = data
 		return nil
 	}
 }

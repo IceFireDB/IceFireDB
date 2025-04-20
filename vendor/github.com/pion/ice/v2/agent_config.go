@@ -195,6 +195,13 @@ type AgentConfig struct {
 	// * Implement draft-thatcher-ice-renomination
 	// * Implement custom CandidatePair switching logic
 	BindingRequestHandler func(m *stun.Message, local, remote Candidate, pair *CandidatePair) bool
+
+	// EnableUseCandidateCheckPriority can be used to enable checking for equal or higher priority to
+	// switch selected candidate pair if the peer requests USE-CANDIDATE and agent is a lite agent.
+	// This is disabled by default, i. e. when peer requests USE-CANDIDATE, the selected pair will be
+	// switched to that irrespective of relative priority between current selected pair
+	// and priority of the pair being switched to.
+	EnableUseCandidateCheckPriority bool
 }
 
 // initWithDefaults populates an agent and falls back to defaults if fields are unset
