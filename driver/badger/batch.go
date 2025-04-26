@@ -14,7 +14,7 @@ type WriteBatch struct {
 
 func (w *WriteBatch) getWriteBatch() *badger.WriteBatch {
 	if w.wb == nil {
-		w.wb = w.db.NewWriteBatchAt(timeTs())
+		w.wb = w.db.NewWriteBatch()
 	}
 	return w.wb
 }
