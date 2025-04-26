@@ -26,7 +26,7 @@ func (s *Snapshot) Get(key []byte) ([]byte, error) {
 }
 
 func (s *Snapshot) NewIterator() driver.IIterator {
-	tnx := s.db.NewTransactionAt(timeTs(), false)
+	tnx := s.db.NewTransaction(false)
 	it := &Iterator{
 		db:  s.db,
 		it:  tnx.NewIterator(badger.DefaultIteratorOptions),
