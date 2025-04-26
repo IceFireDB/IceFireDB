@@ -8,8 +8,6 @@ require (
 	github.com/aws/aws-sdk-go v1.55.7
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
-	github.com/dgraph-io/badger v1.6.2
-	github.com/dgraph-io/badger/v3 v3.2103.5
 	github.com/dgraph-io/badger/v4 v4.2.0
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/ipfs/go-datastore v0.7.0
@@ -71,7 +69,6 @@ require (
 	github.com/caddyserver/certmagic v0.21.4 // indirect
 	github.com/caddyserver/zerossl v0.1.3 // indirect
 	github.com/ceramicnetwork/go-dag-jose v0.1.1 // indirect
-	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cockroachdb/errors v1.11.3 // indirect
 	github.com/cockroachdb/fifo v0.0.0-20240606204812-0bbfbd93a7ce // indirect
@@ -87,6 +84,7 @@ require (
 	github.com/cupcake/rdb v0.0.0-20161107195141-43ba34106c76 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
+	github.com/dgraph-io/badger v1.6.2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
