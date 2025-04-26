@@ -292,6 +292,16 @@ github.com/dgraph-io/badger/v3/skl
 github.com/dgraph-io/badger/v3/table
 github.com/dgraph-io/badger/v3/trie
 github.com/dgraph-io/badger/v3/y
+# github.com/dgraph-io/badger/v4 v4.2.0
+## explicit; go 1.19
+github.com/dgraph-io/badger/v4
+github.com/dgraph-io/badger/v4/fb
+github.com/dgraph-io/badger/v4/options
+github.com/dgraph-io/badger/v4/pb
+github.com/dgraph-io/badger/v4/skl
+github.com/dgraph-io/badger/v4/table
+github.com/dgraph-io/badger/v4/trie
+github.com/dgraph-io/badger/v4/y
 # github.com/dgraph-io/ristretto v0.2.0
 ## explicit; go 1.19
 github.com/dgraph-io/ristretto

@@ -1,9 +1,7 @@
 package badger
 
 import (
-	"bytes"
-
-	"github.com/dgraph-io/badger/v3"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/ledisdb/ledisdb/store/driver"
 )
 
@@ -12,9 +10,19 @@ type Snapshot struct {
 }
 
 func (s *Snapshot) Get(key []byte) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	_, err := s.db.Backup(buf, 0)
-	return buf.Bytes(), err
+	var val []byte
+	err := s.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(key)
+		if err != nil {
+			return err
+		}
+		val, err = item.ValueCopy(nil)
+		return err
+	})
+	if err == badger.ErrKeyNotFound {
+		return nil, nil
+	}
+	return val, err
 }
 
 func (s *Snapshot) NewIterator() driver.IIterator {
