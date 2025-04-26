@@ -10,7 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/IceFireDB/icefiredb-crdt-kv/kv"
-	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/ipfs/go-datastore"
 	"github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/store/driver"

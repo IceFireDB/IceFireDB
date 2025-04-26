@@ -1,8 +1,8 @@
 package badger
 
 import (
-	"github.com/dgraph-io/badger/v3"
-	"github.com/dgraph-io/badger/v3/options"
+	"github.com/dgraph-io/badger/v4"
+	"github.com/dgraph-io/badger/v4/options"
 	"github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/store/driver"
 )
@@ -41,7 +41,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 
 	db.iteratorOpts = badger.DefaultIteratorOptions
 	var err error
-	db.db, err = badger.OpenManaged(db.opts)
+	db.db, err = badger.Open(db.opts)
 	if err != nil {
 		return nil, err
 	}
@@ -50,5 +50,23 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 }
 
 func (s Store) Repair(path string, cfg *config.Config) error {
+	// Open database with default options
+	db, err := badger.Open(badger.DefaultOptions(path))
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	
+	// Run value log GC to clean up any corrupted data
+	for {
+		err := db.RunValueLogGC(0.7)
+		if err == badger.ErrNoRewrite {
+			break
+		}
+		if err != nil {
+			return err
+		}
+	}
+	
 	return nil
 }

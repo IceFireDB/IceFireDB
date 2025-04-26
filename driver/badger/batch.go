@@ -3,7 +3,7 @@ package badger
 import (
 	"sync"
 
-	"github.com/dgraph-io/badger/v3"
+	"github.com/dgraph-io/badger/v4"
 )
 
 type WriteBatch struct {
@@ -14,7 +14,7 @@ type WriteBatch struct {
 
 func (w *WriteBatch) getWriteBatch() *badger.WriteBatch {
 	if w.wb == nil {
-		w.wb = w.db.NewWriteBatchAt(timeTs())
+		w.wb = w.db.NewWriteBatch()
 	}
 	return w.wb
 }
