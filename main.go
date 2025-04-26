@@ -83,9 +83,10 @@ func main() {
 		case *levelkv.LevelKV:
 			db = ldb.GetSDB().GetDriver().(*ipfs_log.DB).GetLevelDB()
 		case *column.DB:
-			// Column engine doesn't need leveldb handle
+			// Column engine uses its own storage
+			return
 		default:
-			panic(fmt.Errorf("unsupported storage is caused: %T", v))
+			panic(fmt.Errorf("unsupported storage engine: %T", v))
 		}
 		if storageBackend == hybriddb.StorageName {
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*hybriddb.DB).Metrics)
@@ -147,6 +148,10 @@ func (s *snap) Persist(wr io.Writer) error {
 }
 
 func snapshot(data interface{}) (rafthub.Snapshot, error) {
+	if storageBackend == column.StorageName {
+		// Column engine handles snapshots internally
+		return &snap{}, nil
+	}
 	s, err := db.GetSnapshot()
 	if err != nil {
 		return nil, err
@@ -155,6 +160,10 @@ func snapshot(data interface{}) (rafthub.Snapshot, error) {
 }
 
 func restore(rd io.Reader) (interface{}, error) {
+	if storageBackend == column.StorageName {
+		// Column engine handles restore internally
+		return nil, nil
+	}
 	sr := sds.NewReader(rd)
 	var batch leveldb.Batch
 	for {

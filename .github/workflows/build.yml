@@ -114,3 +114,19 @@ jobs:
         run: |
           cd IceFireDB-Redis-Proxy
           make
+
+  build-icefiredb-column:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.24.1
+
+      - name: Install dependencies
+        run: go mod tidy && go mod vendor
+
+      - name: Build column engine
+        run: go build ./driver/column/
