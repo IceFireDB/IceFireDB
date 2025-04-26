@@ -21,6 +21,7 @@ import (
 	rafthub "github.com/tidwall/uhaha"
 
 	_ "github.com/IceFireDB/IceFireDB/driver/badger"
+	"github.com/IceFireDB/IceFireDB/driver/column"
 	"github.com/IceFireDB/IceFireDB/driver/crdt"
 	"github.com/IceFireDB/IceFireDB/driver/hybriddb"
 	"github.com/IceFireDB/IceFireDB/driver/ipfs"
@@ -81,6 +82,8 @@ func main() {
 			db = ldb.GetSDB().GetDriver().(*crdt.DB).GetLevelDB()
 		case *levelkv.LevelKV:
 			db = ldb.GetSDB().GetDriver().(*ipfs_log.DB).GetLevelDB()
+		case *column.DB:
+			// Column engine doesn't need leveldb handle
 		default:
 			panic(fmt.Errorf("unsupported storage is caused: %T", v))
 		}
@@ -96,6 +99,10 @@ func main() {
 
 		if storageBackend == oss.StorageName {
 			//serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*orbitdb.DB).Metrics)
+		}
+		if storageBackend == column.StorageName {
+			// Column metrics will be implemented in future
+			serverInfo.RegisterExtInfo(nil)
 		}
 
 	}

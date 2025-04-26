@@ -1438,7 +1438,7 @@ github.com/syndtr/goleveldb/leveldb/opt
 github.com/syndtr/goleveldb/leveldb/storage
 github.com/syndtr/goleveldb/leveldb/table
 github.com/syndtr/goleveldb/leveldb/util
-# github.com/tidwall/btree v1.5.2
+# github.com/tidwall/btree v1.6.0
 ## explicit; go 1.19
 github.com/tidwall/btree
 # github.com/tidwall/match v1.1.1
@@ -1498,6 +1498,8 @@ github.com/yuin/gopher-lua
 github.com/yuin/gopher-lua/ast
 github.com/yuin/gopher-lua/parse
 github.com/yuin/gopher-lua/pm
+# github.com/zeebo/assert v1.3.0
+## explicit; go 1.13
 # github.com/zeebo/blake3 v0.2.4
 ## explicit; go 1.18
 github.com/zeebo/blake3
