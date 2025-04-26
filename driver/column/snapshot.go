@@ -7,7 +7,9 @@ type Snapshot struct {
 }
 
 func (s *Snapshot) Get(key []byte) ([]byte, error) {
-	val, exists := s.db.data[string(key)]
+	s.db.mu.RLock()
+	defer s.db.mu.RUnlock()
+	val, exists := s.db.kvData[string(key)]
 	if !exists {
 		return nil, nil
 	}

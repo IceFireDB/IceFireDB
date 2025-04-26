@@ -12,9 +12,23 @@ type Metrics struct {
 }
 
 type DB struct {
-	data    map[string][]byte
 	mu      sync.RWMutex
 	Metrics *Metrics
+	
+	// Key-value store
+	kvData map[string][]byte
+	
+	// Hash maps
+	hashData map[string]map[string][]byte
+	
+	// Lists
+	listData map[string][][]byte
+	
+	// Sets
+	setData map[string]map[string]struct{}
+	
+	// Sorted sets
+	zsetData map[string]map[string]float64
 }
 
 func (db *DB) Close() error {
@@ -26,12 +40,16 @@ func (db *DB) Compact() error {
 }
 
 func (db *DB) Delete(key []byte) error {
-	delete(db.data, string(key))
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	delete(db.kvData, string(key))
 	return nil
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
-	val, exists := db.data[string(key)]
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	val, exists := db.kvData[string(key)]
 	if !exists {
 		return nil, nil
 	}
@@ -39,8 +57,10 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 }
 
 func (db *DB) NewIterator() driver.IIterator {
-	keys := make([]string, 0, len(db.data))
-	for k := range db.data {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	keys := make([]string, 0, len(db.kvData))
+	for k := range db.kvData {
 		keys = append(keys, k)
 	}
 	return &Iterator{keys: keys}
@@ -55,7 +75,9 @@ func (db *DB) NewWriteBatch() driver.IWriteBatch {
 }
 
 func (db *DB) Put(key, value []byte) error {
-	db.data[string(key)] = value
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	db.kvData[string(key)] = value
 	return nil
 }
 

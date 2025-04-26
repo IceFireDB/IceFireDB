@@ -9,7 +9,12 @@ type Store struct{}
 
 func (s *Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	return &DB{
-		data: make(map[string][]byte),
+		kvData:    make(map[string][]byte),
+		hashData:  make(map[string]map[string][]byte),
+		listData:  make(map[string][][]byte),
+		setData:   make(map[string]map[string]struct{}),
+		zsetData:  make(map[string]map[string]float64),
+		Metrics:   &Metrics{},
 	}, nil
 }
 

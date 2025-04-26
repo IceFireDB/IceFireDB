@@ -32,11 +32,13 @@ func (w *WriteBatch) Commit() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	
+	w.db.mu.Lock()
+	defer w.db.mu.Unlock()
 	for _, op := range w.ops {
 		if op.delete {
-			delete(w.db.data, string(op.key))
+			delete(w.db.kvData, string(op.key))
 		} else {
-			w.db.data[string(op.key)] = op.value
+			w.db.kvData[string(op.key)] = op.value
 		}
 	}
 	return nil
