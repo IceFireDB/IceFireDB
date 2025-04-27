@@ -166,3 +166,24 @@ jobs:
         run: go mod tidy && go mod vendor
       - name: Test
         run: go test -v -tags alltest
+
+  buntdbtest:
+    strategy:
+      matrix:
+        go-version: [1.24.1]
+        os: [ubuntu-latest]
+        arch: [amd64, arm64, armv5, armv6, armv7]
+    runs-on: ${{ matrix.os }}
+    env:
+      DRIVER: buntdb-memory
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: go mod tidy && go mod vendor
+      - name: Test
+        run: go test -v -tags alltest
