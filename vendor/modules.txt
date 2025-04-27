@@ -1441,9 +1441,21 @@ github.com/syndtr/goleveldb/leveldb/util
 # github.com/tidwall/btree v1.5.2
 ## explicit; go 1.19
 github.com/tidwall/btree
+# github.com/tidwall/buntdb v1.3.2
+## explicit; go 1.18
+github.com/tidwall/buntdb
+# github.com/tidwall/gjson v1.16.0
+## explicit; go 1.12
+github.com/tidwall/gjson
+# github.com/tidwall/grect v0.1.4
+## explicit; go 1.15
+github.com/tidwall/grect
 # github.com/tidwall/match v1.1.1
 ## explicit; go 1.15
 github.com/tidwall/match
+# github.com/tidwall/pretty v1.2.1
+## explicit; go 1.16
+github.com/tidwall/pretty
 # github.com/tidwall/raft-leveldb v0.2.1
 ## explicit; go 1.16
 github.com/tidwall/raft-leveldb
@@ -1456,9 +1468,16 @@ github.com/tidwall/redlog/v2
 # github.com/tidwall/rtime v0.2.0
 ## explicit; go 1.13
 github.com/tidwall/rtime
+# github.com/tidwall/rtred v0.1.2
+## explicit; go 1.15
+github.com/tidwall/rtred
+github.com/tidwall/rtred/base
 # github.com/tidwall/sds v0.3.0
 ## explicit; go 1.18
 github.com/tidwall/sds
+# github.com/tidwall/tinyqueue v0.1.1
+## explicit; go 1.15
+github.com/tidwall/tinyqueue
 # github.com/tidwall/uhaha v0.11.2 => github.com/IceFireDB/uhaha v0.12.0
 ## explicit; go 1.18
 github.com/tidwall/uhaha

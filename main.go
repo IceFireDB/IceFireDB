@@ -21,6 +21,7 @@ import (
 	rafthub "github.com/tidwall/uhaha"
 
 	_ "github.com/IceFireDB/IceFireDB/driver/badger"
+	"github.com/IceFireDB/IceFireDB/driver/buntdb_memory"
 	"github.com/IceFireDB/IceFireDB/driver/crdt"
 	"github.com/IceFireDB/IceFireDB/driver/hybriddb"
 	"github.com/IceFireDB/IceFireDB/driver/ipfs"
@@ -77,6 +78,7 @@ func main() {
 		case *leveldb.DB:
 			db = v
 		case *badger.DB:
+		case *buntdb_memory.DB:
 		case *kv.CRDTKeyValueDB:
 			db = ldb.GetSDB().GetDriver().(*crdt.DB).GetLevelDB()
 		case *levelkv.LevelKV:

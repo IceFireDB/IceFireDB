@@ -20,6 +20,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cast v1.7.1
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d
+	github.com/tidwall/buntdb v1.3.2
 	github.com/tidwall/redcon v1.6.2
 	github.com/tidwall/sds v0.3.0
 	github.com/tidwall/uhaha v0.11.2
@@ -271,10 +272,15 @@ require (
 	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tidwall/btree v1.5.2 // indirect
+	github.com/tidwall/gjson v1.16.0 // indirect
+	github.com/tidwall/grect v0.1.4 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/raft-leveldb v0.2.1 // indirect
 	github.com/tidwall/redlog/v2 v2.0.4 // indirect
 	github.com/tidwall/rtime v0.2.0 // indirect
+	github.com/tidwall/rtred v0.1.2 // indirect
+	github.com/tidwall/tinyqueue v0.1.1 // indirect
 	github.com/ucarion/urlpath v0.0.0-20200424170820-7ccc79b76bbb // indirect
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc // indirect
 	github.com/whyrusleeping/cbor v0.0.0-20171005072247-63513f603b11 // indirect
