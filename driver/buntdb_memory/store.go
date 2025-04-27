@@ -1,14 +1,27 @@
 package buntdb_memory
 
-import "github.com/ledisdb/ledisdb/store/driver"
+import (
+	"github.com/ledisdb/ledisdb/config"
+	"github.com/ledisdb/ledisdb/store/driver"
+)
 
+var _ driver.Store = (*MemoryStore)(nil)
 
-// Storage implements the driver.IDB interface
-type Storage interface {
-	driver.IDB
+func init() {
+	driver.Register(MemoryStore{})
 }
 
-// Iterator implements the driver.IIterator interface
-type Iterator interface {
-	driver.IIterator
+type MemoryStore struct{}
+
+func (s MemoryStore) String() string {
+	return "buntdb-memory"
+}
+
+func (s MemoryStore) Open(path string, cfg *config.Config) (driver.IDB, error) {
+	return NewDB()
+}
+
+func (s MemoryStore) Repair(path string, cfg *config.Config) error {
+	// No repair needed for in-memory database
+	return nil
 }
