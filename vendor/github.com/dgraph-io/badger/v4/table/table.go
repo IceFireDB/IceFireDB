@@ -1,17 +1,6 @@
 /*
- * Copyright 2017 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: © Hypermode Inc. <hello@hypermode.com>
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 package table
@@ -20,6 +9,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -31,16 +21,16 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/snappy"
-	"github.com/pkg/errors"
+	"github.com/klauspost/compress/snappy"
+	"github.com/klauspost/compress/zstd"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/dgraph-io/badger/v4/fb"
 	"github.com/dgraph-io/badger/v4/options"
 	"github.com/dgraph-io/badger/v4/pb"
 	"github.com/dgraph-io/badger/v4/y"
-	"github.com/dgraph-io/ristretto"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/dgraph-io/ristretto/v2"
+	"github.com/dgraph-io/ristretto/v2/z"
 )
 
 const fileSuffix = ".sst"
@@ -76,8 +66,8 @@ type Options struct {
 	Compression options.CompressionType
 
 	// Block cache is used to cache decompressed and decrypted blocks.
-	BlockCache *ristretto.Cache
-	IndexCache *ristretto.Cache
+	BlockCache *ristretto.Cache[[]byte, *Block]
+	IndexCache *ristretto.Cache[uint64, *fb.TableIndex]
 
 	AllocPool *z.AllocatorPool
 
@@ -177,13 +167,11 @@ func (t *Table) DecrRef() error {
 }
 
 // BlockEvictHandler is used to reuse the byte slice stored in the block on cache eviction.
-func BlockEvictHandler(value interface{}) {
-	if b, ok := value.(*block); ok {
-		b.decrRef()
-	}
+func BlockEvictHandler(b *Block) {
+	b.decrRef()
 }
 
-type block struct {
+type Block struct {
 	offset            int
 	data              []byte
 	checksum          []byte
@@ -198,7 +186,7 @@ var NumBlocks atomic.Int32
 
 // incrRef increments the ref of a block and return a bool indicating if the
 // increment was successful. A true value indicates that the block can be used.
-func (b *block) incrRef() bool {
+func (b *Block) incrRef() bool {
 	for {
 		// We can't blindly add 1 to ref. We need to check whether it has
 		// reached zero first, because if it did, then we should absolutely not
@@ -221,7 +209,7 @@ func (b *block) incrRef() bool {
 		}
 	}
 }
-func (b *block) decrRef() {
+func (b *Block) decrRef() {
 	if b == nil {
 		return
 	}
@@ -241,12 +229,12 @@ func (b *block) decrRef() {
 	}
 	y.AssertTrue(b.ref.Load() >= 0)
 }
-func (b *block) size() int64 {
+func (b *Block) size() int64 {
 	return int64(3*intSize /* Size of the offset, entriesIndexStart and chkLen */ +
 		cap(b.data) + cap(b.checksum) + cap(b.entryOffsets)*4)
 }
 
-func (b *block) verifyCheckSum() error {
+func (b *Block) verifyCheckSum() error {
 	cs := &pb.Checksum{}
 	if err := proto.Unmarshal(b.checksum, cs); err != nil {
 		return y.Wrapf(err, "unable to unmarshal checksum for block")
@@ -262,7 +250,7 @@ func CreateTable(fname string, builder *Builder) (*Table, error) {
 	} else if err != nil {
 		return nil, y.Wrapf(err, "while creating table: %s", fname)
 	} else {
-		return nil, errors.Errorf("file already exists: %s", fname)
+		return nil, fmt.Errorf("file already exists: %s", fname)
 	}
 
 	written := bd.Copy(mf.Data)
@@ -293,7 +281,7 @@ func OpenTable(mf *z.MmapFile, opts Options) (*Table, error) {
 	id, ok := ParseFileID(filename)
 	if !ok {
 		mf.Close(-1)
-		return nil, errors.Errorf("Invalid filename: %s", filename)
+		return nil, fmt.Errorf("Invalid filename: %s", filename)
 	}
 	t := &Table{
 		MmapFile:   mf,
@@ -520,7 +508,7 @@ func (t *Table) fetchIndex() *fb.TableIndex {
 		panic("Index Cache must be set for encrypted workloads")
 	}
 	if val, ok := t.opt.IndexCache.Get(t.indexKey()); ok && val != nil {
-		return val.(*fb.TableIndex)
+		return val
 	}
 
 	index, err := t.readTableIndex()
@@ -536,7 +524,7 @@ func (t *Table) offsets(ko *fb.BlockOffset, i int) bool {
 // block function return a new block. Each block holds a ref and the byte
 // slice stored in the block will be reused when the ref becomes zero. The
 // caller should release the block by calling block.decrRef() on it.
-func (t *Table) block(idx int, useCache bool) (*block, error) {
+func (t *Table) block(idx int, useCache bool) (*Block, error) {
 	y.AssertTruef(idx >= 0, "idx=%d", idx)
 	if idx >= t.offsetsLength() {
 		return nil, errors.New("block out of index")
@@ -548,15 +536,15 @@ func (t *Table) block(idx int, useCache bool) (*block, error) {
 			// Use the block only if the increment was successful. The block
 			// could get evicted from the cache between the Get() call and the
 			// incrRef() call.
-			if b := blk.(*block); b.incrRef() {
-				return b, nil
+			if blk.incrRef() {
+				return blk, nil
 			}
 		}
 	}
 
 	var ko fb.BlockOffset
 	y.AssertTrue(t.offsets(&ko, idx))
-	blk := &block{offset: int(ko.Offset())}
+	blk := &Block{offset: int(ko.Offset())}
 	blk.ref.Store(1)
 	defer blk.decrRef() // Deal with any errors, where blk would not be returned.
 	NumBlocks.Add(1)
@@ -794,7 +782,7 @@ func NewFilename(id uint64, dir string) string {
 }
 
 // decompress decompresses the data stored in a block.
-func (t *Table) decompress(b *block) error {
+func (t *Table) decompress(b *Block) error {
 	var dst []byte
 	var err error
 
@@ -818,6 +806,11 @@ func (t *Table) decompress(b *block) error {
 		}
 	case options.ZSTD:
 		sz := int(float64(t.opt.BlockSize) * 1.2)
+		// Get frame content size from header.
+		var hdr zstd.Header
+		if err := hdr.Decode(b.data); err == nil && hdr.HasFCS && hdr.FrameContentSize < uint64(t.opt.BlockSize*2) {
+			sz = int(hdr.FrameContentSize)
+		}
 		dst = z.Calloc(sz, "Table.Decompress")
 		b.data, err = y.ZSTDDecompress(dst, b.data)
 		if err != nil {

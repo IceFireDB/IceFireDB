@@ -1,17 +1,6 @@
 /*
- * Copyright 2017 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: © Hypermode Inc. <hello@hypermode.com>
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 package badger
@@ -20,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -30,13 +20,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
-	otrace "go.opencensus.io/trace"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/dgraph-io/badger/v4/pb"
 	"github.com/dgraph-io/badger/v4/table"
 	"github.com/dgraph-io/badger/v4/y"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/dgraph-io/ristretto/v2/z"
 )
 
 type levelsController struct {
@@ -322,14 +312,9 @@ func (s *levelsController) dropPrefixes(prefixes [][]byte) error {
 		if len(tableGroups) == 0 {
 			continue
 		}
-		_, span := otrace.StartSpan(context.Background(), "Badger.Compaction")
-		span.Annotatef(nil, "Compaction level: %v", l.level)
-		span.Annotatef(nil, "Drop Prefixes: %v", prefixes)
-		defer span.End()
 		opt.Infof("Dropping prefix at level %d (%d tableGroups)", l.level, len(tableGroups))
 		for _, operation := range tableGroups {
 			cd := compactDef{
-				span:         span,
 				thisLevel:    l,
 				nextLevel:    l,
 				top:          nil,
@@ -337,12 +322,21 @@ func (s *levelsController) dropPrefixes(prefixes [][]byte) error {
 				dropPrefixes: prefixes,
 				t:            s.levelTargets(),
 			}
+			_, span := otel.Tracer("").Start(context.TODO(), "Badger.Compaction")
+			span.SetAttributes(attribute.Int("Compaction level", l.level))
+			span.SetAttributes(attribute.String("Drop Prefixes", fmt.Sprintf("%v", prefixes)))
 			cd.t.baseLevel = l.level
 			if err := s.runCompactDef(-1, l.level, cd); err != nil {
 				opt.Warningf("While running compact def: %+v. Error: %v", cd, err)
+				span.End()
 				return err
 			}
+			span.SetAttributes(
+				attribute.Int("Top tables count", len(cd.top)),
+				attribute.Int("Bottom tables count", len(cd.bot)))
+			span.End()
 		}
+
 	}
 	return nil
 }
@@ -473,8 +467,13 @@ func (s *levelsController) runCompactor(id int, lc *z.Closer) {
 		}
 		return false
 	}
+
+	var priosBuffer []compactionPriority
 	runOnce := func() bool {
-		prios := s.pickCompactLevels()
+		prios := s.pickCompactLevels(priosBuffer)
+		defer func() {
+			priosBuffer = prios
+		}()
 		if id == 0 {
 			// Worker ID zero prefers to compact L0 always.
 			prios = moveL0toFront(prios)
@@ -536,7 +535,9 @@ func (s *levelsController) lastLevel() *levelHandler {
 
 // pickCompactLevel determines which level to compact.
 // Based on: https://github.com/facebook/rocksdb/wiki/Leveled-Compaction
-func (s *levelsController) pickCompactLevels() (prios []compactionPriority) {
+// It tries to reuse priosBuffer to reduce memory allocation,
+// passing nil is acceptable, then new memory will be allocated.
+func (s *levelsController) pickCompactLevels(priosBuffer []compactionPriority) (prios []compactionPriority) {
 	t := s.levelTargets()
 	addPriority := func(level int, score float64) {
 		pri := compactionPriority{
@@ -547,6 +548,12 @@ func (s *levelsController) pickCompactLevels() (prios []compactionPriority) {
 		}
 		prios = append(prios, pri)
 	}
+
+	// Grow buffer to fit all levels.
+	if cap(priosBuffer) < len(s.levels) {
+		priosBuffer = make([]compactionPriority, 0, len(s.levels))
+	}
+	prios = priosBuffer[:0]
 
 	// Add L0 priority based on the number of tables.
 	addPriority(0, float64(s.levels[0].numTables())/float64(s.kv.opt.NumLevelZeroTables))
@@ -868,9 +875,6 @@ func (s *levelsController) compactBuildTables(
 	y.NumCompactionTablesAdd(s.kv.opt.MetricsEnabled, numTables)
 	defer y.NumCompactionTablesAdd(s.kv.opt.MetricsEnabled, -numTables)
 
-	cd.span.Annotatef(nil, "Top tables count: %v Bottom tables count: %v",
-		len(topTables), len(botTables))
-
 	keepTable := func(t *table.Table) bool {
 		for _, prefix := range cd.dropPrefixes {
 			if bytes.HasPrefix(t.Smallest(), prefix) &&
@@ -1022,8 +1026,6 @@ func containsAnyPrefixes(table *table.Table, listOfPrefixes [][]byte) bool {
 }
 
 type compactDef struct {
-	span *otrace.Span
-
 	compactorId int
 	t           targets
 	p           compactionPriority
@@ -1509,12 +1511,11 @@ func (s *levelsController) doCompact(id int, p compactionPriority) error {
 		p.t = s.levelTargets()
 	}
 
-	_, span := otrace.StartSpan(context.Background(), "Badger.Compaction")
+	_, span := otel.Tracer("").Start(context.TODO(), "Badger.Compaction")
 	defer span.End()
 
 	cd := compactDef{
 		compactorId:  id,
-		span:         span,
 		p:            p,
 		t:            p.t,
 		thisLevel:    s.levels[l],
@@ -1540,12 +1541,16 @@ func (s *levelsController) doCompact(id int, p compactionPriority) error {
 	}
 	defer s.cstatus.delete(cd) // Remove the ranges from compaction status.
 
-	span.Annotatef(nil, "Compaction: %+v", cd)
+	span.SetAttributes(attribute.String("Compaction", fmt.Sprintf("%+v", cd)))
 	if err := s.runCompactDef(id, l, cd); err != nil {
 		// This compaction couldn't be done successfully.
 		s.kv.opt.Warningf("[Compactor: %d] LOG Compact FAILED with error: %+v: %+v", id, err, cd)
 		return err
 	}
+
+	span.SetAttributes(
+		attribute.Int("Top tables count", len(cd.top)),
+		attribute.Int("Bottom tables count", len(cd.bot)))
 
 	s.kv.opt.Debugf("[Compactor: %d] Compaction for level: %d DONE", id, cd.thisLevel.level)
 	return nil
@@ -1707,7 +1712,7 @@ type LevelInfo struct {
 
 func (s *levelsController) getLevelInfo() []LevelInfo {
 	t := s.levelTargets()
-	prios := s.pickCompactLevels()
+	prios := s.pickCompactLevels(nil)
 	result := make([]LevelInfo, len(s.levels))
 	for i, l := range s.levels {
 		l.RLock()

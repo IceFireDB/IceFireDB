@@ -1,30 +1,21 @@
 /*
- * Copyright 2018 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: © Hypermode Inc. <hello@hypermode.com>
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 package badger
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
-	"github.com/pkg/errors"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/dgraph-io/badger/v4/pb"
 	"github.com/dgraph-io/badger/v4/y"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/dgraph-io/ristretto/v2/z"
 )
 
 // WriteBatch holds the necessary info to perform batched writes.
@@ -113,7 +104,7 @@ func (wb *WriteBatch) Write(buf *z.Buffer) error {
 
 	err := buf.SliceIterate(func(s []byte) error {
 		kv := &pb.KV{}
-		if err := kv.Unmarshal(s); err != nil {
+		if err := proto.Unmarshal(s, kv); err != nil {
 			return err
 		}
 		return wb.writeKV(kv)
@@ -230,7 +221,7 @@ func (wb *WriteBatch) Flush() error {
 
 	if err := wb.throttle.Finish(); err != nil {
 		if wb.Error() != nil {
-			return errors.Errorf("wb.err: %s err: %s", wb.Error(), err)
+			return fmt.Errorf("wb.err: %w err: %w", wb.Error(), err)
 		}
 		return err
 	}
