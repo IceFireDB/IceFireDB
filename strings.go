@@ -660,14 +660,158 @@ func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 
 // This is different from the RESP standard. It needs to enrich the algorithm to support more atomic instructions.
 func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) != 3 {
+	// Validate minimum arguments: SET key value [options...]
+	if len(args) < 3 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	if err := ldb.Set([]byte(args[1]), []byte(args[2])); err != nil {
-		return nil, err
+	key := []byte(args[1])
+	value := []byte(args[2])
+
+	var (
+		nx         bool  // NX: Only set if key does not exist
+		xx         bool  // XX: Only set if key exists
+		get        bool  // GET: Return old value before update
+		keepTTL    bool  // KEEPTTL: Preserve existing TTL
+		hasExpire  bool  // Flag for expiration time presence
+		expireTime int64 // Calculated expiration timestamp
+	)
+
+	// Parse optional arguments starting from index 3
+	for i := 3; i < len(args); {
+		arg := strings.ToUpper(args[i])
+		switch arg {
+		case "NX":
+			nx = true
+			i++
+		case "XX":
+			xx = true
+			i++
+		case "GET":
+			get = true
+			i++
+		case "KEEPTTL":
+			keepTTL = true
+			i++
+		case "EX": // Seconds-based expiration
+			if i+1 >= len(args) {
+				return nil, errors.New("ERR syntax error")
+			}
+			seconds, err := strconv.ParseInt(args[i+1], 10, 64)
+			if err != nil || seconds <= 0 {
+				return nil, errors.New("ERR invalid expire time")
+			}
+			expireTime = m.Now().Unix() + seconds
+			hasExpire = true
+			i += 2
+		case "PX": // Milliseconds-based expiration
+			if i+1 >= len(args) {
+				return nil, errors.New("ERR syntax error")
+			}
+			ms, err := strconv.ParseInt(args[i+1], 10, 64)
+			if err != nil || ms <= 0 {
+				return nil, errors.New("ERR invalid expire time")
+			}
+			// Convert milliseconds to seconds with ceiling
+			seconds := (ms + 999) / 1000
+			expireTime = m.Now().Unix() + seconds
+			hasExpire = true
+			i += 2
+		case "EXAT": // Absolute timestamp in seconds
+			if i+1 >= len(args) {
+				return nil, errors.New("ERR syntax error")
+			}
+			ts, err := strconv.ParseInt(args[i+1], 10, 64)
+			if err != nil {
+				return nil, errors.New("ERR invalid expire time")
+			}
+			if ts <= m.Now().Unix() {
+				// Handle immediate expiration by deletion
+				if _, err := ldb.Del(key); err != nil {
+					return nil, err
+				}
+				if get {
+					oldVal, _ := ldb.Get(key)
+					return oldVal, nil
+				}
+				return redcon.SimpleString("OK"), nil
+			}
+			expireTime = ts
+			hasExpire = true
+			i += 2
+		case "PXAT": // Absolute timestamp in milliseconds
+			if i+1 >= len(args) {
+				return nil, errors.New("ERR syntax error")
+			}
+			ts, err := strconv.ParseInt(args[i+1], 10, 64)
+			if err != nil {
+				return nil, errors.New("ERR invalid expire time")
+			}
+			if ts <= m.Now().UnixNano()/1e9 {
+				if _, err := ldb.Del(key); err != nil {
+					return nil, err
+				}
+				if get {
+					oldVal, _ := ldb.Get(key)
+					return oldVal, nil
+				}
+				return redcon.SimpleString("OK"), nil
+			}
+			expireTime = ts / 1000
+			hasExpire = true
+			i += 2
+		default:
+			return nil, errors.New("ERR syntax error")
+		}
 	}
 
+	// Retrieve old value if GET option is specified
+	var oldVal []byte
+	if get {
+		var err error
+		if oldVal, err = ldb.Get(key); err != nil {
+			return nil, err
+		}
+	}
+
+	// Conditional execution checks
+	exists, _ := ldb.Exists(key)
+	if (nx && exists > 0) || (xx && exists == 0) {
+		if get {
+			return oldVal, nil
+		}
+		return nil, nil
+	}
+
+	// Handle KEEPTTL logic
+	if keepTTL && !hasExpire {
+		if ttl, err := ldb.TTL(key); err == nil && ttl > 0 {
+			expireTime = m.Now().Unix() + int64(ttl)
+			hasExpire = true
+		}
+	}
+
+	// Execute value storage with expiration handling
+	if hasExpire {
+		if err := ldb.SetEXAT(key, expireTime, value); err != nil {
+			return nil, err
+		}
+	} else {
+		// Clear existing TTL if not keeping it
+		if !keepTTL {
+			if _, err := ldb.Persist(key); err != nil {
+				return nil, err
+			}
+		}
+		if err := ldb.Set(key, value); err != nil {
+			return nil, err
+		}
+	}
+
+	// Return appropriate response
+	if get {
+		return oldVal, nil
+	}
 	return redcon.SimpleString("OK"), nil
 }
 
