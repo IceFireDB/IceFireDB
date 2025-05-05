@@ -75,10 +75,11 @@ var (
 )
 
 // NewPool initializes new connection pool and uses params: addr, user, password, dbName and options.
-//     minAlive specifies the minimum number of open connections that the pool will try to maintain.
-//     maxAlive specifies the maximum number of open connections
-//       (for internal reasons, may be greater by 1 inside newConnectionProducer).
-//     maxIdle specifies the maximum number of idle connections (see DefaultIdleTimeout).
+//
+//	minAlive specifies the minimum number of open connections that the pool will try to maintain.
+//	maxAlive specifies the maximum number of open connections
+//	  (for internal reasons, may be greater by 1 inside newConnectionProducer).
+//	maxIdle specifies the maximum number of idle connections (see DefaultIdleTimeout).
 func NewPool(
 	logFunc LogFunc,
 	minAlive int,
@@ -417,11 +418,8 @@ func (pool *Pool) closeIdleConnectionsIfCan() {
 		return
 	}
 
-	closeFromIdx := idleCnt - canCloseCnt
-	if closeFromIdx < 0 {
-		// If there are enough requests in the "flight" now, then we can close all unnecessary
-		closeFromIdx = 0
-	}
+	// If there are enough requests in the "flight" now, then we can close all unnecessary
+	closeFromIdx := max(idleCnt-canCloseCnt, 0)
 
 	toClose := append([]Connection{}, pool.synchro.idleConnections[closeFromIdx:]...)
 
