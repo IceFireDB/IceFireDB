@@ -1,8 +1,8 @@
 syntax = "proto2";
 
-package unixfs.v1.pb;
+package ipfs.boxo.ipld.unixfs.pb;
 
-option go_package = "unixfs_pb";
+option go_package = "github.com/ipfs/boxo/ipld/unixfs/pb";
 
 message Data {
 	enum DataType {

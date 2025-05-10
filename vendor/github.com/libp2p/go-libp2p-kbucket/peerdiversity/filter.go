@@ -29,8 +29,25 @@ var dfLog = logging.Logger("diversityFilter")
 //     OR share the same /16 prefix are in the same group.
 type PeerIPGroupKey string
 
+// legacy IPv4 Class A networks.
+var legacyCidrs cidranger.Ranger
+
 // https://en.wikipedia.org/wiki/List_of_assigned_/8_IPv4_address_blocks
 var legacyClassA = []string{"12.0.0.0/8", "17.0.0.0/8", "19.0.0.0/8", "38.0.0.0/8", "48.0.0.0/8", "56.0.0.0/8", "73.0.0.0/8", "53.0.0.0/8"}
+
+func init() {
+	// Initialize the trie for legacy Class A networks
+	legacyCidrs = cidranger.NewPCTrieRanger()
+	for _, cidr := range legacyClassA {
+		_, nn, err := net.ParseCIDR(cidr)
+		if err != nil {
+			panic(fmt.Errorf("failed to parse CIDR %s: %w", cidr, err))
+		}
+		if err := legacyCidrs.Insert(cidranger.NewBasicRangerEntry(*nn)); err != nil {
+			panic(fmt.Errorf("failed to insert CIDR %s: %w", cidr, err))
+		}
+	}
+}
 
 // PeerGroupInfo represents the grouping info for a Peer.
 type PeerGroupInfo struct {
@@ -76,9 +93,6 @@ type Filter struct {
 	// whitelisted peers
 	wlpeers map[peer.ID]struct{}
 
-	// legacy IPv4 Class A networks.
-	legacyCidrs cidranger.Ranger
-
 	logKey string
 
 	cplFnc func(peer.ID) int
@@ -92,23 +106,10 @@ func NewFilter(pgm PeerIPGroupFilter, logKey string, cplFnc func(peer.ID) int) (
 		return nil, errors.New("peergroup implementation can not be nil")
 	}
 
-	// Crate a Trie for legacy Class N networks
-	legacyCidrs := cidranger.NewPCTrieRanger()
-	for _, cidr := range legacyClassA {
-		_, nn, err := net.ParseCIDR(cidr)
-		if err != nil {
-			return nil, err
-		}
-		if err := legacyCidrs.Insert(cidranger.NewBasicRangerEntry(*nn)); err != nil {
-			return nil, err
-		}
-	}
-
 	return &Filter{
 		pgm:           pgm,
 		peerGroups:    make(map[peer.ID][]PeerGroupInfo),
 		wlpeers:       make(map[peer.ID]struct{}),
-		legacyCidrs:   legacyCidrs,
 		logKey:        logKey,
 		cplFnc:        cplFnc,
 		cplPeerGroups: make(map[int]map[peer.ID][]PeerIPGroupKey),
@@ -161,7 +162,7 @@ func (f *Filter) TryAdd(p peer.ID) bool {
 		}
 
 		// reject the peer if we can't determine a grouping for one of it's address.
-		key := f.ipGroupKey(ip)
+		key := IPGroupKey(ip)
 		if len(key) == 0 {
 			dfLog.Errorw("group key is empty", "appKey", f.logKey, "ip", ip.String(), "peer", p)
 			return false
@@ -200,7 +201,7 @@ func (f *Filter) WhitelistPeers(peers ...peer.ID) {
 }
 
 // returns the PeerIPGroupKey to which the given IP belongs.
-func (f *Filter) ipGroupKey(ip net.IP) PeerIPGroupKey {
+func IPGroupKey(ip net.IP) PeerIPGroupKey {
 	switch bz := ip.To4(); bz {
 	case nil:
 		// ipv6 Address -> get ASN
@@ -208,14 +209,14 @@ func (f *Filter) ipGroupKey(ip net.IP) PeerIPGroupKey {
 
 		// if no ASN found then fallback on using the /32 prefix
 		if s == 0 {
-			dfLog.Debugw("ASN not known", "appKey", f.logKey, "ip", ip)
+			dfLog.Debugw("ASN not known", "ip", ip)
 			return PeerIPGroupKey(fmt.Sprintf("unknown ASN: %s", net.CIDRMask(32, 128).String()))
 		}
 
 		return PeerIPGroupKey(strconv.FormatUint(uint64(s), 10))
 	default:
 		// If it belongs to a legacy Class 8, we return the /8 prefix as the key
-		rs, _ := f.legacyCidrs.ContainingNetworks(ip)
+		rs, _ := legacyCidrs.ContainingNetworks(ip)
 		if len(rs) != 0 {
 			key := ip.Mask(net.IPv4Mask(255, 0, 0, 0)).String()
 			return PeerIPGroupKey(key)

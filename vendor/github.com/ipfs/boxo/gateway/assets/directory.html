@@ -25,6 +25,9 @@
         {{ if .Hash }}
         <div class="ipfs-hash" translate="no">
           {{- .Hash -}}
+          <div class="type-icon copy-button" title="Copy CID">
+            <div class="ipfs-copy" onclick="navigator.clipboard.writeText('{{ .Hash }}')">&nbsp;</div>
+          </div>
         </div>
         {{ end }}
       </div>
@@ -56,9 +59,14 @@
           </div>
           <div class="nowrap">
             {{ if .Hash }}
-            <a class="ipfs-hash" translate="no" href={{ if $root.DNSLink }}"https://cid.ipfs.tech/#{{ .Hash | urlEscape}}" target="_blank" rel="noreferrer noopener"{{ else }}"{{ $root.GatewayURL }}/ipfs/{{ .Hash | urlEscape}}?filename={{ .Name | urlEscape }}"{{ end }}>
+            <div>
+              <a class="ipfs-hash" translate="no" href={{ if $root.DNSLink }}"https://cid.ipfs.tech/#{{ .Hash | urlEscape}}" target="_blank" rel="noreferrer noopener"{{ else }}"{{ $root.GatewayURL }}/ipfs/{{ .Hash | urlEscape}}?filename={{ .Name | urlEscape }}"{{ end }}>
               {{- .ShortHash -}}
-            </a>
+              </a>
+              <div class="type-icon copy-button" title="Copy CID">
+                <div class="ipfs-copy" onclick="navigator.clipboard.writeText('{{ .Hash }}')">&nbsp;</div>
+              </div>
+            </div>
             {{ end }}
           </div>
           <div class="nowrap" title="Cumulative size of IPFS DAG (data + metadata)">{{ .Size }}</div>

@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -36,11 +37,13 @@ const (
 
 // ProvideValidity is the default time that a Provider Record should last on DHT
 // This value is also known as Provider Record Expiration Interval.
-var ProvideValidity = amino.DefaultProvideValidity
-var defaultCleanupInterval = time.Hour
-var lruCacheSize = 256
-var batchBufferSize = 256
-var log = logging.Logger("providers")
+var (
+	ProvideValidity        = amino.DefaultProvideValidity
+	defaultCleanupInterval = time.Hour
+	lruCacheSize           = 256
+	batchBufferSize        = 256
+	log                    = logging.Logger("providers")
+)
 
 // ProviderStore represents a store that associates peers and their addresses to keys.
 type ProviderStore interface {
@@ -114,7 +117,7 @@ type getProv struct {
 }
 
 // NewProviderManager constructor
-func NewProviderManager(local peer.ID, ps peerstore.Peerstore, dstore ds.Batching, opts ...Option) (*ProviderManager, error) {
+func NewProviderManager(ctx context.Context, local peer.ID, ps peerstore.Peerstore, dstore ds.Batching, opts ...Option) (*ProviderManager, error) {
 	pm := new(ProviderManager)
 	pm.self = local
 	pm.getprovs = make(chan *getProv)
@@ -130,7 +133,7 @@ func NewProviderManager(local peer.ID, ps peerstore.Peerstore, dstore ds.Batchin
 	if err := pm.applyOptions(opts...); err != nil {
 		return nil, err
 	}
-	pm.ctx, pm.cancel = context.WithCancel(context.Background())
+	pm.ctx, pm.cancel = context.WithCancel(ctx)
 	pm.run()
 	return pm, nil
 }
@@ -146,8 +149,7 @@ func (pm *ProviderManager) run() {
 		defer func() {
 			gcTimer.Stop()
 			if gcQuery != nil {
-				// don't really care if this fails.
-				_ = gcQuery.Close()
+				gcQuery.Close()
 			}
 			if err := pm.dstore.Flush(context.Background()); err != nil {
 				log.Error("failed to flush datastore: ", err)
@@ -180,9 +182,7 @@ func (pm *ProviderManager) run() {
 				gp.resp <- provs[0:len(provs):len(provs)]
 			case res, ok := <-gcQueryRes:
 				if !ok {
-					if err := gcQuery.Close(); err != nil {
-						log.Error("failed to close provider GC query: ", err)
-					}
+					gcQuery.Close()
 					gcTimer.Reset(pm.cleanupInterval)
 
 					// cleanup GC round
@@ -406,7 +406,7 @@ func loadProviderSet(ctx context.Context, dstore ds.Datastore, k []byte) (*provi
 func readTimeValue(data []byte) (time.Time, error) {
 	nsec, n := binary.Varint(data)
 	if n <= 0 {
-		return time.Time{}, fmt.Errorf("failed to parse time")
+		return time.Time{}, errors.New("failed to parse time")
 	}
 
 	return time.Unix(0, nsec), nil

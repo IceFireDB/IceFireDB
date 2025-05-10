@@ -286,7 +286,7 @@ func (dr *dagReader) writeNodeDataBuffer(w io.Writer) (int64, error) {
 		// single node's data, not the entire DAG.
 	}
 
-	dr.offset += int64(n)
+	dr.offset += n
 	return n, nil
 }
 

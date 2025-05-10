@@ -7,11 +7,10 @@ import (
 	"sync"
 	"time"
 
+	chunker "github.com/ipfs/boxo/chunker"
 	dag "github.com/ipfs/boxo/ipld/merkledag"
 	ft "github.com/ipfs/boxo/ipld/unixfs"
 	mod "github.com/ipfs/boxo/ipld/unixfs/mod"
-
-	chunker "github.com/ipfs/boxo/chunker"
 	ipld "github.com/ipfs/go-ipld-format"
 )
 
@@ -270,10 +269,9 @@ func (fi *File) setNodeData(data []byte) error {
 	}
 
 	fi.nodeLock.Lock()
-	defer fi.nodeLock.Unlock()
 	fi.node = nd
 	parent := fi.inode.parent
 	name := fi.inode.name
-
+	fi.nodeLock.Unlock()
 	return parent.updateChildEntry(child{name, fi.node})
 }
