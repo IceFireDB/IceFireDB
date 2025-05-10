@@ -1,7 +1,7 @@
 package badger
 
 import (
-	"github.com/dgraph-io/badger/v3"
+	"github.com/dgraph-io/badger/v4"
 )
 
 type Iterator struct {
@@ -44,7 +44,7 @@ func (it *Iterator) Next() {
 }
 
 func (it *Iterator) Prev() {
-	tnx := it.db.NewTransactionAt(timeTs(), false)
+	tnx := it.db.NewTransaction(false)
 	defer tnx.Discard()
 
 	opts := badger.DefaultIteratorOptions
@@ -69,7 +69,7 @@ func (it *Iterator) First() {
 }
 
 func (it *Iterator) Last() {
-	tnx := it.db.NewTransactionAt(timeTs(), false)
+	tnx := it.db.NewTransaction(false)
 	defer tnx.Discard()
 
 	opts := badger.DefaultIteratorOptions

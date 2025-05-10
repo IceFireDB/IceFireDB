@@ -74,10 +74,7 @@ var (
 // sliceBinOp applies an operator to all slice elements, with Redis string
 // padding logic.
 func sliceBinOp(f func(a, b byte) byte, a, b []byte) []byte {
-	maxl := len(a)
-	if len(b) > maxl {
-		maxl = len(b)
-	}
+	maxl := max(len(b), len(a))
 	lA := make([]byte, maxl)
 	copy(lA, a)
 	lB := make([]byte, maxl)

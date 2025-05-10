@@ -13,7 +13,7 @@ import (
 	"github.com/IceFireDB/icefiredb-ipfs-log/stores/levelkv"
 	"github.com/joho/godotenv"
 
-	badger "github.com/dgraph-io/badger/v3"
+	badger "github.com/dgraph-io/badger/v4"
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/ledis"
 	"github.com/syndtr/goleveldb/leveldb"

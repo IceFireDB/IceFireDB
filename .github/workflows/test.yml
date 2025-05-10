@@ -126,7 +126,6 @@ jobs:
       - name: Test
         run: go test -v -tags alltest
 
-
   crdtdbtest:
     strategy:
       matrix:
@@ -152,7 +151,6 @@ jobs:
       - name: Test
         run: go test -v -tags alltest
 
-
   ipfslogdbtest:
     strategy:
       matrix:
@@ -162,6 +160,31 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       DRIVER: ipfs-log
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: go mod tidy && go mod vendor
+      - name: Test
+        run: go test -v -tags alltest
+
+  badgerdbtest:
+    strategy:
+      matrix:
+        go-version: [1.24.1]
+        os: [ubuntu-latest]
+        arch: [amd64, arm64, armv5, armv6, armv7]
+    runs-on: ${{ matrix.os }}
+    env:
+      DRIVER: badger
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

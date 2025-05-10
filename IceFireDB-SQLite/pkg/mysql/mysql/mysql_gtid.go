@@ -99,10 +99,7 @@ func (s IntervalSlice) Normalize() IntervalSlice {
 			n = append(n, s[i])
 			continue
 		} else {
-			stop := s[i].Stop
-			if last.Stop > stop {
-				stop = last.Stop
-			}
+			stop := max(last.Stop, s[i].Stop)
 			n[len(n)-1] = Interval{last.Start, stop}
 		}
 	}
