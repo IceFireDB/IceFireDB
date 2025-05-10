@@ -1,19 +1,26 @@
 package ipfs
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
+	"sync"
 
+	iflog "github.com/IceFireDB/icefiredb-ipfs-log"
+	"github.com/IceFireDB/icefiredb-ipfs-log/stores/levelkv"
 	"github.com/dgraph-io/ristretto"
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/ipfs/kubo/core"
 	"github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/store/driver"
+	"github.com/libp2p/go-libp2p/core/peer"
+	ma "github.com/multiformats/go-multiaddr"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"go.uber.org/zap"
 )
 
 const (
@@ -56,7 +63,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	db.initOpts()
 
 	var err error
-	db.db, err = leveldb.OpenFile(db.path, db.opts)
+	db.localDB, err = leveldb.OpenFile(db.path, db.opts)
 
 	if err != nil {
 		return nil, err
@@ -83,6 +90,43 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	sh := shell.NewShell(IpfsDefaultConfig.EndPointConnection)
 	db.remoteShell = sh
 
+	// Initialize ipfs-log components
+	db.ctx = context.Background()
+	db.logger = zap.NewNop()
+
+	// Create IPFS node and API
+	node, api, err := iflog.CreateNode(db.ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create IPFS node: %w", err)
+	}
+	db.ipfsNode = node
+
+	// Create ipfs-log event log with proper namespace
+	ev, err := iflog.NewIpfsLog(db.ctx, api, "/ipfs/iflog-event/icefiredb", &iflog.EventOptions{
+		Directory: path,
+		Logger:    db.logger,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create IPFS log: %w", err)
+	}
+	db.ipfsLog = ev
+
+	// Connect to network and load existing data
+	if err := ev.AnnounceConnect(db.ctx, db.ipfsNode); err != nil {
+		return nil, fmt.Errorf("failed to connect to network: %w", err)
+	}
+
+	// Initialize LevelKVDB
+	db.ipfsDB, err = levelkv.NewLevelKVDB(db.ctx, ev, db.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create LevelKVDB: %w", err)
+	}
+
+	// Load existing data from disk
+	if err := ev.LoadDisk(db.ctx); err != nil {
+		return nil, fmt.Errorf("failed to load existing data: %w", err)
+	}
+
 	return db, nil
 }
 
@@ -101,23 +145,30 @@ type DB struct {
 
 	cfg *config.LevelDBConfig
 
-	db *leveldb.DB
-
-	opts *opt.Options
+	localDB *leveldb.DB
+	opts    *opt.Options
 
 	iteratorOpts *opt.ReadOptions
+	syncOpts     *opt.WriteOptions
 
-	syncOpts *opt.WriteOptions
-
-	cache *ristretto.Cache
-
-	filter filter.Filter
-
+	cache       *ristretto.Cache
+	filter      filter.Filter
 	remoteShell *shell.Shell
+
+	ctx      context.Context
+	ipfsDB   *levelkv.LevelKV
+	ipfsLog  *iflog.IpfsLog
+	ipfsNode *core.IpfsNode // Stores the IPFS node returned by iflog.CreateNode()
+	logger   *zap.Logger
+	
+	// For decentralized consistency
+	peerID    peer.ID
+	versionMu sync.RWMutex
+	versions  map[string]uint64 // Key to version counter
 }
 
 func (s *DB) GetStorageEngine() interface{} {
-	return s.db
+	return s.localDB
 }
 
 func (db *DB) initOpts() {
@@ -159,50 +210,137 @@ func newOptions(cfg *config.LevelDBConfig) *opt.Options {
 
 func (db *DB) Close() error {
 	db.cache.Close()
-	return db.db.Close()
+	return db.localDB.Close()
 }
 
 func (db *DB) Put(key, value []byte) error {
-	err := db.db.Put(key, value, nil)
-	if err == nil {
-		db.cache.Del(key)
+	db.versionMu.Lock()
+	defer db.versionMu.Unlock()
+
+	// Increment version
+	db.versions[string(key)] = db.versions[string(key)] + 1
+	version := db.versions[string(key)]
+
+	// Store version separately in metadata
+	metaKey := append([]byte("_meta:"), key...)
+	versionBytes := []byte(fmt.Sprintf("%d", version))
+	
+	// Write data and version separately
+	localErr := db.localDB.Put(key, value, nil)
+	ipfsErr := db.ipfsDB.Put(db.ctx, key, value)
+	metaErr := db.localDB.Put(metaKey, versionBytes, nil)
+	
+	if localErr != nil || ipfsErr != nil || metaErr != nil {
+		return fmt.Errorf("local error: %v, ipfs error: %v, meta error: %v", localErr, ipfsErr, metaErr)
 	}
-	return err
+
+	db.cache.Set(key, value, 0)
+	return nil
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
+	db.versionMu.RLock()
+	defer db.versionMu.RUnlock()
+
 	if v, ok := db.cache.Get(key); ok {
 		return v.([]byte), nil
 	}
-	v, err := db.db.Get(key, nil)
-	if err == leveldb.ErrNotFound {
+
+	// Get values from both stores
+	ipfsValue, ipfsErr := db.ipfsDB.Get(key)
+	localValue, localErr := db.localDB.Get(key, nil)
+	
+	// Get versions
+	metaKey := append([]byte("_meta:"), key...)
+	ipfsVersion, _ := db.ipfsDB.Get(metaKey)
+	localVersion, _ := db.localDB.Get(metaKey, nil)
+	
+	// Resolve conflicts based on version
+	var value []byte
+	switch {
+	case ipfsErr == nil && ipfsValue != nil && localErr == nil && localValue != nil:
+		// Both have value - pick higher version
+		if string(ipfsVersion) > string(localVersion) {
+			value = ipfsValue
+		} else {
+			value = localValue
+		}
+	case ipfsErr == nil && ipfsValue != nil:
+		value = ipfsValue
+	case localErr == nil && localValue != nil:
+		value = localValue
+	case localErr == leveldb.ErrNotFound:
 		return nil, nil
+	default:
+		return nil, fmt.Errorf("ipfs error: %v, local error: %v", ipfsErr, localErr)
 	}
-
-	reader, err := db.remoteShell.Cat(string(v))
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-
-	db.cache.Set(key, data, 0)
-	return data, nil
+	
+	// Cache the result
+	db.cache.Set(key, value, 0)
+	return value, nil
 }
 
 func (db *DB) Delete(key []byte) error {
-	err := db.db.Delete(key, nil)
-	if err == nil {
-		db.cache.Del(key)
+	localErr := db.localDB.Delete(key, nil)
+	ipfsErr := db.ipfsDB.Delete(db.ctx, key)
+	if localErr != nil || ipfsErr != nil {
+		return fmt.Errorf("local error: %v, ipfs error: %v", localErr, ipfsErr)
 	}
-	return err
+	db.cache.Del(key)
+	return nil
+}
+
+func (db *DB) ConnectPeer(ctx context.Context, addr string) error {
+	// Parse multiaddress
+	maddr, err := ma.NewMultiaddr(addr)
+	if err != nil {
+		return fmt.Errorf("invalid multiaddress: %w", err)
+	}
+
+	// Get peer info from multiaddress
+	peerInfo, err := peer.AddrInfoFromP2pAddr(maddr)
+	if err != nil {
+		return fmt.Errorf("invalid peer address: %w", err)
+	}
+
+	// Connect to peer
+	if err := db.ipfsNode.PeerHost.Connect(ctx, *peerInfo); err != nil {
+		return fmt.Errorf("failed to connect to peer: %w", err)
+	}
+
+	// Tag peer to maintain connection
+	db.ipfsNode.PeerHost.ConnManager().TagPeer(peerInfo.ID, "keep", 100)
+	return nil
+}
+
+func (db *DB) ListPeers() []string {
+	peers := db.ipfsNode.PeerHost.Peerstore().Peers()
+	var peerAddrs []string
+	for _, p := range peers {
+		peerAddrs = append(peerAddrs, p.String())
+	}
+	return peerAddrs
+}
+
+func (db *DB) AnnounceConnect(ctx context.Context) error {
+	return db.ipfsLog.AnnounceConnect(ctx, db.ipfsNode)
+}
+
+func (db *DB) LoadDisk(ctx context.Context) error {
+	return db.ipfsLog.LoadDisk(ctx)
+}
+
+func (db *DB) GetMultiaddrs() []string {
+	var addrs []string
+	hostAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s", db.ipfsNode.PeerHost.ID().String()))
+	for _, a := range db.ipfsNode.PeerHost.Addrs() {
+		addrs = append(addrs, a.Encapsulate(hostAddr).String())
+	}
+	return addrs
 }
 
 func (db *DB) SyncPut(key []byte, value []byte) error {
-	err := db.db.Put(key, value, db.syncOpts)
+	err := db.localDB.Put(key, value, db.syncOpts)
 	if err == nil {
 		db.cache.Del(key)
 	}
@@ -210,7 +348,7 @@ func (db *DB) SyncPut(key []byte, value []byte) error {
 }
 
 func (db *DB) SyncDelete(key []byte) error {
-	err := db.db.Delete(key, db.syncOpts)
+	err := db.localDB.Delete(key, db.syncOpts)
 	if err == nil {
 		db.cache.Del(key)
 	}
@@ -227,15 +365,16 @@ func (db *DB) NewWriteBatch() driver.IWriteBatch {
 
 func (db *DB) NewIterator() driver.IIterator {
 	it := &Iterator{
-		it:     db.db.NewIterator(nil, db.iteratorOpts),
-		rShell: db.remoteShell,
+		it:     db.localDB.NewIterator(nil, db.iteratorOpts),
+		ipfsDB: db.ipfsDB,
+		ctx:    db.ctx,
 	}
 
 	return it
 }
 
 func (db *DB) NewSnapshot() (driver.ISnapshot, error) {
-	snapshot, err := db.db.GetSnapshot()
+	snapshot, err := db.localDB.GetSnapshot()
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +388,7 @@ func (db *DB) NewSnapshot() (driver.ISnapshot, error) {
 }
 
 func (db *DB) Compact() error {
-	return db.db.CompactRange(util.Range{
+	return db.localDB.CompactRange(util.Range{
 		Start: nil,
 		Limit: nil,
 	})

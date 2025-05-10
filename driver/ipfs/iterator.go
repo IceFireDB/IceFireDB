@@ -1,15 +1,16 @@
 package ipfs
 
 import (
-	"io/ioutil"
+	"context"
 
-	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/IceFireDB/icefiredb-ipfs-log/stores/levelkv"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
 
 type Iterator struct {
 	it     iterator.Iterator
-	rShell *shell.Shell
+	ipfsDB *levelkv.LevelKV
+	ctx    context.Context
 }
 
 func (it *Iterator) Key() []byte {
@@ -21,19 +22,12 @@ func (it *Iterator) Value1() []byte {
 }
 
 func (it *Iterator) Value() []byte {
-
-	v := it.it.Value()
-	reader, err := it.rShell.Cat(string(v))
-	if err != nil {
-		return nil
+	key := it.it.Key()
+	value, err := it.ipfsDB.Get(key)
+	if err != nil || value == nil {
+		return it.it.Value() // Fall back to local value
 	}
-
-	data, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return nil
-	}
-
-	return data
+	return value
 }
 
 func (it *Iterator) Close() error {
