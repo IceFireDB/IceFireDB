@@ -24,6 +24,7 @@ import (
 	"github.com/IceFireDB/IceFireDB/driver/crdt"
 	"github.com/IceFireDB/IceFireDB/driver/hybriddb"
 	"github.com/IceFireDB/IceFireDB/driver/ipfs"
+	"github.com/IceFireDB/IceFireDB/driver/ipfs-synckv"
 
 	// "github.com/IceFireDB/IceFireDB/driver/orbitdb"
 	"github.com/IceFireDB/IceFireDB/driver/oss"
@@ -48,7 +49,7 @@ func init() {
 
 func main() {
 	conf.Name = "IceFireDB"
-	conf.Version = "1.0.0"
+	conf.Version = "1.0.1"
 	conf.GitSHA = BuildVersion
 	conf.Flag.Custom = true
 	confInit(&conf)
@@ -80,7 +81,12 @@ func main() {
 		case *kv.CRDTKeyValueDB:
 			db = ldb.GetSDB().GetDriver().(*crdt.DB).GetLevelDB()
 		case *levelkv.LevelKV:
-			db = ldb.GetSDB().GetDriver().(*ipfs_log.DB).GetLevelDB()
+			switch driver := ldb.GetSDB().GetDriver().(type) {
+			case *ipfs_log.DB:
+				db = driver.GetLevelDB()
+			case *ipfs_synckv.DB:
+				db = driver.GetStorageEngine().(*leveldb.DB)
+			}
 		default:
 			panic(fmt.Errorf("unsupported storage is caused: %T", v))
 		}
@@ -96,6 +102,9 @@ func main() {
 
 		if storageBackend == oss.StorageName {
 			//serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*orbitdb.DB).Metrics)
+		}
+		if storageBackend == ipfs_synckv.StorageName {
+			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*ipfs_synckv.DB).Metrics)
 		}
 
 	}
