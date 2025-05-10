@@ -5,6 +5,7 @@
 </p>
 
 # IceFireDB - Decentralized Database Infrastructure
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/IceFireDB/IceFireDB)
 ![test](https://github.com/IceFireDB/IceFireDB/actions/workflows/test.yml/badge.svg)
 ![build](https://github.com/IceFireDB/IceFireDB/actions/workflows/build.yml/badge.svg)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FIceFireDB%2FIceFireDB?ref=badge_shield)
