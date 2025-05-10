@@ -1,17 +1,6 @@
 /*
- * Copyright 2017 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: © Hypermode Inc. <hello@hypermode.com>
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 package badger
@@ -24,12 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/dgraph-io/badger/v4/options"
 	"github.com/dgraph-io/badger/v4/table"
 	"github.com/dgraph-io/badger/v4/y"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/dgraph-io/ristretto/v2/z"
 )
 
 // Note: If you add a new option X make sure you also add a WithX method on Options.
@@ -173,8 +160,6 @@ func DefaultOptions(path string) Options {
 		// Benchmark code can be found in table/builder_test.go file
 		ZSTDCompressionLevel: 1,
 
-		// Nothing to read/write value log using standard File I/O
-		// MemoryMap to mmap() the value log files
 		// (2^30 - 1)*2 when mmapping < 2^31 - 1, max int32.
 		// -1 so 2*ValueLogFileSize won't overflow on 32-bit systems.
 		ValueLogFileSize: 1<<30 - 1,
@@ -247,10 +232,10 @@ func parseCompression(cStr string) (options.CompressionType, int, error) {
 		y.Check(err)
 		if level <= 0 {
 			return 0, 0,
-				errors.Errorf("ERROR: compression level(%v) must be greater than zero", level)
+				fmt.Errorf("ERROR: compression level(%v) must be greater than zero", level)
 		}
 	} else if len(cStrSplit) > 2 {
-		return 0, 0, errors.Errorf("ERROR: Invalid badger.compression argument")
+		return 0, 0, fmt.Errorf("ERROR: Invalid badger.compression argument")
 	}
 	switch cType {
 	case "zstd":
@@ -260,7 +245,7 @@ func parseCompression(cStr string) (options.CompressionType, int, error) {
 	case "none":
 		return options.None, 0, nil
 	}
-	return 0, 0, errors.Errorf("ERROR: compression type (%s) invalid", cType)
+	return 0, 0, fmt.Errorf("ERROR: compression type (%s) invalid", cType)
 }
 
 // generateSuperFlag generates an identical SuperFlag string from the provided Options.
@@ -463,7 +448,7 @@ func (opt Options) WithLoggingLevel(val loggingLevel) Options {
 	return opt
 }
 
-// WithBaseTableSize returns a new Options value with MaxTableSize set to the given value.
+// WithBaseTableSize returns a new Options value with BaseTableSize set to the given value.
 //
 // BaseTableSize sets the maximum size in bytes for LSM table or file in the base level.
 //

@@ -1,17 +1,6 @@
 /*
- * Copyright 2017 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: © Hypermode Inc. <hello@hypermode.com>
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 package badger
@@ -27,7 +16,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4/table"
 	"github.com/dgraph-io/badger/v4/y"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/dgraph-io/ristretto/v2/z"
 )
 
 type prefetchStatus uint8
@@ -117,7 +106,7 @@ func (item *Item) Value(fn func(val []byte) error) error {
 // returned. Tip: It might make sense to reuse the returned slice as dst argument for the next call.
 //
 // This function is useful in long running iterate/update transactions to avoid a write deadlock.
-// See Github issue: https://github.com/dgraph-io/badger/issues/315
+// See Github issue: https://github.com/hypermodeinc/badger/issues/315
 func (item *Item) ValueCopy(dst []byte) ([]byte, error) {
 	item.wg.Wait()
 	if item.status == prefetched {
@@ -589,7 +578,7 @@ func (it *Iterator) Next() {
 
 	// Set next item to current
 	it.item = it.data.pop()
-	for it.iitr.Valid() {
+	for it.iitr.Valid() && hasPrefix(it) {
 		if it.parseItem() {
 			// parseItem calls one extra next.
 			// This is used to deal with the complexity of reverse iteration.
@@ -725,6 +714,15 @@ func (it *Iterator) fill(item *Item) {
 	}
 }
 
+func hasPrefix(it *Iterator) bool {
+	// We shouldn't check prefix in case the iterator is going in reverse. Since in reverse we expect
+	// people to append items to the end of prefix.
+	if !it.opt.Reverse && len(it.opt.Prefix) > 0 {
+		return bytes.HasPrefix(y.ParseKey(it.iitr.Key()), it.opt.Prefix)
+	}
+	return true
+}
+
 func (it *Iterator) prefetch() {
 	prefetchSize := 2
 	if it.opt.PrefetchValues && it.opt.PrefetchSize > 1 {
@@ -734,7 +732,7 @@ func (it *Iterator) prefetch() {
 	i := it.iitr
 	var count int
 	it.item = nil
-	for i.Valid() {
+	for i.Valid() && hasPrefix(it) {
 		if !it.parseItem() {
 			continue
 		}

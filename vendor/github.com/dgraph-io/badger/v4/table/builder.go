@@ -1,39 +1,28 @@
 /*
- * Copyright 2017 Dgraph Labs, Inc. and Contributors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-FileCopyrightText: © Hypermode Inc. <hello@hypermode.com>
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 package table
 
 import (
 	"crypto/aes"
+	"errors"
 	"math"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/snappy"
 	fbs "github.com/google/flatbuffers/go"
-	"github.com/pkg/errors"
+	"github.com/klauspost/compress/s2"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/dgraph-io/badger/v4/fb"
 	"github.com/dgraph-io/badger/v4/options"
 	"github.com/dgraph-io/badger/v4/pb"
 	"github.com/dgraph-io/badger/v4/y"
-	"github.com/dgraph-io/ristretto/z"
+	"github.com/dgraph-io/ristretto/v2/z"
 )
 
 const (
@@ -62,8 +51,8 @@ func (h header) Encode() []byte {
 // Decode decodes the header.
 func (h *header) Decode(buf []byte) {
 	// Copy over data from buf into h. Using *h=unsafe.pointer(...) leads to
-	// pointer alignment issues. See https://github.com/dgraph-io/badger/issues/1096
-	// and comment https://github.com/dgraph-io/badger/pull/1097#pullrequestreview-307361714
+	// pointer alignment issues. See https://github.com/hypermodeinc/badger/issues/1096
+	// and comment https://github.com/hypermodeinc/badger/pull/1097#pullrequestreview-307361714
 	copy(((*[headerSize]byte)(unsafe.Pointer(h))[:]), buf[:headerSize])
 }
 
@@ -159,7 +148,7 @@ func NewTableBuilder(opts Options) *Builder {
 func maxEncodedLen(ctype options.CompressionType, sz int) int {
 	switch ctype {
 	case options.Snappy:
-		return snappy.MaxEncodedLen(sz)
+		return s2.MaxEncodedLen(sz)
 	case options.ZSTD:
 		return y.ZSTDCompressBound(sz)
 	}
@@ -523,9 +512,9 @@ func (b *Builder) compressData(data []byte) ([]byte, error) {
 	case options.None:
 		return data, nil
 	case options.Snappy:
-		sz := snappy.MaxEncodedLen(len(data))
+		sz := s2.MaxEncodedLen(len(data))
 		dst := b.alloc.Allocate(sz)
-		return snappy.Encode(dst, data), nil
+		return s2.EncodeSnappy(dst, data), nil
 	case options.ZSTD:
 		sz := y.ZSTDCompressBound(len(data))
 		dst := b.alloc.Allocate(sz)
