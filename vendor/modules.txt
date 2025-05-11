@@ -144,7 +144,7 @@ github.com/btcsuite/btcd/btcec/v2
 github.com/btcsuite/btcd/btcec/v2/ecdsa
 # github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 ## explicit; go 1.17
-# github.com/caddyserver/certmagic v0.21.4
+# github.com/caddyserver/certmagic v0.21.6
 ## explicit; go 1.21.0
 github.com/caddyserver/certmagic
 github.com/caddyserver/certmagic/internal/atomicfile
@@ -190,7 +190,7 @@ github.com/cockroachdb/fifo
 # github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b
 ## explicit; go 1.16
 github.com/cockroachdb/logtags
-# github.com/cockroachdb/pebble v1.1.2
+# github.com/cockroachdb/pebble v1.1.4
 ## explicit; go 1.20
 github.com/cockroachdb/pebble
 github.com/cockroachdb/pebble/internal/arenaskl
@@ -417,9 +417,6 @@ github.com/gorilla/websocket
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/runtime
 github.com/grpc-ecosystem/grpc-gateway/v2/utilities
-# github.com/hashicorp/errwrap v1.1.0
-## explicit
-github.com/hashicorp/errwrap
 # github.com/hashicorp/go-hclog v1.5.0
 ## explicit; go 1.13
 github.com/hashicorp/go-hclog
@@ -429,9 +426,6 @@ github.com/hashicorp/go-immutable-radix
 # github.com/hashicorp/go-msgpack v1.1.5
 ## explicit; go 1.13
 github.com/hashicorp/go-msgpack/codec
-# github.com/hashicorp/go-multierror v1.1.1
-## explicit; go 1.13
-github.com/hashicorp/go-multierror
 # github.com/hashicorp/golang-lru v1.0.2
 ## explicit; go 1.12
 github.com/hashicorp/golang-lru
@@ -461,11 +455,11 @@ github.com/huin/goupnp/httpu
 github.com/huin/goupnp/scpd
 github.com/huin/goupnp/soap
 github.com/huin/goupnp/ssdp
-# github.com/ipfs-shipyard/nopfs v0.0.12
+# github.com/ipfs-shipyard/nopfs v0.0.14
 ## explicit; go 1.18
 github.com/ipfs-shipyard/nopfs
-# github.com/ipfs-shipyard/nopfs/ipfs v0.13.2-0.20231027223058-cde3b5ba964c
-## explicit; go 1.20
+# github.com/ipfs-shipyard/nopfs/ipfs v0.25.0
+## explicit; go 1.22.0
 github.com/ipfs-shipyard/nopfs/ipfs
 # github.com/ipfs/bbloom v0.0.4
 ## explicit; go 1.12
@@ -492,6 +486,8 @@ github.com/ipfs/boxo/bitswap/message
 github.com/ipfs/boxo/bitswap/message/pb
 github.com/ipfs/boxo/bitswap/metrics
 github.com/ipfs/boxo/bitswap/network
+github.com/ipfs/boxo/bitswap/network/bsnet
+github.com/ipfs/boxo/bitswap/network/bsnet/internal
 github.com/ipfs/boxo/bitswap/server
 github.com/ipfs/boxo/bitswap/server/internal/decision
 github.com/ipfs/boxo/bitswap/tracer
@@ -503,6 +499,7 @@ github.com/ipfs/boxo/chunker
 github.com/ipfs/boxo/datastore/dshelp
 github.com/ipfs/boxo/exchange
 github.com/ipfs/boxo/exchange/offline
+github.com/ipfs/boxo/exchange/providing
 github.com/ipfs/boxo/fetcher
 github.com/ipfs/boxo/fetcher/helpers
 github.com/ipfs/boxo/fetcher/impl/blockservice
@@ -580,24 +577,24 @@ github.com/ipfs/go-datastore/mount
 github.com/ipfs/go-datastore/namespace
 github.com/ipfs/go-datastore/query
 github.com/ipfs/go-datastore/sync
-# github.com/ipfs/go-ds-badger v0.3.0
-## explicit; go 1.13
+# github.com/ipfs/go-ds-badger v0.3.4
+## explicit; go 1.23
 github.com/ipfs/go-ds-badger
 # github.com/ipfs/go-ds-crdt v0.5.3
 ## explicit; go 1.21
 github.com/ipfs/go-ds-crdt
 github.com/ipfs/go-ds-crdt/pb
-# github.com/ipfs/go-ds-flatfs v0.5.1
-## explicit; go 1.16
+# github.com/ipfs/go-ds-flatfs v0.5.5
+## explicit; go 1.23
 github.com/ipfs/go-ds-flatfs
-# github.com/ipfs/go-ds-leveldb v0.5.0
-## explicit; go 1.16
+# github.com/ipfs/go-ds-leveldb v0.5.2
+## explicit; go 1.23
 github.com/ipfs/go-ds-leveldb
-# github.com/ipfs/go-ds-measure v0.2.0
-## explicit; go 1.16
+# github.com/ipfs/go-ds-measure v0.2.2
+## explicit; go 1.23
 github.com/ipfs/go-ds-measure
-# github.com/ipfs/go-ds-pebble v0.4.0
-## explicit; go 1.22
+# github.com/ipfs/go-ds-pebble v0.4.4
+## explicit; go 1.23
 github.com/ipfs/go-ds-pebble
 # github.com/ipfs/go-fs-lock v0.0.7
 ## explicit; go 1.15
@@ -676,8 +673,8 @@ github.com/ipfs/go-unixfsnode/utils
 # github.com/ipfs/go-verifcid v0.0.3
 ## explicit; go 1.19
 github.com/ipfs/go-verifcid
-# github.com/ipfs/kubo v0.32.1
-## explicit; go 1.23
+# github.com/ipfs/kubo v0.34.1
+## explicit; go 1.24
 github.com/ipfs/kubo
 github.com/ipfs/kubo/blocks/blockstoreutil
 github.com/ipfs/kubo/config
@@ -759,7 +756,7 @@ github.com/ipld/go-ipld-prime/traversal
 github.com/ipld/go-ipld-prime/traversal/selector
 github.com/ipld/go-ipld-prime/traversal/selector/builder
 github.com/ipld/go-ipld-prime/traversal/selector/parse
-# github.com/ipshipyard/p2p-forge v0.0.2
+# github.com/ipshipyard/p2p-forge v0.4.0
 ## explicit; go 1.23
 github.com/ipshipyard/p2p-forge/client
 # github.com/jackpal/go-nat-pmp v1.0.2
@@ -1004,10 +1001,10 @@ github.com/mattn/go-pointer
 # github.com/mattn/go-sqlite3 v1.14.28
 ## explicit; go 1.19
 github.com/mattn/go-sqlite3
-# github.com/mholt/acmez/v2 v2.0.3
+# github.com/mholt/acmez/v3 v3.0.0
 ## explicit; go 1.21.0
-github.com/mholt/acmez/v2
-github.com/mholt/acmez/v2/acme
+github.com/mholt/acmez/v3
+github.com/mholt/acmez/v3/acme
 # github.com/miekg/dns v1.1.66
 ## explicit; go 1.23.0
 github.com/miekg/dns
@@ -1621,6 +1618,9 @@ go.uber.org/zap/internal/exit
 go.uber.org/zap/internal/pool
 go.uber.org/zap/internal/stacktrace
 go.uber.org/zap/zapcore
+# go.uber.org/zap/exp v0.3.0
+## explicit; go 1.19
+go.uber.org/zap/exp/zapslog
 # go4.org v0.0.0-20230225012048-214862532bf5
 ## explicit; go 1.13
 go4.org/lock

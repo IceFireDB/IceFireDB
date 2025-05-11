@@ -20,6 +20,8 @@ const (
 	// ForgeAuthHeader optional HTTP header that client should include when
 	// talking to a limited access registration endpoint
 	ForgeAuthHeader = "Forge-Authorization"
+
+	DefaultStorageLocation = "p2p-forge-certs"
 )
 
 // defaultUserAgent is used as a fallback to inform HTTP server which library

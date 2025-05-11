@@ -10,7 +10,6 @@ import (
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
 	"github.com/ipfs/go-log/v2"
-	"github.com/jbenet/goprocess"
 )
 
 var logger = log.Logger("pebble")
@@ -240,7 +239,7 @@ func (d *Datastore) Query(ctx context.Context, q query.Query) (query.Results, er
 	}
 
 	d.wg.Add(1)
-	results := query.ResultsWithProcess(q, func(proc goprocess.Process, outCh chan<- query.Result) {
+	results := query.ResultsWithContext(q, func(ctx context.Context, outCh chan<- query.Result) {
 		defer d.wg.Done()
 		defer iter.Close()
 
@@ -260,8 +259,7 @@ func (d *Datastore) Query(ctx context.Context, q query.Query) (query.Results, er
 			case outCh <- r:
 				return
 			case <-d.closing:
-			case <-proc.Closed():
-			case <-proc.Closing(): // client told us to close early
+			case <-ctx.Done():
 			}
 
 			// we are closing; try to send a closure error to the client.
