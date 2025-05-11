@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/ipfs/boxo/bitswap"
-	"github.com/ipfs/boxo/bitswap/network"
+	"github.com/ipfs/boxo/bitswap/network/bsnet"
 	"github.com/ipfs/boxo/blockservice"
 	blockstore "github.com/ipfs/boxo/blockstore"
 	chunker "github.com/ipfs/boxo/chunker"
@@ -153,8 +153,8 @@ func (p *Peer) setupBlockService() error {
 		return nil
 	}
 
-	bswapnet := network.NewFromIpfsHost(p.host, p.dht)
-	bswap := bitswap.New(p.ctx, bswapnet, p.bstore)
+	bswapnet := bsnet.NewFromIpfsHost(p.host)
+	bswap := bitswap.New(p.ctx, bswapnet, nil, p.bstore)
 	p.bserv = blockservice.New(p.bstore, bswap)
 	p.exch = bswap
 	return nil

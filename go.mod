@@ -3,7 +3,7 @@ module github.com/IceFireDB/IceFireDB
 go 1.24.1
 
 require (
-	github.com/IceFireDB/icefiredb-crdt-kv v0.2.0
+	github.com/IceFireDB/icefiredb-crdt-kv v0.3.0
 	github.com/IceFireDB/icefiredb-ipfs-log v0.5.0
 	github.com/aws/aws-sdk-go v1.55.7
 	github.com/cenkalti/backoff/v4 v4.3.0
@@ -126,7 +126,7 @@ require (
 	github.com/hashicorp/raft v1.3.11 // indirect
 	github.com/hashicorp/raft-boltdb v0.0.0-20210422161416-485fa74b0b01 // indirect
 	github.com/hashicorp/raft-boltdb/v2 v2.2.2 // indirect
-	github.com/hsanjuan/ipfs-lite v1.8.2 // indirect
+	github.com/hsanjuan/ipfs-lite v1.8.4 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/ipfs-shipyard/nopfs v0.0.14 // indirect
 	github.com/ipfs-shipyard/nopfs/ipfs v0.25.0 // indirect
@@ -137,7 +137,7 @@ require (
 	github.com/ipfs/go-blockservice v0.5.2 // indirect
 	github.com/ipfs/go-cidutil v0.1.0 // indirect
 	github.com/ipfs/go-ds-badger v0.3.4 // indirect
-	github.com/ipfs/go-ds-crdt v0.5.3 // indirect
+	github.com/ipfs/go-ds-crdt v0.6.5 // indirect
 	github.com/ipfs/go-ds-flatfs v0.5.5 // indirect
 	github.com/ipfs/go-ds-leveldb v0.5.2 // indirect
 	github.com/ipfs/go-ds-measure v0.2.2 // indirect

@@ -36,8 +36,8 @@ github.com/IceFireDB/components-go/codis/trace
 github.com/IceFireDB/components-go/codis/unsafe2
 github.com/IceFireDB/components-go/p2p
 github.com/IceFireDB/components-go/utils
-# github.com/IceFireDB/icefiredb-crdt-kv v0.2.0
-## explicit; go 1.21
+# github.com/IceFireDB/icefiredb-crdt-kv v0.3.0
+## explicit; go 1.24.0
 github.com/IceFireDB/icefiredb-crdt-kv/kv
 github.com/IceFireDB/icefiredb-crdt-kv/pkg/p2p
 # github.com/IceFireDB/icefiredb-ipfs-log v0.5.0
@@ -443,8 +443,8 @@ github.com/hashicorp/raft
 # github.com/hashicorp/raft-boltdb/v2 v2.2.2
 ## explicit; go 1.16
 github.com/hashicorp/raft-boltdb/v2
-# github.com/hsanjuan/ipfs-lite v1.8.2
-## explicit; go 1.20
+# github.com/hsanjuan/ipfs-lite v1.8.4
+## explicit; go 1.24
 github.com/hsanjuan/ipfs-lite
 # github.com/huin/goupnp v1.3.0
 ## explicit; go 1.14
@@ -580,8 +580,8 @@ github.com/ipfs/go-datastore/sync
 # github.com/ipfs/go-ds-badger v0.3.4
 ## explicit; go 1.23
 github.com/ipfs/go-ds-badger
-# github.com/ipfs/go-ds-crdt v0.5.3
-## explicit; go 1.21
+# github.com/ipfs/go-ds-crdt v0.6.5
+## explicit; go 1.24
 github.com/ipfs/go-ds-crdt
 github.com/ipfs/go-ds-crdt/pb
 # github.com/ipfs/go-ds-flatfs v0.5.5
