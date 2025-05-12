@@ -7,7 +7,6 @@ import (
 
 	"github.com/ipfs/boxo/ipns"
 	"github.com/ipfs/boxo/path"
-
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"go.opentelemetry.io/otel/attribute"

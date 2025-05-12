@@ -5,32 +5,37 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/multiformats/go-base32"
-	"github.com/multiformats/go-multiaddr"
+	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/multiformats/go-multihash"
 
+	"github.com/libp2p/go-libp2p-kbucket/peerdiversity"
 	"github.com/libp2p/go-libp2p-routing-helpers/tracing"
+	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	swarm "github.com/libp2p/go-libp2p/p2p/net/swarm"
 
-	"github.com/gogo/protobuf/proto"
-	u "github.com/ipfs/boxo/util"
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	logging "github.com/ipfs/go-log/v2"
+	"google.golang.org/protobuf/proto"
 
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-kad-dht/amino"
 	"github.com/libp2p/go-libp2p-kad-dht/crawler"
 	"github.com/libp2p/go-libp2p-kad-dht/internal"
 	internalConfig "github.com/libp2p/go-libp2p-kad-dht/internal/config"
@@ -51,13 +56,25 @@ import (
 
 var logger = logging.Logger("fullrtdht")
 
-const tracer = tracing.Tracer("go-libp2p-kad-dht/fullrt")
-const dhtName = "FullRT"
+const (
+	tracer  = tracing.Tracer("go-libp2p-kad-dht/fullrt")
+	dhtName = "FullRT"
+)
 
 const rtRefreshLimitsMsg = `Accelerated DHT client was unable to fully refresh its routing table due to Resource Manager limits, which may degrade content routing. Consider increasing resource limits. See debug logs for the "dht-crawler" subsystem for details.`
 
 // FullRT is an experimental DHT client that is under development. Expect breaking changes to occur in this client
 // until it stabilizes.
+//
+// Running FullRT by itself (i.e. without a companion IpfsDHT) will run into some issues. The most critical is that
+// running a FullRT node will not currently keep you connected to the k closest peers which means that your peer's
+// addresses may not be discoverable in the DHT. Additionally, FullRT is only a DHT client and not a server which means it does not contribute capacity to the network.
+// If you want to run a server you should also run an IpfsDHT instance in server mode.
+//
+// FullRT has a Ready function that indicates the routing table has been refreshed recently. It is currently within the
+// discretion of the application as to how much they care about whether the routing table is ready.
+// One approach taken to "readiness" is to not insist on it for ad-hoc operations but to insist on it for larger bulk
+// operations.
 type FullRT struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -84,7 +101,7 @@ type FullRT struct {
 	keyToPeerMap map[string]peer.ID
 
 	peerAddrsLk sync.RWMutex
-	peerAddrs   map[peer.ID][]multiaddr.Multiaddr
+	peerAddrs   map[peer.ID][]ma.Multiaddr
 
 	bootstrapPeers []*peer.AddrInfo
 
@@ -98,6 +115,10 @@ type FullRT struct {
 	bulkSendParallelism int
 
 	self peer.ID
+
+	peerConnectednessSubscriber event.Subscription
+
+	ipDiversityFilterLimit int
 }
 
 // NewFullRT creates a DHT client that tracks the full network. It takes a protocol prefix for the given network,
@@ -107,12 +128,16 @@ type FullRT struct {
 // until it stabilizes.
 //
 // Not all of the standard DHT options are supported in this DHT.
+//
+// DHT options passed in should be suitable for your network (e.g. protocol prefix, validators, bucket size, and
+// bootstrap peers).
 func NewFullRT(h host.Host, protocolPrefix protocol.ID, options ...Option) (*FullRT, error) {
 	fullrtcfg := config{
-		crawlInterval:       time.Hour,
-		bulkSendParallelism: 20,
-		waitFrac:            0.3,
-		timeoutPerOp:        5 * time.Second,
+		crawlInterval:          time.Hour,
+		bulkSendParallelism:    20,
+		waitFrac:               0.3,
+		timeoutPerOp:           5 * time.Second,
+		ipDiversityFilterLimit: amino.DefaultMaxPeersPerIPGroup,
 	}
 	if err := fullrtcfg.apply(options...); err != nil {
 		return nil, err
@@ -138,7 +163,7 @@ func NewFullRT(h host.Host, protocolPrefix protocol.ID, options ...Option) (*Ful
 		return nil, err
 	}
 
-	ms := net.NewMessageSenderImpl(h, []protocol.ID{dhtcfg.ProtocolPrefix + "/kad/1.0.0"})
+	ms := net.NewMessageSenderImpl(h, amino.Protocols)
 	protoMessenger, err := dht_pb.NewProtocolMessenger(ms)
 	if err != nil {
 		return nil, err
@@ -151,10 +176,15 @@ func NewFullRT(h host.Host, protocolPrefix protocol.ID, options ...Option) (*Ful
 		}
 	}
 
+	sub, err := h.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged), eventbus.Name("fullrt-dht"))
+	if err != nil {
+		return nil, fmt.Errorf("peer connectedness subscription failed: %w", err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	self := h.ID()
-	pm, err := providers.NewProviderManager(self, h.Peerstore(), dhtcfg.Datastore, fullrtcfg.pmOpts...)
+	pm, err := providers.NewProviderManager(ctx, self, h.Peerstore(), dhtcfg.Datastore, fullrtcfg.pmOpts...)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -185,7 +215,7 @@ func NewFullRT(h host.Host, protocolPrefix protocol.ID, options ...Option) (*Ful
 		keyToPeerMap:    make(map[string]peer.ID),
 		bucketSize:      dhtcfg.BucketSize,
 
-		peerAddrs:      make(map[peer.ID][]multiaddr.Multiaddr),
+		peerAddrs:      make(map[peer.ID][]ma.Multiaddr),
 		bootstrapPeers: bsPeers,
 
 		triggerRefresh: make(chan struct{}),
@@ -195,20 +225,40 @@ func NewFullRT(h host.Host, protocolPrefix protocol.ID, options ...Option) (*Ful
 
 		crawlerInterval: fullrtcfg.crawlInterval,
 
-		bulkSendParallelism: fullrtcfg.bulkSendParallelism,
-
-		self: self,
+		bulkSendParallelism:         fullrtcfg.bulkSendParallelism,
+		self:                        self,
+		peerConnectednessSubscriber: sub,
 	}
 
-	rt.wg.Add(1)
+	rt.wg.Add(2)
 	go rt.runCrawler(ctx)
-
+	go rt.runSubscriber()
 	return rt, nil
 }
 
-type crawlVal struct {
-	addrs []multiaddr.Multiaddr
-	key   kadkey.Key
+func (dht *FullRT) runSubscriber() {
+	defer dht.wg.Done()
+	ms, ok := dht.messageSender.(dht_pb.MessageSenderWithDisconnect)
+	defer dht.peerConnectednessSubscriber.Close()
+	if !ok {
+		return
+	}
+	for {
+		select {
+		case e := <-dht.peerConnectednessSubscriber.Out():
+			pc, ok := e.(event.EvtPeerConnectednessChanged)
+			if !ok {
+				logger.Errorf("invalid event message type: %T", e)
+				continue
+			}
+
+			if pc.Connectedness != network.Connected {
+				ms.OnDisconnect(dht.ctx, pc.Peer)
+			}
+		case <-dht.ctx.Done():
+			return
+		}
+	}
 }
 
 func (dht *FullRT) TriggerRefresh(ctx context.Context) error {
@@ -218,21 +268,19 @@ func (dht *FullRT) TriggerRefresh(ctx context.Context) error {
 	case dht.triggerRefresh <- struct{}{}:
 		return nil
 	case <-dht.ctx.Done():
-		return fmt.Errorf("dht is closed")
+		return errors.New("dht is closed")
 	}
 }
 
 func (dht *FullRT) Stat() map[string]peer.ID {
-	newMap := make(map[string]peer.ID)
-
 	dht.kMapLk.RLock()
-	for k, v := range dht.keyToPeerMap {
-		newMap[k] = v
-	}
-	dht.kMapLk.RUnlock()
-	return newMap
+	defer dht.kMapLk.RUnlock()
+	return maps.Clone(dht.keyToPeerMap)
 }
 
+// Ready indicates that the routing table has been refreshed recently. It is recommended to be used for operations where
+// it is important for the operation to be particularly accurate (e.g. bulk publishing where you do not want to
+// republish for as long as you can).
 func (dht *FullRT) Ready() bool {
 	dht.rtLk.RLock()
 	lastCrawlTime := dht.lastCrawlTime
@@ -259,8 +307,8 @@ func (dht *FullRT) runCrawler(ctx context.Context) {
 	defer dht.wg.Done()
 	t := time.NewTicker(dht.crawlerInterval)
 
-	m := make(map[peer.ID]*crawlVal)
-	mxLk := sync.Mutex{}
+	foundPeers := make(map[peer.ID][]ma.Multiaddr)
+	foundPeersLk := sync.Mutex{}
 
 	initialTrigger := make(chan struct{}, 1)
 	initialTrigger <- struct{}{}
@@ -276,43 +324,27 @@ func (dht *FullRT) runCrawler(ctx context.Context) {
 
 		var addrs []*peer.AddrInfo
 		dht.peerAddrsLk.Lock()
-		for k := range m {
+		for k := range foundPeers {
 			addrs = append(addrs, &peer.AddrInfo{ID: k}) // Addrs: v.addrs
 		}
 
 		addrs = append(addrs, dht.bootstrapPeers...)
 		dht.peerAddrsLk.Unlock()
 
-		for k := range m {
-			delete(m, k)
-		}
+		clear(foundPeers)
 
 		start := time.Now()
 		limitErrOnce := sync.Once{}
 		dht.crawler.Run(ctx, addrs,
 			func(p peer.ID, rtPeers []*peer.AddrInfo) {
-				conns := dht.h.Network().ConnsToPeer(p)
-				var addrs []multiaddr.Multiaddr
-				for _, conn := range conns {
-					addr := conn.RemoteMultiaddr()
-					addrs = append(addrs, addr)
-				}
-
-				if len(addrs) == 0 {
-					logger.Debugf("no connections to %v after successful query. keeping addresses from the peerstore", p)
-					addrs = dht.h.Peerstore().Addrs(p)
-				}
-
 				keep := kaddht.PublicRoutingTableFilter(dht, p)
 				if !keep {
 					return
 				}
 
-				mxLk.Lock()
-				defer mxLk.Unlock()
-				m[p] = &crawlVal{
-					addrs: addrs,
-				}
+				foundPeersLk.Lock()
+				defer foundPeersLk.Unlock()
+				foundPeers[p] = dht.h.Peerstore().Addrs(p)
 			},
 			func(p peer.ID, err error) {
 				dialErr, ok := err.(*swarm.DialError)
@@ -331,14 +363,14 @@ func (dht *FullRT) runCrawler(ctx context.Context) {
 		dur := time.Since(start)
 		logger.Infof("crawl took %v", dur)
 
-		peerAddrs := make(map[peer.ID][]multiaddr.Multiaddr)
+		peerAddrs := make(map[peer.ID][]ma.Multiaddr)
 		kPeerMap := make(map[string]peer.ID)
 		newRt := trie.New()
-		for k, v := range m {
-			v.key = kadkey.KbucketIDToKey(kb.ConvertPeerID(k))
-			peerAddrs[k] = v.addrs
-			kPeerMap[string(v.key)] = k
-			newRt.Add(v.key)
+		for peerID, foundAddrs := range foundPeers {
+			kadKey := kadkey.KbucketIDToKey(kb.ConvertPeerID(peerID))
+			peerAddrs[peerID] = foundAddrs
+			kPeerMap[string(kadKey)] = peerID
+			newRt.Add(kadKey)
 		}
 
 		dht.peerAddrsLk.Lock()
@@ -376,12 +408,12 @@ func (dht *FullRT) CheckPeers(ctx context.Context, peers ...peer.ID) (int, int) 
 	ctx, span := internal.StartSpan(ctx, "FullRT.CheckPeers", trace.WithAttributes(attribute.Int("NumPeers", len(peers))))
 	defer span.End()
 
-	var peerAddrs chan interface{}
+	var peerAddrs chan peer.AddrInfo
 	var total int
 	if len(peers) == 0 {
 		dht.peerAddrsLk.RLock()
 		total = len(dht.peerAddrs)
-		peerAddrs = make(chan interface{}, total)
+		peerAddrs = make(chan peer.AddrInfo, total)
 		for k, v := range dht.peerAddrs {
 			peerAddrs <- peer.AddrInfo{
 				ID:    k,
@@ -392,7 +424,7 @@ func (dht *FullRT) CheckPeers(ctx context.Context, peers ...peer.ID) (int, int) 
 		dht.peerAddrsLk.RUnlock()
 	} else {
 		total = len(peers)
-		peerAddrs = make(chan interface{}, total)
+		peerAddrs = make(chan peer.AddrInfo, total)
 		dht.peerAddrsLk.RLock()
 		for _, p := range peers {
 			peerAddrs <- peer.AddrInfo{
@@ -406,10 +438,9 @@ func (dht *FullRT) CheckPeers(ctx context.Context, peers ...peer.ID) (int, int) 
 
 	var success uint64
 
-	workers(100, func(i interface{}) {
-		a := i.(peer.AddrInfo)
+	workers(100, func(ai peer.AddrInfo) {
 		dialctx, dialcancel := context.WithTimeout(ctx, time.Second*3)
-		if err := dht.h.Connect(dialctx, a); err == nil {
+		if err := dht.h.Connect(dialctx, ai); err == nil {
 			atomic.AddUint64(&success, 1)
 		}
 		dialcancel()
@@ -417,10 +448,10 @@ func (dht *FullRT) CheckPeers(ctx context.Context, peers ...peer.ID) (int, int) 
 	return int(success), total
 }
 
-func workers(numWorkers int, fn func(interface{}), inputs <-chan interface{}) {
-	jobs := make(chan interface{})
+func workers(numWorkers int, fn func(peer.AddrInfo), inputs <-chan peer.AddrInfo) {
+	jobs := make(chan peer.AddrInfo)
 	defer close(jobs)
-	for i := 0; i < numWorkers; i++ {
+	for range numWorkers {
 		go func() {
 			for j := range jobs {
 				fn(j)
@@ -432,30 +463,78 @@ func workers(numWorkers int, fn func(interface{}), inputs <-chan interface{}) {
 	}
 }
 
+// GetClosestPeers tries to return the `dht.bucketSize` closest known peers to
+// the given key.
+//
+// If the IP diversity filter limit is set, the returned peers will contain at
+// most `dht.ipDiversityFilterLimit` peers sharing the same IP group. Hence,
+// the peers may not be the absolute closest peers to the given key, but they
+// will be more diverse in terms of IP addresses.
 func (dht *FullRT) GetClosestPeers(ctx context.Context, key string) ([]peer.ID, error) {
 	_, span := internal.StartSpan(ctx, "FullRT.GetClosestPeers", trace.WithAttributes(internal.KeyAsAttribute("Key", key)))
 	defer span.End()
 
 	kbID := kb.ConvertKey(key)
 	kadKey := kadkey.KbucketIDToKey(kbID)
-	dht.rtLk.RLock()
-	closestKeys := kademlia.ClosestN(kadKey, dht.rt, dht.bucketSize)
-	dht.rtLk.RUnlock()
 
-	peers := make([]peer.ID, 0, len(closestKeys))
-	for _, k := range closestKeys {
-		dht.kMapLk.RLock()
-		p, ok := dht.keyToPeerMap[string(k)]
-		if !ok {
-			logger.Errorf("key not found in map")
+	ipGroupCounts := make(map[peerdiversity.PeerIPGroupKey]map[peer.ID]struct{})
+	peers := make([]peer.ID, 0, dht.bucketSize)
+
+	// If ipDiversityFilterLimit is non-zero, the step is slightly larger than
+	// the bucket size, allowing to have a few backup peers in case some are
+	// filtered out by the diversity filter. Multiple calls to ClosestN are
+	// expensive, but increasing the `count` parameter is cheap.
+	step := dht.bucketSize + 2*dht.ipDiversityFilterLimit
+	for nClosest := 0; nClosest < dht.rt.Size(); nClosest += step {
+		dht.rtLk.RLock()
+		// Get the last `step` closest peers, because we already tried the `nClosest` closest peers
+		closestKeys := kademlia.ClosestN(kadKey, dht.rt, nClosest+step)[nClosest:]
+		dht.rtLk.RUnlock()
+
+	PeersLoop:
+		for _, k := range closestKeys {
+			dht.kMapLk.RLock()
+			// Recover the peer ID from the key
+			p, ok := dht.keyToPeerMap[string(k)]
+			if !ok {
+				logger.Errorf("key not found in map")
+				continue
+			}
+			dht.kMapLk.RUnlock()
+			dht.peerAddrsLk.RLock()
+			peerAddrs := dht.peerAddrs[p]
+			dht.peerAddrsLk.RUnlock()
+
+			if dht.ipDiversityFilterLimit > 0 {
+				for _, addr := range peerAddrs {
+					ip, err := manet.ToIP(addr)
+					if err != nil {
+						continue
+					}
+					ipGroup := peerdiversity.IPGroupKey(ip)
+					if len(ipGroup) == 0 {
+						continue
+					}
+					if _, ok := ipGroupCounts[ipGroup]; !ok {
+						ipGroupCounts[ipGroup] = make(map[peer.ID]struct{})
+					}
+					if len(ipGroupCounts[ipGroup]) >= dht.ipDiversityFilterLimit {
+						// This ip group is already overrepresented, skip this peer
+						continue PeersLoop
+					}
+					ipGroupCounts[ipGroup][p] = struct{}{}
+				}
+			}
+
+			// Add the peer's known addresses to the peerstore so that it can be
+			// dialed by the caller.
+			dht.h.Peerstore().AddAddrs(p, peerAddrs, peerstore.TempAddrTTL)
+			peers = append(peers, p)
+
+			if len(peers) == dht.bucketSize {
+				return peers, nil
+			}
 		}
-		dht.kMapLk.RUnlock()
-		dht.peerAddrsLk.RLock()
-		peerAddrs := dht.peerAddrs[p]
-		dht.peerAddrsLk.RUnlock()
-
-		dht.h.Peerstore().AddAddrs(p, peerAddrs, peerstore.TempAddrTTL)
-		peers = append(peers, p)
 	}
 	return peers, nil
 }
@@ -491,12 +570,12 @@ func (dht *FullRT) PutValue(ctx context.Context, key string, value []byte, opts 
 			return err
 		}
 		if i != 0 {
-			return fmt.Errorf("can't replace a newer value with an older value")
+			return errors.New("can't replace a newer value with an older value")
 		}
 	}
 
 	rec := record.MakePutRecord(key, value)
-	rec.TimeReceived = u.FormatRFC3339(time.Now())
+	rec.TimeReceived = internal.FormatRFC3339(time.Now())
 	err = dht.putLocal(ctx, key, rec)
 	if err != nil {
 		return err
@@ -517,7 +596,7 @@ func (dht *FullRT) PutValue(ctx context.Context, key string, value []byte, opts 
 	}, peers, true)
 
 	if successes == 0 {
-		return fmt.Errorf("failed to complete put")
+		return errors.New("failed to complete put")
 	}
 
 	return nil
@@ -586,7 +665,7 @@ func (dht *FullRT) SearchValue(ctx context.Context, key string, opts ...routing.
 	}
 
 	stopCh := make(chan struct{})
-	valCh, lookupRes := dht.getValues(ctx, key, stopCh)
+	valCh, lookupRes := dht.getValues(ctx, key)
 
 	out := make(chan []byte)
 	go func() {
@@ -622,7 +701,8 @@ func (dht *FullRT) SearchValue(ctx context.Context, key string, opts ...routing.
 }
 
 func (dht *FullRT) searchValueQuorum(ctx context.Context, key string, valCh <-chan RecvdVal, stopCh chan struct{},
-	out chan<- []byte, nvals int) ([]byte, map[peer.ID]struct{}, bool) {
+	out chan<- []byte, nvals int,
+) ([]byte, map[peer.ID]struct{}, bool) {
 	numResponses := 0
 	return dht.processValues(ctx, key, valCh,
 		func(ctx context.Context, v RecvdVal, better bool) bool {
@@ -644,7 +724,8 @@ func (dht *FullRT) searchValueQuorum(ctx context.Context, key string, valCh <-ch
 }
 
 func (dht *FullRT) processValues(ctx context.Context, key string, vals <-chan RecvdVal,
-	newVal func(ctx context.Context, v RecvdVal, better bool) bool) (best []byte, peersWithBest map[peer.ID]struct{}, aborted bool) {
+	newVal func(ctx context.Context, v RecvdVal, better bool) bool,
+) (best []byte, peersWithBest map[peer.ID]struct{}, aborted bool) {
 loop:
 	for {
 		if aborted {
@@ -712,7 +793,7 @@ type lookupWithFollowupResult struct {
 	peers []peer.ID // the top K not unreachable peers at the end of the query
 }
 
-func (dht *FullRT) getValues(ctx context.Context, key string, stopQuery chan struct{}) (<-chan RecvdVal, <-chan *lookupWithFollowupResult) {
+func (dht *FullRT) getValues(ctx context.Context, key string) (<-chan RecvdVal, <-chan *lookupWithFollowupResult) {
 	valCh := make(chan RecvdVal, 1)
 	lookupResCh := make(chan *lookupWithFollowupResult, 1)
 
@@ -803,7 +884,7 @@ func (dht *FullRT) Provide(ctx context.Context, key cid.Cid, brdcst bool) (err e
 	if !dht.enableProviders {
 		return routing.ErrNotSupported
 	} else if !key.Defined() {
-		return fmt.Errorf("invalid cid: undefined")
+		return errors.New("invalid cid: undefined")
 	}
 	keyMH := key.Hash()
 	logger.Debugw("providing", "cid", key, "mh", internal.LoggableProviderRecordBytes(keyMH))
@@ -864,7 +945,7 @@ func (dht *FullRT) Provide(ctx context.Context, key cid.Cid, brdcst bool) (err e
 	}
 
 	if successes == 0 {
-		return fmt.Errorf("failed to complete provide")
+		return errors.New("failed to complete provide")
 	}
 
 	return ctx.Err()
@@ -958,7 +1039,7 @@ func (dht *FullRT) ProvideMany(ctx context.Context, keys []multihash.Multihash) 
 	// TODO: We may want to limit the type of addresses in our provider records
 	// For example, in a WAN-only DHT prohibit sharing non-WAN addresses (e.g. 192.168.0.100)
 	if len(pi.Addrs) < 1 {
-		return fmt.Errorf("no known addresses for self, cannot put provider")
+		return errors.New("no known addresses for self, cannot put provider")
 	}
 
 	fn := func(ctx context.Context, p, k peer.ID) error {
@@ -973,7 +1054,7 @@ func (dht *FullRT) ProvideMany(ctx context.Context, keys []multihash.Multihash) 
 		keysAsPeerIDs = append(keysAsPeerIDs, peer.ID(k))
 	}
 
-	return dht.bulkMessageSend(ctx, keysAsPeerIDs, fn, true)
+	return dht.bulkMessageSend(ctx, keysAsPeerIDs, fn)
 }
 
 func (dht *FullRT) PutMany(ctx context.Context, keys []string, values [][]byte) error {
@@ -985,7 +1066,7 @@ func (dht *FullRT) PutMany(ctx context.Context, keys []string, values [][]byte) 
 	}
 
 	if len(keys) != len(values) {
-		return fmt.Errorf("number of keys does not match the number of values")
+		return errors.New("number of keys does not match the number of values")
 	}
 
 	keysAsPeerIDs := make([]peer.ID, 0, len(keys))
@@ -996,7 +1077,7 @@ func (dht *FullRT) PutMany(ctx context.Context, keys []string, values [][]byte) 
 	}
 
 	if len(keys) != len(keyRecMap) {
-		return fmt.Errorf("does not support duplicate keys")
+		return errors.New("does not support duplicate keys")
 	}
 
 	fn := func(ctx context.Context, p, k peer.ID) error {
@@ -1004,10 +1085,10 @@ func (dht *FullRT) PutMany(ctx context.Context, keys []string, values [][]byte) 
 		return dht.protoMessenger.PutValue(ctx, p, record.MakePutRecord(keyStr, keyRecMap[keyStr]))
 	}
 
-	return dht.bulkMessageSend(ctx, keysAsPeerIDs, fn, false)
+	return dht.bulkMessageSend(ctx, keysAsPeerIDs, fn)
 }
 
-func (dht *FullRT) bulkMessageSend(ctx context.Context, keys []peer.ID, fn func(ctx context.Context, target, k peer.ID) error, isProvRec bool) error {
+func (dht *FullRT) bulkMessageSend(ctx context.Context, keys []peer.ID, fn func(ctx context.Context, target, k peer.ID) error) error {
 	ctx, span := internal.StartSpan(ctx, "FullRT.BulkMessageSend")
 	defer span.End()
 
@@ -1058,7 +1139,7 @@ func (dht *FullRT) bulkMessageSend(ctx context.Context, keys []peer.ID, fn func(
 	workCh := make(chan workMessage, 1)
 	wg := sync.WaitGroup{}
 	wg.Add(dht.bulkSendParallelism)
-	for i := 0; i < dht.bulkSendParallelism; i++ {
+	for range dht.bulkSendParallelism {
 		go func() {
 			defer wg.Done()
 			defer logger.Debugf("bulk send goroutine done")
@@ -1169,7 +1250,7 @@ func (dht *FullRT) bulkMessageSend(ctx context.Context, keys []peer.ID, fn func(
 
 	if numSendsSuccessful == 0 {
 		logger.Infof("bulk send failed")
-		return fmt.Errorf("failed to complete bulk sending")
+		return errors.New("failed to complete bulk sending")
 	}
 
 	logger.Infof("bulk send complete: %d keys, %d unique, %d successful, %d skipped peers, %d fails",
@@ -1213,7 +1294,7 @@ func (dht *FullRT) FindProviders(ctx context.Context, c cid.Cid) ([]peer.AddrInf
 	if !dht.enableProviders {
 		return nil, routing.ErrNotSupported
 	} else if !c.Defined() {
-		return nil, fmt.Errorf("invalid cid: undefined")
+		return nil, errors.New("invalid cid: undefined")
 	}
 
 	var providers []peer.AddrInfo
@@ -1383,13 +1464,13 @@ func (dht *FullRT) FindPeer(ctx context.Context, id peer.ID) (pi peer.AddrInfo, 
 	defer cancelquery()
 
 	addrsCh := make(chan *peer.AddrInfo, 1)
-	newAddrs := make([]multiaddr.Multiaddr, 0)
+	newAddrs := make([]ma.Multiaddr, 0)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		addrsSoFar := make(map[multiaddr.Multiaddr]struct{})
+		addrsSoFar := make(map[string]struct{})
 		for {
 			select {
 			case ai, ok := <-addrsCh:
@@ -1398,10 +1479,10 @@ func (dht *FullRT) FindPeer(ctx context.Context, id peer.ID) (pi peer.AddrInfo, 
 				}
 
 				for _, a := range ai.Addrs {
-					_, found := addrsSoFar[a]
+					_, found := addrsSoFar[string(a.Bytes())]
 					if !found {
 						newAddrs = append(newAddrs, a)
-						addrsSoFar[a] = struct{}{}
+						addrsSoFar[string(a.Bytes())] = struct{}{}
 					}
 				}
 			case <-ctx.Done():
@@ -1543,7 +1624,7 @@ func (dht *FullRT) FindLocal(id peer.ID) peer.AddrInfo {
 	return peer.AddrInfo{}
 }
 
-func (dht *FullRT) maybeAddAddrs(p peer.ID, addrs []multiaddr.Multiaddr, ttl time.Duration) {
+func (dht *FullRT) maybeAddAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Duration) {
 	// Don't add addresses for self or our connected peers. We have better ones.
 	if p == dht.h.ID() || hasValidConnectedness(dht.h, p) {
 		return

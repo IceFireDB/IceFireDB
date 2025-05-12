@@ -594,9 +594,7 @@ func (a *Agent) checkKeepalive() {
 		return
 	}
 
-	if (a.keepaliveInterval != 0) &&
-		((time.Since(selectedPair.Local.LastSent()) > a.keepaliveInterval) ||
-			(time.Since(selectedPair.Remote.LastReceived()) > a.keepaliveInterval)) {
+	if a.keepaliveInterval != 0 {
 		// We use binding request instead of indication to support refresh consent schemas
 		// see https://tools.ietf.org/html/rfc7675
 		a.selector.PingCandidate(selectedPair.Local, selectedPair.Remote)
@@ -980,18 +978,23 @@ func (a *Agent) findRemoteCandidate(networkType NetworkType, addr net.Addr) Cand
 	return nil
 }
 
-func (a *Agent) sendBindingRequest(m *stun.Message, local, remote Candidate) {
+func (a *Agent) sendBindingRequest(msg *stun.Message, local, remote Candidate) {
 	a.log.Tracef("Ping STUN from %s to %s", local, remote)
 
 	a.invalidatePendingBindingRequests(time.Now())
 	a.pendingBindingRequests = append(a.pendingBindingRequests, bindingRequest{
 		timestamp:      time.Now(),
-		transactionID:  m.TransactionID,
+		transactionID:  msg.TransactionID,
 		destination:    remote.addr(),
-		isUseCandidate: m.Contains(stun.AttrUseCandidate),
+		isUseCandidate: msg.Contains(stun.AttrUseCandidate),
 	})
 
-	a.sendSTUN(m, local, remote)
+	if pair := a.findPair(local, remote); pair != nil {
+		pair.UpdateRequestSent()
+	} else {
+		a.log.Warnf("Failed to find pair for add binding request from %s to %s", local, remote)
+	}
+	a.sendSTUN(msg, local, remote)
 }
 
 func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote Candidate) {
@@ -1014,6 +1017,11 @@ func (a *Agent) sendBindingSuccess(m *stun.Message, local, remote Candidate) {
 	); err != nil {
 		a.log.Warnf("Failed to handle inbound ICE from: %s to: %s error: %s", local, remote, err)
 	} else {
+		if pair := a.findPair(local, remote); pair != nil {
+			pair.UpdateResponseSent()
+		} else {
+			a.log.Warnf("Failed to find pair for add binding response from %s to %s", local, remote)
+		}
 		a.sendSTUN(out, local, remote)
 	}
 }

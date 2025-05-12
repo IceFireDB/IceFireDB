@@ -6,10 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/ipfs/boxo/fetcher"
 	fetcherhelpers "github.com/ipfs/boxo/fetcher/helpers"
 	"github.com/ipfs/boxo/path"
@@ -20,6 +16,9 @@ import (
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 	"github.com/ipld/go-ipld-prime/schema"
 	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var log = logging.Logger("path/resolver")
