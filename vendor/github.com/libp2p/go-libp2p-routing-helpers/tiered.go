@@ -4,12 +4,12 @@ import (
 	"context"
 	"io"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	record "github.com/libp2p/go-libp2p-record"
 	ci "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"go.uber.org/multierr"
 )
 
 // Tiered is like the Parallel except that GetValue and FindPeer
@@ -47,7 +47,7 @@ func (r Tiered) get(ctx context.Context, do func(routing.Routing) (interface{}, 
 	case 1:
 		return nil, errs[0]
 	default:
-		return nil, &multierror.Error{Errors: errs}
+		return nil, multierr.Combine(errs...)
 	}
 }
 
@@ -112,15 +112,15 @@ func (r Tiered) Bootstrap(ctx context.Context) error {
 
 // Close closes all sub-routers that implement the io.Closer interface.
 func (r Tiered) Close() error {
-	var me multierror.Error
+	var errs error
 	for _, router := range r.Routers {
 		if closer, ok := router.(io.Closer); ok {
 			if err := closer.Close(); err != nil {
-				me.Errors = append(me.Errors, err)
+				errs = multierr.Append(errs, err)
 			}
 		}
 	}
-	return me.ErrorOrNil()
+	return errs
 }
 
 var _ routing.Routing = Tiered{}

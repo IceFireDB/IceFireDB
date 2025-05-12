@@ -1,8 +1,15 @@
+// Package provider provides interfaces and tooling for (Re)providers.
+//
+// This includes methods to provide streams of CIDs (i.e. from pinned
+// merkledags, from blockstores, from single dags etc.). These methods can be
+// used for other purposes, but are usually fed to the Reprovider to announce
+// CIDs.
 package provider
 
 import (
 	"context"
 
+	"github.com/gammazero/chanqueue"
 	blocks "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/boxo/fetcher"
 	fetcherhelpers "github.com/ipfs/boxo/fetcher/helpers"
@@ -18,7 +25,7 @@ var logR = logging.Logger("reprovider.simple")
 // Provider announces blocks to the network
 type Provider interface {
 	// Provide takes a cid and makes an attempt to announce it to the network
-	Provide(cid.Cid) error
+	Provide(context.Context, cid.Cid, bool) error
 }
 
 // Reprovider reannounces blocks to the network
@@ -46,7 +53,8 @@ func NewBlockstoreProvider(bstore blocks.Blockstore) KeyChanFunc {
 	}
 }
 
-// NewPinnedProvider returns provider supplying pinned keys
+// NewPinnedProvider returns a KeyChanFunc supplying pinned keys. The Provider
+// will block when writing to the channel and there are no readers.
 func NewPinnedProvider(onlyRoots bool, pinning pin.Pinner, fetchConfig fetcher.Factory) KeyChanFunc {
 	return func(ctx context.Context) (<-chan cid.Cid, error) {
 		set, err := pinSet(ctx, pinning, fetchConfig, onlyRoots)
@@ -67,6 +75,23 @@ func NewPinnedProvider(onlyRoots bool, pinning pin.Pinner, fetchConfig fetcher.F
 		}()
 
 		return outCh, nil
+	}
+}
+
+// NewBufferedProvider returns a KeyChanFunc supplying keys from a given
+// KeyChanFunction, but buffering keys in memory if we can read them faster
+// they are consumed.  This allows the underlying KeyChanFunc to finish
+// listing pins as soon as possible releasing any resources, locks, at the
+// expense of memory usage.
+func NewBufferedProvider(pinsF KeyChanFunc) KeyChanFunc {
+	return func(ctx context.Context) (<-chan cid.Cid, error) {
+		pins, err := pinsF(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		queue := chanqueue.New(chanqueue.WithInputRdOnly[cid.Cid](pins))
+		return queue.Out(), nil
 	}
 }
 
