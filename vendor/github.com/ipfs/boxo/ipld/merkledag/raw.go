@@ -6,12 +6,11 @@ import (
 
 	u "github.com/ipfs/boxo/util"
 	blocks "github.com/ipfs/go-block-format"
+	cid "github.com/ipfs/go-cid"
+	format "github.com/ipfs/go-ipld-format"
 	legacy "github.com/ipfs/go-ipld-legacy"
 	ipld "github.com/ipld/go-ipld-prime"
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
-
-	cid "github.com/ipfs/go-cid"
-	format "github.com/ipfs/go-ipld-format"
 )
 
 // RawNode represents a node which only contains data.
