@@ -12,6 +12,7 @@ require (
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/ipfs/go-datastore v0.7.0
 	github.com/ipfs/go-ipfs-api v0.3.0
+	github.com/ipfs/kubo v0.32.1
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6
 	github.com/philippgille/gokv/encoding v0.6.0
 	github.com/philippgille/gokv/test v0.7.0
@@ -19,6 +20,7 @@ require (
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cast v1.8.0
+	github.com/stretchr/testify v1.10.0
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d
 	github.com/tidwall/redcon v1.6.2
 	github.com/tidwall/sds v0.3.0
@@ -161,7 +163,6 @@ require (
 	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
 	github.com/ipfs/go-unixfsnode v1.9.2 // indirect
 	github.com/ipfs/go-verifcid v0.0.3 // indirect
-	github.com/ipfs/kubo v0.32.1 // indirect
 	github.com/ipld/go-car v0.6.2 // indirect
 	github.com/ipld/go-car/v2 v2.14.2 // indirect
 	github.com/ipld/go-codec-dagpb v1.6.0 // indirect
@@ -268,7 +269,6 @@ require (
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/spinlock/jemalloc-go v0.0.0-20201010032256-e81523fb8524 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tidwall/btree v1.5.2 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
