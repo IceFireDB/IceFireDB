@@ -43,10 +43,6 @@ func TaskWorkerCount(count int) Option {
 	return Option{server.TaskWorkerCount(count)}
 }
 
-func ProvideEnabled(enabled bool) Option {
-	return Option{server.ProvideEnabled(enabled)}
-}
-
 func SetSendDontHaves(send bool) Option {
 	return Option{server.SetSendDontHaves(send)}
 }
@@ -105,4 +101,12 @@ func WithTracer(tap tracer.Tracer) Option {
 			bs.tracer = tap
 		}),
 	}
+}
+
+func WithClientOption(opt client.Option) Option {
+	return Option{opt}
+}
+
+func WithServerOption(opt server.Option) Option {
+	return Option{opt}
 }

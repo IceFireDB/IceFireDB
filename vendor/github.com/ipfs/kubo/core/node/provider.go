@@ -14,8 +14,12 @@ import (
 	"go.uber.org/fx"
 )
 
+// The size of a batch that will be used for calculating average announcement
+// time per CID, inside of boxo/provider.ThroughputReport
+// and in 'ipfs stats provide' report.
+const sampledBatchSize = 1000
+
 func ProviderSys(reprovideInterval time.Duration, acceleratedDHTClient bool) fx.Option {
-	const magicThroughputReportCount = 128
 	return fx.Provide(func(lc fx.Lifecycle, cr irouting.ProvideManyRouter, keyProvider provider.KeyChanFunc, repo repo.Repo, bs blockstore.Blockstore) (provider.System, error) {
 		opts := []provider.Option{
 			provider.Online(cr),
@@ -105,7 +109,7 @@ https://github.com/ipfs/kubo/blob/master/docs/config.md#routingaccelerateddhtcli
 							keysProvided, avgProvideSpeed, count, avgProvideSpeed*time.Duration(count), reprovideInterval)
 					}
 					return false
-				}, magicThroughputReportCount))
+				}, sampledBatchSize))
 		}
 		sys, err := provider.New(repo.Datastore(), opts...)
 		if err != nil {
@@ -163,16 +167,23 @@ func newProvidingStrategy(onlyPinned, onlyRoots bool) interface{} {
 		IPLDFetcher fetcher.Factory `name:"ipldFetcher"`
 	}
 	return func(in input) provider.KeyChanFunc {
+		// Pinner-related CIDs will be buffered in memory to avoid
+		// deadlocking the pinner when the providing process is slow.
+
 		if onlyRoots {
-			return provider.NewPinnedProvider(true, in.Pinner, in.IPLDFetcher)
+			return provider.NewBufferedProvider(
+				provider.NewPinnedProvider(true, in.Pinner, in.IPLDFetcher),
+			)
 		}
 
 		if onlyPinned {
-			return provider.NewPinnedProvider(false, in.Pinner, in.IPLDFetcher)
+			return provider.NewBufferedProvider(
+				provider.NewPinnedProvider(false, in.Pinner, in.IPLDFetcher),
+			)
 		}
 
 		return provider.NewPrioritizedProvider(
-			provider.NewPinnedProvider(true, in.Pinner, in.IPLDFetcher),
+			provider.NewBufferedProvider(provider.NewPinnedProvider(true, in.Pinner, in.IPLDFetcher)),
 			provider.NewBlockstoreProvider(in.Blockstore),
 		)
 	}

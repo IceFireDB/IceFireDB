@@ -86,6 +86,7 @@ is useful when using the daemon in test environments.`,
 
 			c.Bootstrap = []string{}
 			c.Discovery.MDNS.Enabled = false
+			c.AutoTLS.Enabled = False
 			return nil
 		},
 	},
@@ -104,6 +105,7 @@ Inverse profile of the test profile.`,
 
 			c.Swarm.DisableNatPortMap = false
 			c.Discovery.MDNS.Enabled = true
+			c.AutoTLS.Enabled = Default
 			return nil
 		},
 	},
@@ -231,7 +233,7 @@ fetching may be degraded.
 		USE WITH CAUTION:
 		The main use case for this is setups with manual Peering.Peers config.
 		Data from this node will not be announced on the DHT. This will make
-		DHT-based routing an data retrieval impossible if this node is the only
+		DHT-based routing and data retrieval impossible if this node is the only
 		one hosting it, and other peers are not already connected to it.
 `,
 		Transform: func(c *Config) error {
