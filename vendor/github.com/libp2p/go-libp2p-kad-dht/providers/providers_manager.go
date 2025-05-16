@@ -146,8 +146,7 @@ func (pm *ProviderManager) run() {
 		defer func() {
 			gcTimer.Stop()
 			if gcQuery != nil {
-				// don't really care if this fails.
-				_ = gcQuery.Close()
+				gcQuery.Close()
 			}
 			if err := pm.dstore.Flush(context.Background()); err != nil {
 				log.Error("failed to flush datastore: ", err)
@@ -180,9 +179,7 @@ func (pm *ProviderManager) run() {
 				gp.resp <- provs[0:len(provs):len(provs)]
 			case res, ok := <-gcQueryRes:
 				if !ok {
-					if err := gcQuery.Close(); err != nil {
-						log.Error("failed to close provider GC query: ", err)
-					}
+					gcQuery.Close()
 					gcTimer.Reset(pm.cleanupInterval)
 
 					// cleanup GC round

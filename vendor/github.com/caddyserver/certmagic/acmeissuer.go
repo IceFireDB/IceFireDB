@@ -28,8 +28,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mholt/acmez/v2"
-	"github.com/mholt/acmez/v2/acme"
+	"github.com/mholt/acmez/v3"
+	"github.com/mholt/acmez/v3/acme"
 	"go.uber.org/zap"
 )
 
@@ -282,7 +282,7 @@ func NewACMEIssuer(cfg *Config, template ACMEIssuer) *ACMEIssuer {
 }
 
 // IssuerKey returns the unique issuer key for the
-// confgured CA endpoint.
+// configured CA endpoint.
 func (am *ACMEIssuer) IssuerKey() string {
 	return am.issuerKey(am.CA)
 }
@@ -482,7 +482,7 @@ func (am *ACMEIssuer) doIssue(ctx context.Context, csr *x509.CertificateRequest,
 					zap.String("account_id", client.account.Location),
 					zap.Strings("account_contact", client.account.Contact),
 					zap.String("key_location", am.storageKeyUserPrivateKey(client.acmeClient.Directory, am.getEmail())),
-					zap.Object("problem", prob))
+					zap.Any("problem", prob))
 
 				// the account we have no longer exists on the CA, so we need to create a new one;
 				// we could use the same key pair, but this is a good opportunity to rotate keys

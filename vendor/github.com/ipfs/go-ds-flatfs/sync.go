@@ -9,7 +9,7 @@ import (
 // 16 should be able to sataurate most RAIDs
 // in case of two used disks per write (RAID 1, 5) and queue depth of 2,
 // 16 concurrent Sync calls should be able to saturate 16 HDDs RAID
-//TODO: benchmark it out, maybe provide tweak parmeter
+// TODO: benchmark it out, maybe provide tweak parmeter
 const SyncThreadsMax = 16
 
 var syncSemaphore chan struct{} = make(chan struct{}, SyncThreadsMax)

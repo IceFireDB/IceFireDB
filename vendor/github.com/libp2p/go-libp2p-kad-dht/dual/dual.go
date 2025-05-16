@@ -7,14 +7,13 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ipfs/go-cid"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/internal"
-	"github.com/libp2p/go-libp2p-routing-helpers/tracing"
-
-	"github.com/ipfs/go-cid"
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	"github.com/libp2p/go-libp2p-kbucket/peerdiversity"
 	helper "github.com/libp2p/go-libp2p-routing-helpers"
+	"github.com/libp2p/go-libp2p-routing-helpers/tracing"
 	ci "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -22,14 +21,15 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
-
-	"github.com/hashicorp/go-multierror"
+	"go.uber.org/multierr"
 )
 
-const tracer = tracing.Tracer("go-libp2p-kad-dht/dual")
-const dualName = "Dual"
+const (
+	tracer   = tracing.Tracer("go-libp2p-kad-dht/dual")
+	dualName = "Dual"
+)
 
-// DHT implements the routing interface to provide two concrete DHT implementationts for use
+// DHT implements the routing interface to provide two concrete DHT implementations for use
 // in IPFS that are used to support both global network users and disjoint LAN usecases.
 type DHT struct {
 	WAN *dht.IpfsDHT
@@ -99,7 +99,7 @@ func DHTOption(opts ...dht.Option) Option {
 // IpfsDHT internal constructions, modulo additional options used by the Dual DHT to enforce
 // the LAN-vs-WAN distinction.
 // Note: query or routing table functional options provided as arguments to this function
-// will be overriden by this constructor.
+// will be overridden by this constructor.
 func New(ctx context.Context, h host.Host, options ...Option) (*DHT, error) {
 	var cfg config
 	err := cfg.apply(
@@ -318,7 +318,7 @@ func combineErrors(erra, errb error) error {
 	} else if errb == kb.ErrLookupFailure {
 		return erra
 	}
-	return multierror.Append(erra, errb).ErrorOrNil()
+	return multierr.Append(erra, errb)
 }
 
 // Bootstrap allows callers to hint to the routing system to get into a

@@ -9,12 +9,12 @@ var ErrImplemented = errors.New("there is implemenation already injected")
 
 var ctorImpl InternalNew = nil
 
-// name is dot spearated path
-// must be uniqe, use system naming, and unit postfix, examples:
-//   ipfs.blockstore.bloomcache.bloom.miss.total
-//   ipfs.routing.dht.notresuingstream.total
+// New returns a Creator. Name is a dot separated path which must be unique.
+// Examples:
+// ipfs.blockstore.bloomcache.bloom.miss.total
+// ipfs.routing.dht.notresuingstream.total
 //
-// both arguemnts are obligatory
+// Both arguemnts are mandatory.
 func New(name, helptext string) Creator {
 	if ctorImpl == nil {
 		return &noop{}
@@ -23,6 +23,8 @@ func New(name, helptext string) Creator {
 	}
 }
 
+// NewCtx is like New but obtains the metric scope from the given
+// context.
 func NewCtx(ctx context.Context, name, helptext string) Creator {
 	return New(CtxGetScope(ctx)+"."+name, helptext)
 }

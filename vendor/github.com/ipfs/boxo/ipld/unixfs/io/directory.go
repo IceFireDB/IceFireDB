@@ -5,12 +5,11 @@ import (
 	"errors"
 	"os"
 
-	"github.com/ipfs/boxo/ipld/unixfs/hamt"
-	"github.com/ipfs/boxo/ipld/unixfs/private/linksize"
-
 	"github.com/alecthomas/units"
 	mdag "github.com/ipfs/boxo/ipld/merkledag"
 	format "github.com/ipfs/boxo/ipld/unixfs"
+	"github.com/ipfs/boxo/ipld/unixfs/hamt"
+	"github.com/ipfs/boxo/ipld/unixfs/private/linksize"
 	"github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
@@ -48,7 +47,7 @@ type Directory interface {
 	ForEachLink(context.Context, func(*ipld.Link) error) error
 
 	// EnumLinksAsync returns a channel which will receive Links in the directory
-	// as they are enumerated, where order is not gauranteed
+	// as they are enumerated, where order is not guaranteed
 	EnumLinksAsync(context.Context) <-chan format.LinkResult
 
 	// Links returns the all the links in the directory node.
@@ -242,7 +241,7 @@ func (d *BasicDirectory) addLinkChild(ctx context.Context, name string, link *ip
 }
 
 // EnumLinksAsync returns a channel which will receive Links in the directory
-// as they are enumerated, where order is not gauranteed
+// as they are enumerated, where order is not guaranteed
 func (d *BasicDirectory) EnumLinksAsync(ctx context.Context) <-chan format.LinkResult {
 	linkResults := make(chan format.LinkResult)
 	go func() {
@@ -368,7 +367,7 @@ func (d *HAMTDirectory) ForEachLink(ctx context.Context, f func(*ipld.Link) erro
 }
 
 // EnumLinksAsync returns a channel which will receive Links in the directory
-// as they are enumerated, where order is not gauranteed
+// as they are enumerated, where order is not guaranteed
 func (d *HAMTDirectory) EnumLinksAsync(ctx context.Context) <-chan format.LinkResult {
 	return d.shard.EnumLinksAsync(ctx)
 }
@@ -489,7 +488,7 @@ func (d *HAMTDirectory) needsToSwitchToBasicDir(ctx context.Context, name string
 // until we either reach a value above the threshold (in that case no need
 // to keep counting) or an error occurs (like the context being canceled
 // if we take too much time fetching the necessary shards).
-func (d *HAMTDirectory) sizeBelowThreshold(ctx context.Context, sizeChange int) (below bool, err error) {
+func (d *HAMTDirectory) sizeBelowThreshold(ctx context.Context, sizeChange int) (bool, error) {
 	if HAMTShardingSize == 0 {
 		panic("asked to compute HAMT size with HAMTShardingSize option off (0)")
 	}
@@ -497,25 +496,38 @@ func (d *HAMTDirectory) sizeBelowThreshold(ctx context.Context, sizeChange int) 
 	// We don't necessarily compute the full size of *all* shards as we might
 	// end early if we already know we're above the threshold or run out of time.
 	partialSize := 0
+	var err error
+	below := true
 
 	// We stop the enumeration once we have enough information and exit this function.
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	linkResults := d.EnumLinksAsync(ctx)
 
-	for linkResult := range d.EnumLinksAsync(ctx) {
+	for linkResult := range linkResults {
 		if linkResult.Err != nil {
-			return false, linkResult.Err
+			below = false
+			err = linkResult.Err
+			break
 		}
 
 		partialSize += linksize.LinkSizeFunction(linkResult.Link.Name, linkResult.Link.Cid)
 		if partialSize+sizeChange >= HAMTShardingSize {
-			// We have already fetched enough shards to assert we are
-			//  above the threshold, so no need to keep fetching.
-			return false, nil
+			// We have already fetched enough shards to assert we are above the
+			// threshold, so no need to keep fetching.
+			below = false
+			break
 		}
 	}
+	cancel()
 
-	// We enumerated *all* links in all shards and didn't reach the threshold.
+	if !below {
+		// Wait for channel to close so links are not being read after return.
+		for range linkResults {
+		}
+		return false, err
+	}
+
+	// Enumerated all links in all shards before threshold reached.
 	return true, nil
 }
 
