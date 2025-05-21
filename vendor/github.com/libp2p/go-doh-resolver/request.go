@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 
@@ -42,14 +42,14 @@ func doRequest(ctx context.Context, url string, m *dns.Msg) (*dns.Msg, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP error: %q [%d]", resp.Status, resp.StatusCode)
+		return nil, fmt.Errorf("HTTP error: %q [%d] from %q", resp.Status, resp.StatusCode, url)
 	}
 
 	if ct := resp.Header.Get("Content-Type"); ct != dohMimeType {
 		return nil, fmt.Errorf("unexpected Content-Type %q", ct)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

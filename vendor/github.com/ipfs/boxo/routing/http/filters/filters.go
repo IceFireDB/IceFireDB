@@ -49,7 +49,7 @@ func AddFiltersToURL(baseURL string, protocolFilter, addrFilter []string) string
 	return parsedURL.String()
 }
 
-// applyFiltersToIter applies the filters to the given iterator and returns a new iterator.
+// ApplyFiltersToIter applies the filters to the given iterator and returns a new iterator.
 //
 // The function iterates over the input iterator, applying the specified filters to each record.
 // It supports both positive and negative filters for both addresses and protocols.
@@ -79,6 +79,7 @@ func ApplyFiltersToIter(recordsIter iter.ResultIter[types.Record], filterAddrs, 
 			}
 			v.Val = record
 
+		//nolint:staticcheck
 		//lint:ignore SA1019 // ignore staticcheck
 		case types.SchemaBitswap:
 			//lint:ignore SA1019 // ignore staticcheck
@@ -244,7 +245,6 @@ func protocolsAllowed(peerProtocols []string, filterProtocols []string) bool {
 			if strings.EqualFold(peerProtocol, filterProtocol) {
 				return true
 			}
-
 		}
 	}
 	return false
