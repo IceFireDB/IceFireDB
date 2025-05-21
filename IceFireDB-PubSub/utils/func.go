@@ -23,6 +23,7 @@ import (
 	"log"
 	"os"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"time"
 )
@@ -63,12 +64,7 @@ func GetInterfaceString(param interface{}) string {
 }
 
 func InArray(in string, array []string) bool {
-	for k := range array {
-		if in == array[k] {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(array, in)
 }
 
 var _hostname string

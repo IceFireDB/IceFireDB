@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"github.com/pingcap/check"
+	"slices"
 )
 
 type mariaDBTestSuite struct{}
@@ -128,11 +129,8 @@ func (t *mariaDBTestSuite) TestParseMariaDBGTIDSet(c *check.C) {
 			// check String() function
 			inExpectedResult := false
 			actualStr := mariadbGTIDSet.String()
-			for _, str := range cs.expectedStr {
-				if str == actualStr {
-					inExpectedResult = true
-					break
-				}
+			if slices.Contains(cs.expectedStr, actualStr) {
+				inExpectedResult = true
 			}
 			c.Assert(inExpectedResult, check.IsTrue)
 		}
