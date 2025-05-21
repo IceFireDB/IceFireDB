@@ -21,10 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	dag "github.com/ipfs/boxo/ipld/merkledag"
 	ft "github.com/ipfs/boxo/ipld/unixfs"
 	h "github.com/ipfs/boxo/ipld/unixfs/importer/helpers"
-
-	dag "github.com/ipfs/boxo/ipld/merkledag"
 	cid "github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
 )

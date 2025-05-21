@@ -19,6 +19,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/record"
 	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
+	useragent "github.com/libp2p/go-libp2p/p2p/protocol/identify/internal/user-agent"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify/pb"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -53,8 +54,6 @@ const (
 	recentlyConnectedPeerMaxAddrs = 20
 	connectedPeerMaxAddrs         = 500
 )
-
-var defaultUserAgent = "github.com/libp2p/go-libp2p"
 
 type identifySnapshot struct {
 	seq       uint64
@@ -188,7 +187,7 @@ func NewIDService(h host.Host, opts ...Option) (*idService, error) {
 		opt(&cfg)
 	}
 
-	userAgent := defaultUserAgent
+	userAgent := useragent.DefaultUserAgent()
 	if cfg.userAgent != "" {
 		userAgent = cfg.userAgent
 	}
@@ -798,7 +797,7 @@ func (ids *idService) consumeMessage(mes *pb.Identify, c network.Conn, isPush bo
 	// otherwise use the unsigned addresses.
 	signedPeerRecord, err := signedPeerRecordFromMessage(mes)
 	if err != nil {
-		log.Errorf("error getting peer record from Identify message: %v", err)
+		log.Debugf("error getting peer record from Identify message: %v", err)
 	}
 
 	// Extend the TTLs on the known (probably) good addresses.
