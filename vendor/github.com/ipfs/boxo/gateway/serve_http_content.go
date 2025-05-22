@@ -114,7 +114,7 @@ func httpServeContent(w http.ResponseWriter, r *http.Request, modtime time.Time,
 
 	w.WriteHeader(code)
 
-	if r.Method != "HEAD" {
+	if r.Method != http.MethodHead {
 		io.CopyN(w, content, sendSize)
 	}
 }
@@ -249,7 +249,7 @@ func checkIfNoneMatch(w http.ResponseWriter, r *http.Request) condResult {
 }
 
 func checkIfModifiedSince(r *http.Request, modtime time.Time) condResult {
-	if r.Method != "GET" && r.Method != "HEAD" {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		return condNone
 	}
 	ims := r.Header.Get("If-Modified-Since")
@@ -270,7 +270,7 @@ func checkIfModifiedSince(r *http.Request, modtime time.Time) condResult {
 }
 
 func checkIfRange(w http.ResponseWriter, r *http.Request, modtime time.Time) condResult {
-	if r.Method != "GET" && r.Method != "HEAD" {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		return condNone
 	}
 	ir := headerGetExact(r.Header, "If-Range")
@@ -341,7 +341,7 @@ func checkPreconditions(w http.ResponseWriter, r *http.Request, modtime time.Tim
 	}
 	switch checkIfNoneMatch(w, r) {
 	case condFalse:
-		if r.Method == "GET" || r.Method == "HEAD" {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead {
 			writeNotModified(w)
 			return true, ""
 		} else {

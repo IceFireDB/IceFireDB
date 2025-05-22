@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sort"
+	"slices"
+	"strings"
 
 	blocks "github.com/ipfs/go-block-format"
 	cid "github.com/ipfs/go-cid"
@@ -147,13 +148,6 @@ func checkHasher(indicator uint64, sizeHint int) error {
 	return err
 }
 
-// LinkSlice is a slice of format.Links
-type LinkSlice []*format.Link
-
-func (ls LinkSlice) Len() int           { return len(ls) }
-func (ls LinkSlice) Swap(a, b int)      { ls[a], ls[b] = ls[b], ls[a] }
-func (ls LinkSlice) Less(a, b int) bool { return ls[a].Name < ls[b].Name }
-
 // NodeWithData builds a new Protonode with the given data.
 func NodeWithData(d []byte) *ProtoNode {
 	return &ProtoNode{data: d}
@@ -289,7 +283,7 @@ func (n *ProtoNode) Copy() format.Node {
 		// Sort links regardless of linksDirty state, this may have come from a
 		// serialized form that had badly sorted links, in which case linksDirty
 		// will not be true.
-		sort.Stable(LinkSlice(nnode.links))
+		nnode.sortLinks()
 	}
 
 	nnode.builder = n.builder
@@ -424,7 +418,7 @@ func checkLink(lnk *format.Link) error {
 func (n *ProtoNode) MarshalJSON() ([]byte, error) {
 	if n.linksDirty {
 		// there was a mutation involving links, make sure we sort
-		sort.Stable(LinkSlice(n.links))
+		n.sortLinks()
 		n.linksDirty = false
 		n.encoded = nil
 	}
@@ -489,7 +483,7 @@ func (n *ProtoNode) Multihash() mh.Multihash {
 func (n *ProtoNode) Links() []*format.Link {
 	if n.linksDirty {
 		// there was a mutation involving links, make sure we sort
-		sort.Stable(LinkSlice(n.links))
+		n.sortLinks()
 		n.linksDirty = false
 		n.encoded = nil
 	}
@@ -541,7 +535,7 @@ func (n *ProtoNode) Tree(p string, depth int) []string {
 
 	if n.linksDirty {
 		// there was a mutation involving links, make sure we sort
-		sort.Stable(LinkSlice(n.links))
+		n.sortLinks()
 		n.linksDirty = false
 		n.encoded = nil
 	}
@@ -551,6 +545,12 @@ func (n *ProtoNode) Tree(p string, depth int) []string {
 		out = append(out, lnk.Name)
 	}
 	return out
+}
+
+func (n *ProtoNode) sortLinks() {
+	slices.SortStableFunc(n.links, func(a, b *format.Link) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 }
 
 func ProtoNodeConverter(b blocks.Block, nd ipld.Node) (legacy.UniversalNode, error) {

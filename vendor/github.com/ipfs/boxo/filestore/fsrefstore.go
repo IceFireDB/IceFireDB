@@ -8,10 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	pb "github.com/ipfs/boxo/filestore/pb"
-
-	proto "github.com/gogo/protobuf/proto"
 	dshelp "github.com/ipfs/boxo/datastore/dshelp"
+	pb "github.com/ipfs/boxo/filestore/pb"
 	posinfo "github.com/ipfs/boxo/filestore/posinfo"
 	blocks "github.com/ipfs/go-block-format"
 	cid "github.com/ipfs/go-cid"
@@ -20,10 +18,13 @@ import (
 	dsq "github.com/ipfs/go-datastore/query"
 	ipld "github.com/ipfs/go-ipld-format"
 	mh "github.com/multiformats/go-multihash"
+	proto "google.golang.org/protobuf/proto"
 )
 
 // FilestorePrefix identifies the key prefix for FileManager blocks.
 var FilestorePrefix = ds.NewKey("filestore")
+
+type Option func(*FileManager)
 
 // FileManager is a blockstore implementation which stores special
 // blocks FilestoreNode type. These nodes only contain a reference
@@ -34,6 +35,7 @@ type FileManager struct {
 	AllowUrls  bool
 	ds         ds.Batching
 	root       string
+	makeReader func(path string) (FileReader, error)
 }
 
 // CorruptReferenceError implements the error interface.
@@ -51,11 +53,32 @@ func (c CorruptReferenceError) Error() string {
 	return c.Err.Error()
 }
 
+// WithMMapReader sets the FileManager's reader factory to use memory-mapped file I/O.
+// On Windows, when reading and writing to a file simultaneously, the system would consume
+// a significant amount of memory due to caching. This memory usage is not reflected in
+// the application but in the system. Using memory-mapped files (implemented with
+// CreateFileMapping on Windows) avoids this issue.
+func WithMMapReader() Option {
+	return func(f *FileManager) {
+		f.makeReader = newMmapReader
+	}
+}
+
 // NewFileManager initializes a new file manager with the given
 // datastore and root. All FilestoreNodes paths are relative to the
 // root path given here, which is prepended for any operations.
-func NewFileManager(ds ds.Batching, root string) *FileManager {
-	return &FileManager{ds: dsns.Wrap(ds, FilestorePrefix), root: root}
+func NewFileManager(ds ds.Batching, root string, options ...Option) *FileManager {
+	f := &FileManager{
+		ds:         dsns.Wrap(ds, FilestorePrefix),
+		root:       root,
+		makeReader: newStdReader,
+	}
+
+	for _, option := range options {
+		option(f)
+	}
+
+	return f
 }
 
 // AllKeysChan returns a channel from which to read the keys stored in
@@ -134,7 +157,7 @@ func (f *FileManager) GetSize(ctx context.Context, c cid.Cid) (int, error) {
 	if err != nil {
 		return -1, err
 	}
-	return int(dobj.GetSize_()), nil
+	return int(dobj.GetSize()), nil
 }
 
 func (f *FileManager) readDataObj(ctx context.Context, m mh.Multihash, d *pb.DataObj) ([]byte, error) {
@@ -175,7 +198,7 @@ func (f *FileManager) readFileDataObj(m mh.Multihash, d *pb.DataObj) ([]byte, er
 	p := filepath.FromSlash(d.GetFilePath())
 	abspath := filepath.Join(f.root, p)
 
-	fi, err := os.Open(abspath)
+	fi, err := f.makeReader(abspath)
 	if os.IsNotExist(err) {
 		return nil, &CorruptReferenceError{StatusFileNotFound, err}
 	} else if err != nil {
@@ -183,13 +206,8 @@ func (f *FileManager) readFileDataObj(m mh.Multihash, d *pb.DataObj) ([]byte, er
 	}
 	defer fi.Close()
 
-	_, err = fi.Seek(int64(d.GetOffset()), io.SeekStart)
-	if err != nil {
-		return nil, &CorruptReferenceError{StatusFileError, err}
-	}
-
-	outbuf := make([]byte, d.GetSize_())
-	_, err = io.ReadFull(fi, outbuf)
+	outbuf := make([]byte, d.GetSize())
+	_, err = fi.ReadAt(outbuf, int64(d.GetOffset()))
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		return nil, &CorruptReferenceError{StatusFileChanged, err}
 	} else if err != nil {
@@ -220,12 +238,12 @@ func (f *FileManager) readURLDataObj(ctx context.Context, m mh.Multihash, d *pb.
 		return nil, ErrUrlstoreNotEnabled
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", d.GetFilePath(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, d.GetFilePath(), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", d.GetOffset(), d.GetOffset()+d.GetSize_()-1))
+	req.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", d.GetOffset(), d.GetOffset()+d.GetSize()-1))
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -238,7 +256,7 @@ func (f *FileManager) readURLDataObj(ctx context.Context, m mh.Multihash, d *pb.
 		}
 	}
 
-	outbuf := make([]byte, d.GetSize_())
+	outbuf := make([]byte, d.GetSize())
 	_, err = io.ReadFull(res.Body, outbuf)
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		return nil, &CorruptReferenceError{StatusFileChanged, err}
@@ -291,11 +309,13 @@ func (f *FileManager) putTo(ctx context.Context, b *posinfo.FilestoreNode, to pu
 		if !f.AllowUrls {
 			return ErrUrlstoreNotEnabled
 		}
-		dobj.FilePath = b.PosInfo.FullPath
+		dobj.FilePath = &b.PosInfo.FullPath
 	} else {
 		if !f.AllowFiles {
 			return ErrFilestoreNotEnabled
 		}
+
+		//nolint:staticcheck
 		//lint:ignore SA1019 // ignore staticcheck
 		if !filepath.HasPrefix(b.PosInfo.FullPath, f.root) {
 			return fmt.Errorf("cannot add filestore references outside ipfs root (%s)", f.root)
@@ -306,10 +326,12 @@ func (f *FileManager) putTo(ctx context.Context, b *posinfo.FilestoreNode, to pu
 			return err
 		}
 
-		dobj.FilePath = filepath.ToSlash(p)
+		ps := filepath.ToSlash(p)
+		dobj.FilePath = &ps
 	}
-	dobj.Offset = b.PosInfo.Offset
-	dobj.Size_ = uint64(len(b.RawData()))
+	dobj.Offset = &b.PosInfo.Offset
+	size := uint64(len(b.RawData()))
+	dobj.Size = &size
 
 	data, err := proto.Marshal(&dobj)
 	if err != nil {

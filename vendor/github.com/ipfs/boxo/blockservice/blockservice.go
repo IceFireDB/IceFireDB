@@ -8,9 +8,7 @@ import (
 	"io"
 	"sync"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
+	"github.com/ipfs/boxo/blockservice/internal"
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/boxo/exchange"
 	"github.com/ipfs/boxo/verifcid"
@@ -18,8 +16,8 @@ import (
 	"github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
-
-	"github.com/ipfs/boxo/blockservice/internal"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var logger = logging.Logger("blockservice")
@@ -85,10 +83,10 @@ type blockService struct {
 type Option func(*blockService)
 
 // WriteThrough disable cache checks for writes and make them go straight to
-// the blockstore.
-func WriteThrough() Option {
+// the blockstore, when enabled.
+func WriteThrough(enabled bool) Option {
 	return func(bs *blockService) {
-		bs.checkFirst = false
+		bs.checkFirst = !enabled
 	}
 }
 
@@ -488,7 +486,7 @@ func ContextWithSession(ctx context.Context, bs BlockService) context.Context {
 
 // EmbedSessionInContext is like [ContextWithSession] but it allows to embed an existing session.
 func EmbedSessionInContext(ctx context.Context, ses *Session) context.Context {
-	// use ses.bs as a key, so if multiple blockservices use embeded sessions it gets dispatched to the matching blockservice.
+	// use ses.bs as a key, so if multiple blockservices use embedded sessions it gets dispatched to the matching blockservice.
 	return context.WithValue(ctx, ses.bs, ses)
 }
 

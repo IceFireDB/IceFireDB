@@ -13,5 +13,5 @@ const (
 	// cache before checking for update again. The function of this TTL is
 	// similar to TTL of DNS record, and the default here is a trade-off
 	// between faster updates and benefiting from various types of caching.
-	DefaultRecordTTL = 1 * time.Hour
+	DefaultRecordTTL = 5 * time.Minute
 )
