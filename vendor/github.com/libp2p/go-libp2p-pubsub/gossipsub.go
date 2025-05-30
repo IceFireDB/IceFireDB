@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"iter"
 	"math/rand"
 	"sort"
 	"time"
@@ -522,6 +523,8 @@ type GossipSubRouter struct {
 	heartbeatTicks uint64
 }
 
+var _ BatchPublisher = &GossipSubRouter{}
+
 type connectInfo struct {
 	p   peer.ID
 	spr *record.Envelope
@@ -704,10 +707,10 @@ func (gs *GossipSubRouter) AcceptFrom(p peer.ID) AcceptStatus {
 	return gs.gate.AcceptFrom(p)
 }
 
-// PreValidation sends the IDONTWANT control messages to all the mesh
+// Preprocess sends the IDONTWANT control messages to all the mesh
 // peers. They need to be sent right before the validation because they
 // should be seen by the peers as soon as possible.
-func (gs *GossipSubRouter) PreValidation(msgs []*Message) {
+func (gs *GossipSubRouter) Preprocess(from peer.ID, msgs []*Message) {
 	tmids := make(map[string][]string)
 	for _, msg := range msgs {
 		if len(msg.GetData()) < gs.params.IDontWantMessageThreshold {
@@ -724,6 +727,10 @@ func (gs *GossipSubRouter) PreValidation(msgs []*Message) {
 		shuffleStrings(mids)
 		// send IDONTWANT to all the mesh peers
 		for p := range gs.mesh[topic] {
+			if p == from {
+				// We don't send IDONTWANT to the peer that sent us the messages
+				continue
+			}
 			// send to only peers that support IDONTWANT
 			if gs.feature(GossipSubFeatureIdontwant, gs.peers[p]) {
 				idontwant := []*pb.ControlIDontWant{{MessageIDs: mids}}
@@ -1139,81 +1146,105 @@ func (gs *GossipSubRouter) connector() {
 	}
 }
 
-func (gs *GossipSubRouter) Publish(msg *Message) {
-	gs.mcache.Put(msg)
-
-	from := msg.ReceivedFrom
-	topic := msg.GetTopic()
-
-	tosend := make(map[peer.ID]struct{})
-
-	// any peers in the topic?
-	tmap, ok := gs.p.topics[topic]
-	if !ok {
-		return
+func (gs *GossipSubRouter) PublishBatch(messages []*Message, opts *BatchPublishOptions) {
+	strategy := opts.Strategy
+	for _, msg := range messages {
+		msgID := gs.p.idGen.ID(msg)
+		for p, rpc := range gs.rpcs(msg) {
+			strategy.AddRPC(p, msgID, rpc)
+		}
 	}
 
-	if gs.floodPublish && from == gs.p.host.ID() {
-		for p := range tmap {
-			_, direct := gs.direct[p]
-			if direct || gs.score.Score(p) >= gs.publishThreshold {
-				tosend[p] = struct{}{}
-			}
-		}
-	} else {
-		// direct peers
-		for p := range gs.direct {
-			_, inTopic := tmap[p]
-			if inTopic {
-				tosend[p] = struct{}{}
-			}
-		}
+	for p, rpc := range strategy.All() {
+		gs.sendRPC(p, rpc, false)
+	}
+}
 
-		// floodsub peers
-		for p := range tmap {
-			if !gs.feature(GossipSubFeatureMesh, gs.peers[p]) && gs.score.Score(p) >= gs.publishThreshold {
-				tosend[p] = struct{}{}
-			}
-		}
+func (gs *GossipSubRouter) Publish(msg *Message) {
+	for p, rpc := range gs.rpcs(msg) {
+		gs.sendRPC(p, rpc, false)
+	}
+}
 
-		// gossipsub peers
-		gmap, ok := gs.mesh[topic]
+func (gs *GossipSubRouter) rpcs(msg *Message) iter.Seq2[peer.ID, *RPC] {
+	return func(yield func(peer.ID, *RPC) bool) {
+		gs.mcache.Put(msg)
+
+		from := msg.ReceivedFrom
+		topic := msg.GetTopic()
+
+		tosend := make(map[peer.ID]struct{})
+
+		// any peers in the topic?
+		tmap, ok := gs.p.topics[topic]
 		if !ok {
-			// we are not in the mesh for topic, use fanout peers
-			gmap, ok = gs.fanout[topic]
-			if !ok || len(gmap) == 0 {
-				// we don't have any, pick some with score above the publish threshold
-				peers := gs.getPeers(topic, gs.params.D, func(p peer.ID) bool {
-					_, direct := gs.direct[p]
-					return !direct && gs.score.Score(p) >= gs.publishThreshold
-				})
+			return
+		}
 
-				if len(peers) > 0 {
-					gmap = peerListToMap(peers)
-					gs.fanout[topic] = gmap
+		if gs.floodPublish && from == gs.p.host.ID() {
+			for p := range tmap {
+				_, direct := gs.direct[p]
+				if direct || gs.score.Score(p) >= gs.publishThreshold {
+					tosend[p] = struct{}{}
 				}
 			}
-			gs.lastpub[topic] = time.Now().UnixNano()
+		} else {
+			// direct peers
+			for p := range gs.direct {
+				_, inTopic := tmap[p]
+				if inTopic {
+					tosend[p] = struct{}{}
+				}
+			}
+
+			// floodsub peers
+			for p := range tmap {
+				if !gs.feature(GossipSubFeatureMesh, gs.peers[p]) && gs.score.Score(p) >= gs.publishThreshold {
+					tosend[p] = struct{}{}
+				}
+			}
+
+			// gossipsub peers
+			gmap, ok := gs.mesh[topic]
+			if !ok {
+				// we are not in the mesh for topic, use fanout peers
+				gmap, ok = gs.fanout[topic]
+				if !ok || len(gmap) == 0 {
+					// we don't have any, pick some with score above the publish threshold
+					peers := gs.getPeers(topic, gs.params.D, func(p peer.ID) bool {
+						_, direct := gs.direct[p]
+						return !direct && gs.score.Score(p) >= gs.publishThreshold
+					})
+
+					if len(peers) > 0 {
+						gmap = peerListToMap(peers)
+						gs.fanout[topic] = gmap
+					}
+				}
+				gs.lastpub[topic] = time.Now().UnixNano()
+			}
+
+			csum := computeChecksum(gs.p.idGen.ID(msg))
+			for p := range gmap {
+				// Check if it has already received an IDONTWANT for the message.
+				// If so, don't send it to the peer
+				if _, ok := gs.unwanted[p][csum]; ok {
+					continue
+				}
+				tosend[p] = struct{}{}
+			}
 		}
 
-		csum := computeChecksum(gs.p.idGen.ID(msg))
-		for p := range gmap {
-			// Check if it has already received an IDONTWANT for the message.
-			// If so, don't send it to the peer
-			if _, ok := gs.unwanted[p][csum]; ok {
+		out := rpcWithMessages(msg.Message)
+		for pid := range tosend {
+			if pid == from || pid == peer.ID(msg.GetFrom()) {
 				continue
 			}
-			tosend[p] = struct{}{}
-		}
-	}
 
-	out := rpcWithMessages(msg.Message)
-	for pid := range tosend {
-		if pid == from || pid == peer.ID(msg.GetFrom()) {
-			continue
+			if !yield(pid, out) {
+				return
+			}
 		}
-
-		gs.sendRPC(pid, out, false)
 	}
 }
 
@@ -1344,14 +1375,13 @@ func (gs *GossipSubRouter) sendRPC(p peer.ID, out *RPC, urgent bool) {
 	}
 
 	// Potentially split the RPC into multiple RPCs that are below the max message size
-	outRPCs := appendOrMergeRPC(nil, gs.p.maxMessageSize, *out)
-	for _, rpc := range outRPCs {
+	for rpc := range out.split(gs.p.maxMessageSize) {
 		if rpc.Size() > gs.p.maxMessageSize {
 			// This should only happen if a single message/control is above the maxMessageSize.
 			gs.doDropRPC(out, p, fmt.Sprintf("Dropping oversized RPC. Size: %d, limit: %d. (Over by %d bytes)", rpc.Size(), gs.p.maxMessageSize, rpc.Size()-gs.p.maxMessageSize))
 			continue
 		}
-		gs.doSendRPC(rpc, p, q, urgent)
+		gs.doSendRPC(&rpc, p, q, urgent)
 	}
 }
 
@@ -1379,137 +1409,6 @@ func (gs *GossipSubRouter) doSendRPC(rpc *RPC, p peer.ID, q *rpcQueue, urgent bo
 		return
 	}
 	gs.tracer.SendRPC(rpc, p)
-}
-
-// appendOrMergeRPC appends the given RPCs to the slice, merging them if possible.
-// If any elem is too large to fit in a single RPC, it will be split into multiple RPCs.
-// If an RPC is too large and can't be split further (e.g. Message data is
-// bigger than the RPC limit), then it will be returned as an oversized RPC.
-// The caller should filter out oversized RPCs.
-func appendOrMergeRPC(slice []*RPC, limit int, elems ...RPC) []*RPC {
-	if len(elems) == 0 {
-		return slice
-	}
-
-	if len(slice) == 0 && len(elems) == 1 && elems[0].Size() < limit {
-		// Fast path: no merging needed and only one element
-		return append(slice, &elems[0])
-	}
-
-	out := slice
-	if len(out) == 0 {
-		out = append(out, &RPC{RPC: pb.RPC{}})
-		out[0].from = elems[0].from
-	}
-
-	for _, elem := range elems {
-		lastRPC := out[len(out)-1]
-
-		// Merge/Append publish messages
-		// TODO: Never merge messages. The current behavior is the same as the
-		// old behavior. In the future let's not merge messages. Since,
-		// it may increase message latency.
-		for _, msg := range elem.GetPublish() {
-			if lastRPC.Publish = append(lastRPC.Publish, msg); lastRPC.Size() > limit {
-				lastRPC.Publish = lastRPC.Publish[:len(lastRPC.Publish)-1]
-				lastRPC = &RPC{RPC: pb.RPC{}, from: elem.from}
-				lastRPC.Publish = append(lastRPC.Publish, msg)
-				out = append(out, lastRPC)
-			}
-		}
-
-		// Merge/Append Subscriptions
-		for _, sub := range elem.GetSubscriptions() {
-			if lastRPC.Subscriptions = append(lastRPC.Subscriptions, sub); lastRPC.Size() > limit {
-				lastRPC.Subscriptions = lastRPC.Subscriptions[:len(lastRPC.Subscriptions)-1]
-				lastRPC = &RPC{RPC: pb.RPC{}, from: elem.from}
-				lastRPC.Subscriptions = append(lastRPC.Subscriptions, sub)
-				out = append(out, lastRPC)
-			}
-		}
-
-		// Merge/Append Control messages
-		if ctl := elem.GetControl(); ctl != nil {
-			if lastRPC.Control == nil {
-				lastRPC.Control = &pb.ControlMessage{}
-				if lastRPC.Size() > limit {
-					lastRPC.Control = nil
-					lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{}}, from: elem.from}
-					out = append(out, lastRPC)
-				}
-			}
-
-			for _, graft := range ctl.GetGraft() {
-				if lastRPC.Control.Graft = append(lastRPC.Control.Graft, graft); lastRPC.Size() > limit {
-					lastRPC.Control.Graft = lastRPC.Control.Graft[:len(lastRPC.Control.Graft)-1]
-					lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{}}, from: elem.from}
-					lastRPC.Control.Graft = append(lastRPC.Control.Graft, graft)
-					out = append(out, lastRPC)
-				}
-			}
-
-			for _, prune := range ctl.GetPrune() {
-				if lastRPC.Control.Prune = append(lastRPC.Control.Prune, prune); lastRPC.Size() > limit {
-					lastRPC.Control.Prune = lastRPC.Control.Prune[:len(lastRPC.Control.Prune)-1]
-					lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{}}, from: elem.from}
-					lastRPC.Control.Prune = append(lastRPC.Control.Prune, prune)
-					out = append(out, lastRPC)
-				}
-			}
-
-			for _, iwant := range ctl.GetIwant() {
-				if len(lastRPC.Control.Iwant) == 0 {
-					// Initialize with a single IWANT.
-					// For IWANTs we don't need more than a single one,
-					// since there are no topic IDs here.
-					newIWant := &pb.ControlIWant{}
-					if lastRPC.Control.Iwant = append(lastRPC.Control.Iwant, newIWant); lastRPC.Size() > limit {
-						lastRPC.Control.Iwant = lastRPC.Control.Iwant[:len(lastRPC.Control.Iwant)-1]
-						lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{
-							Iwant: []*pb.ControlIWant{newIWant},
-						}}, from: elem.from}
-						out = append(out, lastRPC)
-					}
-				}
-				for _, msgID := range iwant.GetMessageIDs() {
-					if lastRPC.Control.Iwant[0].MessageIDs = append(lastRPC.Control.Iwant[0].MessageIDs, msgID); lastRPC.Size() > limit {
-						lastRPC.Control.Iwant[0].MessageIDs = lastRPC.Control.Iwant[0].MessageIDs[:len(lastRPC.Control.Iwant[0].MessageIDs)-1]
-						lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{
-							Iwant: []*pb.ControlIWant{{MessageIDs: []string{msgID}}},
-						}}, from: elem.from}
-						out = append(out, lastRPC)
-					}
-				}
-			}
-
-			for _, ihave := range ctl.GetIhave() {
-				if len(lastRPC.Control.Ihave) == 0 ||
-					lastRPC.Control.Ihave[len(lastRPC.Control.Ihave)-1].TopicID != ihave.TopicID {
-					// Start a new IHAVE if we are referencing a new topic ID
-					newIhave := &pb.ControlIHave{TopicID: ihave.TopicID}
-					if lastRPC.Control.Ihave = append(lastRPC.Control.Ihave, newIhave); lastRPC.Size() > limit {
-						lastRPC.Control.Ihave = lastRPC.Control.Ihave[:len(lastRPC.Control.Ihave)-1]
-						lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{
-							Ihave: []*pb.ControlIHave{newIhave},
-						}}, from: elem.from}
-						out = append(out, lastRPC)
-					}
-				}
-				for _, msgID := range ihave.GetMessageIDs() {
-					lastIHave := lastRPC.Control.Ihave[len(lastRPC.Control.Ihave)-1]
-					if lastIHave.MessageIDs = append(lastIHave.MessageIDs, msgID); lastRPC.Size() > limit {
-						lastIHave.MessageIDs = lastIHave.MessageIDs[:len(lastIHave.MessageIDs)-1]
-						lastRPC = &RPC{RPC: pb.RPC{Control: &pb.ControlMessage{
-							Ihave: []*pb.ControlIHave{{TopicID: ihave.TopicID, MessageIDs: []string{msgID}}},
-						}}, from: elem.from}
-						out = append(out, lastRPC)
-					}
-				}
-			}
-		}
-	}
-
-	return out
 }
 
 func (gs *GossipSubRouter) heartbeatTimer() {

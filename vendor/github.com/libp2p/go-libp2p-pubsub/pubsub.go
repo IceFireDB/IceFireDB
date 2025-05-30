@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"iter"
+	"math/bits"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -134,6 +136,9 @@ type PubSub struct {
 	// sendMsg handles messages that have been validated
 	sendMsg chan *Message
 
+	// sendMessageBatch publishes a batch of messages
+	sendMessageBatch chan messageBatchAndPublishOptions
+
 	// addVal handles validator registration requests
 	addVal chan *addValReq
 
@@ -201,9 +206,9 @@ type PubSubRouter interface {
 	// Allows routers with internal scoring to vet peers before committing any processing resources
 	// to the message and implement an effective graylist and react to validation queue overload.
 	AcceptFrom(peer.ID) AcceptStatus
-	// PreValidation is invoked on messages in the RPC envelope right before pushing it to
+	// Preprocess is invoked on messages in the RPC envelope right before pushing it to
 	// the validation pipeline
-	PreValidation([]*Message)
+	Preprocess(from peer.ID, msgs []*Message)
 	// HandleRPC is invoked to process control messages in the RPC envelope.
 	// It is invoked after subscriptions and payload messages have been processed.
 	HandleRPC(*RPC)
@@ -215,6 +220,10 @@ type PubSubRouter interface {
 	// Leave notifies the router that we are no longer interested in a topic.
 	// It is invoked after the unsubscription announcement.
 	Leave(topic string)
+}
+
+type BatchPublisher interface {
+	PublishBatch(messages []*Message, opts *BatchPublishOptions)
 }
 
 type AcceptStatus int
@@ -246,6 +255,202 @@ type RPC struct {
 
 	// unexported on purpose, not sending this over the wire
 	from peer.ID
+}
+
+// split splits the given RPC If a sub RPC is too large and can't be split
+// further (e.g. Message data is bigger than the RPC limit), then it will be
+// returned as an oversized RPC. The caller should filter out oversized RPCs.
+func (rpc *RPC) split(limit int) iter.Seq[RPC] {
+	return func(yield func(RPC) bool) {
+		nextRPC := RPC{from: rpc.from}
+
+		{
+			nextRPCSize := 0
+
+			messagesInNextRPC := 0
+			messageSlice := rpc.Publish
+
+			// Merge/Append publish messages. This pattern is optimized compared the
+			// the patterns for other fields because this is the common cause for
+			// splitting a message.
+			for _, msg := range rpc.Publish {
+				// We know the message field number is <15 so this is safe.
+				incrementalSize := pbFieldNumberLT15Size + sizeOfEmbeddedMsg(msg.Size())
+				if nextRPCSize+incrementalSize > limit {
+					// The message doesn't fit. Let's set the messages that did fit
+					// into this RPC, yield it, then make a new one
+					nextRPC.Publish = messageSlice[:messagesInNextRPC]
+					messageSlice = messageSlice[messagesInNextRPC:]
+					if !yield(nextRPC) {
+						return
+					}
+
+					nextRPC = RPC{from: rpc.from}
+					nextRPCSize = 0
+					messagesInNextRPC = 0
+				}
+				messagesInNextRPC++
+				nextRPCSize += incrementalSize
+			}
+
+			if nextRPCSize > 0 {
+				// yield the message here for simplicity. We aren't optimally
+				// packing this RPC, but we avoid successively calling .Size()
+				// on the messages for the next parts.
+				nextRPC.Publish = messageSlice[:messagesInNextRPC]
+				if !yield(nextRPC) {
+					return
+				}
+				nextRPC = RPC{from: rpc.from}
+			}
+		}
+
+		// Fast path check. It's possible the original RPC is now small enough
+		// without the messages to publish
+		nextRPC = *rpc
+		nextRPC.Publish = nil
+		if s := nextRPC.Size(); s < limit {
+			if s != 0 {
+				yield(nextRPC)
+			}
+			return
+		}
+		// We have to split the RPC into multiple parts
+		nextRPC = RPC{from: rpc.from}
+
+		// Merge/Append Subscriptions
+		for _, sub := range rpc.Subscriptions {
+			if nextRPC.Subscriptions = append(nextRPC.Subscriptions, sub); nextRPC.Size() > limit {
+				nextRPC.Subscriptions = nextRPC.Subscriptions[:len(nextRPC.Subscriptions)-1]
+				if !yield(nextRPC) {
+					return
+				}
+
+				nextRPC = RPC{from: rpc.from}
+				nextRPC.Subscriptions = append(nextRPC.Subscriptions, sub)
+			}
+		}
+
+		// Merge/Append Control messages
+		if ctl := rpc.Control; ctl != nil {
+			if nextRPC.Control == nil {
+				nextRPC.Control = &pb.ControlMessage{}
+				if nextRPC.Size() > limit {
+					nextRPC.Control = nil
+					if !yield(nextRPC) {
+						return
+					}
+					nextRPC = RPC{RPC: pb.RPC{Control: &pb.ControlMessage{}}, from: rpc.from}
+				}
+			}
+
+			for _, graft := range ctl.GetGraft() {
+				if nextRPC.Control.Graft = append(nextRPC.Control.Graft, graft); nextRPC.Size() > limit {
+					nextRPC.Control.Graft = nextRPC.Control.Graft[:len(nextRPC.Control.Graft)-1]
+					if !yield(nextRPC) {
+						return
+					}
+					nextRPC = RPC{RPC: pb.RPC{Control: &pb.ControlMessage{}}, from: rpc.from}
+					nextRPC.Control.Graft = append(nextRPC.Control.Graft, graft)
+				}
+			}
+
+			for _, prune := range ctl.GetPrune() {
+				if nextRPC.Control.Prune = append(nextRPC.Control.Prune, prune); nextRPC.Size() > limit {
+					nextRPC.Control.Prune = nextRPC.Control.Prune[:len(nextRPC.Control.Prune)-1]
+					if !yield(nextRPC) {
+						return
+					}
+					nextRPC = RPC{RPC: pb.RPC{Control: &pb.ControlMessage{}}, from: rpc.from}
+					nextRPC.Control.Prune = append(nextRPC.Control.Prune, prune)
+				}
+			}
+
+			for _, iwant := range ctl.GetIwant() {
+				if len(nextRPC.Control.Iwant) == 0 {
+					// Initialize with a single IWANT.
+					// For IWANTs we don't need more than a single one,
+					// since there are no topic IDs here.
+					newIWant := &pb.ControlIWant{}
+					if nextRPC.Control.Iwant = append(nextRPC.Control.Iwant, newIWant); nextRPC.Size() > limit {
+						nextRPC.Control.Iwant = nextRPC.Control.Iwant[:len(nextRPC.Control.Iwant)-1]
+						if !yield(nextRPC) {
+							return
+						}
+						nextRPC = RPC{RPC: pb.RPC{Control: &pb.ControlMessage{
+							Iwant: []*pb.ControlIWant{newIWant},
+						}}, from: rpc.from}
+					}
+				}
+				for _, msgID := range iwant.GetMessageIDs() {
+					if nextRPC.Control.Iwant[0].MessageIDs = append(nextRPC.Control.Iwant[0].MessageIDs, msgID); nextRPC.Size() > limit {
+						nextRPC.Control.Iwant[0].MessageIDs = nextRPC.Control.Iwant[0].MessageIDs[:len(nextRPC.Control.Iwant[0].MessageIDs)-1]
+						if !yield(nextRPC) {
+							return
+						}
+						nextRPC = RPC{RPC: pb.RPC{Control: &pb.ControlMessage{
+							Iwant: []*pb.ControlIWant{{MessageIDs: []string{msgID}}},
+						}}, from: rpc.from}
+					}
+				}
+			}
+
+			for _, ihave := range ctl.GetIhave() {
+				if len(nextRPC.Control.Ihave) == 0 ||
+					nextRPC.Control.Ihave[len(nextRPC.Control.Ihave)-1].TopicID != ihave.TopicID {
+					// Start a new IHAVE if we are referencing a new topic ID
+					newIhave := &pb.ControlIHave{TopicID: ihave.TopicID}
+					if nextRPC.Control.Ihave = append(nextRPC.Control.Ihave, newIhave); nextRPC.Size() > limit {
+						nextRPC.Control.Ihave = nextRPC.Control.Ihave[:len(nextRPC.Control.Ihave)-1]
+						if !yield(nextRPC) {
+							return
+						}
+						nextRPC = RPC{RPC: pb.RPC{Control: &pb.ControlMessage{
+							Ihave: []*pb.ControlIHave{newIhave},
+						}}, from: rpc.from}
+					}
+				}
+				for _, msgID := range ihave.GetMessageIDs() {
+					lastIHave := nextRPC.Control.Ihave[len(nextRPC.Control.Ihave)-1]
+					if lastIHave.MessageIDs = append(lastIHave.MessageIDs, msgID); nextRPC.Size() > limit {
+						lastIHave.MessageIDs = lastIHave.MessageIDs[:len(lastIHave.MessageIDs)-1]
+						if !yield(nextRPC) {
+							return
+						}
+						nextRPC = RPC{RPC: pb.RPC{Control: &pb.ControlMessage{
+							Ihave: []*pb.ControlIHave{{TopicID: ihave.TopicID, MessageIDs: []string{msgID}}},
+						}}, from: rpc.from}
+					}
+				}
+			}
+		}
+
+		if nextRPC.Size() > 0 {
+			if !yield(nextRPC) {
+				return
+			}
+		}
+	}
+}
+
+// pbFieldNumberLT15Size is the number of bytes required to encode a protobuf
+// field number less than or equal to 15 along with its wire type. This is 1
+// byte because the protobuf encoding of field numbers is a varint encoding of:
+// fieldNumber << 3 | wireType
+// Refer to https://protobuf.dev/programming-guides/encoding/#structure
+// for more details on the encoding of messages. You may also reference the
+// concrete implementation of pb.RPC.Size()
+const pbFieldNumberLT15Size = 1
+
+func sovRpc(x uint64) (n int) {
+	return (bits.Len64(x) + 6) / 7
+}
+
+func sizeOfEmbeddedMsg(
+	msgSize int,
+) int {
+	prefixSize := sovRpc(uint64(msgSize))
+	return prefixSize + msgSize
 }
 
 type Option func(*PubSub) error
@@ -281,6 +486,7 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 		rmTopic:               make(chan *rmTopicReq),
 		getTopics:             make(chan *topicReq),
 		sendMsg:               make(chan *Message, 32),
+		sendMessageBatch:      make(chan messageBatchAndPublishOptions, 1),
 		addVal:                make(chan *addValReq),
 		rmVal:                 make(chan *rmValReq),
 		eval:                  make(chan func()),
@@ -641,6 +847,9 @@ func (p *PubSub) processLoop(ctx context.Context) {
 
 		case msg := <-p.sendMsg:
 			p.publishMessage(msg)
+
+		case batchAndOpts := <-p.sendMessageBatch:
+			p.publishMessageBatch(batchAndOpts)
 
 		case req := <-p.addVal:
 			p.val.AddValidator(req)
@@ -1106,7 +1315,7 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 				toPush = append(toPush, msg)
 			}
 		}
-		p.rt.PreValidation(toPush)
+		p.rt.Preprocess(rpc.from, toPush)
 		for _, msg := range toPush {
 			p.pushMsg(msg)
 		}
@@ -1219,6 +1428,15 @@ func (p *PubSub) publishMessage(msg *Message) {
 	if !msg.Local {
 		p.rt.Publish(msg)
 	}
+}
+
+func (p *PubSub) publishMessageBatch(batchAndOpts messageBatchAndPublishOptions) {
+	for _, msg := range batchAndOpts.messages {
+		p.tracer.DeliverMessage(msg)
+		p.notifySubs(msg)
+	}
+	// We type checked when pushing the batch to the channel
+	p.rt.(BatchPublisher).PublishBatch(batchAndOpts.messages, batchAndOpts.opts)
 }
 
 type addTopicReq struct {
@@ -1356,6 +1574,39 @@ func (p *PubSub) Publish(topic string, data []byte, opts ...PubOpt) error {
 	}
 
 	return t.Publish(context.TODO(), data, opts...)
+}
+
+// PublishBatch publishes a batch of messages. This only works for routers that
+// implement the BatchPublisher interface.
+//
+// Users should make sure there is enough space in the Peer's outbound queue to
+// ensure messages are not dropped. WithPeerOutboundQueueSize should be set to
+// at least the expected number of batched messages per peer plus some slack to
+// account for gossip messages.
+//
+// The default publish strategy is RoundRobinMessageIDScheduler.
+func (p *PubSub) PublishBatch(batch *MessageBatch, opts ...BatchPubOpt) error {
+	if _, ok := p.rt.(BatchPublisher); !ok {
+		return fmt.Errorf("pubsub router is not a BatchPublisher")
+	}
+
+	publishOptions := &BatchPublishOptions{}
+	for _, o := range opts {
+		err := o(publishOptions)
+		if err != nil {
+			return err
+		}
+	}
+	setDefaultBatchPublishOptions(publishOptions)
+
+	p.sendMessageBatch <- messageBatchAndPublishOptions{
+		messages: batch.messages,
+		opts:     publishOptions,
+	}
+
+	// Clear the batch's messages in case a user reuses the same batch object
+	batch.messages = nil
+	return nil
 }
 
 func (p *PubSub) nextSeqno() []byte {
