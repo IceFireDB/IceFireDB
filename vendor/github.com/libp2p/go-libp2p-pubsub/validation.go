@@ -26,6 +26,12 @@ func (e ValidationError) Error() string {
 	return e.Reason
 }
 
+type dupeErr struct{}
+
+func (dupeErr) Error() string {
+	return "duplicate message"
+}
+
 // Validator is a function that validates a message with a binary decision: accept or reject.
 type Validator func(context.Context, peer.ID, *Message) bool
 
@@ -226,10 +232,9 @@ func (v *validation) RemoveValidator(req *rmValReq) {
 	}
 }
 
-// PushLocal synchronously pushes a locally published message and performs applicable
-// validations.
-// Returns an error if validation fails
-func (v *validation) PushLocal(msg *Message) error {
+// ValidateLocal synchronously validates a locally published message and
+// performs applicable validations. Returns an error if validation fails.
+func (v *validation) ValidateLocal(msg *Message) error {
 	v.p.tracer.PublishMessage(msg)
 
 	err := v.p.checkSigningPolicy(msg)
@@ -238,7 +243,9 @@ func (v *validation) PushLocal(msg *Message) error {
 	}
 
 	vals := v.getValidators(msg)
-	return v.validate(vals, msg.ReceivedFrom, msg, true)
+	return v.validate(vals, msg.ReceivedFrom, msg, true, func(msg *Message) error {
+		return nil
+	})
 }
 
 // Push pushes a message into the validation pipeline.
@@ -282,15 +289,26 @@ func (v *validation) validateWorker() {
 	for {
 		select {
 		case req := <-v.validateQ:
-			v.validate(req.vals, req.src, req.msg, false)
+			_ = v.validate(req.vals, req.src, req.msg, false, v.sendMsgBlocking)
 		case <-v.p.ctx.Done():
 			return
 		}
 	}
 }
 
-// validate performs validation and only sends the message if all validators succeed
-func (v *validation) validate(vals []*validatorImpl, src peer.ID, msg *Message, synchronous bool) error {
+func (v *validation) sendMsgBlocking(msg *Message) error {
+	select {
+	case v.p.sendMsg <- msg:
+		return nil
+	case <-v.p.ctx.Done():
+		return v.p.ctx.Err()
+	}
+}
+
+// validate performs validation and only calls onValid if all validators succeed.
+// If synchronous is true, onValid will be called before this function returns
+// if the message is new and accepted.
+func (v *validation) validate(vals []*validatorImpl, src peer.ID, msg *Message, synchronous bool, onValid func(*Message) error) error {
 	// If signature verification is enabled, but signing is disabled,
 	// the Signature is required to be nil upon receiving the message in PubSub.pushMsg.
 	if msg.Signature != nil {
@@ -306,7 +324,7 @@ func (v *validation) validate(vals []*validatorImpl, src peer.ID, msg *Message, 
 	id := v.p.idGen.ID(msg)
 	if !v.p.markSeen(id) {
 		v.tracer.DuplicateMessage(msg)
-		return nil
+		return dupeErr{}
 	} else {
 		v.tracer.ValidateMessage(msg)
 	}
@@ -345,7 +363,7 @@ loop:
 		select {
 		case v.validateThrottle <- struct{}{}:
 			go func() {
-				v.doValidateTopic(async, src, msg, result)
+				v.doValidateTopic(async, src, msg, result, onValid)
 				<-v.validateThrottle
 			}()
 		default:
@@ -360,13 +378,8 @@ loop:
 		return ValidationError{Reason: RejectValidationIgnored}
 	}
 
-	// no async validators, accepted message, send it!
-	select {
-	case v.p.sendMsg <- msg:
-		return nil
-	case <-v.p.ctx.Done():
-		return v.p.ctx.Err()
-	}
+	// no async validators, accepted message
+	return onValid(msg)
 }
 
 func (v *validation) validateSignature(msg *Message) bool {
@@ -379,7 +392,7 @@ func (v *validation) validateSignature(msg *Message) bool {
 	return true
 }
 
-func (v *validation) doValidateTopic(vals []*validatorImpl, src peer.ID, msg *Message, r ValidationResult) {
+func (v *validation) doValidateTopic(vals []*validatorImpl, src peer.ID, msg *Message, r ValidationResult, onValid func(*Message) error) {
 	result := v.validateTopic(vals, src, msg)
 
 	if result == ValidationAccept && r != ValidationAccept {
@@ -388,7 +401,7 @@ func (v *validation) doValidateTopic(vals []*validatorImpl, src peer.ID, msg *Me
 
 	switch result {
 	case ValidationAccept:
-		v.p.sendMsg <- msg
+		_ = onValid(msg)
 	case ValidationReject:
 		log.Debugf("message validation failed; dropping message from %s", src)
 		v.tracer.RejectMessage(msg, RejectValidationFailed)
