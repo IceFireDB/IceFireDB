@@ -13,17 +13,17 @@ import (
 	"github.com/ipfs/boxo/gateway/assets"
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
-	"github.com/ipld/go-ipld-prime/multicodec"
-	"github.com/ipld/go-ipld-prime/node/basicnode"
-	mc "github.com/multiformats/go-multicodec"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 
 	// Ensure basic codecs are registered.
 	_ "github.com/ipld/go-ipld-prime/codec/cbor"
 	_ "github.com/ipld/go-ipld-prime/codec/dagcbor"
 	_ "github.com/ipld/go-ipld-prime/codec/dagjson"
 	_ "github.com/ipld/go-ipld-prime/codec/json"
+	"github.com/ipld/go-ipld-prime/multicodec"
+	"github.com/ipld/go-ipld-prime/node/basicnode"
+	mc "github.com/multiformats/go-multicodec"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // codecToContentType maps the supported IPLD codecs to the HTTP Content
@@ -170,10 +170,15 @@ func (i *handler) serveCodecHTML(ctx context.Context, w http.ResponseWriter, r *
 		suffix := "/"
 		// preserve query parameters
 		if r.URL.RawQuery != "" {
-			suffix = suffix + "?" + r.URL.RawQuery
+			suffix = suffix + "?" + url.PathEscape(r.URL.RawQuery)
+		}
+		// Re-escape path instead of reusing RawPath to avod mix of lawer
+		// and upper hex that may come from RawPath.
+		if strings.ContainsRune(requestURI.RawPath, '%') {
+			requestURI.RawPath = ""
 		}
 		// /ipfs/cid/foo?bar must be redirected to /ipfs/cid/foo/?bar
-		redirectURL := requestURI.Path + suffix
+		redirectURL := requestURI.EscapedPath() + suffix
 		http.Redirect(w, r, redirectURL, http.StatusMovedPermanently)
 		return true
 	}

@@ -2,13 +2,13 @@ package dht
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"math"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/libp2p/go-libp2p-kad-dht/metrics"
+	"github.com/libp2p/go-libp2p-kad-dht/internal/metrics"
 	"github.com/libp2p/go-libp2p-kad-dht/netsize"
 	"github.com/libp2p/go-libp2p-kad-dht/qpeerset"
 	kb "github.com/libp2p/go-libp2p-kbucket"
@@ -111,15 +111,15 @@ func (dht *IpfsDHT) optimisticProvide(outerCtx context.Context, keyMH multihash.
 	key := string(keyMH)
 
 	if key == "" {
-		return fmt.Errorf("can't lookup empty key")
+		return errors.New("can't lookup empty key")
 	}
 
-	// initialize new context for all putProvider operations.
+	// use dht.ctx for all putProvider operations.
 	// We don't want to give the outer context to the put operations as we return early before all
 	// put operations have finished to avoid the long tail of the latency distribution. If we
 	// provided the outer context the put operations may be cancelled depending on what happens
 	// with the context on the user side.
-	putCtx, putCtxCancel := context.WithTimeout(context.Background(), time.Minute)
+	putCtx, putCtxCancel := context.WithTimeout(dht.ctx, time.Minute)
 
 	es, err := dht.newOptimisticState(putCtx, key)
 	if err != nil {
@@ -169,11 +169,15 @@ func (dht *IpfsDHT) optimisticProvide(outerCtx context.Context, keyMH multihash.
 
 	// tracking lookup results for network size estimator as "completed" is true
 	if err = dht.nsEstimator.Track(key, lookupRes.closest); err != nil {
-		logger.Warnf("network size estimator track peers: %s", err)
+		if err != netsize.ErrWrongNumOfPeers || dht.routingTable.Size() > dht.bucketSize {
+			// Don't warn if we have a wrong number of peers and the routing table is
+			// small because the network may simply not have enough peers.
+			logger.Warnf("network size estimator track peers: %s", err)
+		}
 	}
 
 	if ns, err := dht.nsEstimator.NetworkSize(); err == nil {
-		metrics.NetworkSize.M(int64(ns))
+		metrics.RecordNetworkSize(dht.ctx, int64(ns))
 	}
 
 	// refresh the cpl for this key as the query was successful

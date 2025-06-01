@@ -26,14 +26,14 @@ type heads struct {
 	logger    logging.StandardLogger
 }
 
-func newHeads(store ds.Datastore, namespace ds.Key, logger logging.StandardLogger) (*heads, error) {
+func newHeads(ctx context.Context, store ds.Datastore, namespace ds.Key, logger logging.StandardLogger) (*heads, error) {
 	hh := &heads{
 		store:     store,
 		namespace: namespace,
 		logger:    logger,
 		cache:     make(map[cid.Cid]uint64),
 	}
-	if err := hh.primeCache(context.Background()); err != nil {
+	if err := hh.primeCache(ctx); err != nil {
 		return nil, err
 	}
 	return hh, nil
@@ -65,7 +65,7 @@ func (hh *heads) delete(ctx context.Context, store ds.Write, c cid.Cid) error {
 }
 
 // IsHead returns if a given cid is among the current heads.
-func (hh *heads) IsHead(c cid.Cid) (bool, uint64, error) {
+func (hh *heads) IsHead(ctx context.Context, c cid.Cid) (bool, uint64, error) {
 	var height uint64
 	var ok bool
 	hh.cacheMux.RLock()
@@ -76,7 +76,7 @@ func (hh *heads) IsHead(c cid.Cid) (bool, uint64, error) {
 	return ok, height, nil
 }
 
-func (hh *heads) Len() (int, error) {
+func (hh *heads) Len(ctx context.Context) (int, error) {
 	var ret int
 	hh.cacheMux.RLock()
 	{
@@ -146,7 +146,7 @@ func (hh *heads) Add(ctx context.Context, c cid.Cid, height uint64) error {
 }
 
 // List returns the list of current heads plus the max height.
-func (hh *heads) List() ([]cid.Cid, uint64, error) {
+func (hh *heads) List(ctx context.Context) ([]cid.Cid, uint64, error) {
 	var maxHeight uint64
 	var heads []cid.Cid
 

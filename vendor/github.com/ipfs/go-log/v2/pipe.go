@@ -33,10 +33,10 @@ func (p *PipeReader) Close() error {
 //
 // By default, it:
 //
-// 1. Logs JSON. This can be changed by passing the PipeFormat option.
-// 2. Logs everything that would otherwise be logged to the "primary" log
-//    output. That is, everything enabled by SetLogLevel. The minimum log level
-//    can be increased by passing the PipeLevel option.
+//  1. Logs JSON. This can be changed by passing the PipeFormat option.
+//  2. Logs everything that would otherwise be logged to the "primary" log
+//     output. That is, everything enabled by SetLogLevel. The minimum log level
+//     can be increased by passing the PipeLevel option.
 func NewPipeReader(opts ...PipeReaderOption) *PipeReader {
 	opt := pipeReaderOptions{
 		format: JSONOutput,

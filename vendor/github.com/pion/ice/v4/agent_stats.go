@@ -26,18 +26,22 @@ func (a *Agent) GetCandidatePairsStats() []CandidatePairStats {
 				// BytesReceived uint64
 				// LastPacketSentTimestamp time.Time
 				// LastPacketReceivedTimestamp time.Time
-				// FirstRequestTimestamp time.Time
-				// LastRequestTimestamp time.Time
-				// LastResponseTimestamp time.Time
+				FirstRequestTimestamp:         cp.FirstRequestSentAt(),
+				LastRequestTimestamp:          cp.LastRequestSentAt(),
+				FirstResponseTimestamp:        cp.FirstReponseReceivedAt(),
+				LastResponseTimestamp:         cp.LastResponseReceivedAt(),
+				FirstRequestReceivedTimestamp: cp.FirstRequestReceivedAt(),
+				LastRequestReceivedTimestamp:  cp.LastRequestReceivedAt(),
+
 				TotalRoundTripTime:   cp.TotalRoundTripTime(),
 				CurrentRoundTripTime: cp.CurrentRoundTripTime(),
 				// AvailableOutgoingBitrate float64
 				// AvailableIncomingBitrate float64
 				// CircuitBreakerTriggerCount uint32
-				// RequestsReceived uint64
-				// RequestsSent uint64
+				RequestsReceived:  cp.RequestsReceived(),
+				RequestsSent:      cp.RequestsSent(),
 				ResponsesReceived: cp.ResponsesReceived(),
-				// ResponsesSent uint64
+				ResponsesSent:     cp.ResponsesSent(),
 				// RetransmissionsReceived uint64
 				// RetransmissionsSent uint64
 				// ConsentRequestsSent uint64
