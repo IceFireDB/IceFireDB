@@ -24,6 +24,10 @@ type Datastore struct {
 
 var _ ds.Datastore = (*Datastore)(nil)
 var _ ds.TxnDatastore = (*Datastore)(nil)
+var _ ds.Txn = (*transaction)(nil)
+var _ ds.PersistentDatastore = (*Datastore)(nil)
+var _ ds.Batching = (*Datastore)(nil)
+var _ ds.Batch = (*leveldbBatch)(nil)
 
 // Options is an alias of syndtr/goleveldb/opt.Options which might be extended
 // in the future.
@@ -201,7 +205,7 @@ func (d *Datastore) DiskUsage(ctx context.Context) (uint64, error) {
 }
 
 // LevelDB needs to be closed.
-func (d *Datastore) Close() (err error) {
+func (d *Datastore) Close() error {
 	d.closeLk.Lock()
 	defer d.closeLk.Unlock()
 	return d.DB.Close()

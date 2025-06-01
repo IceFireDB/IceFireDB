@@ -36,11 +36,11 @@ func UnixPermsOrDefault(n Node) uint32 {
 
 	switch n.(type) {
 	case *Symlink:
-		return 0777
+		return 0o777
 	case Directory:
-		return 0755
+		return 0o755
 	default:
-		return 0644
+		return 0o644
 	}
 }
 
