@@ -57,14 +57,12 @@ github.com/alecthomas/units
 # github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5
 ## explicit
 github.com/alexbrainman/goissue34681
-# github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302
-## explicit
-github.com/alicebob/gopher-json
-# github.com/alicebob/miniredis/v2 v2.34.0
+# github.com/alicebob/miniredis/v2 v2.35.0
 ## explicit; go 1.17
 github.com/alicebob/miniredis/v2
 github.com/alicebob/miniredis/v2/fpconv
 github.com/alicebob/miniredis/v2/geohash
+github.com/alicebob/miniredis/v2/gopher-json
 github.com/alicebob/miniredis/v2/hyperloglog
 github.com/alicebob/miniredis/v2/metro
 github.com/alicebob/miniredis/v2/proto
