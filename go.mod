@@ -30,7 +30,7 @@ require (
 require (
 	berty.tech/go-ipfs-log v1.10.2 // indirect
 	github.com/IceFireDB/components-go v1.2.0
-	github.com/alicebob/miniredis/v2 v2.34.0
+	github.com/alicebob/miniredis/v2 v2.35.0
 	github.com/chasex/redis-go-cluster v1.0.0
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/ipfs/go-cid v0.5.0
@@ -60,7 +60,6 @@ require (
 	github.com/Jorropo/jsync v1.0.1 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
-	github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
