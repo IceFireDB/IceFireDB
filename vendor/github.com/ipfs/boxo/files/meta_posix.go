@@ -22,7 +22,7 @@ func updateMtime(path string, mtime time.Time) error {
 	if mtime.IsZero() {
 		return nil
 	}
-	var AtFdCwd = -100
+	AtFdCwd := -100
 	pathname, err := syscall.BytePtrFromString(path)
 	if err != nil {
 		return err

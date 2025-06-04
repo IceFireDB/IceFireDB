@@ -1,14 +1,12 @@
 package mfs
 
 import (
+	context "context"
 	"errors"
 	"fmt"
 	"io"
 
 	mod "github.com/ipfs/boxo/ipld/unixfs/mod"
-
-	context "context"
-
 	ipld "github.com/ipfs/go-ipld-format"
 )
 
@@ -109,7 +107,7 @@ func (fi *fileDescriptor) CtxReadFull(ctx context.Context, b []byte) (int, error
 	return fi.mod.CtxReadFull(ctx, b)
 }
 
-// Close flushes, then propogates the modified dag node up the directory structure
+// Close flushes, then propagates the modified dag node up the directory structure
 // and signals a republish to occur
 func (fi *fileDescriptor) Close() error {
 	if fi.state == stateClosed {

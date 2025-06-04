@@ -193,7 +193,7 @@ func (pm *ProtocolMessenger) PutProviderAddrs(ctx context.Context, p peer.ID, ke
 	// TODO: We may want to limit the type of addresses in our provider records
 	// For example, in a WAN-only DHT prohibit sharing non-WAN addresses (e.g. 192.168.0.100)
 	if len(self.Addrs) < 1 {
-		return fmt.Errorf("no known addresses for self, cannot put provider")
+		return errors.New("no known addresses for self, cannot put provider")
 	}
 
 	pmes := NewMessage(Message_ADD_PROVIDER, key, 0)
