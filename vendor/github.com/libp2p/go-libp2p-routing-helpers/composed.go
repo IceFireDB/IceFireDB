@@ -3,11 +3,11 @@ package routinghelpers
 import (
 	"context"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	ci "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"go.uber.org/multierr"
 )
 
 // Compose composes the components into a single router. Not specifying a
@@ -133,13 +133,13 @@ func (cr *Compose) Bootstrap(ctx context.Context) (err error) {
 		}
 	}
 
-	var me multierror.Error
+	var errs error
 	for b := range routers {
 		if err := b.Bootstrap(ctx); err != nil {
-			me.Errors = append(me.Errors, err)
+			errs = multierr.Append(errs, err)
 		}
 	}
-	return me.ErrorOrNil()
+	return errs
 }
 
 var _ routing.Routing = (*Compose)(nil)
