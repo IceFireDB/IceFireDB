@@ -37,11 +37,13 @@ type contentRouter struct {
 	maxProvideBatchSize   int
 }
 
-var _ routing.ContentRouting = (*contentRouter)(nil)
-var _ routing.PeerRouting = (*contentRouter)(nil)
-var _ routing.ValueStore = (*contentRouter)(nil)
-var _ routinghelpers.ProvideManyRouter = (*contentRouter)(nil)
-var _ routinghelpers.ReadyAbleRouter = (*contentRouter)(nil)
+var (
+	_ routing.ContentRouting           = (*contentRouter)(nil)
+	_ routing.PeerRouting              = (*contentRouter)(nil)
+	_ routing.ValueStore               = (*contentRouter)(nil)
+	_ routinghelpers.ProvideManyRouter = (*contentRouter)(nil)
+	_ routinghelpers.ReadyAbleRouter   = (*contentRouter)(nil)
+)
 
 type option func(c *contentRouter)
 
@@ -145,9 +147,11 @@ func readProviderResponses(ctx context.Context, iter iter.ResultIter[types.Recor
 				return
 			case ch <- peer.AddrInfo{
 				ID:    *result.ID,
-				Addrs: addrs}:
+				Addrs: addrs,
+			}:
 			}
 
+		//nolint:staticcheck
 		//lint:ignore SA1019 // ignore staticcheck
 		case types.SchemaBitswap:
 			//lint:ignore SA1019 // ignore staticcheck
@@ -171,7 +175,8 @@ func readProviderResponses(ctx context.Context, iter iter.ResultIter[types.Recor
 				return
 			case ch <- peer.AddrInfo{
 				ID:    *result.ID,
-				Addrs: addrs}:
+				Addrs: addrs,
+			}:
 			}
 		}
 	}

@@ -7,8 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	u "github.com/ipfs/boxo/util"
 	cid "github.com/ipfs/go-cid"
-	u "github.com/ipfs/go-ipfs-util"
 	mh "github.com/multiformats/go-multihash"
 )
 
