@@ -1,54 +1,40 @@
 package multiaddr
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/multiformats/go-multiaddr/x/meg"
+)
 
 // Split returns the sub-address portions of a multiaddr.
-func Split(m Multiaddr) []Multiaddr {
-	if _, ok := m.(*Component); ok {
-		return []Multiaddr{m}
-	}
-	var addrs []Multiaddr
-	ForEach(m, func(c Component) bool {
-		addrs = append(addrs, &c)
-		return true
-	})
-	return addrs
+func Split(m Multiaddr) []Component {
+	return m
 }
 
 // Join returns a combination of addresses.
-func Join(ms ...Multiaddr) Multiaddr {
-	switch len(ms) {
-	case 0:
-		// empty multiaddr, unfortunately, we have callers that rely on
-		// this contract.
-		return &multiaddr{}
-	case 1:
-		return ms[0]
-	}
-
-	length := 0
-	for _, m := range ms {
+// Note: This copies all the components from the input Multiaddrs. Depending on
+// your use case, you may prefer to use `append(leftMA, rightMA...)` instead.
+func Join(msInterfaces ...Multiaddrer) Multiaddr {
+	ms := make([]Multiaddr, len(msInterfaces))
+	for i, m := range msInterfaces {
 		if m == nil {
 			continue
 		}
-		length += len(m.Bytes())
+		ms[i] = m.Multiaddr()
+	}
+	size := 0
+	for _, m := range ms {
+		size += len(m)
+	}
+	if size == 0 {
+		return nil
 	}
 
-	bidx := 0
-	b := make([]byte, length)
-	if length == 0 {
-		return nil
+	out := make([]Component, 0, size)
+	for _, m := range ms {
+		out = append(out, m...)
 	}
-	for _, mb := range ms {
-		if mb == nil {
-			continue
-		}
-		bidx += copy(b[bidx:], mb.Bytes())
-	}
-	if length == 0 {
-		return nil
-	}
-	return &multiaddr{bytes: b}
+	return out
 }
 
 // Cast re-casts a byte slice as a multiaddr. will panic if it fails to parse.
@@ -71,134 +57,82 @@ func StringCast(s string) Multiaddr {
 
 // SplitFirst returns the first component and the rest of the multiaddr.
 func SplitFirst(m Multiaddr) (*Component, Multiaddr) {
-	if m == nil {
+	if len(m) == 0 {
 		return nil, nil
 	}
-	// Shortcut if we already have a component
-	if c, ok := m.(*Component); ok {
-		return c, nil
+	if len(m) == 1 {
+		return &m[0], nil
 	}
-
-	b := m.Bytes()
-	if len(b) == 0 {
-		return nil, nil
-	}
-	n, c, err := readComponent(b)
-	if err != nil {
-		panic(err)
-	}
-	if len(b) == n {
-		return &c, nil
-	}
-	return &c, &multiaddr{b[n:]}
+	// defensive copy. Users can avoid by doing the split themselves.
+	copyC := m[0]
+	return &copyC, m[1:].copy()
 }
 
 // SplitLast returns the rest of the multiaddr and the last component.
 func SplitLast(m Multiaddr) (Multiaddr, *Component) {
-	if m == nil {
+	if len(m) == 0 {
 		return nil, nil
 	}
-
-	// Shortcut if we already have a component
-	if c, ok := m.(*Component); ok {
-		return nil, c
+	if len(m) == 1 {
+		// We want to explicitly return a nil slice if the prefix is now empty.
+		return nil, &m[0]
 	}
-
-	b := m.Bytes()
-	if len(b) == 0 {
-		return nil, nil
-	}
-
-	var (
-		c      Component
-		err    error
-		offset int
-	)
-	for {
-		var n int
-		n, c, err = readComponent(b[offset:])
-		if err != nil {
-			panic(err)
-		}
-		if len(b) == n+offset {
-			// Reached end
-			if offset == 0 {
-				// Only one component
-				return nil, &c
-			}
-			return &multiaddr{b[:offset]}, &c
-		}
-		offset += n
-	}
+	// defensive copy. Users can avoid by doing the split themselves.
+	copyC := m[len(m)-1]
+	return m[:len(m)-1].copy(), &copyC
 }
 
 // SplitFunc splits the multiaddr when the callback first returns true. The
 // component on which the callback first returns will be included in the
 // *second* multiaddr.
 func SplitFunc(m Multiaddr, cb func(Component) bool) (Multiaddr, Multiaddr) {
-	if m == nil {
+	if len(m) == 0 {
 		return nil, nil
 	}
-	// Shortcut if we already have a component
-	if c, ok := m.(*Component); ok {
-		if cb(*c) {
-			return nil, m
-		}
-		return m, nil
-	}
-	b := m.Bytes()
-	if len(b) == 0 {
-		return nil, nil
-	}
-	var (
-		c      Component
-		err    error
-		offset int
-	)
-	for offset < len(b) {
-		var n int
-		n, c, err = readComponent(b[offset:])
-		if err != nil {
-			panic(err)
-		}
+
+	idx := len(m)
+	for i, c := range m {
 		if cb(c) {
+			idx = i
 			break
 		}
-		offset += n
 	}
-	switch offset {
-	case 0:
-		return nil, m
-	case len(b):
-		return m, nil
-	default:
-		return &multiaddr{b[:offset]}, &multiaddr{b[offset:]}
+	pre, post := m[:idx], m[idx:]
+	if len(pre) == 0 {
+		pre = nil
 	}
+	if len(post) == 0 {
+		post = nil
+	}
+	// defensive copy. Users can avoid by doing the split themselves.
+	return pre.copy(), post.copy()
 }
 
 // ForEach walks over the multiaddr, component by component.
 //
-// This function iterates over components *by value* to avoid allocating.
+// This function iterates over components.
 // Return true to continue iteration, false to stop.
+//
+// Prefer a standard for range loop instead
+// e.g. `for _, c := range m { ... }`
 func ForEach(m Multiaddr, cb func(c Component) bool) {
-	if m == nil {
-		return
-	}
-	// Shortcut if we already have a component
-	if c, ok := m.(*Component); ok {
-		cb(*c)
-		return
-	}
-
-	b := m.Bytes()
-	for len(b) > 0 {
-		n, c, err := readComponent(b)
-		if err != nil {
-			panic(err)
-		}
+	for _, c := range m {
 		if !cb(c) {
 			return
 		}
-		b = b[n:]
 	}
+}
+
+type componentList []Component
+
+func (m componentList) Get(i int) meg.Matchable {
+	return &m[i]
+}
+
+func (m componentList) Len() int {
+	return len(m)
+}
+func (m Multiaddr) Match(p ...meg.Pattern) (bool, error) {
+	matcher := meg.PatternToMatcher(p...)
+	return meg.Match(matcher, componentList(m))
 }
