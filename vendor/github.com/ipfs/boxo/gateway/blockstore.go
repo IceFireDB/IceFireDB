@@ -10,14 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ipfs/go-cid"
-	format "github.com/ipfs/go-ipld-format"
-
+	lru "github.com/hashicorp/golang-lru/v2"
 	blockstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/boxo/util"
 	blocks "github.com/ipfs/go-block-format"
-
-	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/ipfs/go-cid"
+	format "github.com/ipfs/go-ipld-format"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap/zapcore"
 )
@@ -35,8 +33,7 @@ var _ blockstore.Blockstore = (*cacheBlockStore)(nil)
 // in memory using a two queue cache. It can be useful, for example, when paired
 // with a proxy blockstore (see [NewRemoteBlockstore]).
 //
-// If the given [prometheus.Registerer] is nil, a new one will be created using
-// [prometheus.NewRegistry].
+// If the given [prometheus.Registerer] is nil, a [prometheus.DefaultRegisterer] will be used.
 func NewCacheBlockStore(size int, reg prometheus.Registerer) (blockstore.Blockstore, error) {
 	c, err := lru.New2Q[string, []byte](size)
 	if err != nil {
@@ -44,7 +41,7 @@ func NewCacheBlockStore(size int, reg prometheus.Registerer) (blockstore.Blockst
 	}
 
 	if reg == nil {
-		reg = prometheus.NewRegistry()
+		reg = prometheus.DefaultRegisterer
 	}
 
 	cacheHitsMetric := prometheus.NewCounter(prometheus.CounterOpts{
@@ -61,15 +58,8 @@ func NewCacheBlockStore(size int, reg prometheus.Registerer) (blockstore.Blockst
 		Help:      "The number of global block cache requests.",
 	})
 
-	err = reg.Register(cacheHitsMetric)
-	if err != nil {
-		return nil, err
-	}
-
-	err = reg.Register(cacheRequestsMetric)
-	if err != nil {
-		return nil, err
-	}
+	registerMetric(reg, cacheHitsMetric)
+	registerMetric(reg, cacheRequestsMetric)
 
 	return &cacheBlockStore{
 		cache:               c,

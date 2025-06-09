@@ -36,10 +36,7 @@ func NaiveLimit(qr Results, limit int) Results {
 			if limit == 0 {
 				if !closed {
 					closed = true
-					err := qr.Close()
-					if err != nil {
-						return Result{Error: err}, true
-					}
+					qr.Close()
 				}
 				return Result{}, false
 			}
