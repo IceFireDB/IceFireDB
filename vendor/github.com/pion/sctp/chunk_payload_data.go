@@ -86,7 +86,7 @@ const (
 	payloadDataHeaderSize = 12
 )
 
-// PayloadProtocolIdentifier is an enum for DataChannel payload types
+// PayloadProtocolIdentifier is an enum for DataChannel payload types.
 type PayloadProtocolIdentifier uint32
 
 // PayloadProtocolIdentifier enums
@@ -100,7 +100,7 @@ const (
 	PayloadTypeWebRTCBinaryEmpty PayloadProtocolIdentifier = 57
 )
 
-// Data chunk errors
+// Data chunk errors.
 var (
 	ErrChunkPayloadSmall = errors.New("packet is smaller than the header size")
 )
@@ -170,6 +170,7 @@ func (p *chunkPayloadData) marshal() ([]byte, error) {
 	p.chunkHeader.flags = flags
 	p.chunkHeader.typ = ctPayloadData
 	p.chunkHeader.raw = payRaw
+
 	return p.chunkHeader.marshal()
 }
 
@@ -177,7 +178,7 @@ func (p *chunkPayloadData) check() (abort bool, err error) {
 	return false, nil
 }
 
-// String makes chunkPayloadData printable
+// String makes chunkPayloadData printable.
 func (p *chunkPayloadData) String() string {
 	return fmt.Sprintf("%s\n%d", p.chunkHeader, p.tsn)
 }
@@ -186,12 +187,14 @@ func (p *chunkPayloadData) abandoned() bool {
 	if p.head != nil {
 		return p.head._abandoned && p.head._allInflight
 	}
+
 	return p._abandoned && p._allInflight
 }
 
 func (p *chunkPayloadData) setAbandoned(abandoned bool) {
 	if p.head != nil {
 		p.head._abandoned = abandoned
+
 		return
 	}
 	p._abandoned = abandoned

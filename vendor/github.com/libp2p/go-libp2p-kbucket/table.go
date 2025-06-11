@@ -18,8 +18,10 @@ import (
 
 var log = logging.Logger("table")
 
-var ErrPeerRejectedHighLatency = errors.New("peer rejected; latency too high")
-var ErrPeerRejectedNoCapacity = errors.New("peer rejected; insufficient capacity")
+var (
+	ErrPeerRejectedHighLatency = errors.New("peer rejected; latency too high")
+	ErrPeerRejectedNoCapacity  = errors.New("peer rejected; insufficient capacity")
+)
 
 // RoutingTable defines the routing table.
 type RoutingTable struct {
@@ -61,7 +63,8 @@ type RoutingTable struct {
 
 // NewRoutingTable creates a new routing table with a given bucketsize, local ID, and latency tolerance.
 func NewRoutingTable(bucketsize int, localID ID, latency time.Duration, m peerstore.Metrics, usefulnessGracePeriod time.Duration,
-	df *peerdiversity.Filter) (*RoutingTable, error) {
+	df *peerdiversity.Filter,
+) (*RoutingTable, error) {
 	rt := &RoutingTable{
 		buckets:    []*bucket{newBucket()},
 		bucketsize: bucketsize,

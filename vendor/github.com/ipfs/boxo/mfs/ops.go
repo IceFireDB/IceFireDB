@@ -120,11 +120,13 @@ func PutNode(r *Root, path string, nd ipld.Node) error {
 
 // MkdirOpts is used by Mkdir
 type MkdirOpts struct {
-	Mkparents  bool
-	Flush      bool
-	CidBuilder cid.Builder
-	Mode       os.FileMode
-	ModTime    time.Time
+	Mkparents     bool
+	Flush         bool
+	CidBuilder    cid.Builder
+	Mode          os.FileMode
+	ModTime       time.Time
+	MaxLinks      int
+	MaxHAMTFanout int
 }
 
 // Mkdir creates a directory at 'path' under the directory 'd', creating
@@ -152,13 +154,23 @@ func Mkdir(r *Root, pth string, opts MkdirOpts) error {
 	}
 
 	cur := r.GetDirectory()
+
+	// opts to make the parents leave MkParents and Flush as false.
+	parentsOpts := MkdirOpts{
+		MaxLinks:      opts.MaxLinks,
+		MaxHAMTFanout: opts.MaxHAMTFanout,
+	}
+
 	for i, d := range parts[:len(parts)-1] {
 		fsn, err := cur.Child(d)
 		if err == os.ErrNotExist && opts.Mkparents {
-			mkd, err := cur.Mkdir(d)
+
+			mkd, err := cur.MkdirWithOpts(d, parentsOpts)
 			if err != nil {
 				return err
 			}
+			// MkdirWithOps uses cur.GetCidBuilder regardless of
+			// the option. So we must set it manually.
 			if opts.CidBuilder != nil {
 				mkd.SetCidBuilder(opts.CidBuilder)
 			}
@@ -180,6 +192,9 @@ func Mkdir(r *Root, pth string, opts MkdirOpts) error {
 			return err
 		}
 	}
+
+	// Again, MkdirWithOpts ignores opts.CidBuilder so must be applied
+	// here.
 	if opts.CidBuilder != nil {
 		final.SetCidBuilder(opts.CidBuilder)
 	}
