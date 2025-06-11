@@ -10,9 +10,6 @@ import (
 	"time"
 
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/jbenet/goprocess"
-	goprocessctx "github.com/jbenet/goprocess/context"
-	periodicproc "github.com/jbenet/goprocess/periodic"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -112,78 +109,105 @@ func (cfg *BootstrapConfig) SetBackupPeers(load func(context.Context) []peer.Add
 // connections to well-known bootstrap peers. It also kicks off subsystem
 // bootstrapping (i.e. routing).
 func Bootstrap(id peer.ID, host host.Host, rt routing.Routing, cfg BootstrapConfig) (io.Closer, error) {
-	// make a signal to wait for one bootstrap round to complete.
-	doneWithRound := make(chan struct{})
-
 	if len(cfg.BootstrapPeers()) == 0 {
 		// We *need* to bootstrap but we have no bootstrap peers
 		// configured *at all*, inform the user.
 		log.Warn("no bootstrap nodes configured: go-ipfs may have difficulty connecting to the network")
 	}
 
-	// the periodic bootstrap function -- the connection supervisor
-	periodic := func(worker goprocess.Process) {
-		ctx := goprocessctx.OnClosingContext(worker)
+	ctx, cancel := context.WithCancel(context.Background())
 
-		if err := bootstrapRound(ctx, host, cfg); err != nil {
-			log.Debugf("%s bootstrap error: %s", id, err)
+	// Signal when first bootstrap round is complete, started independent of ticker.
+	doneWithRound := make(chan struct{})
+
+	go func() {
+		// the periodic bootstrap function -- the connection supervisor
+		periodic := func() {
+			if err := bootstrapRound(ctx, host, cfg); err != nil {
+				log.Debugf("%s bootstrap error: %s", id, err)
+			}
 		}
 
-		// Exit the first call (triggered independently by `proc.Go`, not `Tick`)
-		// only after being done with the *single* Routing.Bootstrap call. Following
-		// periodic calls (`Tick`) will not block on this.
-		<-doneWithRound
-	}
+		ticker := time.NewTicker(cfg.Period)
+		defer ticker.Stop()
 
-	// kick off the node's periodic bootstrapping
-	proc := periodicproc.Tick(cfg.Period, periodic)
-	proc.Go(periodic) // run one right now.
+		// Run first round independent of ticker.
+		periodic()
+		<-doneWithRound
+		if ctx.Err() != nil {
+			return
+		}
+
+		for {
+			select {
+			case <-ticker.C:
+				periodic()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	// kick off Routing.Bootstrap
 	if rt != nil {
-		ctx := goprocessctx.OnClosingContext(proc)
 		if err := rt.Bootstrap(ctx); err != nil {
-			proc.Close()
+			cancel()
+			close(doneWithRound)
 			return nil, err
 		}
 	}
 
-	doneWithRound <- struct{}{}
-	close(doneWithRound) // it no longer blocks periodic
-
 	// If loadBackupBootstrapPeers is not nil then saveBackupBootstrapPeers
 	// must also not be nil.
 	if cfg.loadBackupBootstrapPeers != nil {
-		startSavePeersAsTemporaryBootstrapProc(cfg, host, proc)
+		doneWithRound <- struct{}{} // wait for first bootstrap
+		startSavePeersAsTemporaryBootstrapProc(ctx, cfg, host)
 	}
 
-	return proc, nil
+	return &bootstrapCloser{
+		cancel: cancel,
+	}, nil
+}
+
+type bootstrapCloser struct {
+	cancel context.CancelFunc
+}
+
+func (bsc *bootstrapCloser) Close() error {
+	bsc.cancel()
+	return nil
 }
 
 // Aside of the main bootstrap process we also run a secondary one that saves
 // connected peers as a backup measure if we can't connect to the official
 // bootstrap ones. These peers will serve as *temporary* bootstrap nodes.
-func startSavePeersAsTemporaryBootstrapProc(cfg BootstrapConfig, host host.Host, bootstrapProc goprocess.Process) {
-	savePeersFn := func(worker goprocess.Process) {
-		ctx := goprocessctx.OnClosingContext(worker)
-
-		if err := saveConnectedPeersAsTemporaryBootstrap(ctx, host, cfg); err != nil {
-			log.Debugf("saveConnectedPeersAsTemporaryBootstrap error: %s", err)
-		}
-	}
-	savePeersProc := periodicproc.Tick(cfg.BackupBootstrapInterval, savePeersFn)
-
-	// When the main bootstrap process ends also terminate the 'save connected
-	// peers' ones. Coupling the two seems the easiest way to handle this backup
-	// process without additional complexity.
+func startSavePeersAsTemporaryBootstrapProc(ctx context.Context, cfg BootstrapConfig, host host.Host) {
 	go func() {
-		<-bootstrapProc.Closing()
-		savePeersProc.Close()
-	}()
+		periodic := func() {
+			if err := saveConnectedPeersAsTemporaryBootstrap(ctx, host, cfg); err != nil {
+				log.Debugf("saveConnectedPeersAsTemporaryBootstrap error: %s", err)
+			}
+		}
 
-	// Run the first round now (after the first bootstrap process has finished)
-	// as the SavePeersPeriod can be much longer than bootstrap.
-	savePeersProc.Go(savePeersFn)
+		ticker := time.NewTicker(cfg.BackupBootstrapInterval)
+		defer ticker.Stop()
+
+		// Run the first round now (after the first bootstrap process has
+		// finished) as the SavePeersPeriod can be much longer than bootstrap.
+		periodic()
+		if ctx.Err() != nil {
+			return
+		}
+
+		for {
+			select {
+			case <-ticker.C:
+				periodic()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 func saveConnectedPeersAsTemporaryBootstrap(ctx context.Context, host host.Host, cfg BootstrapConfig) error {

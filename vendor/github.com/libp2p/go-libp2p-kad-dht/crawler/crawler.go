@@ -9,10 +9,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	ma "github.com/multiformats/go-multiaddr"
 
 	logging "github.com/ipfs/go-log/v2"
-	//lint:ignore SA1019 TODO migrate away from gogo pb
-	"github.com/libp2p/go-msgio/protoio"
+	"github.com/libp2p/go-msgio/pbio"
 
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
@@ -32,12 +32,11 @@ type (
 	}
 	// DefaultCrawler provides a default implementation of Crawler.
 	DefaultCrawler struct {
-		parallelism          int
-		connectTimeout       time.Duration
-		queryTimeout         time.Duration
-		host                 host.Host
-		dhtRPC               *pb.ProtocolMessenger
-		dialAddressExtendDur time.Duration
+		parallelism    int
+		connectTimeout time.Duration
+		queryTimeout   time.Duration
+		host           host.Host
+		dhtRPC         *pb.ProtocolMessenger
 	}
 )
 
@@ -59,12 +58,11 @@ func NewDefaultCrawler(host host.Host, opts ...Option) (*DefaultCrawler, error) 
 	}
 
 	return &DefaultCrawler{
-		parallelism:          o.parallelism,
-		connectTimeout:       o.connectTimeout,
-		queryTimeout:         3 * o.connectTimeout,
-		host:                 host,
-		dhtRPC:               pm,
-		dialAddressExtendDur: o.dialAddressExtendDur,
+		parallelism:    o.parallelism,
+		connectTimeout: o.connectTimeout,
+		queryTimeout:   3 * o.connectTimeout,
+		host:           host,
+		dhtRPC:         pm,
 	}, nil
 }
 
@@ -85,12 +83,12 @@ func (ms *messageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Me
 		return nil, err
 	}
 
-	w := protoio.NewDelimitedWriter(s)
+	w := pbio.NewDelimitedWriter(s)
 	if err := w.WriteMsg(pmes); err != nil {
 		return nil, err
 	}
 
-	r := protoio.NewDelimitedReader(s, network.MessageSizeMax)
+	r := pbio.NewDelimitedReader(s, network.MessageSizeMax)
 	defer func() { _ = s.Close() }()
 
 	msg := new(pb.Message)
@@ -102,9 +100,9 @@ func (ms *messageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Me
 	return msg, nil
 }
 
-func ctxReadMsg(ctx context.Context, rc protoio.ReadCloser, mes *pb.Message) error {
+func ctxReadMsg(ctx context.Context, rc pbio.ReadCloser, mes *pb.Message) error {
 	errc := make(chan error, 1)
-	go func(r protoio.ReadCloser) {
+	go func(r pbio.ReadCloser) {
 		defer close(errc)
 		err := r.ReadMsg(mes)
 		errc <- err
@@ -126,7 +124,7 @@ func (ms *messageSender) SendMessage(ctx context.Context, p peer.ID, pmes *pb.Me
 	}
 	defer func() { _ = s.Close() }()
 
-	w := protoio.NewDelimitedWriter(s)
+	w := pbio.NewDelimitedWriter(s)
 	return w.WriteMsg(pmes)
 }
 
@@ -136,10 +134,60 @@ type HandleQueryResult func(p peer.ID, rtPeers []*peer.AddrInfo)
 // HandleQueryFail is a callback on failed peer query
 type HandleQueryFail func(p peer.ID, err error)
 
+type peerAddrs struct {
+	peers map[peer.ID]map[string]ma.Multiaddr
+	lk    *sync.RWMutex
+}
+
+func newPeerAddrs() peerAddrs {
+	return peerAddrs{
+		peers: make(map[peer.ID]map[string]ma.Multiaddr),
+		lk:    new(sync.RWMutex),
+	}
+}
+
+func (ps peerAddrs) RemoveSourceAndAddPeers(source peer.ID, peers map[peer.ID][]ma.Multiaddr) {
+	ps.lk.Lock()
+	defer ps.lk.Unlock()
+
+	// remove source from peerstore
+	delete(ps.peers, source)
+	// add peers to peerstore
+	ps.addAddrsNoLock(peers)
+}
+
+func (ps peerAddrs) addAddrsNoLock(peers map[peer.ID][]ma.Multiaddr) {
+	for p, addrs := range peers {
+		ps.addPeerAddrsNoLock(p, addrs)
+	}
+}
+
+func (ps peerAddrs) addPeerAddrsNoLock(p peer.ID, addrs []ma.Multiaddr) {
+	if _, ok := ps.peers[p]; !ok {
+		ps.peers[p] = make(map[string]ma.Multiaddr)
+	}
+	for _, addr := range addrs {
+		ps.peers[p][string(addr.Bytes())] = addr
+	}
+}
+
+func (ps peerAddrs) PeerInfo(p peer.ID) peer.AddrInfo {
+	ps.lk.RLock()
+	defer ps.lk.RUnlock()
+
+	addrs := make([]ma.Multiaddr, 0, len(ps.peers[p]))
+	for _, addr := range ps.peers[p] {
+		addrs = append(addrs, addr)
+	}
+	return peer.AddrInfo{ID: p, Addrs: addrs}
+}
+
 // Run crawls dht peers from an initial seed of `startingPeers`
 func (c *DefaultCrawler) Run(ctx context.Context, startingPeers []*peer.AddrInfo, handleSuccess HandleQueryResult, handleFail HandleQueryFail) {
 	jobs := make(chan peer.ID, 1)
 	results := make(chan *queryResult, 1)
+
+	peerAddrs := newPeerAddrs()
 
 	// Start worker goroutines
 	var wg sync.WaitGroup
@@ -149,7 +197,8 @@ func (c *DefaultCrawler) Run(ctx context.Context, startingPeers []*peer.AddrInfo
 			defer wg.Done()
 			for p := range jobs {
 				qctx, cancel := context.WithTimeout(ctx, c.queryTimeout)
-				res := c.queryPeer(qctx, p)
+				ai := peerAddrs.PeerInfo(p)
+				res := c.queryPeer(qctx, ai)
 				cancel() // do not defer, cleanup after each job
 				results <- res
 			}
@@ -163,26 +212,28 @@ func (c *DefaultCrawler) Run(ctx context.Context, startingPeers []*peer.AddrInfo
 	peersSeen := make(map[peer.ID]struct{})
 
 	numSkipped := 0
+	peerAddrs.lk.Lock()
 	for _, ai := range startingPeers {
 		extendAddrs := c.host.Peerstore().Addrs(ai.ID)
 		if len(ai.Addrs) > 0 {
 			extendAddrs = append(extendAddrs, ai.Addrs...)
-			c.host.Peerstore().AddAddrs(ai.ID, extendAddrs, c.dialAddressExtendDur)
 		}
 		if len(extendAddrs) == 0 {
 			numSkipped++
 			continue
 		}
+		peerAddrs.addPeerAddrsNoLock(ai.ID, extendAddrs)
 
 		toDial = append(toDial, ai)
 		peersSeen[ai.ID] = struct{}{}
 	}
+	peerAddrs.lk.Unlock()
 
 	if numSkipped > 0 {
 		logger.Infof("%d starting peers were skipped due to lack of addresses. Starting crawl with %d peers", numSkipped, len(toDial))
 	}
 
-	numQueried := 0
+	peersQueried := make(map[peer.ID]struct{})
 	outstanding := 0
 
 	for len(toDial) > 0 || outstanding > 0 {
@@ -198,14 +249,20 @@ func (c *DefaultCrawler) Run(ctx context.Context, startingPeers []*peer.AddrInfo
 			if len(res.data) > 0 {
 				logger.Debugf("peer %v had %d peers", res.peer, len(res.data))
 				rtPeers := make([]*peer.AddrInfo, 0, len(res.data))
+				addrsToUpdate := make(map[peer.ID][]ma.Multiaddr)
 				for p, ai := range res.data {
-					c.host.Peerstore().AddAddrs(p, ai.Addrs, c.dialAddressExtendDur)
+					if _, ok := peersQueried[p]; !ok {
+						addrsToUpdate[p] = ai.Addrs
+					}
 					if _, ok := peersSeen[p]; !ok {
 						peersSeen[p] = struct{}{}
 						toDial = append(toDial, ai)
 					}
 					rtPeers = append(rtPeers, ai)
 				}
+				peersQueried[res.peer] = struct{}{}
+				peerAddrs.RemoveSourceAndAddPeers(res.peer, addrsToUpdate)
+
 				if handleSuccess != nil {
 					handleSuccess(res.peer, rtPeers)
 				}
@@ -215,9 +272,8 @@ func (c *DefaultCrawler) Run(ctx context.Context, startingPeers []*peer.AddrInfo
 			outstanding--
 		case jobCh <- nextPeerID:
 			outstanding++
-			numQueried++
 			toDial = toDial[1:]
-			logger.Debugf("starting %d out of %d", numQueried, len(peersSeen))
+			logger.Debugf("starting %d out of %d", len(peersQueried)+1, len(peersSeen))
 		}
 	}
 }
@@ -228,19 +284,19 @@ type queryResult struct {
 	err  error
 }
 
-func (c *DefaultCrawler) queryPeer(ctx context.Context, nextPeer peer.ID) *queryResult {
-	tmpRT, err := kbucket.NewRoutingTable(20, kbucket.ConvertPeerID(nextPeer), time.Hour, c.host.Peerstore(), time.Hour, nil)
+func (c *DefaultCrawler) queryPeer(ctx context.Context, nextPeer peer.AddrInfo) *queryResult {
+	tmpRT, err := kbucket.NewRoutingTable(20, kbucket.ConvertPeerID(nextPeer.ID), time.Hour, c.host.Peerstore(), time.Hour, nil)
 	if err != nil {
-		logger.Errorf("error creating rt for peer %v : %v", nextPeer, err)
-		return &queryResult{nextPeer, nil, err}
+		logger.Errorf("error creating rt for peer %v : %v", nextPeer.ID, err)
+		return &queryResult{nextPeer.ID, nil, err}
 	}
 
 	connCtx, cancel := context.WithTimeout(ctx, c.connectTimeout)
 	defer cancel()
-	err = c.host.Connect(connCtx, peer.AddrInfo{ID: nextPeer})
+	err = c.host.Connect(connCtx, nextPeer)
 	if err != nil {
-		logger.Debugf("could not connect to peer %v: %v", nextPeer, err)
-		return &queryResult{nextPeer, nil, err}
+		logger.Debugf("could not connect to peer %v: %v", nextPeer.ID, err)
+		return &queryResult{nextPeer.ID, nil, err}
 	}
 
 	localPeers := make(map[peer.ID]*peer.AddrInfo)
@@ -250,9 +306,9 @@ func (c *DefaultCrawler) queryPeer(ctx context.Context, nextPeer peer.ID) *query
 		if err != nil {
 			panic(err)
 		}
-		peers, err := c.dhtRPC.GetClosestPeers(ctx, nextPeer, generatePeer)
+		peers, err := c.dhtRPC.GetClosestPeers(ctx, nextPeer.ID, generatePeer)
 		if err != nil {
-			logger.Debugf("error finding data on peer %v with cpl %d : %v", nextPeer, cpl, err)
+			logger.Debugf("error finding data on peer %v with cpl %d : %v", nextPeer.ID, cpl, err)
 			retErr = err
 			break
 		}
@@ -264,8 +320,8 @@ func (c *DefaultCrawler) queryPeer(ctx context.Context, nextPeer peer.ID) *query
 	}
 
 	if retErr != nil {
-		return &queryResult{nextPeer, nil, retErr}
+		return &queryResult{nextPeer.ID, nil, retErr}
 	}
 
-	return &queryResult{nextPeer, localPeers, retErr}
+	return &queryResult{nextPeer.ID, localPeers, retErr}
 }

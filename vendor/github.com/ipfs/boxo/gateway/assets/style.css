@@ -66,6 +66,19 @@ a:visited {
 	font-family: var(--monospace);
 }
 
+.copy-button {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.15em;
+  transition: background-color 0.3s ease;
+}
+
+.copy-button:active {
+  opacity: 0.25;
+}
+
 #header {
 	align-items: center;
 	background: var(--navy);

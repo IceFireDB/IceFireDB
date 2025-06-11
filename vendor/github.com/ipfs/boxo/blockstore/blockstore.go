@@ -83,13 +83,13 @@ type Viewer interface {
 // garbage-collection operations.
 type GCLocker interface {
 	// GCLock locks the blockstore for garbage collection. No operations
-	// that expect to finish with a pin should ocurr simultaneously.
+	// that expect to finish with a pin should occur simultaneously.
 	// Reading during GC is safe, and requires no lock.
 	GCLock(context.Context) Unlocker
 
 	// PinLock locks the blockstore for sequences of puts expected to finish
 	// with a pin (before GC). Multiple put->pin sequences can write through
-	// at the same time, but no GC should happen simulatenously.
+	// at the same time, but no GC should happen simultaneously.
 	// Reading during Pinning is safe, and requires no lock.
 	PinLock(context.Context) Unlocker
 
@@ -122,11 +122,11 @@ type Option struct {
 }
 
 // WriteThrough skips checking if the blockstore already has a block before
-// writing it.
-func WriteThrough() Option {
+// writing it, when enabled.
+func WriteThrough(enabled bool) Option {
 	return Option{
 		func(bs *blockstore) {
-			bs.writeThrough = true
+			bs.writeThrough = enabled
 		},
 	}
 }

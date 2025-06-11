@@ -340,15 +340,16 @@ func configFromEnv() Config {
 		cfg.Stderr = false
 	}
 
+	var stderrOpt, stdoutOpt bool
 	cfg.URL = os.Getenv(envLoggingURL)
 	output := os.Getenv(envLoggingOutput)
 	outputOptions := strings.Split(output, "+")
 	for _, opt := range outputOptions {
 		switch opt {
 		case "stdout":
-			cfg.Stdout = true
+			stdoutOpt = true
 		case "stderr":
-			cfg.Stderr = true
+			stderrOpt = true
 		case "file":
 			if cfg.File == "" {
 				fmt.Fprint(os.Stderr, "please specify a GOLOG_FILE value to write to")
@@ -358,6 +359,11 @@ func configFromEnv() Config {
 				fmt.Fprint(os.Stderr, "please specify a GOLOG_URL value to write to")
 			}
 		}
+	}
+
+	if stdoutOpt || stderrOpt {
+		cfg.Stdout = stdoutOpt
+		cfg.Stderr = stderrOpt
 	}
 
 	// Check that neither of the requested Std* nor the file are TTYs

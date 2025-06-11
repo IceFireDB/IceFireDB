@@ -26,6 +26,7 @@ func NewRecordsIter(r io.Reader) iter.Iter[iter.Result[types.Record]] {
 				return result
 			}
 			result.Val = &prov
+		//nolint:staticcheck
 		//lint:ignore SA1019 // ignore staticcheck
 		case types.SchemaBitswap:
 			//lint:ignore SA1019 // ignore staticcheck
