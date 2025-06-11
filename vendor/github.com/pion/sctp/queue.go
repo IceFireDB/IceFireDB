@@ -40,6 +40,7 @@ func (q *queue[T]) PopFront() T {
 	q.buf[q.head] = zeroVal
 	q.head = (q.head + 1) % len(q.buf)
 	q.count--
+
 	return ele
 }
 

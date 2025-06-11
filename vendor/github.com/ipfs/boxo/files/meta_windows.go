@@ -15,11 +15,11 @@ func updateMode(path string, mode os.FileMode) error {
 		return nil
 	}
 	// read+write if owner, group or world writeable
-	if mode&0222 != 0 {
-		return os.Chmod(path, 0600)
+	if mode&0o222 != 0 {
+		return os.Chmod(path, 0o600)
 	}
 	// otherwise read-only
-	return os.Chmod(path, 0400)
+	return os.Chmod(path, 0o400)
 }
 
 func updateMtime(path string, mtime time.Time) error {

@@ -3,7 +3,9 @@
 
 package guts
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+)
 
 // CompressBuffer compresses up to MaxSIMD chunks in parallel and returns their
 // root node.

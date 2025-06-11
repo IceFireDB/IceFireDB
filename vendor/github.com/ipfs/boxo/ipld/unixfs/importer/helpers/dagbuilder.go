@@ -7,14 +7,12 @@ import (
 	"os"
 	"time"
 
-	dag "github.com/ipfs/boxo/ipld/merkledag"
-
-	ft "github.com/ipfs/boxo/ipld/unixfs"
-	pb "github.com/ipfs/boxo/ipld/unixfs/pb"
-
 	chunker "github.com/ipfs/boxo/chunker"
 	"github.com/ipfs/boxo/files"
 	pi "github.com/ipfs/boxo/filestore/posinfo"
+	dag "github.com/ipfs/boxo/ipld/merkledag"
+	ft "github.com/ipfs/boxo/ipld/unixfs"
+	pb "github.com/ipfs/boxo/ipld/unixfs/pb"
 	cid "github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
 )

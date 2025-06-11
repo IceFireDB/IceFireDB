@@ -100,10 +100,12 @@ func (s *controllingSelector) HandleBindingRequest(message *stun.Message, local,
 	pair := s.agent.findPair(local, remote)
 
 	if pair == nil {
-		s.agent.addPair(local, remote)
+		pair = s.agent.addPair(local, remote)
+		pair.UpdateRequestReceived()
 
 		return
 	}
+	pair.UpdateRequestReceived()
 
 	if pair.state == CandidatePairStateSucceeded && s.nominatedPair == nil && s.agent.getSelectedPair() == nil {
 		bestPair := s.agent.getBestAvailableCandidatePair()
@@ -281,6 +283,7 @@ func (s *controlledSelector) HandleBindingRequest(message *stun.Message, local, 
 	if pair == nil {
 		pair = s.agent.addPair(local, remote)
 	}
+	pair.UpdateRequestReceived()
 
 	if message.Contains(stun.AttrUseCandidate) { //nolint:nestif
 		// https://tools.ietf.org/html/rfc8445#section-7.3.1.5
