@@ -445,7 +445,7 @@ func (p *VP9Packet) parseSSData(packet []byte, pos int) (int, error) { // nolint
 
 	p.NS = packet[pos] >> 5
 	p.Y = packet[pos]&0x10 != 0
-	p.G = (packet[pos]>>1)&0x7 != 0
+	p.G = packet[pos]&0x8 != 0
 	pos++
 
 	NS := p.NS + 1
