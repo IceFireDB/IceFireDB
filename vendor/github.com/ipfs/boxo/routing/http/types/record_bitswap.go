@@ -17,9 +17,7 @@ import (
 // [IPIP-417]: https://github.com/ipfs/specs/pull/417
 const SchemaBitswap = "bitswap"
 
-var (
-	_ Record = &BitswapRecord{}
-)
+var _ Record = &BitswapRecord{}
 
 // Deprecated: use the more versatile [PeerRecord] instead. For more information, read [IPIP-417].
 //
