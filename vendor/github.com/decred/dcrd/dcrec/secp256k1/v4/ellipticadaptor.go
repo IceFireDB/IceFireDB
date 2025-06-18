@@ -153,17 +153,17 @@ func moduloReduce(k []byte) []byte {
 	return k
 }
 
-// ScalarMult returns k*(Bx, By) where k is a big endian integer.
+// ScalarMult returns k*(bx, by) where k is a big endian integer.
 //
 // This is part of the elliptic.Curve interface implementation.
-func (curve *KoblitzCurve) ScalarMult(Bx, By *big.Int, k []byte) (*big.Int, *big.Int) {
+func (curve *KoblitzCurve) ScalarMult(bx, by *big.Int, k []byte) (*big.Int, *big.Int) {
 	// Convert the affine coordinates from big integers to Jacobian points,
 	// do the multiplication in Jacobian projective space, and convert the
 	// Jacobian point back to affine big.Ints.
 	var kModN ModNScalar
 	kModN.SetByteSlice(moduloReduce(k))
 	var point, result JacobianPoint
-	bigAffineToJacobian(Bx, By, &point)
+	bigAffineToJacobian(bx, by, &point)
 	ScalarMultNonConst(&kModN, &point, &result)
 	return jacobianToBigAffine(&result)
 }

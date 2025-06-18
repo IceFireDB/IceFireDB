@@ -6,18 +6,17 @@ import (
 	"sync"
 	"time"
 
-	cid "github.com/ipfs/go-cid"
-	delay "github.com/ipfs/go-ipfs-delay"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/ipfs/boxo/bitswap/client/internal"
 	bsbpm "github.com/ipfs/boxo/bitswap/client/internal/blockpresencemanager"
 	notifications "github.com/ipfs/boxo/bitswap/client/internal/notifications"
 	bssession "github.com/ipfs/boxo/bitswap/client/internal/session"
 	bssim "github.com/ipfs/boxo/bitswap/client/internal/sessioninterestmanager"
 	exchange "github.com/ipfs/boxo/exchange"
+	cid "github.com/ipfs/go-cid"
+	delay "github.com/ipfs/go-ipfs-delay"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Session is a session that is managed by the session manager
@@ -152,8 +151,17 @@ func (sm *SessionManager) GetNextSessionID() uint64 {
 	return sm.sessID
 }
 
-// ReceiveFrom is called when a new message is received
+// ReceiveFrom is called when a new message is received.
+//
+// IMPORTANT: ReceiveFrom filters the given Cid slices in place, modifying
+// their contents. If the caller needs to preserve a copy of the lists it
+// should make a copy before calling ReceiveFrom.
 func (sm *SessionManager) ReceiveFrom(ctx context.Context, p peer.ID, blks []cid.Cid, haves []cid.Cid, dontHaves []cid.Cid) {
+	// Keep only the keys that at least one session wants
+	keys := sm.sessionInterestManager.FilterInterests(blks, haves, dontHaves)
+	blks = keys[0]
+	haves = keys[1]
+	dontHaves = keys[2]
 	// Record block presence for HAVE / DONT_HAVE
 	sm.blockPresenceManager.ReceiveFrom(p, haves, dontHaves)
 
@@ -171,9 +179,6 @@ func (sm *SessionManager) ReceiveFrom(ctx context.Context, p peer.ID, blks []cid
 			sess.ReceiveFrom(p, blks, haves, dontHaves)
 		}
 	}
-
-	// Send CANCEL to all peers with want-have / want-block
-	sm.peerManager.SendCancels(ctx, blks)
 }
 
 // CancelSessionWants is called when a session cancels wants because a call to
@@ -181,7 +186,7 @@ func (sm *SessionManager) ReceiveFrom(ctx context.Context, p peer.ID, blks []cid
 func (sm *SessionManager) CancelSessionWants(sesid uint64, wants []cid.Cid) {
 	// Remove session's interest in the given blocks - returns the keys that no
 	// session is interested in anymore.
-	cancelKs := sm.sessionInterestManager.RemoveSessionInterested(sesid, wants)
+	cancelKs := sm.sessionInterestManager.RemoveSessionWants(sesid, wants)
 	sm.cancelWants(cancelKs)
 }
 

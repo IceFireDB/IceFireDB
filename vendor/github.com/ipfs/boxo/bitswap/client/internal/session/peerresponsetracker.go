@@ -61,3 +61,7 @@ func (prt *peerResponseTracker) getPeerCount(p peer.ID) int {
 	// will be chosen
 	return prt.firstResponder[p] + 1
 }
+
+func (prt *peerResponseTracker) remove(p peer.ID) {
+	delete(prt.firstResponder, p)
+}
