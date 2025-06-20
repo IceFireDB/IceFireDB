@@ -26,8 +26,8 @@ func (m *Message) GetData() []byte {
 // PubSub wraps libp2p pubsub with our custom message handling
 type PubSub struct {
 	*pubsub.PubSub
-	Topic *pubsub.Topic
-	Sub   *pubsub.Subscription
+	Topic    *pubsub.Topic
+	Sub      *pubsub.Subscription
 	Inbound  chan *Message
 	Outbound chan string
 }
