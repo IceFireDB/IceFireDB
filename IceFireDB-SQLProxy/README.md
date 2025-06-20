@@ -54,29 +54,41 @@ debug:  # Control to enable debug mode
   enable: true
   port: 17878
 
-# MySQL configuration
+# mysql configurations for different access levels
 mysql:
-  addr: "127.0.0.1:3306"
-  user: "root"
-  password: "password"
-  dbname: "exampledb"
-  minAlive: 1 # Specifies the minimum number of open connections the pool will attempt to maintain
-  maxAlive: 64 # Specifies the maximum number of open connections the pool will attempt to maintain
-  maxIdle: 4 # Maximum number of idle connections
+  admin:
+    addr: "127.0.0.1:3306"
+    user: "admin_user"
+    password: "admin_pass"
+    dbname: "exampledb"
+    minAlive: 1 # Specifies the minimum number of open connections the pool will attempt to maintain
+    maxAlive: 64 # Specifies the maximum number of open connections the pool will attempt to maintain
+    maxIdle: 4 # Maximum number of idle connections
+  readonly:
+    addr: "127.0.0.1:3306"
+    user: "readonly_user"
+    password: "readonly_pass"
+    dbname: "exampledb"
+    minAlive: 1 # Specifies the minimum number of open connections the pool will attempt to maintain
+    maxAlive: 64 # Specifies the maximum number of open connections the pool will attempt to maintain
+    maxIdle: 4 # Maximum number of idle connections
 
 # Tenant list
 userlist:
-  - user: root
-    password: rootpassword
+  - user: host1
+    password: host1
 
-# P2P configuration
+# p2p config for different access levels
 p2p:
-  enable: false
-  service_discovery_id: "p2p_sqlproxy_service_test"
-  service_command_topic: "p2p_sqlproxy_service_topic_test"
-  service_discover_mode: "advertise" # advertise or announce
-  node_host_ip: "127.0.0.1" # local ipv4 ip
-  node_host_port: 0 # any port
+  enable: true
+  serviceDiscoveryId: "tanovo_sqlproxy_admin_service"
+  serviceCommandTopic: "tanovo_sqlproxy_command_topic"
+  adminTopic: "tanovo_sqlproxy_admin_topic"
+  readonlyTopic: "tanovo_sqlproxy_readonly_topic"
+  serviceDiscoverMode: "advertise" # advertise or announce
+  nodeHostIp: "127.0.0.1" # local ipv4 ip
+  nodeHostPort: 0 # any port
+
 ```
 
 ### Demo

@@ -10,7 +10,7 @@ import (
 )
 
 type Resultset struct {
-	Fields     []*Field 
+	Fields     []*Field
 	FieldNames map[string]int
 	Values     [][]FieldValue
 
@@ -24,7 +24,6 @@ var resultsetPool = sync.Pool{
 		return &Resultset{}
 	},
 }
-
 
 func NewResultset(fieldsCount int) *Resultset {
 	r := resultsetPool.Get().(*Resultset)
