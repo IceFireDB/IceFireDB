@@ -19,7 +19,6 @@ const defaultAuthPluginName = AUTH_NATIVE_PASSWORD
 // defines the supported auth plugins
 var supportedAuthPlugins = []string{AUTH_NATIVE_PASSWORD, AUTH_SHA256_PASSWORD, AUTH_CACHING_SHA2_PASSWORD}
 
-
 // See: http://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::Handshake
 func (c *Conn) readInitialHandshake() error {
 	data, err := c.ReadPacket()

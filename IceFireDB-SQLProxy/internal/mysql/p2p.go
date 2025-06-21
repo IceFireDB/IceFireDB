@@ -12,9 +12,9 @@ import (
 )
 
 type p2pChannels struct {
-	adminHost    *p2p.P2P
-	adminPubSub  *p2p.PubSub
-	readonlyHost *p2p.P2P
+	adminHost      *p2p.P2P
+	adminPubSub    *p2p.PubSub
+	readonlyHost   *p2p.P2P
 	readonlyPubSub *p2p.PubSub
 }
 
@@ -24,11 +24,11 @@ var (
 
 func initP2P(m *mysqlProxy) {
 	p2pChans = &p2pChannels{}
-	
+
 	// Initialize admin P2P
-	p2pChans.adminHost = p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID, 
+	p2pChans.adminHost = p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID,
 		config.Get().P2P.NodeHostIP, config.Get().P2P.NodeHostPort)
-	
+
 	// Initialize readonly P2P
 	p2pChans.readonlyHost = p2p.NewP2P(config.Get().P2P.ServiceDiscoveryID,
 		config.Get().P2P.NodeHostIP, config.Get().P2P.NodeHostPort)
@@ -39,7 +39,7 @@ func initP2P(m *mysqlProxy) {
 
 	// Join pubsub channels
 	var err error
-	p2pChans.adminPubSub, err = p2p.JoinPubSub(p2pChans.adminHost, "mysql-admin", 
+	p2pChans.adminPubSub, err = p2p.JoinPubSub(p2pChans.adminHost, "mysql-admin",
 		config.Get().P2P.AdminTopic)
 	if err != nil {
 		panic(err)
@@ -82,7 +82,7 @@ func asyncSQL(m *mysqlProxy) {
 				_ = p2pChans.readonlyHost.Host.Close()
 				_ = p2pChans.readonlyHost.KadDHT.Close()
 				return
-				
+
 			// Handle admin channel messages
 			case msg := <-p2pChans.adminPubSub.Inbound:
 				s := &p2p.Message{
@@ -90,7 +90,7 @@ func asyncSQL(m *mysqlProxy) {
 					Content:  string(msg.GetData()),
 				}
 				handleInboundSQL(m, s, adminTxConn, "admin")
-				
+
 			// Handle readonly channel messages
 			case msg := <-p2pChans.readonlyPubSub.Inbound:
 				s := &p2p.Message{
@@ -109,7 +109,7 @@ func asyncSQL(m *mysqlProxy) {
 func handleInboundSQL(m *mysqlProxy, s *p2p.Message, txConn map[string]*client.Conn, accessType string) {
 	var err error
 	conn, ok := txConn[s.SenderID]
-	
+
 	if !ok {
 		// Get appropriate connection based on access type
 		if accessType == "admin" {
@@ -178,7 +178,7 @@ func broadcast(sql string, accessType string) {
 	if !isDML(sql) {
 		return
 	}
-	
+
 	if accessType == "admin" {
 		p2pChans.adminPubSub.Outbound <- sql
 		logrus.Infof("Outbound admin sql: %s", sql)
