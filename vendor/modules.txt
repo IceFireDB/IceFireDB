@@ -1341,7 +1341,7 @@ github.com/quic-go/webtransport-go
 # github.com/raulk/go-watchdog v1.3.0
 ## explicit; go 1.15
 github.com/raulk/go-watchdog
-# github.com/redis/go-redis/v9 v9.10.0
+# github.com/redis/go-redis/v9 v9.11.0
 ## explicit; go 1.18
 github.com/redis/go-redis/v9
 github.com/redis/go-redis/v9/auth
