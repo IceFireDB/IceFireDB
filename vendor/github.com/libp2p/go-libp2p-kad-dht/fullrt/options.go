@@ -12,12 +12,13 @@ import (
 type config struct {
 	dhtOpts []kaddht.Option
 
-	crawlInterval       time.Duration
-	waitFrac            float64
-	bulkSendParallelism int
-	timeoutPerOp        time.Duration
-	crawler             crawler.Crawler
-	pmOpts              []providers.Option
+	crawlInterval          time.Duration
+	waitFrac               float64
+	bulkSendParallelism    int
+	timeoutPerOp           time.Duration
+	crawler                crawler.Crawler
+	pmOpts                 []providers.Option
+	ipDiversityFilterLimit int
 }
 
 func (cfg *config) apply(opts ...Option) error {
@@ -47,8 +48,8 @@ func WithCrawler(c crawler.Crawler) Option {
 	}
 }
 
-// WithCrawlInterval sets the interval at which the DHT is crawled to refresh peer store.
-// Defaults to 1 hour if unspecified.
+// WithCrawlInterval sets the interval at which the DHT is crawled to refresh
+// peer store. Defaults to 1 hour if unspecified.
 func WithCrawlInterval(i time.Duration) Option {
 	return func(opt *config) error {
 		opt.crawlInterval = i
@@ -56,7 +57,8 @@ func WithCrawlInterval(i time.Duration) Option {
 	}
 }
 
-// WithSuccessWaitFraction sets the fraction of peers to wait for before considering an operation a success defined as a number between (0, 1].
+// WithSuccessWaitFraction sets the fraction of peers to wait for before
+// considering an operation a success defined as a number between (0, 1].
 // Defaults to 30% if unspecified.
 func WithSuccessWaitFraction(f float64) Option {
 	return func(opt *config) error {
@@ -68,8 +70,9 @@ func WithSuccessWaitFraction(f float64) Option {
 	}
 }
 
-// WithBulkSendParallelism sets the maximum degree of parallelism at which messages are sent to other peers. It must be at least 1.
-// Defaults to 20 if unspecified.
+// WithBulkSendParallelism sets the maximum degree of parallelism at which
+// messages are sent to other peers. It must be at least 1. Defaults to 20 if
+// unspecified.
 func WithBulkSendParallelism(b int) Option {
 	return func(opt *config) error {
 		if b < 1 {
@@ -80,8 +83,9 @@ func WithBulkSendParallelism(b int) Option {
 	}
 }
 
-// WithTimeoutPerOperation sets the timeout per operation, where operations include putting providers and querying the DHT.
-// Defaults to 5 seconds if unspecified.
+// WithTimeoutPerOperation sets the timeout per operation, where operations
+// include putting providers and querying the DHT. Defaults to 5 seconds if
+// unspecified.
 func WithTimeoutPerOperation(t time.Duration) Option {
 	return func(opt *config) error {
 		opt.timeoutPerOp = t
@@ -89,10 +93,20 @@ func WithTimeoutPerOperation(t time.Duration) Option {
 	}
 }
 
-// WithProviderManagerOptions sets the options to use when instantiating providers.ProviderManager.
+// WithProviderManagerOptions sets the options to use when instantiating
+// providers.ProviderManager.
 func WithProviderManagerOptions(pmOpts ...providers.Option) Option {
 	return func(opt *config) error {
 		opt.pmOpts = pmOpts
+		return nil
+	}
+}
+
+// WithIPDiversityFilterLimit sets the maximum number of peers with addresses
+// in the same IP group returned by GetClosestPeers.
+func WithIPDiversityFilterLimit(ipDiversityFilterLimit int) Option {
+	return func(opt *config) error {
+		opt.ipDiversityFilterLimit = ipDiversityFilterLimit
 		return nil
 	}
 }

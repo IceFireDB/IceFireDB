@@ -1,13 +1,14 @@
 package filestore
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"sort"
-
-	pb "github.com/ipfs/boxo/filestore/pb"
+	"slices"
+	"strings"
 
 	dshelp "github.com/ipfs/boxo/datastore/dshelp"
+	pb "github.com/ipfs/boxo/filestore/pb"
 	cid "github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	dsq "github.com/ipfs/go-datastore/query"
@@ -177,7 +178,7 @@ func listAllFileOrder(ctx context.Context, fs *Filestore, verify bool) (func(con
 		return nil, err
 	}
 
-	var entries listEntries
+	var entries []*listEntry
 
 	for {
 		v, ok := qr.NextSync()
@@ -195,11 +196,19 @@ func listAllFileOrder(ctx context.Context, fs *Filestore, verify bool) (func(con
 				dsKey:    v.Key,
 				filePath: dobj.GetFilePath(),
 				offset:   dobj.GetOffset(),
-				size:     dobj.GetSize_(),
+				size:     dobj.GetSize(),
 			})
 		}
 	}
-	sort.Sort(entries)
+	slices.SortFunc(entries, func(a, b *listEntry) int {
+		if a.filePath == b.filePath {
+			if a.offset == b.offset {
+				return strings.Compare(a.dsKey, b.dsKey)
+			}
+			return cmp.Compare(a.offset, b.offset)
+		}
+		return strings.Compare(a.filePath, b.filePath)
+	})
 
 	i := 0
 	return func(ctx context.Context) *ListRes {
@@ -217,9 +226,9 @@ func listAllFileOrder(ctx context.Context, fs *Filestore, verify bool) (func(con
 		}
 		// now reconstruct the DataObj
 		dobj := pb.DataObj{
-			FilePath: v.filePath,
-			Offset:   v.offset,
-			Size_:    v.size,
+			FilePath: &v.filePath,
+			Offset:   &v.offset,
+			Size:     &v.size,
 		}
 		// now if we could not convert the datastore key return that
 		// error
@@ -241,20 +250,6 @@ type listEntry struct {
 	dsKey    string
 	size     uint64
 	err      error
-}
-
-type listEntries []*listEntry
-
-func (l listEntries) Len() int      { return len(l) }
-func (l listEntries) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
-func (l listEntries) Less(i, j int) bool {
-	if l[i].filePath == l[j].filePath {
-		if l[i].offset == l[j].offset {
-			return l[i].dsKey < l[j].dsKey
-		}
-		return l[i].offset < l[j].offset
-	}
-	return l[i].filePath < l[j].filePath
 }
 
 func mkListRes(m mh.Multihash, d *pb.DataObj, err error) *ListRes {
@@ -285,8 +280,8 @@ func mkListRes(m mh.Multihash, d *pb.DataObj, err error) *ListRes {
 		Status:   status,
 		ErrorMsg: errorMsg,
 		Key:      c,
-		FilePath: d.FilePath,
-		Size:     d.Size_,
-		Offset:   d.Offset,
+		FilePath: d.GetFilePath(),
+		Size:     d.GetSize(),
+		Offset:   d.GetOffset(),
 	}
 }
