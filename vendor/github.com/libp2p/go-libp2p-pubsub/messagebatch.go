@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"iter"
+	"sync"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -10,7 +11,22 @@ import (
 // once. This allows the Scheduler to define an order for outgoing RPCs.
 // This helps bandwidth constrained peers.
 type MessageBatch struct {
+	mu       sync.Mutex
 	messages []*Message
+}
+
+func (mb *MessageBatch) add(msg *Message) {
+	mb.mu.Lock()
+	defer mb.mu.Unlock()
+	mb.messages = append(mb.messages, msg)
+}
+
+func (mb *MessageBatch) take() []*Message {
+	mb.mu.Lock()
+	defer mb.mu.Unlock()
+	messages := mb.messages
+	mb.messages = nil
+	return messages
 }
 
 type messageBatchAndPublishOptions struct {

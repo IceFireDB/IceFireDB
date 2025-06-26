@@ -1600,12 +1600,10 @@ func (p *PubSub) PublishBatch(batch *MessageBatch, opts ...BatchPubOpt) error {
 	setDefaultBatchPublishOptions(publishOptions)
 
 	p.sendMessageBatch <- messageBatchAndPublishOptions{
-		messages: batch.messages,
+		messages: batch.take(),
 		opts:     publishOptions,
 	}
 
-	// Clear the batch's messages in case a user reuses the same batch object
-	batch.messages = nil
 	return nil
 }
 
