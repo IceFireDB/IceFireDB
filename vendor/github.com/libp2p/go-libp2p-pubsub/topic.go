@@ -257,7 +257,7 @@ func (t *Topic) AddToBatch(ctx context.Context, batch *MessageBatch, data []byte
 		}
 		return err
 	}
-	batch.messages = append(batch.messages, msg)
+	batch.add(msg)
 	return nil
 }
 
