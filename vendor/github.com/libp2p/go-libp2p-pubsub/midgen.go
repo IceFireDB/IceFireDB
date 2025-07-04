@@ -9,6 +9,7 @@ import (
 // msgIDGenerator handles computing IDs for msgs
 // It allows setting custom generators(MsgIdFunction) per topic
 type msgIDGenerator struct {
+	sync.Mutex
 	Default MsgIdFunction
 
 	topicGensLk sync.RWMutex
@@ -31,6 +32,8 @@ func (m *msgIDGenerator) Set(topic string, gen MsgIdFunction) {
 
 // ID computes ID for the msg or short-circuits with the cached value.
 func (m *msgIDGenerator) ID(msg *Message) string {
+	m.Lock()
+	defer m.Unlock()
 	if msg.ID != "" {
 		return msg.ID
 	}

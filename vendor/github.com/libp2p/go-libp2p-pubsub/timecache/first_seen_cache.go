@@ -18,6 +18,10 @@ type FirstSeenCache struct {
 var _ TimeCache = (*FirstSeenCache)(nil)
 
 func newFirstSeenCache(ttl time.Duration) *FirstSeenCache {
+	return newFirstSeenCacheWithSweepInterval(ttl, backgroundSweepInterval)
+}
+
+func newFirstSeenCacheWithSweepInterval(ttl time.Duration, sweepInterval time.Duration) *FirstSeenCache {
 	tc := &FirstSeenCache{
 		m:   make(map[string]time.Time),
 		ttl: ttl,
@@ -25,7 +29,7 @@ func newFirstSeenCache(ttl time.Duration) *FirstSeenCache {
 
 	ctx, done := context.WithCancel(context.Background())
 	tc.done = done
-	go background(ctx, &tc.lk, tc.m)
+	go background(ctx, &tc.lk, tc.m, sweepInterval)
 
 	return tc
 }

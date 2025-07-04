@@ -19,6 +19,10 @@ type LastSeenCache struct {
 var _ TimeCache = (*LastSeenCache)(nil)
 
 func newLastSeenCache(ttl time.Duration) *LastSeenCache {
+	return newLastSeenCacheWithSweepInterval(ttl, backgroundSweepInterval)
+}
+
+func newLastSeenCacheWithSweepInterval(ttl time.Duration, sweepInterval time.Duration) *LastSeenCache {
 	tc := &LastSeenCache{
 		m:   make(map[string]time.Time),
 		ttl: ttl,
@@ -26,7 +30,7 @@ func newLastSeenCache(ttl time.Duration) *LastSeenCache {
 
 	ctx, done := context.WithCancel(context.Background())
 	tc.done = done
-	go background(ctx, &tc.lk, tc.m)
+	go background(ctx, &tc.lk, tc.m, sweepInterval)
 
 	return tc
 }
