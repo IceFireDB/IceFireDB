@@ -14,7 +14,7 @@ func ResolveUnspecifiedAddress(resolve ma.Multiaddr, ifaceAddrs []ma.Multiaddr) 
 	first, rest := ma.SplitFirst(resolve)
 
 	// if first component (ip) is not unspecified, use it as is.
-	if !IsIPUnspecified(first) {
+	if !IsIPUnspecified(first.Multiaddr()) {
 		return []ma.Multiaddr{resolve}, nil
 	}
 
