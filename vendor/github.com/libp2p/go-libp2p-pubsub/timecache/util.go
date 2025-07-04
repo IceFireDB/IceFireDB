@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-var backgroundSweepInterval = time.Minute
+const backgroundSweepInterval = time.Minute
 
-func background(ctx context.Context, lk sync.Locker, m map[string]time.Time) {
-	ticker := time.NewTicker(backgroundSweepInterval)
+func background(ctx context.Context, lk sync.Locker, m map[string]time.Time, tickerDur time.Duration) {
+	ticker := time.NewTicker(tickerDur)
 	defer ticker.Stop()
 
 	for {

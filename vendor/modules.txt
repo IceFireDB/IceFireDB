@@ -936,7 +936,7 @@ github.com/libp2p/go-libp2p-kad-dht/rtrefresh
 github.com/libp2p/go-libp2p-kbucket
 github.com/libp2p/go-libp2p-kbucket/keyspace
 github.com/libp2p/go-libp2p-kbucket/peerdiversity
-# github.com/libp2p/go-libp2p-pubsub v0.14.1
+# github.com/libp2p/go-libp2p-pubsub v0.14.2
 ## explicit; go 1.23
 github.com/libp2p/go-libp2p-pubsub
 github.com/libp2p/go-libp2p-pubsub/pb
