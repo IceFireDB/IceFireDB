@@ -9,6 +9,7 @@ import (
 
 type Iterator struct {
 	it     iterator.Iterator
+	db     *DB // Reference to the main DB to access encryption key
 	ipfsDB *levelkv.LevelKV
 	ctx    context.Context
 }
@@ -17,17 +18,18 @@ func (it *Iterator) Key() []byte {
 	return it.it.Key()
 }
 
-func (it *Iterator) Value1() []byte {
-	return it.it.Value()
-}
-
 func (it *Iterator) Value() []byte {
 	key := it.it.Key()
+	// Try to get the value from IPFS first for consistency
 	value, err := it.ipfsDB.Get(key)
-	if err != nil || value == nil {
-		return it.it.Value() // Fall back to local value
+	if err == nil && value != nil {
+		if it.db.encryptionKey != nil {
+			return decrypt(value, it.db.encryptionKey)
+		}
+		return value
 	}
-	return value
+	// Fall back to local value if IPFS fails or returns nil
+	return it.it.Value()
 }
 
 func (it *Iterator) Close() error {
