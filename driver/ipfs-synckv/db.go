@@ -280,7 +280,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 
 	var wg sync.WaitGroup
 	var ipfsValue, localValue, ipfsVersionBytes, localVersionBytes []byte
-	var ipfsErr, localErr, ipfsVersionErr, localVersionErr error
+	var ipfsErr, localErr error
 
 	wg.Add(2)
 
@@ -289,14 +289,14 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 		defer wg.Done()
 		metaKey := append([]byte("_meta:"), key...)
 		localValue, localErr = db.localDB.Get(key, nil)
-		localVersionBytes, localVersionErr = db.localDB.Get(metaKey, nil)
+		localVersionBytes, _ = db.localDB.Get(metaKey, nil)
 	}()
 
 	go func() {
 		defer wg.Done()
 		metaKey := append([]byte("_meta:"), key...)
 		ipfsValue, ipfsErr = db.ipfsDB.Get(key)
-		ipfsVersionBytes, ipfsVersionErr = db.ipfsDB.Get(metaKey)
+		ipfsVersionBytes, _ = db.ipfsDB.Get(metaKey)
 	}()
 
 	wg.Wait()

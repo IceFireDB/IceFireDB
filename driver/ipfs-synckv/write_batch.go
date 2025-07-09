@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 var _ = context.Background // Reference context to prevent unused import warning
@@ -88,7 +89,7 @@ func (w *WriteBatch) commit(sync bool) error {
 	}
 
 	// 2. If all IPFS operations succeed, commit the local leveldb batch.
-	var wo *leveldb.WriteOptions
+	var wo *opt.WriteOptions
 	if sync {
 		wo = w.db.syncOpts
 	}
@@ -115,6 +116,6 @@ func (w *WriteBatch) Close() {
 	w.ipfsOps = nil
 }
 
-func (w.WriteBatch) Data() []byte {
+func (w *WriteBatch) Data() []byte {
 	return w.wbatch.Dump()
 }
