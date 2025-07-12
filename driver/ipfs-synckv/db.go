@@ -35,13 +35,13 @@ const (
 type Config struct {
 	HotCacheSize       int64
 	EndPointConnection string
-	EncryptionKey      []byte // For AES-256, this should be a 32-byte key
+	EncryptionKey      string // For AES-256, this should be a 32-byte key
 }
 
-var IpfsDefaultConfig = Config{
+var DefaultConfig = Config{
 	HotCacheSize:       defaultHotCacheSize,
 	EndPointConnection: "http://localhost:5001",
-	EncryptionKey:      nil, // Encryption is off by default
+	EncryptionKey:      "", // Encryption is off by default
 }
 
 func init() {
@@ -65,8 +65,8 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	db.versions = make(map[string]uint64)
 
 	// Set encryption key if provided
-	if len(IpfsDefaultConfig.EncryptionKey) > 0 {
-		db.encryptionKey = IpfsDefaultConfig.EncryptionKey
+	if len(DefaultConfig.EncryptionKey) > 0 {
+		db.encryptionKey = []byte(DefaultConfig.EncryptionKey)
 	}
 
 	db.initOpts()
@@ -77,13 +77,13 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if IpfsDefaultConfig.HotCacheSize <= 0 {
-		IpfsDefaultConfig.HotCacheSize = defaultHotCacheSize
+	if DefaultConfig.HotCacheSize <= 0 {
+		DefaultConfig.HotCacheSize = defaultHotCacheSize
 	}
 
 	// here we use default value, later add config support
 	db.cache, err = ristretto.NewCache(&ristretto.Config{
-		MaxCost:     IpfsDefaultConfig.HotCacheSize * MB,
+		MaxCost:     DefaultConfig.HotCacheSize * MB,
 		NumCounters: defaultHotCacheNumCounters,
 		BufferItems: 64,
 		Metrics:     true,
@@ -96,7 +96,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 		return nil, err
 	}
 
-	sh := shell.NewShell(IpfsDefaultConfig.EndPointConnection)
+	sh := shell.NewShell(DefaultConfig.EndPointConnection)
 	db.remoteShell = sh
 
 	// Initialize ipfs-log components

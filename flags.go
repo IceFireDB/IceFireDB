@@ -15,6 +15,7 @@ import (
 
 	"github.com/IceFireDB/IceFireDB/driver/hybriddb"
 	"github.com/IceFireDB/IceFireDB/driver/ipfs"
+	"github.com/IceFireDB/IceFireDB/driver/ipfs-synckv"
 
 	//"github.com/IceFireDB/IceFireDB/driver/orbitdb"
 	"github.com/IceFireDB/IceFireDB/driver/oss"
@@ -62,6 +63,7 @@ Advanced options:
   --raft-backend   : Raft storage backend
   --storage-backend : Storage backend
   --ipfs-endpoint	: ipfs endpoint connect
+  --ipfs-synckv-key : ipfs-synckv driver encryption key
   --pubsub-id		: orbitdb pub sub
   --oss-endpoint	: aws oss endpoint connect
   --oss-ak			: aws oss access key
@@ -117,6 +119,7 @@ func confInit(conf *rafthub.Config) {
 	flag.StringVar(&testNode, "t", "", "")
 
 	flag.StringVar(&ipfs.IpfsDefaultConfig.EndPointConnection, "ipfs-endpoint", "", "")
+	flag.StringVar(&ipfs_synckv.DefaultConfig.EncryptionKey, "ipfs-synckv-key", "", "")
 	flag.StringVar(&oss.OssDefaultConfig.EndPointConnection, "oss-endpoint", "", "")
 	flag.StringVar(&oss.OssDefaultConfig.AccessKey, "oss-ak", "", "")
 	flag.StringVar(&oss.OssDefaultConfig.Secretkey, "oss-sk", "", "")
