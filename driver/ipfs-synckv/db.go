@@ -450,6 +450,7 @@ func (db *DB) NewWriteBatch() driver.IWriteBatch {
 func (db *DB) NewIterator() driver.IIterator {
 	it := &Iterator{
 		it:     db.localDB.NewIterator(nil, db.iteratorOpts),
+		db:     db,
 		ipfsDB: db.ipfsDB,
 		ctx:    db.ctx,
 	}
