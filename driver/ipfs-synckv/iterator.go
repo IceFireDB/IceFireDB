@@ -21,12 +21,14 @@ func (it *Iterator) Key() []byte {
 func (it *Iterator) Value() []byte {
 	key := it.it.Key()
 	// Try to get the value from IPFS first for consistency
-	value, err := it.ipfsDB.Get(key)
-	if err == nil && value != nil {
-		if it.db.encryptionKey != nil {
-			return decrypt(value, it.db.encryptionKey)
+	if it.ipfsDB != nil {
+		value, err := it.ipfsDB.Get(key)
+		if err == nil && value != nil {
+			if it.db.encryptionKey != nil {
+				return decrypt(value, it.db.encryptionKey)
+			}
+			return value
 		}
-		return value
 	}
 	// Fall back to local value if IPFS fails or returns nil
 	return it.it.Value()
