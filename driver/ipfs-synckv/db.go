@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"strconv"
 	"sync"
 
 	iflog "github.com/IceFireDB/icefiredb-ipfs-log"
@@ -34,11 +35,13 @@ const (
 type Config struct {
 	HotCacheSize       int64
 	EndPointConnection string
+	EncryptionKey      string // For AES-256, this should be a 32-byte key
 }
 
-var IpfsDefaultConfig = Config{
+var DefaultConfig = Config{
 	HotCacheSize:       defaultHotCacheSize,
 	EndPointConnection: "http://localhost:5001",
+	EncryptionKey:      "", // Encryption is off by default
 }
 
 func init() {
@@ -59,6 +62,12 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	db := new(DB)
 	db.path = path
 	db.cfg = &cfg.LevelDB
+	db.versions = make(map[string]uint64)
+
+	// Set encryption key if provided
+	if len(DefaultConfig.EncryptionKey) > 0 {
+		db.encryptionKey = []byte(DefaultConfig.EncryptionKey)
+	}
 
 	db.initOpts()
 
@@ -68,13 +77,13 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if IpfsDefaultConfig.HotCacheSize <= 0 {
-		IpfsDefaultConfig.HotCacheSize = defaultHotCacheSize
+	if DefaultConfig.HotCacheSize <= 0 {
+		DefaultConfig.HotCacheSize = defaultHotCacheSize
 	}
 
 	// here we use default value, later add config support
 	db.cache, err = ristretto.NewCache(&ristretto.Config{
-		MaxCost:     IpfsDefaultConfig.HotCacheSize * MB,
+		MaxCost:     DefaultConfig.HotCacheSize * MB,
 		NumCounters: defaultHotCacheNumCounters,
 		BufferItems: 64,
 		Metrics:     true,
@@ -87,7 +96,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 		return nil, err
 	}
 
-	sh := shell.NewShell(IpfsDefaultConfig.EndPointConnection)
+	sh := shell.NewShell(DefaultConfig.EndPointConnection)
 	db.remoteShell = sh
 
 	// Initialize ipfs-log components
@@ -151,16 +160,17 @@ type DB struct {
 	iteratorOpts *opt.ReadOptions
 	syncOpts     *opt.WriteOptions
 
-	cache       *ristretto.Cache
-	filter      filter.Filter
-	remoteShell *shell.Shell
+	cache         *ristretto.Cache
+	filter        filter.Filter
+	remoteShell   *shell.Shell
+	encryptionKey []byte
 
 	ctx      context.Context
 	ipfsDB   *levelkv.LevelKV
 	ipfsLog  *iflog.IpfsLog
 	ipfsNode *core.IpfsNode // Stores the IPFS node returned by iflog.CreateNode()
 	logger   *zap.Logger
-	
+
 	// For decentralized consistency
 	peerID    peer.ID
 	versionMu sync.RWMutex
@@ -218,20 +228,45 @@ func (db *DB) Put(key, value []byte) error {
 	defer db.versionMu.Unlock()
 
 	// Increment version
-	db.versions[string(key)] = db.versions[string(key)] + 1
+	db.versions[string(key)]++
 	version := db.versions[string(key)]
-
-	// Store version separately in metadata
-	metaKey := append([]byte("_meta:"), key...)
 	versionBytes := []byte(fmt.Sprintf("%d", version))
-	
-	// Write data and version separately
-	localErr := db.localDB.Put(key, value, nil)
-	ipfsErr := db.ipfsDB.Put(db.ctx, key, value)
-	metaErr := db.localDB.Put(metaKey, versionBytes, nil)
-	
-	if localErr != nil || ipfsErr != nil || metaErr != nil {
-		return fmt.Errorf("local error: %v, ipfs error: %v, meta error: %v", localErr, ipfsErr, metaErr)
+
+	// Prepare data for IPFS (encrypt if key is available)
+	ipfsValue := value
+	if db.encryptionKey != nil {
+		ipfsValue = encrypt(value, db.encryptionKey)
+	}
+
+	// --- Atomic Write (IPFS-first) ---
+	// 1. Write to IPFS first. This is the source of truth for the network.
+	ipfsErr := db.ipfsDB.Put(db.ctx, key, ipfsValue)
+	if ipfsErr != nil {
+		// If IPFS write fails, we abort the whole operation.
+		return fmt.Errorf("ipfs write failed, aborting put: %w", ipfsErr)
+	}
+
+	// 2. Write to local DB and metadata only after IPFS success.
+	var wg sync.WaitGroup
+	var localErr, metaErr error
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		localErr = db.localDB.Put(key, value, nil)
+	}()
+	go func() {
+		defer wg.Done()
+		// Store version in both local and ipfs for consistency checks
+		metaKey := append([]byte("_meta:"), key...)
+		metaErr = db.localDB.Put(metaKey, versionBytes, nil)
+		_ = db.ipfsDB.Put(db.ctx, metaKey, versionBytes) // Also store version on IPFS
+	}()
+	wg.Wait()
+
+	if localErr != nil || metaErr != nil {
+		// This indicates a critical local failure. The data is on IPFS but not fully on local disk.
+		// A more robust solution might involve a local recovery process.
+		return fmt.Errorf("local write failed after successful ipfs write: localErr=%v, metaErr=%v", localErr, metaErr)
 	}
 
 	db.cache.Set(key, value, 0)
@@ -239,50 +274,99 @@ func (db *DB) Put(key, value []byte) error {
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
-	db.versionMu.RLock()
-	defer db.versionMu.RUnlock()
-
 	if v, ok := db.cache.Get(key); ok {
 		return v.([]byte), nil
 	}
 
-	// Get values from both stores
-	ipfsValue, ipfsErr := db.ipfsDB.Get(key)
-	localValue, localErr := db.localDB.Get(key, nil)
-	
-	// Get versions
-	metaKey := append([]byte("_meta:"), key...)
-	ipfsVersion, _ := db.ipfsDB.Get(metaKey)
-	localVersion, _ := db.localDB.Get(metaKey, nil)
-	
-	// Resolve conflicts based on version
+	var wg sync.WaitGroup
+	var ipfsValue, localValue, ipfsVersionBytes, localVersionBytes []byte
+	var ipfsErr, localErr error
+
+	wg.Add(2)
+
+	// Concurrently get from localDB and ipfsDB
+	go func() {
+		defer wg.Done()
+		metaKey := append([]byte("_meta:"), key...)
+		localValue, localErr = db.localDB.Get(key, nil)
+		localVersionBytes, _ = db.localDB.Get(metaKey, nil)
+	}()
+
+	go func() {
+		defer wg.Done()
+		metaKey := append([]byte("_meta:"), key...)
+		ipfsValue, ipfsErr = db.ipfsDB.Get(key)
+		ipfsVersionBytes, _ = db.ipfsDB.Get(metaKey)
+	}()
+
+	wg.Wait()
+
+	// Decrypt IPFS value if needed
+	if ipfsErr == nil && ipfsValue != nil && db.encryptionKey != nil {
+		ipfsValue = decrypt(ipfsValue, db.encryptionKey)
+	}
+
+	// --- Conflict Resolution ---
 	var value []byte
+	localExists := localErr == nil && localValue != nil
+	ipfsExists := ipfsErr == nil && ipfsValue != nil
+
 	switch {
-	case ipfsErr == nil && ipfsValue != nil && localErr == nil && localValue != nil:
-		// Both have value - pick higher version
-		if string(ipfsVersion) > string(localVersion) {
+	case ipfsExists && localExists:
+		// Both exist, compare versions correctly
+		localVer, _ := strconv.ParseUint(string(localVersionBytes), 10, 64)
+		ipfsVer, _ := strconv.ParseUint(string(ipfsVersionBytes), 10, 64)
+
+		if ipfsVer > localVer {
 			value = ipfsValue
+			// Heal local store with the newer value
+			_ = db.localDB.Put(key, ipfsValue, nil)
+			_ = db.localDB.Put(append([]byte("_meta:"), key...), ipfsVersionBytes, nil)
 		} else {
 			value = localValue
 		}
-	case ipfsErr == nil && ipfsValue != nil:
+
+	case ipfsExists:
 		value = ipfsValue
-	case localErr == nil && localValue != nil:
+		// Heal local store
+		_ = db.localDB.Put(key, ipfsValue, nil)
+		_ = db.localDB.Put(append([]byte("_meta:"), key...), ipfsVersionBytes, nil)
+
+	case localExists:
 		value = localValue
+
 	case localErr == leveldb.ErrNotFound:
-		return nil, nil
+		return nil, nil // Not found in either store
+
 	default:
 		return nil, fmt.Errorf("ipfs error: %v, local error: %v", ipfsErr, localErr)
 	}
-	
-	// Cache the result
-	db.cache.Set(key, value, 0)
+
+	if value != nil {
+		db.cache.Set(key, value, 0)
+	}
 	return value, nil
 }
 
 func (db *DB) Delete(key []byte) error {
-	localErr := db.localDB.Delete(key, nil)
-	ipfsErr := db.ipfsDB.Delete(db.ctx, key)
+	var wg sync.WaitGroup
+	var localErr, ipfsErr error
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		localErr = db.localDB.Delete(key, nil)
+		_ = db.localDB.Delete(append([]byte("_meta:"), key...), nil) // Delete meta
+	}()
+
+	go func() {
+		defer wg.Done()
+		ipfsErr = db.ipfsDB.Delete(db.ctx, key)
+		_ = db.ipfsDB.Delete(db.ctx, append([]byte("_meta:"), key...)) // Delete meta
+	}()
+
+	wg.Wait()
+
 	if localErr != nil || ipfsErr != nil {
 		return fmt.Errorf("local error: %v, ipfs error: %v", localErr, ipfsErr)
 	}
@@ -366,6 +450,7 @@ func (db *DB) NewWriteBatch() driver.IWriteBatch {
 func (db *DB) NewIterator() driver.IIterator {
 	it := &Iterator{
 		it:     db.localDB.NewIterator(nil, db.iteratorOpts),
+		db:     db,
 		ipfsDB: db.ipfsDB,
 		ctx:    db.ctx,
 	}
