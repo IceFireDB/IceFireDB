@@ -338,9 +338,9 @@ func TestRPopLPush(t *testing.T) {
 		t.Fatal(v)
 	}
 
-	if v, err := c.Do(ctx, "rpoplpush", src, des).Int64(); err != nil {
+	if res, err := c.Do(ctx, "rpoplpush", src, des).Result(); err != nil {
 		t.Fatal(err)
-	} else if v != 5 {
+	} else if v := cast.ToInt(res); v != 5 {
 		t.Fatal(v)
 	}
 
