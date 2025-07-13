@@ -47,7 +47,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 			})
 		}
 		
-		v, err = item.ValueCopy(nil)
+		v, err = item.ValueCopy(v)
 		if err != nil {
 			return err
 		}
