@@ -47,7 +47,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 			})
 		}
 		
-		v, err = item.ValueCopy(v)
+		v, err = item.ValueCopy(nil)
 		if err != nil {
 			return err
 		}
@@ -107,7 +107,7 @@ func (db *DB) NewStream() *badger.Stream {
 }
 
 func (db *DB) Compact() error {
-	return nil
+	return db.db.RunValueLogGC(0.5)
 }
 
 func (db *DB) GetStorageEngine() interface{} {

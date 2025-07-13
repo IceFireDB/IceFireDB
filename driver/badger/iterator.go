@@ -16,9 +16,8 @@ func (it *Iterator) Key() []byte {
 }
 
 func (it *Iterator) Value() []byte {
-	v := []byte{}
 	var err error
-	v, err = it.it.Item().ValueCopy(v)
+	v, err := it.it.Item().ValueCopy(nil)
 	if err != nil {
 		return nil
 	}
