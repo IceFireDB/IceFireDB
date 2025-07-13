@@ -5,7 +5,7 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/dgraph-io/ristretto"
+	"github.com/dgraph-io/ristretto/v2"
 	"github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/store/driver"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -15,12 +15,20 @@ import (
 )
 
 const (
-	StorageName                      = "hybriddb"
-	MB                         int64 = 1024 * 1024
-	defaultHotCacheSize        int64 = 1024 // unit:MB 1G
-	defaultHotCacheNumCounters int64 = 1e7  // unit:byte 10m
-	defaultFilterBits          int   = 10
+	StorageName                = "hybriddb"
+	MB                         = 1024 * 1024
+	defaultHotCacheSize        = 1024 // unit:MB 1G
+	defaultHotCacheNumCounters = 1e7  // unit:byte 10m
+	defaultFilterBits          = 10
 )
+
+// cacheItem is a struct that holds both the key and value.
+// We store this in the cache so that we can access the key
+// during eviction.
+type cacheItem struct {
+	key   []byte
+	value []byte
+}
 
 type Config struct {
 	HotCacheSize int64
@@ -53,27 +61,38 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 
 	var err error
 	db.db, err = leveldb.OpenFile(db.path, db.opts)
-
 	if err != nil {
 		return nil, err
 	}
+
 	if DefaultConfig.HotCacheSize <= 0 {
 		DefaultConfig.HotCacheSize = defaultHotCacheSize
 	}
-	//TODO: here we use default value, need add config support
-	db.cache, err = ristretto.NewCache(&ristretto.Config{
+
+	// Ristretto (hot tier) configuration
+	db.cache, err = ristretto.NewCache(&ristretto.Config[[]byte, *cacheItem]{
 		MaxCost:     DefaultConfig.HotCacheSize * MB,
 		NumCounters: defaultHotCacheNumCounters,
 		BufferItems: 64,
 		Metrics:     true,
-		Cost: func(value interface{}) int64 {
-			return int64(len(value.([]byte)))
+		// The cost is the size of the value in bytes.
+		Cost: func(item *cacheItem) int64 {
+			return int64(len(item.value))
+		},
+		// OnEvict is called when an item is evicted from the cache.
+		// We use this to demote the hot data to the cold tier (LevelDB).
+		OnEvict: func(item *ristretto.Item[*cacheItem]) {
+			if item == nil || item.Value == nil {
+				return
+			}
+			// Write the evicted item to LevelDB.
+			db.db.Put(item.Value.key, item.Value.value, nil)
 		},
 	})
-
 	if err != nil {
 		return nil, err
 	}
+
 	return db, nil
 }
 
@@ -82,25 +101,20 @@ func (s Store) Repair(path string, cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-
-	db.Close()
+	defer db.Close()
 	return nil
 }
 
 type DB struct {
 	path string
-
-	cfg *config.LevelDBConfig
-
-	db *leveldb.DB
-
+	cfg  *config.LevelDBConfig
+	db   *leveldb.DB // Cold tier storage
 	opts *opt.Options
 
 	iteratorOpts *opt.ReadOptions
+	syncOpts     *opt.WriteOptions
 
-	syncOpts *opt.WriteOptions
-
-	cache *ristretto.Cache
+	cache *ristretto.Cache[[]byte, *cacheItem] // Hot tier storage
 
 	filter filter.Filter
 }
@@ -122,10 +136,7 @@ func (db *DB) initOpts() {
 func newOptions(cfg *config.LevelDBConfig) *opt.Options {
 	opts := &opt.Options{}
 	opts.ErrorIfMissing = false
-
 	opts.BlockCacheCapacity = cfg.CacheSize
-
-	// we must use bloomfilter
 	opts.Filter = filter.NewBloomFilter(defaultFilterBits)
 
 	if !cfg.Compression {
@@ -137,8 +148,6 @@ func newOptions(cfg *config.LevelDBConfig) *opt.Options {
 	opts.BlockSize = cfg.BlockSize
 	opts.WriteBuffer = cfg.WriteBufferSize
 	opts.OpenFilesCacheCapacity = cfg.MaxOpenFiles
-
-	// here we use default value, later add config support
 	opts.CompactionTableSize = 32 * 1024 * 1024
 	opts.WriteL0SlowdownTrigger = 16
 	opts.WriteL0PauseTrigger = 64
@@ -147,52 +156,61 @@ func newOptions(cfg *config.LevelDBConfig) *opt.Options {
 }
 
 func (db *DB) Close() error {
+	// Close the cache and wait for all OnEvict writes to complete.
 	db.cache.Close()
 	return db.db.Close()
 }
 
 func (db *DB) Put(key, value []byte) error {
-	err := db.db.Put(key, value, nil)
-	if err == nil {
-		db.cache.Del(key)
-	}
-	return err
+	item := &cacheItem{key: key, value: value}
+	db.cache.Set(key, item, int64(len(value)))
+	// We also need to delete from the cold tier in case of an update
+	// to an existing key that might be in the cold tier.
+	db.db.Delete(key, nil)
+	return nil
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
-	if v, ok := db.cache.Get(key); ok {
-		return v.([]byte), nil
+	// 1. Check hot tier
+	if item, ok := db.cache.Get(key); ok {
+		return item.value, nil
 	}
+
+	// 2. Check cold tier
 	v, err := db.db.Get(key, nil)
-	if err == leveldb.ErrNotFound {
-		return nil, nil
+	if err != nil {
+		if err == leveldb.ErrNotFound {
+			return nil, nil // Not found in either tier
+		}
+		return nil, err // Other LevelDB error
 	}
-	db.cache.Set(key, v, 0)
+
+	// 3. Promote to hot tier
+	if v != nil {
+		item := &cacheItem{key: key, value: v}
+		db.cache.Set(key, item, int64(len(v)))
+	}
+
 	return v, nil
 }
 
 func (db *DB) Delete(key []byte) error {
-	err := db.db.Delete(key, nil)
-	if err == nil {
-		db.cache.Del(key)
-	}
-	return err
+	db.cache.Del(key)
+	return db.db.Delete(key, nil)
 }
 
-func (db *DB) SyncPut(key []byte, value []byte) error {
+func (db *DB) SyncPut(key, value []byte) error {
 	err := db.db.Put(key, value, db.syncOpts)
 	if err == nil {
-		db.cache.Del(key)
+		item := &cacheItem{key: key, value: value}
+		db.cache.Set(key, item, int64(len(value)))
 	}
 	return err
 }
 
 func (db *DB) SyncDelete(key []byte) error {
-	err := db.db.Delete(key, db.syncOpts)
-	if err == nil {
-		db.cache.Del(key)
-	}
-	return err
+	db.cache.Del(key)
+	return db.db.Delete(key, db.syncOpts)
 }
 
 func (db *DB) NewWriteBatch() driver.IWriteBatch {
@@ -207,7 +225,6 @@ func (db *DB) NewIterator() driver.IIterator {
 	it := &Iterator{
 		db.db.NewIterator(nil, db.iteratorOpts),
 	}
-
 	return it
 }
 
@@ -216,12 +233,10 @@ func (db *DB) NewSnapshot() (driver.ISnapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	s := &Snapshot{
 		db:  db,
 		snp: snapshot,
 	}
-
 	return s, nil
 }
 
@@ -234,27 +249,24 @@ func (db *DB) Compact() error {
 
 func (db *DB) Metrics() (tit string, metrics []map[string]interface{}) {
 	tit = "hybriddb cache"
-	costAdd := db.cache.Metrics.CostAdded()
-	costEvicted := db.cache.Metrics.CostEvicted()
+	if db.cache == nil || db.cache.Metrics == nil {
+		return tit, nil
+	}
+	m := db.cache.Metrics
 	metrics = []map[string]interface{}{
-		{"used_cost": costAdd - costEvicted},                     // Current memory usage (bytes)
-		{"cost_added": costAdd},                                  // Total memory sum of data added in history, incrementing (bytes)
-		{"cost_evicted": costEvicted},                            // Free total memory, incrementing (bytes)
-		{"hits": db.cache.Metrics.Hits()},                        // hits
-		{"misses": db.cache.Metrics.Misses()},                    // misses
-		{"ratio": fmt.Sprintf("%.2f", db.cache.Metrics.Ratio())}, // hits / (hists + misses)
-		{"keys_added": db.cache.Metrics.KeysAdded()},             // number of keys added
-		{"keys_evicted": db.cache.Metrics.KeysEvicted()},         // delete key times
-		{"keys_updated": db.cache.Metrics.KeysUpdated()},         // update key times
-		{"gets_kept": db.cache.Metrics.GetsKept()},               // get total number of times the command is executed
-		// GetsDropped is the number of Get counter increments that are dropped
-		// internally.
-		{"gets_dropped": db.cache.Metrics.GetsDropped()},
-		// SetsDropped is the number of Set calls that don't make it into internal
-		// buffers (due to contention or some other reason).
-		{"sets_dropped": db.cache.Metrics.SetsDropped()},
-		// SetsRejected is the number of Set calls rejected by the policy (TinyLFU).
-		{"sets_rejected": db.cache.Metrics.SetsRejected()},
+		{"used_cost": m.CostAdded() - m.CostEvicted()},
+		{"cost_added": m.CostAdded()},
+		{"cost_evicted": m.CostEvicted()},
+		{"hits": m.Hits()},
+		{"misses": m.Misses()},
+		{"ratio": fmt.Sprintf("%.2f", m.Ratio())},
+		{"keys_added": m.KeysAdded()},
+		{"keys_evicted": m.KeysEvicted()},
+		{"keys_updated": m.KeysUpdated()},
+		{"gets_kept": m.GetsKept()},
+		{"gets_dropped": m.GetsDropped()},
+		{"sets_dropped": m.SetsDropped()},
+		{"sets_rejected": m.SetsRejected()},
 	}
 	return
 }
