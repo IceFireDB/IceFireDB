@@ -79,15 +79,6 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 		Cost: func(item *cacheItem) int64 {
 			return int64(len(item.value))
 		},
-		// OnEvict is called when an item is evicted from the cache.
-		// We use this to demote the hot data to the cold tier (LevelDB).
-		OnEvict: func(item *ristretto.Item[*cacheItem]) {
-			if item == nil || item.Value == nil {
-				return
-			}
-			// Write the evicted item to LevelDB.
-			db.db.Put(item.Value.key, item.Value.value, nil)
-		},
 	})
 	if err != nil {
 		return nil, err
@@ -162,11 +153,11 @@ func (db *DB) Close() error {
 }
 
 func (db *DB) Put(key, value []byte) error {
+	if err := db.db.Put(key, value, nil); err != nil {
+		return err
+	}
 	item := &cacheItem{key: key, value: value}
 	db.cache.Set(key, item, int64(len(value)))
-	// We also need to delete from the cold tier in case of an update
-	// to an existing key that might be in the cold tier.
-	db.db.Delete(key, nil)
 	return nil
 }
 
@@ -200,12 +191,12 @@ func (db *DB) Delete(key []byte) error {
 }
 
 func (db *DB) SyncPut(key, value []byte) error {
-	err := db.db.Put(key, value, db.syncOpts)
-	if err == nil {
-		item := &cacheItem{key: key, value: value}
-		db.cache.Set(key, item, int64(len(value)))
+	if err := db.db.Put(key, value, db.syncOpts); err != nil {
+		return err
 	}
-	return err
+	item := &cacheItem{key: key, value: value}
+	db.cache.Set(key, item, int64(len(value)))
+	return nil
 }
 
 func (db *DB) SyncDelete(key []byte) error {
