@@ -19,6 +19,7 @@ import (
 	pin "github.com/ipfs/boxo/pinning/pinner"
 	"github.com/ipfs/go-datastore"
 
+	bitswap "github.com/ipfs/boxo/bitswap"
 	bserv "github.com/ipfs/boxo/blockservice"
 	bstore "github.com/ipfs/boxo/blockstore"
 	exchange "github.com/ipfs/boxo/exchange"
@@ -27,7 +28,7 @@ import (
 	pathresolver "github.com/ipfs/boxo/path/resolver"
 	provider "github.com/ipfs/boxo/provider"
 	ipld "github.com/ipfs/go-ipld-format"
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 	goprocess "github.com/jbenet/goprocess"
 	ddht "github.com/libp2p/go-libp2p-kad-dht/dual"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -102,7 +103,8 @@ type IpfsNode struct {
 	UnixFSPathResolver        pathresolver.Resolver      `name:"unixFSPathResolver"`        // The UnixFS path resolver
 	OfflineIPLDPathResolver   pathresolver.Resolver      `name:"offlineIpldPathResolver"`   // The IPLD path resolver that uses only locally available blocks
 	OfflineUnixFSPathResolver pathresolver.Resolver      `name:"offlineUnixFSPathResolver"` // The UnixFS path resolver that uses only locally available blocks
-	Exchange                  exchange.Interface         // the block exchange + strategy (bitswap)
+	Exchange                  exchange.Interface         // the block exchange + strategy
+	Bitswap                   *bitswap.Bitswap           `optional:"true"` // The Bitswap instance
 	Namesys                   namesys.NameSystem         // the name system, resolves paths to hashes
 	Provider                  provider.System            // the value provider system
 	IpnsRepub                 *ipnsrp.Republisher        `optional:"true"`
@@ -132,6 +134,7 @@ type IpfsNode struct {
 type Mounts struct {
 	Ipfs mount.Mount
 	Ipns mount.Mount
+	Mfs  mount.Mount
 }
 
 // Close calls Close() on the App object
