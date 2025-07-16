@@ -102,15 +102,19 @@ func (m *PacketFactoryCopy) NewPacket(
 		// Rewrite the sequence number.
 		retainablePacket.header.SequenceNumber = m.rtxSequencer.NextSequenceNumber()
 		// Remove padding if present.
-		if retainablePacket.header.Padding && retainablePacket.payload != nil && len(retainablePacket.payload) > 0 {
-			paddingLength := int(retainablePacket.payload[len(retainablePacket.payload)-1])
-			retainablePacket.header.Padding = false
-
-			if paddingLength > len(retainablePacket.payload) {
-				return nil, errPaddingOverflow
+		if retainablePacket.header.Padding {
+			// Older versions of pion/rtp didn't have the Header.PaddingSize field and as a workaround
+			// users had to add padding to the payload. We need to handle this case here.
+			if retainablePacket.header.PaddingSize == 0 && len(retainablePacket.payload) > 0 {
+				paddingLength := int(retainablePacket.payload[len(retainablePacket.payload)-1])
+				if paddingLength > len(retainablePacket.payload) {
+					return nil, errPaddingOverflow
+				}
+				retainablePacket.payload = (*retainablePacket.buffer)[:len(retainablePacket.payload)-paddingLength]
 			}
 
-			retainablePacket.payload = (*retainablePacket.buffer)[:len(retainablePacket.payload)-paddingLength]
+			retainablePacket.header.Padding = false
+			retainablePacket.header.PaddingSize = 0
 		}
 	}
 

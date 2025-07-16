@@ -36,14 +36,13 @@ type Service struct {
 var rxMaxAge = regexp.MustCompile(`\bmax-age\s*=\s*(\d+)\b`)
 
 func extractMaxAge(s string, value int) int {
-	v := value
 	if m := rxMaxAge.FindStringSubmatch(s); m != nil {
 		i64, err := strconv.ParseInt(m[1], 10, 32)
 		if err == nil {
-			v = int(i64)
+			return int(i64)
 		}
 	}
-	return v
+	return value
 }
 
 // MaxAge extracts "max-age" value from "CACHE-CONTROL" property.
@@ -98,7 +97,7 @@ func Search(searchType string, waitSec int, localAddr string, opts ...Option) ([
 	// wait response.
 	var list []Service
 	h := func(a net.Addr, d []byte) error {
-		srv, err := parseService(a, d)
+		srv, err := parseService(d)
 		if err != nil {
 			ssdplog.Printf("invalid search response from %s: %s", a.String(), err)
 			return nil
@@ -133,7 +132,7 @@ var (
 
 var endOfHeader = []byte{'\r', '\n', '\r', '\n'}
 
-func parseService(addr net.Addr, data []byte) (*Service, error) {
+func parseService(data []byte) (*Service, error) {
 	if !bytes.HasPrefix(data, []byte("HTTP")) {
 		return nil, errWithoutHTTPPrefix
 	}

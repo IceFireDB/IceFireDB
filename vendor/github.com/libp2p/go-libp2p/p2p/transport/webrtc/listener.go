@@ -253,7 +253,7 @@ func (l *listener) setupConnection(
 	if err != nil {
 		return nil, err
 	}
-	handshakeChannel := newStream(w.HandshakeDataChannel, rwc, func() {})
+	handshakeChannel := newStream(w.HandshakeDataChannel, rwc, maxSendMessageSize, nil)
 	// we do not yet know A's peer ID so accept any inbound
 	remotePubKey, err := l.transport.noiseHandshake(ctx, w.PeerConnection, handshakeChannel, "", crypto.SHA256, true)
 	if err != nil {
@@ -333,7 +333,7 @@ func (l *listener) Multiaddr() ma.Multiaddr {
 func addOnConnectionStateChangeCallback(pc *webrtc.PeerConnection) <-chan error {
 	errC := make(chan error, 1)
 	var once sync.Once
-	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+	pc.OnConnectionStateChange(func(_ webrtc.PeerConnectionState) {
 		switch pc.ConnectionState() {
 		case webrtc.PeerConnectionStateConnected:
 			once.Do(func() { close(errC) })

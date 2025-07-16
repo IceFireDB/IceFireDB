@@ -10,7 +10,7 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol"
 )
 
-// Header implements a TLS RecordLayer header
+// Header implements a TLS RecordLayer header.
 type Header struct {
 	ContentType    protocol.ContentType
 	ContentLen     uint16
@@ -22,7 +22,7 @@ type Header struct {
 	ConnectionID []byte
 }
 
-// RecordLayer enums
+// RecordLayer enums.
 const (
 	// FixedHeaderSize is the size of a DTLS record header when connection IDs
 	// are not in use.
@@ -30,7 +30,7 @@ const (
 	MaxSequenceNumber = 0x0000FFFFFFFFFFFF
 )
 
-// Marshal encodes a TLS RecordLayer Header to binary
+// Marshal encodes a TLS RecordLayer Header to binary.
 func (h *Header) Marshal() ([]byte, error) {
 	if h.SequenceNumber > MaxSequenceNumber {
 		return nil, errSequenceNumberOverflow
@@ -46,10 +46,11 @@ func (h *Header) Marshal() ([]byte, error) {
 	util.PutBigEndianUint48(out[5:], h.SequenceNumber)
 	copy(out[11:11+len(h.ConnectionID)], h.ConnectionID)
 	binary.BigEndian.PutUint16(out[hs-2:], h.ContentLen)
+
 	return out, nil
 }
 
-// Unmarshal populates a TLS RecordLayer Header from binary
+// Unmarshal populates a TLS RecordLayer Header from binary.
 func (h *Header) Unmarshal(data []byte) error {
 	if len(data) < FixedHeaderSize {
 		return errBufferTooSmall
