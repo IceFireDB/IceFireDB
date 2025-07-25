@@ -33,7 +33,18 @@ type CandidatePair struct {
 	// stats
 	currentRoundTripTime int64 // in ns
 	totalRoundTripTime   int64 // in ns
-	responsesReceived    uint64
+
+	requestsReceived  uint64
+	requestsSent      uint64
+	responsesReceived uint64
+	responsesSent     uint64
+
+	firstRequestSentAt     atomic.Value // time.Time
+	lastRequestSentAt      atomic.Value // time.Time
+	firstReponseReceivedAt atomic.Value // time.Time
+	lastResponseReceivedAt atomic.Value // time.Time
+	firstRequestReceivedAt atomic.Value // time.Time
+	lastRequestReceivedAt  atomic.Value // time.Time
 }
 
 func (p *CandidatePair) String() string {
@@ -127,6 +138,10 @@ func (p *CandidatePair) UpdateRoundTripTime(rtt time.Duration) {
 	atomic.StoreInt64(&p.currentRoundTripTime, rttNs)
 	atomic.AddInt64(&p.totalRoundTripTime, rttNs)
 	atomic.AddUint64(&p.responsesReceived, 1)
+
+	now := time.Now()
+	p.firstReponseReceivedAt.CompareAndSwap(nil, now)
+	p.lastResponseReceivedAt.Store(now)
 }
 
 // CurrentRoundTripTime returns the current round trip time in seconds
@@ -141,8 +156,101 @@ func (p *CandidatePair) TotalRoundTripTime() float64 {
 	return time.Duration(atomic.LoadInt64(&p.totalRoundTripTime)).Seconds()
 }
 
+// RequestsReceived returns the total number of connectivity checks received
+// https://www.w3.org/TR/webrtc-stats/#dom-rtcicecandidatepairstats-requestsreceived
+func (p *CandidatePair) RequestsReceived() uint64 {
+	return atomic.LoadUint64(&p.requestsReceived)
+}
+
+// RequestsSent returns the total number of connectivity checks sent
+// https://www.w3.org/TR/webrtc-stats/#dom-rtcicecandidatepairstats-requestssent
+func (p *CandidatePair) RequestsSent() uint64 {
+	return atomic.LoadUint64(&p.requestsSent)
+}
+
 // ResponsesReceived returns the total number of connectivity responses received
 // https://www.w3.org/TR/webrtc-stats/#dom-rtcicecandidatepairstats-responsesreceived
 func (p *CandidatePair) ResponsesReceived() uint64 {
 	return atomic.LoadUint64(&p.responsesReceived)
+}
+
+// ResponsesSent returns the total number of connectivity responses sent
+// https://www.w3.org/TR/webrtc-stats/#dom-rtcicecandidatepairstats-responsessent
+func (p *CandidatePair) ResponsesSent() uint64 {
+	return atomic.LoadUint64(&p.responsesSent)
+}
+
+// FirstRequestSentAt returns the timestamp of the first connectivity check sent.
+func (p *CandidatePair) FirstRequestSentAt() time.Time {
+	if v, ok := p.firstRequestSentAt.Load().(time.Time); ok {
+		return v
+	}
+
+	return time.Time{}
+}
+
+// LastRequestSentAt returns the timestamp of the last connectivity check sent.
+func (p *CandidatePair) LastRequestSentAt() time.Time {
+	if v, ok := p.lastRequestSentAt.Load().(time.Time); ok {
+		return v
+	}
+
+	return time.Time{}
+}
+
+// FirstReponseReceivedAt returns the timestamp of the first connectivity response received.
+func (p *CandidatePair) FirstReponseReceivedAt() time.Time {
+	if v, ok := p.firstReponseReceivedAt.Load().(time.Time); ok {
+		return v
+	}
+
+	return time.Time{}
+}
+
+// LastResponseReceivedAt returns the timestamp of the last connectivity response received.
+func (p *CandidatePair) LastResponseReceivedAt() time.Time {
+	if v, ok := p.lastResponseReceivedAt.Load().(time.Time); ok {
+		return v
+	}
+
+	return time.Time{}
+}
+
+// FirstRequestReceivedAt returns the timestamp of the first connectivity check received.
+func (p *CandidatePair) FirstRequestReceivedAt() time.Time {
+	if v, ok := p.firstRequestReceivedAt.Load().(time.Time); ok {
+		return v
+	}
+
+	return time.Time{}
+}
+
+// LastRequestReceivedAt returns the timestamp of the last connectivity check received.
+func (p *CandidatePair) LastRequestReceivedAt() time.Time {
+	if v, ok := p.lastRequestReceivedAt.Load().(time.Time); ok {
+		return v
+	}
+
+	return time.Time{}
+}
+
+// UpdateRequestSent increments the number of requests sent and updates the timestamp.
+func (p *CandidatePair) UpdateRequestSent() {
+	atomic.AddUint64(&p.requestsSent, 1)
+	now := time.Now()
+	p.firstRequestSentAt.CompareAndSwap(nil, now)
+	p.lastRequestSentAt.Store(now)
+}
+
+// UpdateResponseSent increments the number of responses sent.
+func (p *CandidatePair) UpdateResponseSent() {
+	atomic.AddUint64(&p.responsesSent, 1)
+}
+
+// UpdateRequestReceived increments the number of requests received and updates the timestamp.
+func (p *CandidatePair) UpdateRequestReceived() {
+	atomic.AddUint64(&p.requestsReceived, 1)
+	now := time.Now()
+	p.firstRequestReceivedAt.CompareAndSwap(nil, now)
+	p.lastRequestReceivedAt.Store(now)
 }

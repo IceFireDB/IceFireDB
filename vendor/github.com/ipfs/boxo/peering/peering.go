@@ -22,7 +22,7 @@ const (
 	// If we go over the max, we'll adjust the delay down to a random value
 	// between 90-100% of the max backoff.
 	maxBackoffJitter = 10 // %
-	connmgrTag       = "ipfs-peering"
+	ConnmgrTag       = "ipfs-peering"
 	// This needs to be sufficient to prevent two sides from simultaneously
 	// dialing.
 	initialDelay = 5 * time.Second
@@ -236,7 +236,7 @@ func (ps *PeeringService) AddPeer(info peer.AddrInfo) {
 		handler.setAddrs(info.Addrs)
 	} else {
 		logger.Infow("peer added", "peer", info.ID, "addrs", info.Addrs)
-		ps.host.ConnManager().Protect(info.ID, connmgrTag)
+		ps.host.ConnManager().Protect(info.ID, ConnmgrTag)
 
 		handler = &peerHandler{
 			host:      ps.host,
@@ -281,7 +281,7 @@ func (ps *PeeringService) RemovePeer(id peer.ID) {
 
 	if handler, ok := ps.peers[id]; ok {
 		logger.Infow("peer removed", "peer", id)
-		ps.host.ConnManager().Unprotect(id, connmgrTag)
+		ps.host.ConnManager().Unprotect(id, ConnmgrTag)
 
 		handler.stop()
 		delete(ps.peers, id)

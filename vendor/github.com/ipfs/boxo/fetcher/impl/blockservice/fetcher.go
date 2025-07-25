@@ -8,6 +8,7 @@ import (
 
 	"github.com/ipfs/boxo/blockservice"
 	"github.com/ipfs/boxo/fetcher"
+	format "github.com/ipfs/go-ipld-format"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
@@ -26,6 +27,10 @@ type FetcherConfig struct {
 	blockService     blockservice.BlockService
 	NodeReifier      ipld.NodeReifier
 	PrototypeChooser traversal.LinkTargetNodePrototypeChooser
+
+	// SkipNotFound skips "ipld: not found" errors when traversing a DAG,
+	// allowing to traverse incomplete DAGs or doing offline traversals.
+	SkipNotFound bool
 }
 
 // NewFetcherConfig creates a FetchConfig from which session may be created and nodes retrieved.
@@ -47,7 +52,7 @@ func (fc FetcherConfig) FetcherWithSession(ctx context.Context, s *blockservice.
 	// while we may be loading blocks remotely, they are already hash verified by the time they load
 	// into ipld-prime
 	ls.TrustedStorage = true
-	ls.StorageReadOpener = blockOpener(ctx, s)
+	ls.StorageReadOpener = blockOpener(ctx, s, fc.SkipNotFound)
 	ls.NodeReifier = fc.NodeReifier
 
 	protoChooser := fc.PrototypeChooser
@@ -61,6 +66,7 @@ func (fc FetcherConfig) WithReifier(nr ipld.NodeReifier) fetcher.Factory {
 		blockService:     fc.blockService,
 		NodeReifier:      nr,
 		PrototypeChooser: fc.PrototypeChooser,
+		SkipNotFound:     fc.SkipNotFound,
 	}
 }
 
@@ -131,7 +137,7 @@ var DefaultPrototypeChooser = func(lnk ipld.Link, lnkCtx ipld.LinkContext) (ipld
 	return basicnode.Prototype.Any, nil
 }
 
-func blockOpener(ctx context.Context, bs *blockservice.Session) ipld.BlockReadOpener {
+func blockOpener(ctx context.Context, bs *blockservice.Session, offline bool) ipld.BlockReadOpener {
 	return func(_ ipld.LinkContext, lnk ipld.Link) (io.Reader, error) {
 		cidLink, ok := lnk.(cidlink.Link)
 		if !ok {
@@ -140,6 +146,9 @@ func blockOpener(ctx context.Context, bs *blockservice.Session) ipld.BlockReadOp
 
 		blk, err := bs.GetBlock(ctx, cidLink.Cid)
 		if err != nil {
+			if format.IsNotFound(err) && offline {
+				return nil, traversal.SkipMe{}
+			}
 			return nil, err
 		}
 

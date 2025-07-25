@@ -4,6 +4,7 @@
 package dtls
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
@@ -16,49 +17,63 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol/recordlayer"
 )
 
-// CipherSuiteID is an ID for our supported CipherSuites
+// CipherSuiteID is an ID for our supported CipherSuites.
 type CipherSuiteID = ciphersuite.ID
 
-// Supported Cipher Suites
+// Supported Cipher Suites.
 const (
 	// AES-128-CCM
-	TLS_ECDHE_ECDSA_WITH_AES_128_CCM   CipherSuiteID = ciphersuite.TLS_ECDHE_ECDSA_WITH_AES_128_CCM   //nolint:revive,stylecheck
-	TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 CipherSuiteID = ciphersuite.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 //nolint:revive,stylecheck
+	//nolint:revive,stylecheck
+	TLS_ECDHE_ECDSA_WITH_AES_128_CCM CipherSuiteID = ciphersuite.TLS_ECDHE_ECDSA_WITH_AES_128_CCM
+	//nolint:revive,stylecheck
+	TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 CipherSuiteID = ciphersuite.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8
 
 	// AES-128-GCM-SHA256
-	TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 CipherSuiteID = ciphersuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 //nolint:revive,stylecheck
-	TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256   CipherSuiteID = ciphersuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256   //nolint:revive,stylecheck
+	//nolint:revive,stylecheck
+	TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 CipherSuiteID = ciphersuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+	//nolint:revive,stylecheck
+	TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 CipherSuiteID = ciphersuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 
-	TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 CipherSuiteID = ciphersuite.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 //nolint:revive,stylecheck
-	TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384   CipherSuiteID = ciphersuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384   //nolint:revive,stylecheck
+	//nolint:revive,stylecheck
+	TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 CipherSuiteID = ciphersuite.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+	//nolint:revive,stylecheck
+	TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 CipherSuiteID = ciphersuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
 
 	// AES-256-CBC-SHA
-	TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA CipherSuiteID = ciphersuite.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA //nolint:revive,stylecheck
-	TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA   CipherSuiteID = ciphersuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA   //nolint:revive,stylecheck
+	//nolint:revive,stylecheck
+	TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA CipherSuiteID = ciphersuite.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA
+	//nolint:revive,stylecheck
+	TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA CipherSuiteID = ciphersuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
 
-	TLS_PSK_WITH_AES_128_CCM        CipherSuiteID = ciphersuite.TLS_PSK_WITH_AES_128_CCM        //nolint:revive,stylecheck
-	TLS_PSK_WITH_AES_128_CCM_8      CipherSuiteID = ciphersuite.TLS_PSK_WITH_AES_128_CCM_8      //nolint:revive,stylecheck
-	TLS_PSK_WITH_AES_256_CCM_8      CipherSuiteID = ciphersuite.TLS_PSK_WITH_AES_256_CCM_8      //nolint:revive,stylecheck
-	TLS_PSK_WITH_AES_128_GCM_SHA256 CipherSuiteID = ciphersuite.TLS_PSK_WITH_AES_128_GCM_SHA256 //nolint:revive,stylecheck
-	TLS_PSK_WITH_AES_128_CBC_SHA256 CipherSuiteID = ciphersuite.TLS_PSK_WITH_AES_128_CBC_SHA256 //nolint:revive,stylecheck
+	//nolint:revive,stylecheck
+	TLS_PSK_WITH_AES_128_CCM CipherSuiteID = ciphersuite.TLS_PSK_WITH_AES_128_CCM
+	//nolint:revive,stylecheck
+	TLS_PSK_WITH_AES_128_CCM_8 CipherSuiteID = ciphersuite.TLS_PSK_WITH_AES_128_CCM_8
+	//nolint:revive,stylecheck
+	TLS_PSK_WITH_AES_256_CCM_8 CipherSuiteID = ciphersuite.TLS_PSK_WITH_AES_256_CCM_8
+	//nolint:revive,stylecheck
+	TLS_PSK_WITH_AES_128_GCM_SHA256 CipherSuiteID = ciphersuite.TLS_PSK_WITH_AES_128_GCM_SHA256
+	//nolint:revive,stylecheck
+	TLS_PSK_WITH_AES_128_CBC_SHA256 CipherSuiteID = ciphersuite.TLS_PSK_WITH_AES_128_CBC_SHA256
 
-	TLS_ECDHE_PSK_WITH_AES_128_CBC_SHA256 CipherSuiteID = ciphersuite.TLS_ECDHE_PSK_WITH_AES_128_CBC_SHA256 //nolint:revive,stylecheck
+	//nolint:revive,stylecheck
+	TLS_ECDHE_PSK_WITH_AES_128_CBC_SHA256 CipherSuiteID = ciphersuite.TLS_ECDHE_PSK_WITH_AES_128_CBC_SHA256
 )
 
-// CipherSuiteAuthenticationType controls what authentication method is using during the handshake for a CipherSuite
+// CipherSuiteAuthenticationType controls what authentication method is using during the handshake for a CipherSuite.
 type CipherSuiteAuthenticationType = ciphersuite.AuthenticationType
 
-// AuthenticationType Enums
+// AuthenticationType Enums.
 const (
 	CipherSuiteAuthenticationTypeCertificate  CipherSuiteAuthenticationType = ciphersuite.AuthenticationTypeCertificate
 	CipherSuiteAuthenticationTypePreSharedKey CipherSuiteAuthenticationType = ciphersuite.AuthenticationTypePreSharedKey
 	CipherSuiteAuthenticationTypeAnonymous    CipherSuiteAuthenticationType = ciphersuite.AuthenticationTypeAnonymous
 )
 
-// CipherSuiteKeyExchangeAlgorithm controls what exchange algorithm is using during the handshake for a CipherSuite
+// CipherSuiteKeyExchangeAlgorithm controls what exchange algorithm is using during the handshake for a CipherSuite.
 type CipherSuiteKeyExchangeAlgorithm = ciphersuite.KeyExchangeAlgorithm
 
-// CipherSuiteKeyExchangeAlgorithm Bitmask
+// CipherSuiteKeyExchangeAlgorithm Bitmask.
 const (
 	CipherSuiteKeyExchangeAlgorithmNone  CipherSuiteKeyExchangeAlgorithm = ciphersuite.KeyExchangeAlgorithmNone
 	CipherSuiteKeyExchangeAlgorithmPsk   CipherSuiteKeyExchangeAlgorithm = ciphersuite.KeyExchangeAlgorithmPsk
@@ -67,7 +82,7 @@ const (
 
 var _ = allCipherSuites() // Necessary until this function isn't only used by Go 1.14
 
-// CipherSuite is an interface that all DTLS CipherSuites must satisfy
+// CipherSuite is an interface that all DTLS CipherSuites must satisfy.
 type CipherSuite interface {
 	// String of CipherSuite, only used for logging
 	String() string
@@ -108,13 +123,14 @@ func CipherSuiteName(id CipherSuiteID) string {
 	if suite != nil {
 		return suite.String()
 	}
+
 	return fmt.Sprintf("0x%04X", uint16(id))
 }
 
 // Taken from https://www.iana.org/assignments/tls-parameters/tls-parameters.xml
 // A cipherSuite is a specific combination of key agreement, cipher and MAC
 // function.
-func cipherSuiteForID(id CipherSuiteID, customCiphers func() []CipherSuite) CipherSuite {
+func cipherSuiteForID(id CipherSuiteID, customCiphers func() []CipherSuite) CipherSuite { //nolint:cyclop
 	switch id { //nolint:exhaustive
 	case TLS_ECDHE_ECDSA_WITH_AES_128_CCM:
 		return ciphersuite.NewTLSEcdheEcdsaWithAes128Ccm()
@@ -157,7 +173,7 @@ func cipherSuiteForID(id CipherSuiteID, customCiphers func() []CipherSuite) Ciph
 	return nil
 }
 
-// CipherSuites we support in order of preference
+// CipherSuites we support in order of preference.
 func defaultCipherSuites() []CipherSuite {
 	return []CipherSuite{
 		&ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256{},
@@ -191,10 +207,16 @@ func cipherSuiteIDs(cipherSuites []CipherSuite) []uint16 {
 	for _, c := range cipherSuites {
 		rtrn = append(rtrn, uint16(c.ID()))
 	}
+
 	return rtrn
 }
 
-func parseCipherSuites(userSelectedSuites []CipherSuiteID, customCipherSuites func() []CipherSuite, includeCertificateSuites, includePSKSuites bool) ([]CipherSuite, error) {
+//nolint:cyclop
+func parseCipherSuites(
+	userSelectedSuites []CipherSuiteID,
+	customCipherSuites func() []CipherSuite,
+	includeCertificateSuites, includePSKSuites bool,
+) ([]CipherSuite, error) {
 	cipherSuitesForIDs := func(ids []CipherSuiteID) ([]CipherSuite, error) {
 		cipherSuites := []CipherSuite{}
 		for _, id := range ids {
@@ -204,6 +226,7 @@ func parseCipherSuites(userSelectedSuites []CipherSuiteID, customCipherSuites fu
 			}
 			cipherSuites = append(cipherSuites, c)
 		}
+
 		return cipherSuites, nil
 	}
 
@@ -258,11 +281,16 @@ func filterCipherSuitesForCertificate(cert *tls.Certificate, cipherSuites []Ciph
 	if cert == nil || cert.PrivateKey == nil {
 		return cipherSuites
 	}
+	signer, ok := cert.PrivateKey.(crypto.Signer)
+	if !ok {
+		return cipherSuites
+	}
+
 	var certType clientcertificate.Type
-	switch cert.PrivateKey.(type) {
-	case ed25519.PrivateKey, *ecdsa.PrivateKey:
+	switch signer.Public().(type) {
+	case ed25519.PublicKey, *ecdsa.PublicKey:
 		certType = clientcertificate.ECDSASign
-	case *rsa.PrivateKey:
+	case *rsa.PublicKey:
 		certType = clientcertificate.RSASign
 	}
 
@@ -272,5 +300,6 @@ func filterCipherSuitesForCertificate(cert *tls.Certificate, cipherSuites []Ciph
 			filtered = append(filtered, c)
 		}
 	}
+
 	return filtered
 }

@@ -16,7 +16,7 @@ var (
 	errInvalidFingerprintLength = errors.New("fingerprint: invalid fingerprint length")
 )
 
-// Fingerprint creates a fingerprint for a certificate using the specified hash algorithm
+// Fingerprint creates a fingerprint for a certificate using the specified hash algorithm.
 func Fingerprint(cert *x509.Certificate, algo crypto.Hash) (string, error) {
 	if !algo.Available() {
 		return "", errHashUnavailable

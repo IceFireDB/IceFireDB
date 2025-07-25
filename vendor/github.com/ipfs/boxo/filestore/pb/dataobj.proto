@@ -1,6 +1,8 @@
-syntax = "proto2";
+syntax = "proto3";
 
-package datastore.pb;
+package ipfs.boxo.filestore.pb;
+
+option go_package = "github.com/ipfs/boxo/filestore/pb";
 
 message DataObj {
         optional string FilePath = 1;

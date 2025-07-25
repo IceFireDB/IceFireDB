@@ -219,10 +219,11 @@ type ContentPathMetadata struct {
 //   - From >= 0 and To = nil: Get the file (From, Length)
 //   - From >= 0 and To >= 0: Get the range (From, To)
 //   - From >= 0 and To <0: Get the range (From, Length - To)
+//   - From < 0 and To = nil: Get the file (Length - From, Length)
 //
 // [HTTP Byte Range]: https://httpwg.org/specs/rfc9110.html#rfc.section.14.1.2
 type ByteRange struct {
-	From uint64
+	From int64
 	To   *int64
 }
 

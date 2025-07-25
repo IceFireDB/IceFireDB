@@ -1,5 +1,6 @@
+#ifndef USE_EXTERNAL_ZSTD
 /*
- * Copyright (c) 2016-present, Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -19,7 +20,8 @@ extern "C" {
 #include "zstd_compress_internal.h"     /* ZSTD_CCtx, size_t */
 
 void ZSTD_fillDoubleHashTable(ZSTD_matchState_t* ms,
-                              void const* end, ZSTD_dictTableLoadMethod_e dtlm);
+                              void const* end, ZSTD_dictTableLoadMethod_e dtlm,
+                              ZSTD_tableFillPurpose_e tfp);
 size_t ZSTD_compressBlock_doubleFast(
         ZSTD_matchState_t* ms, seqStore_t* seqStore, U32 rep[ZSTD_REP_NUM],
         void const* src, size_t srcSize);
@@ -36,3 +38,5 @@ size_t ZSTD_compressBlock_doubleFast_extDict(
 #endif
 
 #endif /* ZSTD_DOUBLE_FAST_H */
+
+#endif /* USE_EXTERNAL_ZSTD */
