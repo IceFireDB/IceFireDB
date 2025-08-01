@@ -12,7 +12,7 @@ import (
 	"github.com/pion/dtls/v3/pkg/crypto/signature"
 )
 
-// MessageServerKeyExchange supports ECDH and PSK
+// MessageServerKeyExchange supports ECDH and PSK.
 type MessageServerKeyExchange struct {
 	IdentityHint []byte
 
@@ -27,17 +27,17 @@ type MessageServerKeyExchange struct {
 	KeyExchangeAlgorithm types.KeyExchangeAlgorithm
 }
 
-// Type returns the Handshake Type
+// Type returns the Handshake Type.
 func (m MessageServerKeyExchange) Type() Type {
 	return TypeServerKeyExchange
 }
 
-// Marshal encodes the Handshake
-func (m *MessageServerKeyExchange) Marshal() ([]byte, error) {
+// Marshal encodes the Handshake.
+func (m *MessageServerKeyExchange) Marshal() ([]byte, error) { //nolint:cyclop
 	var out []byte
 	if m.IdentityHint != nil {
 		out = append([]byte{0x00, 0x00}, m.IdentityHint...)
-		binary.BigEndian.PutUint16(out, uint16(len(out)-2))
+		binary.BigEndian.PutUint16(out, uint16(len(out)-2)) //nolint:gosec //G115
 	}
 
 	if m.EllipticCurveType == 0 || len(m.PublicKey) == 0 {
@@ -60,14 +60,14 @@ func (m *MessageServerKeyExchange) Marshal() ([]byte, error) {
 	}
 
 	out = append(out, []byte{byte(m.HashAlgorithm), byte(m.SignatureAlgorithm), 0x00, 0x00}...)
-	binary.BigEndian.PutUint16(out[len(out)-2:], uint16(len(m.Signature)))
+	binary.BigEndian.PutUint16(out[len(out)-2:], uint16(len(m.Signature))) //nolint:gosec // G115
 	out = append(out, m.Signature...)
 
 	return out, nil
 }
 
-// Unmarshal populates the message from encoded data
-func (m *MessageServerKeyExchange) Unmarshal(data []byte) error {
+// Unmarshal populates the message from encoded data.
+func (m *MessageServerKeyExchange) Unmarshal(data []byte) error { //nolint:cyclop
 	switch {
 	case len(data) < 2:
 		return errBufferTooSmall
@@ -84,6 +84,7 @@ func (m *MessageServerKeyExchange) Unmarshal(data []byte) error {
 		if len(data) == 0 {
 			return nil
 		}
+
 		return errLengthMismatch
 	}
 
@@ -144,5 +145,6 @@ func (m *MessageServerKeyExchange) Unmarshal(data []byte) error {
 		return errBufferTooSmall
 	}
 	m.Signature = append([]byte{}, data[offset:offset+signatureLength]...)
+
 	return nil
 }

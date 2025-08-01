@@ -29,12 +29,12 @@ type MessageServerHello struct {
 
 const messageServerHelloVariableWidthStart = 2 + RandomLength
 
-// Type returns the Handshake Type
+// Type returns the Handshake Type.
 func (m MessageServerHello) Type() Type {
 	return TypeServerHello
 }
 
-// Marshal encodes the Handshake
+// Marshal encodes the Handshake.
 func (m *MessageServerHello) Marshal() ([]byte, error) {
 	if m.CipherSuiteID == nil {
 		return nil, errCipherSuiteUnset
@@ -49,23 +49,23 @@ func (m *MessageServerHello) Marshal() ([]byte, error) {
 	rand := m.Random.MarshalFixed()
 	copy(out[2:], rand[:])
 
-	out = append(out, byte(len(m.SessionID)))
-	out = append(out, m.SessionID...)
+	out = append(out, byte(len(m.SessionID))) //nolint:makezero // todo: fix
+	out = append(out, m.SessionID...)         //nolint:makezero // todo: fix
 
-	out = append(out, []byte{0x00, 0x00}...)
+	out = append(out, []byte{0x00, 0x00}...) //nolint:makezero // todo: fix
 	binary.BigEndian.PutUint16(out[len(out)-2:], *m.CipherSuiteID)
 
-	out = append(out, byte(m.CompressionMethod.ID))
+	out = append(out, byte(m.CompressionMethod.ID)) //nolint:makezero // todo: fix
 
 	extensions, err := extension.Marshal(m.Extensions)
 	if err != nil {
 		return nil, err
 	}
 
-	return append(out, extensions...), nil
+	return append(out, extensions...), nil //nolint:makezero // todo: fix
 }
 
-// Unmarshal populates the message from encoded data
+// Unmarshal populates the message from encoded data.
 func (m *MessageServerHello) Unmarshal(data []byte) error {
 	if len(data) < 2+RandomLength {
 		return errBufferTooSmall
@@ -110,6 +110,7 @@ func (m *MessageServerHello) Unmarshal(data []byte) error {
 
 	if len(data) <= currOffset {
 		m.Extensions = []extension.Extension{}
+
 		return nil
 	}
 
@@ -118,5 +119,6 @@ func (m *MessageServerHello) Unmarshal(data []byte) error {
 		return err
 	}
 	m.Extensions = extensions
+
 	return nil
 }

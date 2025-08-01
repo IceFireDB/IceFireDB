@@ -9,13 +9,13 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
 	"time"
 
-	mrand "golang.org/x/exp/rand"
+	mrand "math/rand/v2"
+
 	"google.golang.org/protobuf/proto"
 
 	"github.com/libp2p/go-libp2p/core/connmgr"
@@ -68,7 +68,13 @@ const (
 	DefaultFailedTimeout       = 30 * time.Second
 	DefaultKeepaliveTimeout    = 15 * time.Second
 
-	sctpReceiveBufferSize = 100_000
+	// sctpReceiveBufferSize is the size of the buffer for incoming messages.
+	//
+	// This is enough space for enqueuing 10 full sized messages.
+	// Besides throughput, this only matters if an application is using multiple dependent
+	// streams, say streams 1 & 2. It reads from stream 1 only after receiving message from
+	// stream 2. A buffer of 10 messages should serve all such situations.
+	sctpReceiveBufferSize = 10 * maxReceiveMessageSize
 )
 
 type WebRTCTransport struct {
@@ -233,7 +239,7 @@ func (t *WebRTCTransport) listenSocket(socket net.PacketConn) (tpt.Listener, err
 	if err != nil {
 		return nil, err
 	}
-	listenerMultiaddr = listenerMultiaddr.Encapsulate(webrtcComponent).Encapsulate(certComp)
+	listenerMultiaddr = listenerMultiaddr.AppendComponent(webrtcComponent, certComp)
 
 	return newListener(
 		t,
@@ -367,7 +373,7 @@ func (t *WebRTCTransport) dial(ctx context.Context, scope network.ConnManagement
 	if err != nil {
 		return nil, err
 	}
-	channel := newStream(w.HandshakeDataChannel, detached, func() {})
+	channel := newStream(w.HandshakeDataChannel, detached, maxSendMessageSize, nil)
 
 	remotePubKey, err := t.noiseHandshake(ctx, w.PeerConnection, channel, p, remoteHashFunction, false)
 	if err != nil {
@@ -420,15 +426,15 @@ func genUfrag() string {
 		uFragLength   = len(uFragPrefix) + uFragIdLength
 	)
 
-	seed := [8]byte{}
+	seed := [32]byte{}
 	rand.Read(seed[:])
-	r := mrand.New(mrand.NewSource(binary.BigEndian.Uint64(seed[:])))
+	r := mrand.New(mrand.New(mrand.NewChaCha8(seed)))
 	b := make([]byte, uFragLength)
 	for i := 0; i < len(uFragPrefix); i++ {
 		b[i] = uFragPrefix[i]
 	}
 	for i := len(uFragPrefix); i < uFragLength; i++ {
-		b[i] = uFragAlphabet[r.Intn(len(uFragAlphabet))]
+		b[i] = uFragAlphabet[r.IntN(len(uFragAlphabet))]
 	}
 	return string(b)
 }
@@ -531,7 +537,7 @@ func (t *WebRTCTransport) AddCertHashes(addr ma.Multiaddr) (ma.Multiaddr, bool) 
 	if err != nil {
 		return nil, false
 	}
-	return addr.Encapsulate(certComp), true
+	return addr.AppendComponent(certComp), true
 }
 
 type netConnWrapper struct {
@@ -618,7 +624,7 @@ func newWebRTCConnection(settings webrtc.SettingEngine, config webrtc.Configurat
 	})
 
 	connectionClosedCh := make(chan struct{}, 1)
-	pc.SCTP().OnClose(func(err error) {
+	pc.SCTP().OnClose(func(_ error) {
 		// We only need one message. Closing a connection is a problem as pion might invoke the callback more than once.
 		select {
 		case connectionClosedCh <- struct{}{}:

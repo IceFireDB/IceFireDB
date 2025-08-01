@@ -7,8 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	u "github.com/ipfs/boxo/util"
 	cid "github.com/ipfs/go-cid"
-	u "github.com/ipfs/go-ipfs-util"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -17,11 +17,16 @@ import (
 var ErrWrongHash = errors.New("data did not match given hash")
 
 // Block provides abstraction for blocks implementations.
+//
+// Many different packages use objects that contain Block information, and this
+// interface allows those objects to be passed to APIs as a Block. The Block
+// interface provides a common basis for interoperability between many packages
+// in the IPFS ecosystem that exchange block information.
 type Block interface {
 	RawData() []byte
 	Cid() cid.Cid
 	String() string
-	Loggable() map[string]interface{}
+	Loggable() map[string]any
 }
 
 // A BasicBlock is a singular block of data in ipfs. It implements the Block
@@ -33,8 +38,10 @@ type BasicBlock struct {
 
 // NewBlock creates a Block object from opaque data. It will hash the data.
 func NewBlock(data []byte) *BasicBlock {
-	// TODO: fix assumptions
-	return &BasicBlock{data: data, cid: cid.NewCidV0(u.Hash(data))}
+	return &BasicBlock{
+		data: data,
+		cid:  cid.NewCidV0(u.Hash(data)),
+	}
 }
 
 // NewBlockWithCid creates a new block when the hash of the data
@@ -55,28 +62,28 @@ func NewBlockWithCid(data []byte, c cid.Cid) (*BasicBlock, error) {
 }
 
 // Multihash returns the hash contained in the block CID.
-func (b *BasicBlock) Multihash() mh.Multihash {
+func (b BasicBlock) Multihash() mh.Multihash {
 	return b.cid.Hash()
 }
 
 // RawData returns the block raw contents as a byte slice.
-func (b *BasicBlock) RawData() []byte {
+func (b BasicBlock) RawData() []byte {
 	return b.data
 }
 
 // Cid returns the content identifier of the block.
-func (b *BasicBlock) Cid() cid.Cid {
+func (b BasicBlock) Cid() cid.Cid {
 	return b.cid
 }
 
 // String provides a human-readable representation of the block CID.
-func (b *BasicBlock) String() string {
+func (b BasicBlock) String() string {
 	return fmt.Sprintf("[Block %s]", b.Cid())
 }
 
 // Loggable returns a go-log loggable item.
-func (b *BasicBlock) Loggable() map[string]interface{} {
-	return map[string]interface{}{
+func (b BasicBlock) Loggable() map[string]any {
+	return map[string]any{
 		"block": b.Cid().String(),
 	}
 }
