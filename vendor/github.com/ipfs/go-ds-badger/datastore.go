@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -14,7 +15,6 @@ import (
 	ds "github.com/ipfs/go-datastore"
 	dsq "github.com/ipfs/go-datastore/query"
 	logger "github.com/ipfs/go-log/v2"
-	goprocess "github.com/jbenet/goprocess"
 )
 
 // badgerLog is a local wrapper for go-log to make the interface
@@ -118,7 +118,9 @@ func init() {
 }
 
 var _ ds.Datastore = (*Datastore)(nil)
+var _ ds.PersistentDatastore = (*Datastore)(nil)
 var _ ds.TxnDatastore = (*Datastore)(nil)
+var _ ds.Txn = (*txn)(nil)
 var _ ds.TTLDatastore = (*Datastore)(nil)
 var _ ds.GCDatastore = (*Datastore)(nil)
 var _ ds.Batching = (*Datastore)(nil)
@@ -126,22 +128,26 @@ var _ ds.Batching = (*Datastore)(nil)
 // NewDatastore creates a new badger datastore.
 //
 // DO NOT set the Dir and/or ValuePath fields of opt, they will be set for you.
-func NewDatastore(path string, options *Options) (*Datastore, error) {
+func NewDatastore(path string, opts *Options) (*Datastore, error) {
 	// Copy the options because we modify them.
 	var opt badger.Options
 	var gcDiscardRatio float64
 	var gcSleep time.Duration
 	var gcInterval time.Duration
-	if options == nil {
+	if opts == nil {
 		opt = badger.DefaultOptions("")
 		gcDiscardRatio = DefaultOptions.GcDiscardRatio
 		gcSleep = DefaultOptions.GcSleep
 		gcInterval = DefaultOptions.GcInterval
 	} else {
-		opt = options.Options
-		gcDiscardRatio = options.GcDiscardRatio
-		gcSleep = options.GcSleep
-		gcInterval = options.GcInterval
+		opt = opts.Options
+		gcDiscardRatio = opts.GcDiscardRatio
+		gcSleep = opts.GcSleep
+		gcInterval = opts.GcInterval
+	}
+
+	if os.Getenv("GOARCH") == "386" {
+		opt.TableLoadingMode = options.FileIO
 	}
 
 	if gcSleep <= 0 {
@@ -726,18 +732,17 @@ func (t *txn) query(q dsq.Query) (dsq.Results, error) {
 	}
 
 	it := t.txn.NewIterator(opt)
-	qrb := dsq.NewResultBuilder(q)
-	qrb.Process.Go(func(worker goprocess.Process) {
+	results := dsq.ResultsWithContext(q, func(ctx context.Context, output chan<- dsq.Result) {
 		t.ds.closeLk.RLock()
 		closedEarly := false
 		defer func() {
 			t.ds.closeLk.RUnlock()
 			if closedEarly {
 				select {
-				case qrb.Output <- dsq.Result{
+				case output <- dsq.Result{
 					Error: ErrClosed,
 				}:
-				case <-qrb.Process.Closing():
+				case <-ctx.Done():
 				}
 			}
 
@@ -799,11 +804,11 @@ func (t *txn) query(q dsq.Query) (dsq.Results, error) {
 
 			if err != nil {
 				select {
-				case qrb.Output <- dsq.Result{Error: err}:
+				case output <- dsq.Result{Error: err}:
 				case <-t.ds.closing: // datastore closing.
 					closedEarly = true
 					return
-				case <-worker.Closing(): // client told us to close early
+				case <-ctx.Done(): // client told us to close early
 					return
 				}
 			}
@@ -842,20 +847,18 @@ func (t *txn) query(q dsq.Query) (dsq.Results, error) {
 			}
 
 			select {
-			case qrb.Output <- result:
+			case output <- result:
 				sent++
 			case <-t.ds.closing: // datastore closing.
 				closedEarly = true
 				return
-			case <-worker.Closing(): // client told us to close early
+			case <-ctx.Done(): // client told us to close early
 				return
 			}
 		}
 	})
 
-	go qrb.Process.CloseAfterChildren() //nolint
-
-	return qrb.Results(), nil
+	return results, nil
 }
 
 func (t *txn) Commit(ctx context.Context) error {

@@ -14,7 +14,14 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 )
 
-func flight0Parse(_ context.Context, _ flightConn, state *State, cache *handshakeCache, cfg *handshakeConfig) (flightVal, *alert.Alert, error) {
+//nolint:cyclop
+func flight0Parse(
+	_ context.Context,
+	_ flightConn,
+	state *State,
+	cache *handshakeCache,
+	cfg *handshakeConfig,
+) (flightVal, *alert.Alert, error) {
 	seq, msgs, ok := cache.fullPullMap(0, state.cipherSuite,
 		handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
 	)
@@ -55,32 +62,32 @@ func flight0Parse(_ context.Context, _ flightConn, state *State, cache *handshak
 	}
 
 	for _, val := range clientHello.Extensions {
-		switch e := val.(type) {
+		switch ext := val.(type) {
 		case *extension.SupportedEllipticCurves:
-			if len(e.EllipticCurves) == 0 {
+			if len(ext.EllipticCurves) == 0 {
 				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InsufficientSecurity}, errNoSupportedEllipticCurves
 			}
-			state.namedCurve = e.EllipticCurves[0]
+			state.namedCurve = ext.EllipticCurves[0]
 		case *extension.UseSRTP:
-			profile, ok := findMatchingSRTPProfile(e.ProtectionProfiles, cfg.localSRTPProtectionProfiles)
+			profile, ok := findMatchingSRTPProfile(ext.ProtectionProfiles, cfg.localSRTPProtectionProfiles)
 			if !ok {
 				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InsufficientSecurity}, errServerNoMatchingSRTPProfile
 			}
 			state.setSRTPProtectionProfile(profile)
-			state.remoteSRTPMasterKeyIdentifier = e.MasterKeyIdentifier
+			state.remoteSRTPMasterKeyIdentifier = ext.MasterKeyIdentifier
 		case *extension.UseExtendedMasterSecret:
 			if cfg.extendedMasterSecret != DisableExtendedMasterSecret {
 				state.extendedMasterSecret = true
 			}
 		case *extension.ServerName:
-			state.serverName = e.ServerName // remote server name
+			state.serverName = ext.ServerName // remote server name
 		case *extension.ALPN:
-			state.peerSupportedProtocols = e.ProtocolNameList
+			state.peerSupportedProtocols = ext.ProtocolNameList
 		case *extension.ConnectionID:
 			// Only set connection ID to be sent if server supports connection
 			// IDs.
 			if cfg.connectionIDGenerator != nil {
-				state.remoteConnectionID = e.CID
+				state.remoteConnectionID = ext.CID
 			}
 		}
 	}
@@ -112,7 +119,12 @@ func flight0Parse(_ context.Context, _ flightConn, state *State, cache *handshak
 	return handleHelloResume(clientHello.SessionID, state, cfg, nextFlight)
 }
 
-func handleHelloResume(sessionID []byte, state *State, cfg *handshakeConfig, next flightVal) (flightVal, *alert.Alert, error) {
+func handleHelloResume(
+	sessionID []byte,
+	state *State,
+	cfg *handshakeConfig,
+	next flightVal,
+) (flightVal, *alert.Alert, error) {
 	if len(sessionID) > 0 && cfg.sessionStore != nil {
 		if s, err := cfg.sessionStore.Get(sessionID); err != nil {
 			return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
@@ -132,10 +144,16 @@ func handleHelloResume(sessionID []byte, state *State, cfg *handshakeConfig, nex
 			return flight4b, nil, nil
 		}
 	}
+
 	return next, nil, nil
 }
 
-func flight0Generate(_ flightConn, state *State, _ *handshakeCache, cfg *handshakeConfig) ([]*packet, *alert.Alert, error) {
+func flight0Generate(
+	_ flightConn,
+	state *State,
+	_ *handshakeCache,
+	cfg *handshakeConfig,
+) ([]*packet, *alert.Alert, error) {
 	// Initialize
 	if !cfg.insecureSkipHelloVerify {
 		state.cookie = make([]byte, cookieLength)

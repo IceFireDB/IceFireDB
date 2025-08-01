@@ -29,8 +29,10 @@ func (r *WriteProvidersRequest) UnmarshalJSON(b []byte) error {
 		}
 
 		switch rawProv.Schema {
+		//nolint:staticcheck
 		//lint:ignore SA1019 // ignore staticcheck
 		case types.SchemaBitswap:
+			//nolint:staticcheck
 			//lint:ignore SA1019 // ignore staticcheck
 			var prov types.WriteBitswapRecord
 			err := json.Unmarshal(rawProv.Bytes, &prov)
