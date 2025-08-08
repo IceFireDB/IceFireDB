@@ -64,7 +64,7 @@ IceFireDB is a database built for web3 and web2. The core mission of the project
 | Integrate with [NATS](https://nats.io/) for high-performance decentralized networking                      | In progress                  |
 | Supports scalable, auditable, and high-performance tamper-resistant logging (combined with [qed](https://github.com/BBVA/qed)) | Planned                    |
 | Build an immutable transparent log witness layer between Web2 and Web3, build a data hot and cold hybrid structure, and an immutable data bridge layer (inspired by Google Trillian-Witness and IPLD) | Planned             |
-| Support KV metadata layer and mixed storage structure of hot and cold                                      | Planned                    |
+| Support for tiered hot/cold storage via the `hybriddb` driver                                            | Implemented                |
 | More advanced cache implementation, faster LSM persistent storage ([Source](https://dl.acm.org/doi/10.1145/3448016.3452819)) | Planned              |
 
 
@@ -144,7 +144,7 @@ It supports distributed raft disk Redis database mode in web2 mode, and also sup
 | System components | describe | technology used |
 | ------------- | ------------- | ------------- |
 | **[Network layer](https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/network/)**  |  1. RAFT guarantees data consistency within a single availability zone. <br />2. P2P network construction decentralized database communication. <br />3. NATS is a new network layer being built.  |P2P、RAFT、NATS  |
-| **[Storage layer](https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/storage/)** | Many types of storage are currently supported. Under the codec computing layer, we abstract the KV storage driver layer, which is compatible with different storage engines of web2 and web3.  |goleveldb、badger、IPFS、CRDT、IPFS-LOG、OSS  |
+| **[Storage layer](https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/storage/)** | Many types of storage are currently supported. Under the codec computing layer, we abstract the KV storage driver layer, which is compatible with different storage engines of web2 and web3.  |goleveldb、badger、hybriddb、IPFS、CRDT、IPFS-LOG、IPFS-SYNCKV、OSS  |
 | **[Protocol layer](https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/protocol/)**| Based on the codec layer, we have built a protocol layer. A good communication protocol allows more applications to easily access the IceFireDB data network. Currently, we support the Redis-RESP NoSQL protocol and the MySQL protocol.  |RESP、SQL |
 | **[Codec layer](https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/codec/)**| The codec layer is the core of our system. For NoSQL scenarios, any data type will be abstracted into a KV storage model. With the flexible coding layer, we can build rich data operation structures and instructions, such as hash, sets, strings, etc.  |KV、Strings、Hashes、Lists、Sorted Sets、Sets、SQL、PubSub  |
 
