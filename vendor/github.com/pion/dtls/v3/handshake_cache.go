@@ -49,7 +49,7 @@ func (h *handshakeCache) push(data []byte, epoch, messageSequence uint16, typ ha
 
 // returns a list handshakes that match the requested rules
 // the list will contain null entries for rules that can't be satisfied
-// multiple entries may match a rule, but only the last match is returned (ie ClientHello with cookies)
+// multiple entries may match a rule, but only the last match is returned (ie ClientHello with cookies).
 func (h *handshakeCache) pull(rules ...handshakeCachePullRule) []*handshakeCacheItem {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -72,15 +72,21 @@ func (h *handshakeCache) pull(rules ...handshakeCachePullRule) []*handshakeCache
 }
 
 // fullPullMap pulls all handshakes between rules[0] to rules[len(rules)-1] as map.
-func (h *handshakeCache) fullPullMap(startSeq int, cipherSuite CipherSuite, rules ...handshakeCachePullRule) (int, map[handshake.Type]handshake.Message, bool) {
+//
+//nolint:cyclop
+func (h *handshakeCache) fullPullMap(
+	startSeq int,
+	cipherSuite CipherSuite,
+	rules ...handshakeCachePullRule,
+) (int, map[handshake.Type]handshake.Message, bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	ci := make(map[handshake.Type]*handshakeCacheItem)
-	for _, r := range rules {
+	for _, rule := range rules {
 		var item *handshakeCacheItem
 		for _, c := range h.cache {
-			if c.typ == r.typ && c.isClient == r.isClient && c.epoch == r.epoch {
+			if c.typ == rule.typ && c.isClient == rule.isClient && c.epoch == rule.epoch {
 				switch {
 				case item == nil:
 					item = c
@@ -89,18 +95,18 @@ func (h *handshakeCache) fullPullMap(startSeq int, cipherSuite CipherSuite, rule
 				}
 			}
 		}
-		if !r.optional && item == nil {
+		if !rule.optional && item == nil {
 			// Missing mandatory message.
 			return startSeq, nil, false
 		}
-		ci[r.typ] = item
+		ci[rule.typ] = item
 	}
 	out := make(map[handshake.Type]handshake.Message)
 	seq := startSeq
 	ok := false
 	for _, r := range rules {
-		t := r.typ
-		i := ci[t]
+		typ := r.typ
+		i := ci[typ]
 		if i == nil {
 			continue
 		}
@@ -114,21 +120,22 @@ func (h *handshakeCache) fullPullMap(startSeq int, cipherSuite CipherSuite, rule
 		if err := rawHandshake.Unmarshal(i.data); err != nil {
 			return startSeq, nil, false
 		}
-		if uint16(seq) != rawHandshake.Header.MessageSequence {
+		if uint16(seq) != rawHandshake.Header.MessageSequence { //nolint:gosec // G115
 			// There is a gap. Some messages are not arrived.
 			return startSeq, nil, false
 		}
 		seq++
 		ok = true
-		out[t] = rawHandshake.Message
+		out[typ] = rawHandshake.Message
 	}
 	if !ok {
 		return seq, nil, false
 	}
+
 	return seq, out, true
 }
 
-// pullAndMerge calls pull and then merges the results, ignoring any null entries
+// pullAndMerge calls pull and then merges the results, ignoring any null entries.
 func (h *handshakeCache) pullAndMerge(rules ...handshakeCachePullRule) []byte {
 	merged := []byte{}
 
@@ -137,6 +144,7 @@ func (h *handshakeCache) pullAndMerge(rules ...handshakeCachePullRule) []byte {
 			merged = append(merged, p.data...)
 		}
 	}
+
 	return merged
 }
 

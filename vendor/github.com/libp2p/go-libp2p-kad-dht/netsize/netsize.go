@@ -1,7 +1,7 @@
 package netsize
 
 import (
-	"fmt"
+	"errors"
 	"math"
 	"math/big"
 	"sort"
@@ -20,8 +20,8 @@ import (
 const invalidEstimate int32 = -1
 
 var (
-	ErrNotEnoughData   = fmt.Errorf("not enough data")
-	ErrWrongNumOfPeers = fmt.Errorf("expected bucket size number of peers")
+	ErrNotEnoughData   = errors.New("not enough data")
+	ErrWrongNumOfPeers = errors.New("expected bucket size number of peers")
 )
 
 var (
@@ -144,7 +144,6 @@ func (e *Estimator) Track(key string, peers []peer.ID) error {
 
 // NetworkSize instructs the Estimator to calculate the current network size estimate.
 func (e *Estimator) NetworkSize() (int32, error) {
-
 	// return cached calculation lock-free (fast path)
 	if estimate := atomic.LoadInt32(&e.netSizeCache); estimate != invalidEstimate {
 		logger.Debugw("Cached network size estimation", "estimate", estimate)
@@ -234,7 +233,6 @@ func (e *Estimator) NetworkSize() (int32, error) {
 // I actually thought this cannot happen as peers would have been added to the routing table before
 // the Track function gets called. But they seem sometimes not to be added.
 func (e *Estimator) calcWeight(key string, peers []peer.ID) float64 {
-
 	cpl := kbucket.CommonPrefixLen(kbucket.ConvertKey(key), e.localID)
 	bucketLevel := e.rt.NPeersForCpl(uint(cpl))
 

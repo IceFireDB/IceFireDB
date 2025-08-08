@@ -10,7 +10,7 @@ type PacketHandler func(net.Addr, []byte) error
 type AddrResolver struct {
 	Addr string
 
-	mu  sync.RWMutex
+	mu  sync.Mutex
 	udp *net.UDPAddr
 	err error
 }
@@ -24,19 +24,16 @@ func (r *AddrResolver) setAddress(addr string) {
 }
 
 func (r *AddrResolver) resolve() (*net.UDPAddr, error) {
-	r.mu.RLock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if err := r.err; err != nil {
-		r.mu.RUnlock()
 		return nil, err
 	}
 	if udp := r.udp; udp != nil {
-		r.mu.RUnlock()
 		return udp, nil
 	}
-	r.mu.RUnlock()
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.udp, r.err = net.ResolveUDPAddr("udp4", r.Addr)
 	return r.udp, r.err
 }

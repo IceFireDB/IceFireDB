@@ -20,7 +20,8 @@ type FatalError struct {
 	Err error
 }
 
-// InternalError indicates and internal error caused by the implementation, and the DTLS connection is no longer available.
+// InternalError indicates and internal error caused by the implementation,
+// and the DTLS connection is no longer available.
 // It is mainly caused by bugs or tried to use unimplemented features.
 type InternalError struct {
 	Err error
@@ -41,10 +42,10 @@ type HandshakeError struct {
 	Err error
 }
 
-// Timeout implements net.Error.Timeout()
+// Timeout implements net.Error.Timeout().
 func (*FatalError) Timeout() bool { return false }
 
-// Temporary implements net.Error.Temporary()
+// Temporary implements net.Error.Temporary().
 func (*FatalError) Temporary() bool { return false }
 
 // Unwrap implements Go1.13 error unwrapper.
@@ -52,10 +53,10 @@ func (e *FatalError) Unwrap() error { return e.Err }
 
 func (e *FatalError) Error() string { return fmt.Sprintf("dtls fatal: %v", e.Err) }
 
-// Timeout implements net.Error.Timeout()
+// Timeout implements net.Error.Timeout().
 func (*InternalError) Timeout() bool { return false }
 
-// Temporary implements net.Error.Temporary()
+// Temporary implements net.Error.Temporary().
 func (*InternalError) Temporary() bool { return false }
 
 // Unwrap implements Go1.13 error unwrapper.
@@ -63,10 +64,10 @@ func (e *InternalError) Unwrap() error { return e.Err }
 
 func (e *InternalError) Error() string { return fmt.Sprintf("dtls internal: %v", e.Err) }
 
-// Timeout implements net.Error.Timeout()
+// Timeout implements net.Error.Timeout().
 func (*TemporaryError) Timeout() bool { return false }
 
-// Temporary implements net.Error.Temporary()
+// Temporary implements net.Error.Temporary().
 func (*TemporaryError) Temporary() bool { return true }
 
 // Unwrap implements Go1.13 error unwrapper.
@@ -74,10 +75,10 @@ func (e *TemporaryError) Unwrap() error { return e.Err }
 
 func (e *TemporaryError) Error() string { return fmt.Sprintf("dtls temporary: %v", e.Err) }
 
-// Timeout implements net.Error.Timeout()
+// Timeout implements net.Error.Timeout().
 func (*TimeoutError) Timeout() bool { return true }
 
-// Temporary implements net.Error.Temporary()
+// Temporary implements net.Error.Temporary().
 func (*TimeoutError) Temporary() bool { return true }
 
 // Unwrap implements Go1.13 error unwrapper.
@@ -85,21 +86,23 @@ func (e *TimeoutError) Unwrap() error { return e.Err }
 
 func (e *TimeoutError) Error() string { return fmt.Sprintf("dtls timeout: %v", e.Err) }
 
-// Timeout implements net.Error.Timeout()
+// Timeout implements net.Error.Timeout().
 func (e *HandshakeError) Timeout() bool {
 	var netErr net.Error
 	if errors.As(e.Err, &netErr) {
 		return netErr.Timeout()
 	}
+
 	return false
 }
 
-// Temporary implements net.Error.Temporary()
+// Temporary implements net.Error.Temporary().
 func (e *HandshakeError) Temporary() bool {
 	var netErr net.Error
 	if errors.As(e.Err, &netErr) {
 		return netErr.Temporary() //nolint
 	}
+
 	return false
 }
 

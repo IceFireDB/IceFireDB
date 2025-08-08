@@ -28,7 +28,7 @@ func (s fixedLocation) Location(net.Addr, *net.Interface) string {
 	return string(s)
 }
 
-func toLocationProvider(v interface{}) (LocationProvider, error) {
+func toLocationProvider(v any) (LocationProvider, error) {
 	switch w := v.(type) {
 	case string:
 		return fixedLocation(w), nil

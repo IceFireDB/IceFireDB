@@ -57,15 +57,17 @@ func MultiaddrToIPNet(m ma.Multiaddr) (*net.IPNet, error) {
 	var ipString string
 	var mask string
 
-	ma.ForEach(m, func(c ma.Component) bool {
+	for _, c := range m {
 		if c.Protocol().Code == ma.P_IP4 || c.Protocol().Code == ma.P_IP6 {
 			ipString = c.Value()
 		}
 		if c.Protocol().Code == ma.P_IPCIDR {
 			mask = c.Value()
 		}
-		return ipString == "" || mask == ""
-	})
+		if ipString != "" && mask != "" {
+			break
+		}
+	}
 
 	if ipString == "" {
 		return nil, errors.New("no ip protocol found")
@@ -102,12 +104,17 @@ func parseBasicNetMaddr(maddr ma.Multiaddr) (net.Addr, error) {
 func FromIPAndZone(ip net.IP, zone string) (ma.Multiaddr, error) {
 	switch {
 	case ip.To4() != nil:
-		return ma.NewComponent("ip4", ip.String())
-	case ip.To16() != nil:
-		ip6, err := ma.NewComponent("ip6", ip.String())
+		c, err := ma.NewComponent("ip4", ip.String())
 		if err != nil {
 			return nil, err
 		}
+		return c.Multiaddr(), nil
+	case ip.To16() != nil:
+		ip6C, err := ma.NewComponent("ip6", ip.String())
+		if err != nil {
+			return nil, err
+		}
+		ip6 := ip6C.Multiaddr()
 		if zone == "" {
 			return ip6, nil
 		} else {
@@ -130,21 +137,18 @@ func FromIP(ip net.IP) (ma.Multiaddr, error) {
 // ToIP converts a Multiaddr to a net.IP when possible
 func ToIP(addr ma.Multiaddr) (net.IP, error) {
 	var ip net.IP
-	ma.ForEach(addr, func(c ma.Component) bool {
+	for _, c := range addr {
 		switch c.Protocol().Code {
 		case ma.P_IP6ZONE:
 			// we can't return these anyways.
-			return true
+			continue
 		case ma.P_IP6, ma.P_IP4:
 			ip = net.IP(c.RawValue())
-			return false
+			return ip, nil
 		}
-		return false
-	})
-	if ip == nil {
 		return nil, errNotIP
 	}
-	return ip, nil
+	return nil, errNotIP
 }
 
 // DialArgs is a convenience function that returns network and address as
@@ -167,7 +171,7 @@ func DialArgs(m ma.Multiaddr) (string, string, error) {
 			return network, ip + ":" + port, nil
 		}
 		// Hostname is only true when network is one of the above.
-		panic("unreachable")
+		return "", "", errors.New("no hostname") // should be unreachable
 	}
 
 	switch network {
@@ -198,48 +202,48 @@ func DialArgs(m ma.Multiaddr) (string, string, error) {
 
 // dialArgComponents extracts the raw pieces used in dialing a Multiaddr
 func dialArgComponents(m ma.Multiaddr) (zone, network, ip, port string, hostname bool, err error) {
-	ma.ForEach(m, func(c ma.Component) bool {
+	for _, c := range m {
 		switch network {
 		case "":
 			switch c.Protocol().Code {
 			case ma.P_IP6ZONE:
 				if zone != "" {
 					err = fmt.Errorf("%s has multiple zones", m)
-					return false
+					return
 				}
 				zone = c.Value()
-				return true
+				continue
 			case ma.P_IP6:
 				network = "ip6"
 				ip = c.Value()
-				return true
+				continue
 			case ma.P_IP4:
 				if zone != "" {
 					err = fmt.Errorf("%s has ip4 with zone", m)
-					return false
+					return
 				}
 				network = "ip4"
 				ip = c.Value()
-				return true
+				continue
 			case ma.P_DNS:
 				network = "ip"
 				hostname = true
 				ip = c.Value()
-				return true
+				continue
 			case ma.P_DNS4:
 				network = "ip4"
 				hostname = true
 				ip = c.Value()
-				return true
+				continue
 			case ma.P_DNS6:
 				network = "ip6"
 				hostname = true
 				ip = c.Value()
-				return true
+				continue
 			case ma.P_UNIX:
 				network = "unix"
 				ip = c.Value()
-				return false
+				return
 			}
 		case "ip":
 			switch c.Protocol().Code {
@@ -248,7 +252,7 @@ func dialArgComponents(m ma.Multiaddr) (zone, network, ip, port string, hostname
 			case ma.P_TCP:
 				network = "tcp"
 			default:
-				return false
+				return
 			}
 			port = c.Value()
 		case "ip4":
@@ -258,7 +262,7 @@ func dialArgComponents(m ma.Multiaddr) (zone, network, ip, port string, hostname
 			case ma.P_TCP:
 				network = "tcp4"
 			default:
-				return false
+				return
 			}
 			port = c.Value()
 		case "ip6":
@@ -268,13 +272,13 @@ func dialArgComponents(m ma.Multiaddr) (zone, network, ip, port string, hostname
 			case ma.P_TCP:
 				network = "tcp6"
 			default:
-				return false
+				return
 			}
 			port = c.Value()
 		}
 		// Done.
-		return false
-	})
+		return
+	}
 	return
 }
 
@@ -354,5 +358,9 @@ func parseUnixNetAddr(a net.Addr) (ma.Multiaddr, error) {
 		path = "/" + path
 	}
 
-	return ma.NewComponent("unix", path)
+	c, err := ma.NewComponent("unix", path)
+	if err != nil {
+		return nil, err
+	}
+	return c.Multiaddr(), nil
 }

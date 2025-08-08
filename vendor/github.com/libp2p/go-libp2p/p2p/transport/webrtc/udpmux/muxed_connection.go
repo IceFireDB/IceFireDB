@@ -23,31 +23,29 @@ const queueLen = 128
 // from which this connection (indexed by ufrag) received
 // data.
 type muxedConnection struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	onClose func()
-	queue   chan packet
-	mux     *UDPMux
+	ctx    context.Context
+	cancel context.CancelFunc
+	queue  chan packet
+	mux    *UDPMux
+	ufrag  string
 }
 
 var _ net.PacketConn = &muxedConnection{}
 
-func newMuxedConnection(mux *UDPMux, onClose func()) *muxedConnection {
+func newMuxedConnection(mux *UDPMux, ufrag string) *muxedConnection {
 	ctx, cancel := context.WithCancel(mux.ctx)
 	return &muxedConnection{
-		ctx:     ctx,
-		cancel:  cancel,
-		queue:   make(chan packet, queueLen),
-		onClose: onClose,
-		mux:     mux,
+		ctx:    ctx,
+		cancel: cancel,
+		queue:  make(chan packet, queueLen),
+		mux:    mux,
+		ufrag:  ufrag,
 	}
 }
 
 func (c *muxedConnection) Push(buf []byte, addr net.Addr) error {
-	select {
-	case <-c.ctx.Done():
+	if c.ctx.Err() != nil {
 		return errors.New("closed")
-	default:
 	}
 	select {
 	case c.queue <- packet{buf: buf, addr: addr}:
@@ -76,12 +74,21 @@ func (c *muxedConnection) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 }
 
 func (c *muxedConnection) Close() error {
-	select {
-	case <-c.ctx.Done():
+	if c.ctx.Err() != nil {
 		return nil
-	default:
 	}
-	c.onClose()
+	// mux calls close to actually close the connection
+	//
+	// Removing the connection from the mux or closing the connection
+	// must trigger the other.
+	// Doing this here ensures we don't need to call both RemoveConnByUfrag
+	// and close on all code paths.
+	c.mux.RemoveConnByUfrag(c.ufrag)
+	return nil
+}
+
+// closes the connection. Must only be called by the mux.
+func (c *muxedConnection) close() {
 	c.cancel()
 	// drain the packet queue
 	for {
@@ -89,24 +96,24 @@ func (c *muxedConnection) Close() error {
 		case p := <-c.queue:
 			pool.Put(p.buf)
 		default:
-			return nil
+			return
 		}
 	}
 }
 
 func (c *muxedConnection) LocalAddr() net.Addr { return c.mux.socket.LocalAddr() }
 
-func (*muxedConnection) SetDeadline(t time.Time) error {
+func (*muxedConnection) SetDeadline(_ time.Time) error {
 	// no deadline is desired here
 	return nil
 }
 
-func (*muxedConnection) SetReadDeadline(t time.Time) error {
+func (*muxedConnection) SetReadDeadline(_ time.Time) error {
 	// no read deadline is desired here
 	return nil
 }
 
-func (*muxedConnection) SetWriteDeadline(t time.Time) error {
+func (*muxedConnection) SetWriteDeadline(_ time.Time) error {
 	// no write deadline is desired here
 	return nil
 }
