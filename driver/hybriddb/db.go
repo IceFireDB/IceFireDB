@@ -153,9 +153,12 @@ func (db *DB) Close() error {
 }
 
 func (db *DB) Put(key, value []byte) error {
+	// Write-through caching: write to persistent storage first
 	if err := db.db.Put(key, value, nil); err != nil {
 		return err
 	}
+	
+	// Then update the cache to ensure consistency
 	item := &cacheItem{key: key, value: value}
 	db.cache.Set(key, item, int64(len(value)))
 	return nil
@@ -186,22 +189,37 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 }
 
 func (db *DB) Delete(key []byte) error {
+	// Write-through caching: delete from persistent storage first
+	if err := db.db.Delete(key, nil); err != nil {
+		return err
+	}
+	
+	// Then remove from cache to ensure consistency
 	db.cache.Del(key)
-	return db.db.Delete(key, nil)
+	return nil
 }
 
 func (db *DB) SyncPut(key, value []byte) error {
+	// Write-through caching: write to persistent storage first (with sync)
 	if err := db.db.Put(key, value, db.syncOpts); err != nil {
 		return err
 	}
+	
+	// Then update the cache to ensure consistency
 	item := &cacheItem{key: key, value: value}
 	db.cache.Set(key, item, int64(len(value)))
 	return nil
 }
 
 func (db *DB) SyncDelete(key []byte) error {
+	// Write-through caching: delete from persistent storage first (with sync)
+	if err := db.db.Delete(key, db.syncOpts); err != nil {
+		return err
+	}
+	
+	// Then remove from cache to ensure consistency
 	db.cache.Del(key)
-	return db.db.Delete(key, db.syncOpts)
+	return nil
 }
 
 func (db *DB) NewWriteBatch() driver.IWriteBatch {

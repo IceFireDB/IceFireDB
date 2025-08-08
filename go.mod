@@ -9,7 +9,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/dgraph-io/badger/v4 v4.7.0
-	github.com/dgraph-io/ristretto v0.2.0
+	github.com/dgraph-io/ristretto v0.1.1
 	github.com/dgraph-io/ristretto/v2 v2.2.0
 	github.com/ipfs/go-datastore v0.7.0
 	github.com/ipfs/go-ipfs-api v0.3.0
@@ -108,6 +108,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/glog v1.2.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
