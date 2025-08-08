@@ -1,5 +1,6 @@
+#ifndef USE_EXTERNAL_ZSTD
 /*
- * Copyright (c) 2016-present, Yann Collet, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -54,3 +55,5 @@ size_t ZSTD_compressBlock_btultra_extDict(
 #endif
 
 #endif /* ZSTD_OPT_H */
+
+#endif /* USE_EXTERNAL_ZSTD */

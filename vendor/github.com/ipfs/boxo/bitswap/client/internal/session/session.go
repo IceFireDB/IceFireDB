@@ -15,14 +15,12 @@ import (
 	delay "github.com/ipfs/go-ipfs-delay"
 	logging "github.com/ipfs/go-log/v2"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-var (
-	log   = logging.Logger("bitswap/session")
-	sflog = log.Desugar()
-)
+var log = logging.Logger("bitswap/session")
 
 const (
 	broadcastLiveWantsLimit = 64
@@ -38,7 +36,7 @@ type PeerManager interface {
 	// interested in a peer's connection state
 	UnregisterSession(uint64)
 	// SendWants tells the PeerManager to send wants to the given peer
-	SendWants(ctx context.Context, peerId peer.ID, wantBlocks []cid.Cid, wantHaves []cid.Cid)
+	SendWants(ctx context.Context, peerId peer.ID, wantBlocks []cid.Cid, wantHaves []cid.Cid) bool
 	// BroadcastWantHaves sends want-haves to all connected peers (used for
 	// session discovery)
 	BroadcastWantHaves(context.Context, []cid.Cid)
@@ -72,12 +70,6 @@ type SessionPeerManager interface {
 	ProtectConnection(peer.ID)
 }
 
-// ProviderFinder is used to find providers for a given key
-type ProviderFinder interface {
-	// FindProvidersAsync searches for peers that provide the given CID
-	FindProvidersAsync(ctx context.Context, k cid.Cid) <-chan peer.ID
-}
-
 // opType is the kind of operation that is being processed by the event loop
 type opType int
 
@@ -109,7 +101,7 @@ type Session struct {
 	sm             SessionManager
 	pm             PeerManager
 	sprm           SessionPeerManager
-	providerFinder ProviderFinder
+	providerFinder routing.ContentDiscovery
 	sim            *bssim.SessionInterestManager
 
 	sw  sessionWants
@@ -142,7 +134,7 @@ func New(
 	sm SessionManager,
 	id uint64,
 	sprm SessionPeerManager,
-	providerFinder ProviderFinder,
+	providerFinder routing.ContentDiscovery,
 	sim *bssim.SessionInterestManager,
 	pm PeerManager,
 	bpm *bsbpm.BlockPresenceManager,
@@ -150,6 +142,7 @@ func New(
 	initialSearchDelay time.Duration,
 	periodicSearchDelay delay.D,
 	self peer.ID,
+	havesReceivedGauge bspm.Gauge,
 ) *Session {
 	ctx, cancel := context.WithCancel(ctx)
 	s := &Session{
@@ -171,7 +164,7 @@ func New(
 		periodicSearchDelay: periodicSearchDelay,
 		self:                self,
 	}
-	s.sws = newSessionWantSender(id, pm, sprm, sm, bpm, s.onWantsSent, s.onPeersExhausted)
+	s.sws = newSessionWantSender(id, pm, sprm, sm, bpm, s.onWantsSent, s.onPeersExhausted, havesReceivedGauge)
 
 	go s.run(ctx)
 
@@ -213,7 +206,7 @@ func (s *Session) ReceiveFrom(from peer.ID, ks []cid.Cid, haves []cid.Cid, dontH
 
 func (s *Session) logReceiveFrom(from peer.ID, interestedKs []cid.Cid, haves []cid.Cid, dontHaves []cid.Cid) {
 	// Save some CPU cycles if log level is higher than debug
-	if ce := sflog.Check(zap.DebugLevel, "Bitswap <- rcv message"); ce == nil {
+	if !log.Level().Enabled(zapcore.DebugLevel) {
 		return
 	}
 
@@ -375,10 +368,10 @@ func (s *Session) broadcast(ctx context.Context, wants []cid.Cid) {
 		log.Debugw("FindMorePeers", "session", s.id, "cid", wants[0], "pending", len(wants))
 		s.findMorePeers(ctx, wants[0])
 	}
-	s.resetIdleTick()
 
 	// If we have live wants record a consecutive tick
 	if s.sw.HasLiveWants() {
+		s.resetIdleTick() // call before incrementing s.consecutiveTicks
 		s.consecutiveTicks++
 	}
 }
@@ -403,14 +396,18 @@ func (s *Session) handlePeriodicSearch(ctx context.Context) {
 // findMorePeers attempts to find more peers for a session by searching for
 // providers for the given Cid
 func (s *Session) findMorePeers(ctx context.Context, c cid.Cid) {
+	// noop when provider finder is disabled
+	if s.providerFinder == nil {
+		return
+	}
 	go func(k cid.Cid) {
 		ctx, span := internal.StartSpan(ctx, "Session.FindMorePeers")
 		defer span.End()
-		for p := range s.providerFinder.FindProvidersAsync(ctx, k) {
+		for p := range s.providerFinder.FindProvidersAsync(ctx, k, 0) {
 			// When a provider indicates that it has a cid, it's equivalent to
 			// the providing peer sending a HAVE
 			span.AddEvent("FoundPeer")
-			s.sws.Update(p, nil, []cid.Cid{c}, nil)
+			s.sws.Update(p.ID, nil, []cid.Cid{c}, nil)
 		}
 	}(c)
 }
@@ -441,9 +438,9 @@ func (s *Session) handleReceive(ks []cid.Cid) {
 	// Record latency
 	s.latencyTrkr.receiveUpdate(len(wanted), totalLatency)
 
-	// Inform the SessionInterestManager that this session is no longer
-	// expecting to receive the wanted keys
-	s.sim.RemoveSessionWants(s.id, wanted)
+	// Inform the SessionManager that this session is no longer expecting to
+	// receive the wanted keys, since we now have them
+	s.sm.CancelSessionWants(s.id, wanted)
 
 	s.idleTick.Stop()
 
@@ -451,7 +448,10 @@ func (s *Session) handleReceive(ks []cid.Cid) {
 	// that have occurred since the last new block
 	s.consecutiveTicks = 0
 
-	s.resetIdleTick()
+	// Reset rebroadcast timer if there are still outstanding wants.
+	if s.sw.HasLiveWants() {
+		s.resetIdleTick()
+	}
 }
 
 // wantBlocks is called when blocks are requested by the client

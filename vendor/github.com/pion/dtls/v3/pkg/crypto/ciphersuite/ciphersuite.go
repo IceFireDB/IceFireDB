@@ -21,10 +21,14 @@ const (
 )
 
 var (
-	errNotEnoughRoomForNonce = &protocol.InternalError{Err: errors.New("buffer not long enough to contain nonce")} //nolint:goerr113
-	errDecryptPacket         = &protocol.TemporaryError{Err: errors.New("failed to decrypt packet")}               //nolint:goerr113
-	errInvalidMAC            = &protocol.TemporaryError{Err: errors.New("invalid mac")}                            //nolint:goerr113
-	errFailedToCast          = &protocol.FatalError{Err: errors.New("failed to cast")}                             //nolint:goerr113
+	//nolint:goerr113
+	errNotEnoughRoomForNonce = &protocol.InternalError{Err: errors.New("buffer not long enough to contain nonce")}
+	//nolint:goerr113
+	errDecryptPacket = &protocol.TemporaryError{Err: errors.New("failed to decrypt packet")}
+	//nolint:goerr113
+	errInvalidMAC = &protocol.TemporaryError{Err: errors.New("invalid mac")}
+	//nolint:goerr113
+	errFailedToCast = &protocol.FatalError{Err: errors.New("failed to cast")}
 )
 
 func generateAEADAdditionalData(h *recordlayer.Header, payloadLen int) []byte {
@@ -37,6 +41,7 @@ func generateAEADAdditionalData(h *recordlayer.Header, payloadLen int) []byte {
 	additionalData[8] = byte(h.ContentType)
 	additionalData[9] = h.Version.Major
 	additionalData[10] = h.Version.Minor
+	//nolint:gosec //G115
 	binary.BigEndian.PutUint16(additionalData[len(additionalData)-2:], uint16(payloadLen))
 
 	return additionalData[:]
@@ -45,20 +50,20 @@ func generateAEADAdditionalData(h *recordlayer.Header, payloadLen int) []byte {
 // generateAEADAdditionalDataCID generates additional data for AEAD ciphers
 // according to https://datatracker.ietf.org/doc/html/rfc9146#name-aead-ciphers
 func generateAEADAdditionalDataCID(h *recordlayer.Header, payloadLen int) []byte {
-	var b cryptobyte.Builder
+	var builder cryptobyte.Builder
 
-	b.AddUint64(seqNumPlaceholder)
-	b.AddUint8(uint8(protocol.ContentTypeConnectionID))
-	b.AddUint8(uint8(len(h.ConnectionID)))
-	b.AddUint8(uint8(protocol.ContentTypeConnectionID))
-	b.AddUint8(h.Version.Major)
-	b.AddUint8(h.Version.Minor)
-	b.AddUint16(h.Epoch)
-	util.AddUint48(&b, h.SequenceNumber)
-	b.AddBytes(h.ConnectionID)
-	b.AddUint16(uint16(payloadLen))
+	builder.AddUint64(seqNumPlaceholder)
+	builder.AddUint8(uint8(protocol.ContentTypeConnectionID))
+	builder.AddUint8(uint8(len(h.ConnectionID))) //nolint:gosec //G115
+	builder.AddUint8(uint8(protocol.ContentTypeConnectionID))
+	builder.AddUint8(h.Version.Major)
+	builder.AddUint8(h.Version.Minor)
+	builder.AddUint16(h.Epoch)
+	util.AddUint48(&builder, h.SequenceNumber)
+	builder.AddBytes(h.ConnectionID)
+	builder.AddUint16(uint16(payloadLen)) //nolint:gosec //G115
 
-	return b.BytesOrPanic()
+	return builder.BytesOrPanic()
 }
 
 // examinePadding returns, in constant time, the length of the padding to remove
@@ -72,9 +77,9 @@ func examinePadding(payload []byte) (toRemove int, good byte) {
 	}
 
 	paddingLen := payload[len(payload)-1]
-	t := uint(len(payload)-1) - uint(paddingLen)
+	t := uint(len(payload)-1) - uint(paddingLen) //nolint:gosec //G115
 	// if len(payload) >= (paddingLen - 1) then the MSB of t is zero
-	good = byte(int32(^t) >> 31)
+	good = byte(int32(^t) >> 31) //nolint:gosec //G115
 
 	// The maximum possible padding length plus the actual length field
 	toCheck := 256
@@ -84,9 +89,9 @@ func examinePadding(payload []byte) (toRemove int, good byte) {
 	}
 
 	for i := 0; i < toCheck; i++ {
-		t := uint(paddingLen) - uint(i)
+		t := uint(paddingLen) - uint(i) //nolint:gosec //G115
 		// if i <= paddingLen then the MSB of t is zero
-		mask := byte(int32(^t) >> 31)
+		mask := byte(int32(^t) >> 31) //nolint:gosec //G115
 		b := payload[len(payload)-1-i]
 		good &^= mask&paddingLen ^ mask&b
 	}
@@ -96,7 +101,7 @@ func examinePadding(payload []byte) (toRemove int, good byte) {
 	good &= good << 4
 	good &= good << 2
 	good &= good << 1
-	good = uint8(int8(good) >> 7)
+	good = uint8(int8(good) >> 7) //nolint:gosec //G115
 
 	toRemove = int(paddingLen) + 1
 

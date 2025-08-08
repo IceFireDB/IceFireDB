@@ -178,8 +178,10 @@ func (b *ipfsBackendWithMetrics) GetDNSLinkRecord(ctx context.Context, fqdn stri
 	return p, err
 }
 
-var _ IPFSBackend = (*ipfsBackendWithMetrics)(nil)
-var _ WithContextHint = (*ipfsBackendWithMetrics)(nil)
+var (
+	_ IPFSBackend     = (*ipfsBackendWithMetrics)(nil)
+	_ WithContextHint = (*ipfsBackendWithMetrics)(nil)
+)
 
 func (b *ipfsBackendWithMetrics) WrapContextForRequest(ctx context.Context) context.Context {
 	if withCtxWrap, ok := b.backend.(WithContextHint); ok {
@@ -306,4 +308,15 @@ var tracer = otel.Tracer("boxo/gateway")
 
 func spanTrace(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	return tracer.Start(ctx, "Gateway."+spanName, opts...)
+}
+
+// registerMetric registers metrics in registry or logs an error.
+//
+// Registration may error if metric is alreadyregistered. we are not using
+// MustRegister here to allow people to run tests in parallel without having to
+// write tedious  glue code that creates unique registry for each unit test
+func registerMetric(registry prometheus.Registerer, metric prometheus.Collector) {
+	if err := registry.Register(metric); err != nil {
+		log.Errorf("failed to register %v: %v", metric, err)
+	}
 }

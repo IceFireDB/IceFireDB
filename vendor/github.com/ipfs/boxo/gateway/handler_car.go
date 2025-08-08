@@ -14,7 +14,6 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
-
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"

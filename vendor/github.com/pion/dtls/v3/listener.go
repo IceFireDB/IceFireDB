@@ -12,7 +12,7 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol/recordlayer"
 )
 
-// Listen creates a DTLS listener
+// Listen creates a DTLS listener.
 func Listen(network string, laddr *net.UDPAddr, config *Config) (net.Listener, error) {
 	if err := validateConfig(config); err != nil {
 		return nil, err
@@ -28,6 +28,7 @@ func Listen(network string, laddr *net.UDPAddr, config *Config) (net.Listener, e
 			if err := h.Unmarshal(pkts[0]); err != nil {
 				return false
 			}
+
 			return h.ContentType == protocol.ContentTypeHandshake
 		},
 	}
@@ -41,6 +42,7 @@ func Listen(network string, laddr *net.UDPAddr, config *Config) (net.Listener, e
 	if err != nil {
 		return nil, err
 	}
+
 	return &listener{
 		config: config,
 		parent: parent,
@@ -59,7 +61,7 @@ func NewListener(inner dtlsnet.PacketListener, config *Config) (net.Listener, er
 	}, nil
 }
 
-// listener represents a DTLS listener
+// listener represents a DTLS listener.
 type listener struct {
 	config *Config
 	parent dtlsnet.PacketListener
@@ -72,6 +74,7 @@ func (l *listener) Accept() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return Server(c, raddr, l.config)
 }
 

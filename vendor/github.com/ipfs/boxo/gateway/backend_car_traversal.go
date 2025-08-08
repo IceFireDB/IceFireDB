@@ -13,7 +13,7 @@ import (
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-unixfsnode"
-	"github.com/ipld/go-car"
+	"github.com/ipld/go-car/v2"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/linking"
@@ -26,7 +26,7 @@ type getBlock func(ctx context.Context, cid cid.Cid) (blocks.Block, error)
 var errNilBlock = ErrInvalidResponse{Message: "received a nil block with no error"}
 
 func carToLinearBlockGetter(ctx context.Context, reader io.Reader, timeout time.Duration, metrics *CarBackendMetrics) (getBlock, error) {
-	cr, err := car.NewCarReaderWithOptions(reader, car.WithErrorOnEmptyRoots(false))
+	cr, err := car.NewBlockReader(reader, car.WithoutIndex())
 	if err != nil {
 		return nil, err
 	}

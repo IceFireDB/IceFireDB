@@ -39,7 +39,7 @@ type Advertiser struct {
 
 // Advertise starts advertisement of service.
 // location should be a string or a ssdp.LocationProvider.
-func Advertise(st, usn string, location interface{}, server string, maxAge int, opts ...Option) (*Advertiser, error) {
+func Advertise(st, usn string, location any, server string, maxAge int, opts ...Option) (*Advertiser, error) {
 	locProv, err := toLocationProvider(location)
 	if err != nil {
 		return nil, err

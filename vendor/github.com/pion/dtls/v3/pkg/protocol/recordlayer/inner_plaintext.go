@@ -17,22 +17,24 @@ type InnerPlaintext struct {
 	Zeros    uint
 }
 
-// Marshal encodes a DTLS InnerPlaintext to binary
+// Marshal encodes a DTLS InnerPlaintext to binary.
 func (p *InnerPlaintext) Marshal() ([]byte, error) {
 	var out cryptobyte.Builder
 	out.AddBytes(p.Content)
 	out.AddUint8(uint8(p.RealType))
 	out.AddBytes(make([]byte, p.Zeros))
+
 	return out.Bytes()
 }
 
-// Unmarshal populates a DTLS InnerPlaintext from binary
+// Unmarshal populates a DTLS InnerPlaintext from binary.
 func (p *InnerPlaintext) Unmarshal(data []byte) error {
 	// Process in reverse
 	i := len(data) - 1
 	for i >= 0 {
 		if data[i] != 0 {
-			p.Zeros = uint(len(data) - 1 - i)
+			p.Zeros = uint(len(data) - 1 - i) //nolint:gosec // G115
+
 			break
 		}
 		i--

@@ -17,7 +17,7 @@ import (
 	"github.com/quic-go/quic-go/logging"
 )
 
-// ErrServerClosed is returned by the Listener or EarlyListener's Accept method after a call to Close.
+// ErrServerClosed is returned by the [Listener] or [EarlyListener]'s Accept method after a call to Close.
 var ErrServerClosed = errServerClosed{}
 
 type errServerClosed struct{}
@@ -30,14 +30,6 @@ type packetHandler interface {
 	handlePacket(receivedPacket)
 	destroy(error)
 	closeWithTransportError(qerr.TransportErrorCode)
-}
-
-type packetHandlerManager interface {
-	Get(protocol.ConnectionID) (packetHandler, bool)
-	GetByResetToken(protocol.StatelessResetToken) (packetHandler, bool)
-	AddWithConnID(destConnID, newConnID protocol.ConnectionID, h packetHandler) bool
-	Close(error)
-	connRunner
 }
 
 type quicConn interface {
@@ -61,6 +53,7 @@ type rejectedPacket struct {
 
 // A Listener of QUIC
 type baseServer struct {
+	tr                        *packetHandlerMap
 	disableVersionNegotiation bool
 	acceptEarlyConns          bool
 
@@ -74,7 +67,6 @@ type baseServer struct {
 
 	connIDGenerator   ConnectionIDGenerator
 	statelessResetter *statelessResetter
-	connHandler       packetHandlerManager
 	onClose           func()
 
 	receivedPackets chan receivedPacket
@@ -82,7 +74,7 @@ type baseServer struct {
 	nextZeroRTTCleanup time.Time
 	zeroRTTQueues      map[protocol.ConnectionID]*zeroRTTQueue // only initialized if acceptEarlyConns == true
 
-	connContext func(context.Context) context.Context
+	connContext func(context.Context, *ClientInfo) (context.Context, error)
 
 	// set as a member, so they can be set in the tests
 	newConn func(
@@ -101,6 +93,7 @@ type baseServer struct {
 		*tls.Config,
 		*handshake.TokenGenerator,
 		bool, /* client address validated by an address validation token */
+		time.Duration,
 		*logging.ConnectionTracer,
 		utils.Logger,
 		protocol.Version,
@@ -146,11 +139,9 @@ func (l *Listener) Accept(ctx context.Context) (Connection, error) {
 }
 
 // Close closes the listener.
-// Accept will return ErrServerClosed as soon as all connections in the accept queue have been accepted.
+// Accept will return [ErrServerClosed] as soon as all connections in the accept queue have been accepted.
 // QUIC handshakes that are still in flight will be rejected with a CONNECTION_REFUSED error.
-// The effect of closing the listener depends on how it was created:
-// * if it was created using Transport.Listen, already established connections will be unaffected
-// * if it was created using the Listen convenience method, all established connection will be closed immediately
+// Already established (accepted)connections will be unaffected.
 func (l *Listener) Close() error {
 	return l.baseServer.Close()
 }
@@ -186,7 +177,7 @@ func (l *EarlyListener) Addr() net.Addr {
 }
 
 // ListenAddr creates a QUIC server listening on a given address.
-// See Listen for more details.
+// See [Listen] for more details.
 func ListenAddr(addr string, tlsConf *tls.Config, config *Config) (*Listener, error) {
 	conn, err := listenUDP(addr)
 	if err != nil {
@@ -199,7 +190,7 @@ func ListenAddr(addr string, tlsConf *tls.Config, config *Config) (*Listener, er
 	}).Listen(tlsConf, config)
 }
 
-// ListenAddrEarly works like ListenAddr, but it returns connections before the handshake completes.
+// ListenAddrEarly works like [ListenAddr], but it returns connections before the handshake completes.
 func ListenAddrEarly(addr string, tlsConf *tls.Config, config *Config) (*EarlyListener, error) {
 	conn, err := listenUDP(addr)
 	if err != nil {
@@ -221,16 +212,16 @@ func listenUDP(addr string) (*net.UDPConn, error) {
 }
 
 // Listen listens for QUIC connections on a given net.PacketConn.
-// If the PacketConn satisfies the OOBCapablePacketConn interface (as a net.UDPConn does),
+// If the PacketConn satisfies the [OOBCapablePacketConn] interface (as a [net.UDPConn] does),
 // ECN and packet info support will be enabled. In this case, ReadMsgUDP and WriteMsgUDP
 // will be used instead of ReadFrom and WriteTo to read/write packets.
 // A single net.PacketConn can only be used for a single call to Listen.
 //
 // The tls.Config must not be nil and must contain a certificate configuration.
-// Furthermore, it must define an application control (using NextProtos).
+// Furthermore, it must define an application control (using [NextProtos]).
 // The quic.Config may be nil, in that case the default values will be used.
 //
-// This is a convenience function. More advanced use cases should instantiate a Transport,
+// This is a convenience function. More advanced use cases should instantiate a [Transport],
 // which offers configuration options for a more fine-grained control of the connection establishment,
 // including reusing the underlying UDP socket for outgoing QUIC connections.
 // When closing a listener created with Listen, all established QUIC connections will be closed immediately.
@@ -239,7 +230,7 @@ func Listen(conn net.PacketConn, tlsConf *tls.Config, config *Config) (*Listener
 	return tr.Listen(tlsConf, config)
 }
 
-// ListenEarly works like Listen, but it returns connections before the handshake completes.
+// ListenEarly works like [Listen], but it returns connections before the handshake completes.
 func ListenEarly(conn net.PacketConn, tlsConf *tls.Config, config *Config) (*EarlyListener, error) {
 	tr := &Transport{Conn: conn, isSingleUse: true}
 	return tr.ListenEarly(tlsConf, config)
@@ -247,10 +238,10 @@ func ListenEarly(conn net.PacketConn, tlsConf *tls.Config, config *Config) (*Ear
 
 func newServer(
 	conn rawConn,
-	connHandler packetHandlerManager,
+	tr *packetHandlerMap,
 	connIDGenerator ConnectionIDGenerator,
 	statelessResetter *statelessResetter,
-	connContext func(context.Context) context.Context,
+	connContext func(context.Context, *ClientInfo) (context.Context, error),
 	tlsConf *tls.Config,
 	config *Config,
 	tracer *logging.Tracer,
@@ -264,6 +255,7 @@ func newServer(
 	s := &baseServer{
 		conn:                      conn,
 		connContext:               connContext,
+		tr:                        tr,
 		tlsConf:                   tlsConf,
 		config:                    config,
 		tokenGenerator:            handshake.NewTokenGenerator(tokenGeneratorKey),
@@ -271,7 +263,6 @@ func newServer(
 		verifySourceAddress:       verifySourceAddress,
 		connIDGenerator:           connIDGenerator,
 		statelessResetter:         statelessResetter,
-		connHandler:               connHandler,
 		connQueue:                 make(chan quicConn, protocol.MaxAcceptQueueSize),
 		errorChan:                 make(chan struct{}),
 		stopAccepting:             make(chan struct{}),
@@ -426,6 +417,9 @@ func (s *baseServer) handlePacketImpl(p receivedPacket) bool /* is the buffer st
 	// send a Version Negotiation Packet if the client is speaking a different protocol version
 	if !protocol.IsSupportedVersion(s.config.Versions, v) {
 		if s.disableVersionNegotiation {
+			if s.tracer != nil && s.tracer.DroppedPacket != nil {
+				s.tracer.DroppedPacket(p.remoteAddr, logging.PacketTypeNotDetermined, p.Size(), logging.PacketDropUnexpectedVersion)
+			}
 			return false
 		}
 
@@ -498,7 +492,7 @@ func (s *baseServer) handle0RTTPacket(p receivedPacket) bool {
 	}
 
 	// check again if we might have a connection now
-	if handler, ok := s.connHandler.Get(connID); ok {
+	if handler, ok := s.tr.Get(connID); ok {
 		handler.handlePacket(p)
 		return true
 	}
@@ -588,7 +582,7 @@ func (s *baseServer) handleInitialImpl(p receivedPacket, hdr *wire.Header) error
 	// The server queues packets for a while, and we might already have established a connection by now.
 	// This results in a second check in the connection map.
 	// That's ok since it's not the hot path (it's only taken by some Initial and 0-RTT packets).
-	if handler, ok := s.connHandler.Get(hdr.DestConnectionID); ok {
+	if handler, ok := s.tr.Get(hdr.DestConnectionID); ok {
 		handler.handlePacket(p)
 		return nil
 	}
@@ -644,21 +638,22 @@ func (s *baseServer) handleInitialImpl(p receivedPacket, hdr *wire.Header) error
 		return nil
 	}
 
+	// restore RTT from token
+	var rtt time.Duration
+	if token != nil && !token.IsRetryToken {
+		rtt = token.RTT
+	}
+
 	config := s.config
+	clientInfo := &ClientInfo{
+		RemoteAddr:   p.remoteAddr,
+		AddrVerified: clientAddrVerified,
+	}
 	if s.config.GetConfigForClient != nil {
-		conf, err := s.config.GetConfigForClient(&ClientHelloInfo{
-			RemoteAddr:   p.remoteAddr,
-			AddrVerified: clientAddrVerified,
-		})
+		conf, err := s.config.GetConfigForClient(clientInfo)
 		if err != nil {
 			s.logger.Debugf("Rejecting new connection due to GetConfigForClient callback")
-			delete(s.zeroRTTQueues, hdr.DestConnectionID)
-			select {
-			case s.connectionRefusedQueue <- rejectedPacket{receivedPacket: p, hdr: hdr}:
-			default:
-				// drop packet if we can't send out the CONNECTION_REFUSED fast enough
-				p.buffer.Release()
-			}
+			s.refuseNewConn(p, hdr)
 			return nil
 		}
 		config = populateConfig(conf)
@@ -668,7 +663,14 @@ func (s *baseServer) handleInitialImpl(p receivedPacket, hdr *wire.Header) error
 	var cancel context.CancelCauseFunc
 	ctx, cancel1 := context.WithCancelCause(context.Background())
 	if s.connContext != nil {
-		ctx = s.connContext(ctx)
+		var err error
+		ctx, err = s.connContext(ctx, clientInfo)
+		if err != nil {
+			cancel1(err)
+			s.logger.Debugf("Rejecting new connection due to ConnContext callback: %s", err)
+			s.refuseNewConn(p, hdr)
+			return nil
+		}
 		if ctx == nil {
 			panic("quic: ConnContext returned nil")
 		}
@@ -703,7 +705,7 @@ func (s *baseServer) handleInitialImpl(p receivedPacket, hdr *wire.Header) error
 		ctx,
 		cancel,
 		newSendConn(s.conn, p.remoteAddr, p.info, s.logger),
-		s.connHandler,
+		s.tr,
 		origDestConnID,
 		retrySrcConnID,
 		hdr.DestConnectionID,
@@ -715,6 +717,7 @@ func (s *baseServer) handleInitialImpl(p receivedPacket, hdr *wire.Header) error
 		s.tlsConf,
 		s.tokenGenerator,
 		clientAddrVerified,
+		rtt,
 		tracer,
 		s.logger,
 		hdr.Version,
@@ -724,9 +727,9 @@ func (s *baseServer) handleInitialImpl(p receivedPacket, hdr *wire.Header) error
 	// This is very unlikely: Even if an attacker chooses a connection ID that's already in use,
 	// under normal circumstances the packet would just be routed to that connection.
 	// The only time this collision will occur if we receive the two Initial packets at the same time.
-	if added := s.connHandler.AddWithConnID(hdr.DestConnectionID, connID, conn); !added {
+	if added := s.tr.AddWithConnID(hdr.DestConnectionID, connID, conn); !added {
 		delete(s.zeroRTTQueues, hdr.DestConnectionID)
-		conn.closeWithTransportError(qerr.ConnectionRefused)
+		conn.closeWithTransportError(ConnectionRefused)
 		return nil
 	}
 	// Pass queued 0-RTT to the newly established connection.
@@ -744,6 +747,16 @@ func (s *baseServer) handleInitialImpl(p receivedPacket, hdr *wire.Header) error
 	}()
 	go conn.run()
 	return nil
+}
+
+func (s *baseServer) refuseNewConn(p receivedPacket, hdr *wire.Header) {
+	delete(s.zeroRTTQueues, hdr.DestConnectionID)
+	select {
+	case s.connectionRefusedQueue <- rejectedPacket{receivedPacket: p, hdr: hdr}:
+	default:
+		// drop packet if we can't send out the CONNECTION_REFUSED fast enough
+		p.buffer.Release()
+	}
 }
 
 func (s *baseServer) handleNewConn(conn quicConn) {
@@ -850,7 +863,7 @@ func (s *baseServer) maybeSendInvalidToken(p rejectedPacket) {
 	if s.logger.Debug() {
 		s.logger.Debugf("Client sent an invalid retry token. Sending INVALID_TOKEN to %s.", p.remoteAddr)
 	}
-	if err := s.sendError(p.remoteAddr, hdr, sealer, qerr.InvalidToken, p.info); err != nil {
+	if err := s.sendError(p.remoteAddr, hdr, sealer, InvalidToken, p.info); err != nil {
 		s.logger.Debugf("Error sending INVALID_TOKEN error: %s", err)
 	}
 }
@@ -858,7 +871,7 @@ func (s *baseServer) maybeSendInvalidToken(p rejectedPacket) {
 func (s *baseServer) sendConnectionRefused(p rejectedPacket) {
 	defer p.buffer.Release()
 	sealer, _ := handshake.NewInitialAEAD(p.hdr.DestConnectionID, protocol.PerspectiveServer, p.hdr.Version)
-	if err := s.sendError(p.remoteAddr, p.hdr, sealer, qerr.ConnectionRefused, p.info); err != nil {
+	if err := s.sendError(p.remoteAddr, p.hdr, sealer, ConnectionRefused, p.info); err != nil {
 		s.logger.Debugf("Error sending CONNECTION_REFUSED error: %s", err)
 	}
 }

@@ -10,11 +10,11 @@ import (
 	"mime"
 	"net/http"
 	gourl "net/url"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/benbjohnson/clock"
+	"github.com/filecoin-project/go-clock"
 	ipns "github.com/ipfs/boxo/ipns"
 	"github.com/ipfs/boxo/routing/http/contentrouter"
 	"github.com/ipfs/boxo/routing/http/filters"
@@ -37,6 +37,27 @@ var (
 	DefaultProtocolFilter = []string{"unknown", "transport-bitswap"} // IPIP-484
 )
 
+// normalizeBaseURL removes duplicate /routing/v1 paths from the base URL
+// to prevent URLs like /routing/v1/routing/v1/providers when baseURL ends with /routing/v1
+func normalizeBaseURL(baseURL string) (string, error) {
+	// Remove trailing slashes first
+	baseURL = strings.TrimRight(baseURL, "/")
+
+	// Remove /routing/v1 suffix if present
+	baseURL = strings.TrimSuffix(baseURL, "/routing/v1")
+
+	// After deduplication, check if there's any path remaining
+	u, err := gourl.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+	if u.Path != "" && u.Path != "/" {
+		return "", errors.New("only /routing/v1 URLs are supported")
+	}
+
+	return baseURL, nil
+}
+
 const (
 	mediaTypeJSON       = "application/json"
 	mediaTypeNDJSON     = "application/x-ndjson"
@@ -55,6 +76,7 @@ type Client struct {
 
 	// Called immediately after signing a provide request. It is used
 	// for testing, e.g., testing the server with a mangled signature.
+	//nolint:staticcheck
 	//lint:ignore SA1019 // ignore staticcheck
 	afterSignCallback func(req *types.WriteBitswapRecord)
 
@@ -107,7 +129,7 @@ func WithDisabledLocalFiltering(val bool) Option {
 // The protocols are ordered alphabetically for cache key (url) consistency
 func WithProtocolFilter(protocolFilter []string) Option {
 	return func(c *Client) error {
-		sort.Strings(protocolFilter)
+		slices.Sort(protocolFilter)
 		c.protocolFilter = protocolFilter
 		return nil
 	}
@@ -118,7 +140,7 @@ func WithProtocolFilter(protocolFilter []string) Option {
 // The addresses are ordered alphabetically for cache key (url) consistency
 func WithAddrFilter(addrFilter []string) Option {
 	return func(c *Client) error {
-		sort.Strings(addrFilter)
+		slices.Sort(addrFilter)
 		c.addrFilter = addrFilter
 		return nil
 	}
@@ -176,8 +198,13 @@ func WithStreamResultsRequired() Option {
 // New creates a content routing API client.
 // The Provider and identity parameters are option. If they are nil, the [client.ProvideBitswap] method will not function.
 func New(baseURL string, opts ...Option) (*Client, error) {
+	normalizedURL, err := normalizeBaseURL(baseURL)
+	if err != nil {
+		return nil, err
+	}
+
 	client := &Client{
-		baseURL:        baseURL,
+		baseURL:        normalizedURL,
 		httpClient:     newDefaultHTTPClient(defaultUserAgent),
 		clock:          clock.New(),
 		accepts:        strings.Join([]string{mediaTypeNDJSON, mediaTypeJSON}, ","),
@@ -353,8 +380,10 @@ func (c *Client) ProvideBitswap(ctx context.Context, keys []cid.Cid, ttl time.Du
 
 // ProvideAsync makes a provide request to a delegated router
 //
+//nolint:staticcheck
 //lint:ignore SA1019 // ignore staticcheck
 func (c *Client) provideSignedBitswapRecord(ctx context.Context, bswp *types.WriteBitswapRecord) (time.Duration, error) {
+	//nolint:staticcheck
 	//lint:ignore SA1019 // ignore staticcheck
 	req := jsontypes.WriteProvidersRequest{Providers: []types.Record{bswp}}
 

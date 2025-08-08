@@ -14,7 +14,13 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol/recordlayer"
 )
 
-func flight1Parse(ctx context.Context, c flightConn, state *State, cache *handshakeCache, cfg *handshakeConfig) (flightVal, *alert.Alert, error) {
+func flight1Parse(
+	ctx context.Context,
+	conn flightConn,
+	state *State,
+	cache *handshakeCache,
+	cfg *handshakeConfig,
+) (flightVal, *alert.Alert, error) {
 	// HelloVerifyRequest can be skipped by the server,
 	// so allow ServerHello during flight1 also
 	seq, msgs, ok := cache.fullPullMap(state.handshakeRecvSequence, state.cipherSuite,
@@ -29,7 +35,7 @@ func flight1Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	if _, ok := msgs[handshake.TypeServerHello]; ok {
 		// Flight1 and flight2 were skipped.
 		// Parse as flight3.
-		return flight3Parse(ctx, c, state, cache, cfg)
+		return flight3Parse(ctx, conn, state, cache, cfg)
 	}
 
 	if h, ok := msgs[handshake.TypeHelloVerifyRequest].(*handshake.MessageHelloVerifyRequest); ok {
@@ -40,13 +46,20 @@ func flight1Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 		}
 		state.cookie = append([]byte{}, h.Cookie...)
 		state.handshakeRecvSequence = seq
+
 		return flight3, nil, nil
 	}
 
 	return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, nil
 }
 
-func flight1Generate(c flightConn, state *State, _ *handshakeCache, cfg *handshakeConfig) ([]*packet, *alert.Alert, error) {
+//nolint:cyclop
+func flight1Generate(
+	conn flightConn,
+	state *State,
+	_ *handshakeCache,
+	cfg *handshakeConfig,
+) ([]*packet, *alert.Alert, error) {
 	var zeroEpoch uint16
 	state.localEpoch.Store(zeroEpoch)
 	state.remoteEpoch.Store(zeroEpoch)
@@ -74,6 +87,7 @@ func flight1Generate(c flightConn, state *State, _ *handshakeCache, cfg *handsha
 	for _, c := range cfg.localCipherSuites {
 		if c.ECC() {
 			setEllipticCurveCryptographyClientHelloExtensions = true
+
 			break
 		}
 	}
@@ -113,7 +127,7 @@ func flight1Generate(c flightConn, state *State, _ *handshakeCache, cfg *handsha
 
 	if cfg.sessionStore != nil {
 		cfg.log.Tracef("[handshake] try to resume session")
-		if s, err := cfg.sessionStore.Get(c.sessionKey()); err != nil {
+		if s, err := cfg.sessionStore.Get(conn.sessionKey()); err != nil {
 			return nil, &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}, err
 		} else if s.ID != nil {
 			cfg.log.Tracef("[handshake] get saved session: %x", s.ID)

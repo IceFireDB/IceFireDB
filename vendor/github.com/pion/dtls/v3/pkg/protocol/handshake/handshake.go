@@ -14,7 +14,7 @@ import (
 // https://tools.ietf.org/html/rfc5246#section-7.4
 type Type uint8
 
-// Types of DTLS Handshake messages we know about
+// Types of DTLS Handshake messages we know about.
 const (
 	TypeHelloRequest       Type = 0
 	TypeClientHello        Type = 1
@@ -29,8 +29,8 @@ const (
 	TypeFinished           Type = 20
 )
 
-// String returns the string representation of this type
-func (t Type) String() string {
+// String returns the string representation of this type.
+func (t Type) String() string { //nolint:cyclop
 	switch t {
 	case TypeHelloRequest:
 		return "HelloRequest"
@@ -55,10 +55,11 @@ func (t Type) String() string {
 	case TypeFinished:
 		return "Finished"
 	}
+
 	return ""
 }
 
-// Message is the body of a Handshake datagram
+// Message is the body of a Handshake datagram.
 type Message interface {
 	Marshal() ([]byte, error)
 	Unmarshal(data []byte) error
@@ -78,12 +79,12 @@ type Handshake struct {
 	KeyExchangeAlgorithm types.KeyExchangeAlgorithm
 }
 
-// ContentType returns what kind of content this message is carying
+// ContentType returns what kind of content this message is carying.
 func (h Handshake) ContentType() protocol.ContentType {
 	return protocol.ContentTypeHandshake
 }
 
-// Marshal encodes a handshake into a binary message
+// Marshal encodes a handshake into a binary message.
 func (h *Handshake) Marshal() ([]byte, error) {
 	if h.Message == nil {
 		return nil, errHandshakeMessageUnset
@@ -96,7 +97,7 @@ func (h *Handshake) Marshal() ([]byte, error) {
 		return nil, err
 	}
 
-	h.Header.Length = uint32(len(msg))
+	h.Header.Length = uint32(len(msg)) //nolint:gosec // G115
 	h.Header.FragmentLength = h.Header.Length
 	h.Header.Type = h.Message.Type()
 	header, err := h.Header.Marshal()
@@ -107,14 +108,14 @@ func (h *Handshake) Marshal() ([]byte, error) {
 	return append(header, msg...), nil
 }
 
-// Unmarshal decodes a handshake from a binary message
-func (h *Handshake) Unmarshal(data []byte) error {
+// Unmarshal decodes a handshake from a binary message.
+func (h *Handshake) Unmarshal(data []byte) error { //nolint:cyclop
 	if err := h.Header.Unmarshal(data); err != nil {
 		return err
 	}
 
 	reportedLen := util.BigEndianUint24(data[1:])
-	if uint32(len(data)-HeaderLength) != reportedLen {
+	if uint32(len(data)-HeaderLength) != reportedLen { //nolint:gosec // G115
 		return errLengthMismatch
 	} else if reportedLen != h.Header.FragmentLength {
 		return errLengthMismatch
@@ -146,5 +147,6 @@ func (h *Handshake) Unmarshal(data []byte) error {
 	default:
 		return errNotImplemented
 	}
+
 	return h.Message.Unmarshal(data[HeaderLength:])
 }

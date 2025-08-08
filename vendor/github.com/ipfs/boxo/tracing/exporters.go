@@ -20,7 +20,7 @@ import (
 // most of this code.
 //
 // Specs:
-// - https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/sdk-environment-variables.md#exporter-selection
+// - https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/configuration/sdk-environment-variables.md#exporter-selection
 // - https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/exporter.md
 func NewSpanExporters(ctx context.Context) ([]trace.SpanExporter, error) {
 	var exporters []trace.SpanExporter

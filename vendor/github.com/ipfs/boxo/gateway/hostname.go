@@ -12,7 +12,6 @@ import (
 	cid "github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	dns "github.com/miekg/dns"
-
 	mbase "github.com/multiformats/go-multibase"
 )
 
@@ -182,7 +181,6 @@ func NewHostnameHandler(c Config, backend IPFSBackend, next http.Handler) http.H
 						// Un-inlined DNS name has a valid DNSLink record.
 						// Update path prefix to use un-inlined FQDN in gateway processing.
 						pathPrefix = "/ipns/" + dnslinkFQDN // → /ipns/my.v-long.example.com
-
 					} else if !hasDNSLinkRecord(r.Context(), backend, rootID) {
 						// Inspected _dnslink.my-v--long-example-com as a
 						// fallback, but it had no DNSLink record either.
@@ -193,7 +191,6 @@ func NewHostnameHandler(c Config, backend IPFSBackend, next http.Handler) http.H
 						// about missing DNSLink will use the un-inlined FQDN,
 						// and not the inlined one.
 						pathPrefix = "/ipns/" + dnslinkFQDN
-
 					}
 				}
 			}
@@ -260,6 +257,11 @@ func isDomainNameAndNotPeerID(hostname string) bool {
 // hasDNSLinkRecord returns if a DNS TXT record exists for the provided host.
 func hasDNSLinkRecord(ctx context.Context, backend IPFSBackend, host string) bool {
 	dnslinkName := stripPort(host)
+
+	// Skip DNSLink lookup for IP addresses
+	if net.ParseIP(dnslinkName) != nil {
+		return false
+	}
 
 	if !isDomainNameAndNotPeerID(dnslinkName) {
 		return false
@@ -552,6 +554,14 @@ func prepareHostnameGateways(gateways map[string]*PublicGateway) *hostnameGatewa
 	}
 
 	for hostname, gw := range gateways {
+		// Validate that UseSubdomains is not enabled for IP addresses
+		if gw.UseSubdomains {
+			hostWithoutPort := stripPort(hostname)
+			if net.ParseIP(hostWithoutPort) != nil {
+				log.Warn("invalid gateway configuration: UseSubdomains cannot be enabled for IP address %s", hostname)
+				continue
+			}
+		}
 		if strings.Contains(hostname, "*") {
 			// from *.domain.tld, construct a regexp that match any direct subdomain
 			// of .domain.tld.
