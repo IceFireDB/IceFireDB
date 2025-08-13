@@ -1026,10 +1026,11 @@ github.com/multiformats/go-base32
 # github.com/multiformats/go-base36 v0.2.0
 ## explicit; go 1.18
 github.com/multiformats/go-base36
-# github.com/multiformats/go-multiaddr v0.14.0
-## explicit; go 1.22
+# github.com/multiformats/go-multiaddr v0.16.1
+## explicit; go 1.23
 github.com/multiformats/go-multiaddr
 github.com/multiformats/go-multiaddr/net
+github.com/multiformats/go-multiaddr/x/meg
 # github.com/multiformats/go-multiaddr-dns v0.4.1
 ## explicit; go 1.22
 github.com/multiformats/go-multiaddr-dns
