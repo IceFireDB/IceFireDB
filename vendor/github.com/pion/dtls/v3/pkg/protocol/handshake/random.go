@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Consts for Random in Handshake
+// Consts for Random in Handshake.
 const (
 	RandomBytesLength = 28
 	RandomLength      = RandomBytesLength + 4
@@ -23,24 +23,24 @@ type Random struct {
 	RandomBytes [RandomBytesLength]byte
 }
 
-// MarshalFixed encodes the Handshake
+// MarshalFixed encodes the Handshake.
 func (r *Random) MarshalFixed() [RandomLength]byte {
 	var out [RandomLength]byte
 
-	binary.BigEndian.PutUint32(out[0:], uint32(r.GMTUnixTime.Unix()))
+	binary.BigEndian.PutUint32(out[0:], uint32(r.GMTUnixTime.Unix())) //nolint:gosec // G115
 	copy(out[4:], r.RandomBytes[:])
 
 	return out
 }
 
-// UnmarshalFixed populates the message from encoded data
+// UnmarshalFixed populates the message from encoded data.
 func (r *Random) UnmarshalFixed(data [RandomLength]byte) {
 	r.GMTUnixTime = time.Unix(int64(binary.BigEndian.Uint32(data[0:])), 0)
 	copy(r.RandomBytes[:], data[4:])
 }
 
 // Populate fills the handshakeRandom with random values
-// may be called multiple times
+// may be called multiple times.
 func (r *Random) Populate() error {
 	r.GMTUnixTime = time.Now()
 

@@ -3,10 +3,10 @@
 
 package types
 
-// AuthenticationType controls what authentication method is using during the handshake
+// AuthenticationType controls what authentication method is using during the handshake.
 type AuthenticationType int
 
-// AuthenticationType Enums
+// AuthenticationType Enums.
 const (
 	AuthenticationTypeCertificate AuthenticationType = iota + 1
 	AuthenticationTypePreSharedKey
