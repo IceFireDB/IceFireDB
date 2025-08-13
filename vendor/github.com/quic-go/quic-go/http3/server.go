@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,20 +18,9 @@ import (
 	"time"
 
 	"github.com/quic-go/quic-go"
-	"github.com/quic-go/quic-go/internal/protocol"
 	"github.com/quic-go/quic-go/quicvarint"
 
 	"github.com/quic-go/qpack"
-)
-
-// allows mocking of quic.Listen and quic.ListenAddr
-var (
-	quicListen = func(conn net.PacketConn, tlsConf *tls.Config, config *quic.Config) (QUICEarlyListener, error) {
-		return quic.ListenEarly(conn, tlsConf, config)
-	}
-	quicListenAddr = func(addr string, tlsConf *tls.Config, config *quic.Config) (QUICEarlyListener, error) {
-		return quic.ListenAddrEarly(addr, tlsConf, config)
-	}
 )
 
 // NextProtoH3 is the ALPN protocol negotiated during the TLS handshake, for QUIC v1 and v2.
@@ -46,66 +36,33 @@ const (
 	streamTypeQPACKDecoderStream = 3
 )
 
-const goawayTimeout = 5 * time.Second
-
-// A QUICEarlyListener listens for incoming QUIC connections.
-type QUICEarlyListener interface {
-	Accept(context.Context) (quic.EarlyConnection, error)
+// A QUICListener listens for incoming QUIC connections.
+type QUICListener interface {
+	Accept(context.Context) (*quic.Conn, error)
 	Addr() net.Addr
 	io.Closer
 }
 
-var _ QUICEarlyListener = &quic.EarlyListener{}
-
-func versionToALPN(v protocol.Version) string {
-	//nolint:exhaustive // These are all the versions we care about.
-	switch v {
-	case protocol.Version1, protocol.Version2:
-		return NextProtoH3
-	default:
-		return ""
-	}
-}
+var _ QUICListener = &quic.EarlyListener{}
 
 // ConfigureTLSConfig creates a new tls.Config which can be used
-// to create a quic.Listener meant for serving http3. The created
-// tls.Config adds the functionality of detecting the used QUIC version
-// in order to set the correct ALPN value for the http3 connection.
+// to create a quic.Listener meant for serving HTTP/3.
 func ConfigureTLSConfig(tlsConf *tls.Config) *tls.Config {
-	// The tls.Config used to setup the quic.Listener needs to have the GetConfigForClient callback set.
-	// That way, we can get the QUIC version and set the correct ALPN value.
-	return &tls.Config{
-		GetConfigForClient: func(ch *tls.ClientHelloInfo) (*tls.Config, error) {
-			// determine the ALPN from the QUIC version used
-			proto := NextProtoH3
-			val := ch.Context().Value(quic.QUICVersionContextKey)
-			if v, ok := val.(quic.Version); ok {
-				proto = versionToALPN(v)
+	// Workaround for https://github.com/golang/go/issues/60506.
+	// This initializes the session tickets _before_ cloning the config.
+	_, _ = tlsConf.DecryptTicket(nil, tls.ConnectionState{})
+	config := tlsConf.Clone()
+	config.NextProtos = []string{NextProtoH3}
+	if gfc := config.GetConfigForClient; gfc != nil {
+		config.GetConfigForClient = func(ch *tls.ClientHelloInfo) (*tls.Config, error) {
+			conf, err := gfc(ch)
+			if conf == nil || err != nil {
+				return conf, err
 			}
-			config := tlsConf
-			if tlsConf.GetConfigForClient != nil {
-				getConfigForClient := tlsConf.GetConfigForClient
-				var err error
-				conf, err := getConfigForClient(ch)
-				if err != nil {
-					return nil, err
-				}
-				if conf != nil {
-					config = conf
-				}
-			}
-			if config == nil {
-				return nil, nil
-			}
-			// Workaround for https://github.com/golang/go/issues/60506.
-			// This initializes the session tickets _before_ cloning the config.
-			_, _ = config.DecryptTicket(nil, tls.ConnectionState{})
-
-			config = config.Clone()
-			config.NextProtos = []string{proto}
-			return config, nil
-		},
+			return ConfigureTLSConfig(conf), nil
+		}
 	}
+	return config
 }
 
 // contextKey is a value for use with context.WithValue. It's used as
@@ -132,9 +89,13 @@ var ServerContextKey = &contextKey{"http3-server"}
 // than its string representation.
 var RemoteAddrContextKey = &contextKey{"remote-addr"}
 
-// listenerInfo contains info about specific listener added with addListener
-type listenerInfo struct {
+// listener contains info about specific listener added with addListener
+type listener struct {
+	ln   *QUICListener
 	port int // 0 means that no info about port is available
+
+	// if this listener was constructed by the application, it won't be closed when the server is closed
+	createdLocally bool
 }
 
 // Server is a HTTP/3 server.
@@ -194,12 +155,12 @@ type Server struct {
 	// Callers can either ignore the frame and return control of the stream back to HTTP/3
 	// (by returning hijacked false).
 	// Alternatively, callers can take over the QUIC stream (by returning hijacked true).
-	StreamHijacker func(FrameType, quic.ConnectionTracingID, quic.Stream, error) (hijacked bool, err error)
+	StreamHijacker func(FrameType, quic.ConnectionTracingID, *quic.Stream, error) (hijacked bool, err error)
 
 	// UniStreamHijacker, when set, is called for unknown unidirectional stream of unknown stream type.
 	// If parsing the stream type fails, the error is passed to the callback.
 	// In that case, the stream type will not be set.
-	UniStreamHijacker func(StreamType, quic.ConnectionTracingID, quic.ReceiveStream, error) (hijacked bool)
+	UniStreamHijacker func(StreamType, quic.ConnectionTracingID, *quic.ReceiveStream, error) (hijacked bool)
 
 	// IdleTimeout specifies how long until idle clients connection should be
 	// closed. Idle refers only to the HTTP/3 layer, activity at the QUIC layer
@@ -209,12 +170,12 @@ type Server struct {
 
 	// ConnContext optionally specifies a function that modifies the context used for a new connection c.
 	// The provided ctx has a ServerContextKey value.
-	ConnContext func(ctx context.Context, c quic.Connection) context.Context
+	ConnContext func(ctx context.Context, c *quic.Conn) context.Context
 
 	Logger *slog.Logger
 
 	mutex     sync.RWMutex
-	listeners map[*QUICEarlyListener]listenerInfo
+	listeners []listener
 
 	closed           bool
 	closeCtx         context.Context    // canceled when the server is closed
@@ -235,9 +196,9 @@ func (s *Server) ListenAndServe() error {
 	if err != nil {
 		return err
 	}
-	defer s.removeListener(&ln)
+	defer s.removeListener(ln)
 
-	return s.serveListener(ln)
+	return s.serveListener(*ln)
 }
 
 // ListenAndServeTLS listens on the UDP address s.Addr and calls s.Handler to handle HTTP/3 requests on incoming connections.
@@ -256,9 +217,9 @@ func (s *Server) ListenAndServeTLS(certFile, keyFile string) error {
 	if err != nil {
 		return err
 	}
-	defer s.removeListener(&ln)
+	defer s.removeListener(ln)
 
-	return s.serveListener(ln)
+	return s.serveListener(*ln)
 }
 
 // Serve an existing UDP connection.
@@ -269,9 +230,9 @@ func (s *Server) Serve(conn net.PacketConn) error {
 	if err != nil {
 		return err
 	}
-	defer s.removeListener(&ln)
+	defer s.removeListener(ln)
 
-	return s.serveListener(ln)
+	return s.serveListener(*ln)
 }
 
 // init initializes the contexts used for shutting down the server.
@@ -291,8 +252,13 @@ func (s *Server) decreaseConnCount() {
 }
 
 // ServeQUICConn serves a single QUIC connection.
-func (s *Server) ServeQUICConn(conn quic.Connection) error {
+func (s *Server) ServeQUICConn(conn *quic.Conn) error {
 	s.mutex.Lock()
+	if s.closed {
+		s.mutex.Unlock()
+		return http.ErrServerClosed
+	}
+
 	s.init()
 	s.mutex.Unlock()
 
@@ -307,9 +273,9 @@ func (s *Server) ServeQUICConn(conn quic.Connection) error {
 // and use it to construct a http3-friendly QUIC listener.
 // Closing the server does close the listener.
 // ServeListener always returns a non-nil error. After Shutdown or Close, the returned error is http.ErrServerClosed.
-func (s *Server) ServeListener(ln QUICEarlyListener) error {
+func (s *Server) ServeListener(ln QUICListener) error {
 	s.mutex.Lock()
-	if err := s.addListener(&ln); err != nil {
+	if err := s.addListener(&ln, false); err != nil {
 		s.mutex.Unlock()
 		return err
 	}
@@ -319,7 +285,7 @@ func (s *Server) ServeListener(ln QUICEarlyListener) error {
 	return s.serveListener(ln)
 }
 
-func (s *Server) serveListener(ln QUICEarlyListener) error {
+func (s *Server) serveListener(ln QUICListener) error {
 	for {
 		conn, err := ln.Accept(s.graceCtx)
 		// server closed
@@ -343,7 +309,7 @@ func (s *Server) serveListener(ln QUICEarlyListener) error {
 
 var errServerWithoutTLSConfig = errors.New("use of http3.Server without TLSConfig")
 
-func (s *Server) setupListenerForConn(tlsConf *tls.Config, conn net.PacketConn) (QUICEarlyListener, error) {
+func (s *Server) setupListenerForConn(tlsConf *tls.Config, conn net.PacketConn) (*QUICListener, error) {
 	if tlsConf == nil {
 		return nil, errServerWithoutTLSConfig
 	}
@@ -366,24 +332,24 @@ func (s *Server) setupListenerForConn(tlsConf *tls.Config, conn net.PacketConn) 
 		return nil, http.ErrServerClosed
 	}
 
-	var ln QUICEarlyListener
+	var ln QUICListener
 	var err error
 	if conn == nil {
 		addr := s.Addr
 		if addr == "" {
 			addr = ":https"
 		}
-		ln, err = quicListenAddr(addr, baseConf, quicConf)
+		ln, err = quic.ListenAddrEarly(addr, baseConf, quicConf)
 	} else {
-		ln, err = quicListen(conn, baseConf, quicConf)
+		ln, err = quic.ListenEarly(conn, baseConf, quicConf)
 	}
 	if err != nil {
 		return nil, err
 	}
-	if err := s.addListener(&ln); err != nil {
+	if err := s.addListener(&ln, true); err != nil {
 		return nil, err
 	}
-	return ln, nil
+	return &ln, nil
 }
 
 func extractPort(addr string) (int, error) {
@@ -407,28 +373,10 @@ func (s *Server) generateAltSvcHeader() {
 	}
 
 	// This code assumes that we will use protocol.SupportedVersions if no quic.Config is passed.
-	supportedVersions := protocol.SupportedVersions
-	if s.QUICConfig != nil && len(s.QUICConfig.Versions) > 0 {
-		supportedVersions = s.QUICConfig.Versions
-	}
-
-	// keep track of which have been seen so we don't yield duplicate values
-	seen := make(map[string]struct{}, len(supportedVersions))
-	var versionStrings []string
-	for _, version := range supportedVersions {
-		if v := versionToALPN(version); len(v) > 0 {
-			if _, ok := seen[v]; !ok {
-				versionStrings = append(versionStrings, v)
-				seen[v] = struct{}{}
-			}
-		}
-	}
 
 	var altSvc []string
 	addPort := func(port int) {
-		for _, v := range versionStrings {
-			altSvc = append(altSvc, fmt.Sprintf(`%s=":%d"; ma=2592000`, v, port))
-		}
+		altSvc = append(altSvc, fmt.Sprintf(`%s=":%d"; ma=2592000`, NextProtoH3, port))
 	}
 
 	if s.Port != 0 {
@@ -455,43 +403,40 @@ func (s *Server) generateAltSvcHeader() {
 	s.altSvcHeader = strings.Join(altSvc, ",")
 }
 
-// We store a pointer to interface in the map set. This is safe because we only
-// call trackListener via Serve and can track+defer untrack the same pointer to
-// local variable there. We never need to compare a Listener from another caller.
-func (s *Server) addListener(l *QUICEarlyListener) error {
+func (s *Server) addListener(l *QUICListener, createdLocally bool) error {
 	if s.closed {
 		return http.ErrServerClosed
-	}
-	if s.listeners == nil {
-		s.listeners = make(map[*QUICEarlyListener]listenerInfo)
 	}
 	s.init()
 
 	laddr := (*l).Addr()
 	if port, err := extractPort(laddr.String()); err == nil {
-		s.listeners[l] = listenerInfo{port}
+		s.listeners = append(s.listeners, listener{ln: l, port: port, createdLocally: createdLocally})
 	} else {
 		logger := s.Logger
 		if logger == nil {
 			logger = slog.Default()
 		}
 		logger.Error("Unable to extract port from listener, will not be announced using SetQUICHeaders", "local addr", laddr, "error", err)
-		s.listeners[l] = listenerInfo{}
+		s.listeners = append(s.listeners, listener{ln: l, port: 0, createdLocally: createdLocally})
 	}
 	s.generateAltSvcHeader()
 	return nil
 }
 
-func (s *Server) removeListener(l *QUICEarlyListener) {
+func (s *Server) removeListener(l *QUICListener) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	delete(s.listeners, l)
+
+	s.listeners = slices.DeleteFunc(s.listeners, func(info listener) bool {
+		return info.ln == l
+	})
 	s.generateAltSvcHeader()
 }
 
 // handleConn handles the HTTP/3 exchange on a QUIC connection.
 // It blocks until all HTTP handlers for all streams have returned.
-func (s *Server) handleConn(conn quic.Connection) error {
+func (s *Server) handleConn(conn *quic.Conn) error {
 	// open the control stream and send a SETTINGS frame, it's also used to send a GOAWAY frame later
 	// when the server is gracefully closed
 	ctrlStr, err := conn.OpenUniStream()
@@ -507,22 +452,22 @@ func (s *Server) handleConn(conn quic.Connection) error {
 	}).Append(b)
 	ctrlStr.Write(b)
 
-	ctx := conn.Context()
-	ctx = context.WithValue(ctx, ServerContextKey, s)
-	ctx = context.WithValue(ctx, http.LocalAddrContextKey, conn.LocalAddr())
-	ctx = context.WithValue(ctx, RemoteAddrContextKey, conn.RemoteAddr())
+	connCtx := conn.Context()
+	connCtx = context.WithValue(connCtx, ServerContextKey, s)
+	connCtx = context.WithValue(connCtx, http.LocalAddrContextKey, conn.LocalAddr())
+	connCtx = context.WithValue(connCtx, RemoteAddrContextKey, conn.RemoteAddr())
 	if s.ConnContext != nil {
-		ctx = s.ConnContext(ctx, conn)
-		if ctx == nil {
+		connCtx = s.ConnContext(connCtx, conn)
+		if connCtx == nil {
 			panic("http3: ConnContext returned nil")
 		}
 	}
 
 	hconn := newConnection(
-		ctx,
+		connCtx,
 		conn,
 		s.EnableDatagrams,
-		protocol.PerspectiveServer,
+		true, // server
 		s.Logger,
 		s.IdleTimeout,
 	)
@@ -531,42 +476,57 @@ func (s *Server) handleConn(conn quic.Connection) error {
 	var nextStreamID quic.StreamID
 	var wg sync.WaitGroup
 	var handleErr error
+	var inGracefulShutdown bool
 	// Process all requests immediately.
 	// It's the client's responsibility to decide which requests are eligible for 0-RTT.
+	ctx := s.graceCtx
 	for {
-		str, datagrams, err := hconn.acceptStream(s.graceCtx)
+		// The context used here is:
+		// * before graceful shutdown: s.graceCtx
+		// * after graceful shutdown: s.closeCtx
+		// This allows us to keep accepting (and resetting) streams after graceful shutdown has started.
+		str, err := hconn.acceptStream(ctx)
 		if err != nil {
+			// the underlying connection was closed (by either side)
+			if hconn.Context().Err() != nil {
+				var appErr *quic.ApplicationError
+				if !errors.As(err, &appErr) || appErr.ErrorCode != quic.ApplicationErrorCode(ErrCodeNoError) {
+					handleErr = fmt.Errorf("accepting stream failed: %w", err)
+				}
+				break
+			}
 			// server (not gracefully) closed, close the connection immediately
 			if s.closeCtx.Err() != nil {
 				conn.CloseWithError(quic.ApplicationErrorCode(ErrCodeNoError), "")
 				handleErr = http.ErrServerClosed
 				break
 			}
-
-			// gracefully closed, send GOAWAY frame and wait for requests to complete or grace period to end
-			// new requests will be rejected and shouldn't be sent
-			if s.graceCtx.Err() != nil {
-				b = (&goAwayFrame{StreamID: nextStreamID}).Append(b[:0])
-				// set a deadline to send the GOAWAY frame
-				ctrlStr.SetWriteDeadline(time.Now().Add(goawayTimeout))
-				ctrlStr.Write(b)
-
-				select {
-				case <-hconn.Context().Done():
-					// we expect the client to eventually close the connection after receiving the GOAWAY
-				case <-s.closeCtx.Done():
-					// close the connection after graceful period
-					conn.CloseWithError(quic.ApplicationErrorCode(ErrCodeNoError), "")
+			inGracefulShutdown = s.graceCtx.Err() != nil
+			if !inGracefulShutdown {
+				var appErr *quic.ApplicationError
+				if !errors.As(err, &appErr) || appErr.ErrorCode != quic.ApplicationErrorCode(ErrCodeNoError) {
+					handleErr = fmt.Errorf("accepting stream failed: %w", err)
 				}
-				handleErr = http.ErrServerClosed
 				break
 			}
 
-			var appErr *quic.ApplicationError
-			if !errors.As(err, &appErr) || appErr.ErrorCode != quic.ApplicationErrorCode(ErrCodeNoError) {
-				handleErr = fmt.Errorf("accepting stream failed: %w", err)
-			}
-			break
+			// gracefully closed, send GOAWAY frame and wait for requests to complete or grace period to end
+			// new requests will be rejected and shouldn't be sent
+			wg.Add(1)
+			// Send the GOAWAY frame in a separate Goroutine.
+			// Sending might block if the peer didn't grant enough flow control credit.
+			// Write is guaranteed to return once the connection is closed.
+			go func() {
+				defer wg.Done()
+				_, _ = ctrlStr.Write((&goAwayFrame{StreamID: nextStreamID}).Append(nil))
+			}()
+			ctx = s.closeCtx
+			continue
+		}
+		if inGracefulShutdown {
+			str.CancelRead(quic.StreamErrorCode(ErrCodeRequestRejected))
+			str.CancelWrite(quic.StreamErrorCode(ErrCodeRequestRejected))
+			continue
 		}
 
 		nextStreamID = str.StreamID() + 4
@@ -575,7 +535,7 @@ func (s *Server) handleConn(conn quic.Connection) error {
 			// handleRequest will return once the request has been handled,
 			// or the underlying connection is closed
 			defer wg.Done()
-			s.handleRequest(hconn, str, datagrams, hconn.decoder)
+			s.handleRequest(hconn, str, hconn.decoder)
 		}()
 	}
 	wg.Wait()
@@ -589,19 +549,19 @@ func (s *Server) maxHeaderBytes() uint64 {
 	return uint64(s.MaxHeaderBytes)
 }
 
-func (s *Server) handleRequest(conn *connection, str quic.Stream, datagrams *datagrammer, decoder *qpack.Decoder) {
+func (s *Server) handleRequest(conn *Conn, str datagramStream, decoder *qpack.Decoder) {
 	var ufh unknownFrameHandlerFunc
 	if s.StreamHijacker != nil {
 		ufh = func(ft FrameType, e error) (processed bool, err error) {
 			return s.StreamHijacker(
 				ft,
 				conn.Context().Value(quic.ConnectionTracingKey).(quic.ConnectionTracingID),
-				str,
+				str.QUICStream(),
 				e,
 			)
 		}
 	}
-	fp := &frameParser{conn: conn, r: str, unknownFrameHandler: ufh}
+	fp := &frameParser{closeConn: conn.CloseWithError, r: str, unknownFrameHandler: ufh}
 	frame, err := fp.ParseNext()
 	if err != nil {
 		if !errors.Is(err, errHijacked) {
@@ -649,7 +609,7 @@ func (s *Server) handleRequest(conn *connection, str quic.Stream, datagrams *dat
 	if _, ok := req.Header["Content-Length"]; ok && req.ContentLength >= 0 {
 		contentLength = req.ContentLength
 	}
-	hstr := newStream(str, conn, datagrams, nil)
+	hstr := newStream(str, conn, nil, nil)
 	body := newRequestBody(hstr, contentLength, conn.Context(), conn.ReceivedSettings(), conn.Settings)
 	req.Body = body
 
@@ -684,7 +644,7 @@ func (s *Server) handleRequest(conn *connection, str quic.Stream, datagrams *dat
 				if logger == nil {
 					logger = slog.Default()
 				}
-				logger.Error("http: panic serving", "arg", p, "trace", string(buf))
+				logger.Error("http3: panic serving", "arg", p, "trace", string(buf))
 			}
 		}()
 		handler.ServeHTTP(r, req)
@@ -694,18 +654,6 @@ func (s *Server) handleRequest(conn *connection, str quic.Stream, datagrams *dat
 		return
 	}
 
-	// only write response when there is no panic
-	if !panicked {
-		// response not written to the client yet, set Content-Length
-		if !r.headerWritten {
-			if _, haveCL := r.header["Content-Length"]; !haveCL {
-				r.header.Set("Content-Length", strconv.FormatInt(r.numWritten, 10))
-			}
-		}
-		r.Flush()
-		r.flushTrailers()
-	}
-
 	// abort the stream when there is a panic
 	if panicked {
 		str.CancelRead(quic.StreamErrorCode(ErrCodeInternalError))
@@ -713,9 +661,17 @@ func (s *Server) handleRequest(conn *connection, str quic.Stream, datagrams *dat
 		return
 	}
 
+	// response not written to the client yet, set Content-Length
+	if !r.headerWritten {
+		if _, haveCL := r.header["Content-Length"]; !haveCL {
+			r.header.Set("Content-Length", strconv.FormatInt(r.numWritten, 10))
+		}
+	}
+	r.Flush()
+	r.flushTrailers()
+
 	// If the EOF was read by the handler, CancelRead() is a no-op.
 	str.CancelRead(quic.StreamErrorCode(ErrCodeNoError))
-
 	str.Close()
 }
 
@@ -734,9 +690,11 @@ func (s *Server) Close() error {
 	s.closeCancel()
 
 	var err error
-	for ln := range s.listeners {
-		if cerr := (*ln).Close(); cerr != nil && err == nil {
-			err = cerr
+	for _, l := range s.listeners {
+		if l.createdLocally {
+			if cerr := (*l.ln).Close(); cerr != nil && err == nil {
+				err = cerr
+			}
 		}
 	}
 	if s.connCount.Load() == 0 {
@@ -747,19 +705,33 @@ func (s *Server) Close() error {
 	return err
 }
 
-// Shutdown shuts down the server gracefully.
+// Shutdown gracefully shuts down the server without interrupting any active connections.
 // The server sends a GOAWAY frame first, then or for all running requests to complete.
-// Shutdown in combination with ListenAndServe() (instead of Serve()) may race if it is called before a UDP socket is established.
+// Shutdown in combination with ListenAndServe may race if it is called before a UDP socket is established.
+// It is recommended to use Serve instead.
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.mutex.Lock()
 	s.closed = true
-	// server is never used
+	// server was never used
 	if s.closeCtx == nil {
 		s.mutex.Unlock()
 		return nil
 	}
 	s.graceCancel()
+
+	// close all listeners
+	var closeErrs []error
+	for _, l := range s.listeners {
+		if l.createdLocally {
+			if err := (*l.ln).Close(); err != nil {
+				closeErrs = append(closeErrs, err)
+			}
+		}
+	}
 	s.mutex.Unlock()
+	if len(closeErrs) > 0 {
+		return errors.Join(closeErrs...)
+	}
 
 	if s.connCount.Load() == 0 {
 		return s.Close()

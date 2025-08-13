@@ -34,8 +34,6 @@ var ErrHolePunching = errors.New("hole punching attempted; no active dial")
 
 var HolePunchTimeout = 5 * time.Second
 
-const errorCodeConnectionGating = 0x47415445 // GATE in ASCII
-
 // The Transport implements the tpt.Transport interface for QUIC connections.
 type transport struct {
 	privKey     ic.PrivKey
@@ -52,7 +50,7 @@ type transport struct {
 	rnd   rand.Rand
 
 	connMx sync.Mutex
-	conns  map[quic.Connection]*conn
+	conns  map[*quic.Conn]*conn
 
 	listenersMu sync.Mutex
 	// map of UDPAddr as string to a virtualListeners
@@ -97,7 +95,7 @@ func NewTransport(key ic.PrivKey, connManager *quicreuse.ConnManager, psk pnet.P
 		connManager:  connManager,
 		gater:        gater,
 		rcmgr:        rcmgr,
-		conns:        make(map[quic.Connection]*conn),
+		conns:        make(map[*quic.Conn]*conn),
 		holePunching: make(map[holePunchKey]*activeHolePunch),
 		rnd:          *rand.New(rand.NewSource(time.Now().UnixNano())),
 
@@ -169,20 +167,20 @@ func (t *transport) dialWithScope(ctx context.Context, raddr ma.Multiaddr, p pee
 		remoteMultiaddr: raddr,
 	}
 	if t.gater != nil && !t.gater.InterceptSecured(network.DirOutbound, p, c) {
-		pconn.CloseWithError(errorCodeConnectionGating, "connection gated")
+		pconn.CloseWithError(quic.ApplicationErrorCode(network.ConnGated), "connection gated")
 		return nil, fmt.Errorf("secured connection gated")
 	}
 	t.addConn(pconn, c)
 	return c, nil
 }
 
-func (t *transport) addConn(conn quic.Connection, c *conn) {
+func (t *transport) addConn(conn *quic.Conn, c *conn) {
 	t.connMx.Lock()
 	t.conns[conn] = c
 	t.connMx.Unlock()
 }
 
-func (t *transport) removeConn(conn quic.Connection) {
+func (t *transport) removeConn(conn *quic.Conn) {
 	t.connMx.Lock()
 	delete(t.conns, conn)
 	t.connMx.Unlock()
@@ -346,7 +344,7 @@ func (t *transport) Listen(addr ma.Multiaddr) (tpt.Listener, error) {
 	return l, nil
 }
 
-func (t *transport) allowWindowIncrease(conn quic.Connection, size uint64) bool {
+func (t *transport) allowWindowIncrease(conn *quic.Conn, size uint64) bool {
 	// If the QUIC connection tries to increase the window before we've inserted it
 	// into our connections map (which we do right after dialing / accepting it),
 	// we have no way to account for that memory. This should be very rare.

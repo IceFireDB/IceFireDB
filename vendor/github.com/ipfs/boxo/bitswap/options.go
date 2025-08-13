@@ -43,10 +43,6 @@ func TaskWorkerCount(count int) Option {
 	return Option{server.TaskWorkerCount(count)}
 }
 
-func ProvideEnabled(enabled bool) Option {
-	return Option{server.ProvideEnabled(enabled)}
-}
-
 func SetSendDontHaves(send bool) Option {
 	return Option{server.SetSendDontHaves(send)}
 }
@@ -57,10 +53,6 @@ func WithPeerBlockRequestFilter(pbrf server.PeerBlockRequestFilter) Option {
 
 func WithScoreLedger(scoreLedger server.ScoreLedger) Option {
 	return Option{server.WithScoreLedger(scoreLedger)}
-}
-
-func WithPeerLedger(peerLedger server.PeerLedger) Option {
-	return Option{server.WithPeerLedger(peerLedger)}
 }
 
 func WithTargetMessageSize(tms int) Option {
@@ -105,4 +97,20 @@ func WithTracer(tap tracer.Tracer) Option {
 			bs.tracer = tap
 		}),
 	}
+}
+
+func WithServerEnabled(enabled bool) Option {
+	return Option{
+		option(func(bs *Bitswap) {
+			bs.serverEnabled = enabled
+		}),
+	}
+}
+
+func WithClientOption(opt client.Option) Option {
+	return Option{opt}
+}
+
+func WithServerOption(opt server.Option) Option {
+	return Option{opt}
 }

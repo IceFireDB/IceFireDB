@@ -70,7 +70,7 @@ const (
 	flight6
 )
 
-func (f flightVal) String() string {
+func (f flightVal) String() string { //nolint:cyclop
 	switch f {
 	case flight0:
 		return "Flight 0"

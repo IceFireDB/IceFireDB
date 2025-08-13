@@ -162,6 +162,7 @@ func srvCliStr(isClient bool) string {
 	if isClient {
 		return "client"
 	}
+
 	return "server"
 }
 
@@ -179,7 +180,7 @@ func newHandshakeFSM(
 	}
 }
 
-func (s *handshakeFSM) Run(ctx context.Context, c flightConn, initialState handshakeState) error {
+func (s *handshakeFSM) Run(ctx context.Context, conn flightConn, initialState handshakeState) error {
 	state := initialState
 	defer func() {
 		close(s.closed)
@@ -192,13 +193,13 @@ func (s *handshakeFSM) Run(ctx context.Context, c flightConn, initialState hands
 		var err error
 		switch state {
 		case handshakePreparing:
-			state, err = s.prepare(ctx, c)
+			state, err = s.prepare(ctx, conn)
 		case handshakeSending:
-			state, err = s.send(ctx, c)
+			state, err = s.send(ctx, conn)
 		case handshakeWaiting:
-			state, err = s.wait(ctx, c)
+			state, err = s.wait(ctx, conn)
 		case handshakeFinished:
-			state, err = s.finish(ctx, c)
+			state, err = s.finish(ctx, conn)
 		default:
 			return errInvalidFSMTransition
 		}
@@ -212,24 +213,24 @@ func (s *handshakeFSM) Done() <-chan struct{} {
 	return s.closed
 }
 
-func (s *handshakeFSM) prepare(ctx context.Context, c flightConn) (handshakeState, error) {
+func (s *handshakeFSM) prepare(ctx context.Context, conn flightConn) (handshakeState, error) {
 	s.flights = nil
 	// Prepare flights
 	var (
-		a    *alert.Alert
-		err  error
-		pkts []*packet
+		dtlsAlert *alert.Alert
+		err       error
+		pkts      []*packet
 	)
 	gen, retransmit, errFlight := s.currentFlight.getFlightGenerator()
 	if errFlight != nil {
 		err = errFlight
-		a = &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}
+		dtlsAlert = &alert.Alert{Level: alert.Fatal, Description: alert.InternalError}
 	} else {
-		pkts, a, err = gen(c, s.state, s.cache, s.cfg)
+		pkts, dtlsAlert, err = gen(conn, s.state, s.cache, s.cfg)
 		s.retransmit = retransmit
 	}
-	if a != nil {
-		if alertErr := c.notify(ctx, a.Level, a.Description); alertErr != nil {
+	if dtlsAlert != nil {
+		if alertErr := conn.notify(ctx, dtlsAlert.Level, dtlsAlert.Description); alertErr != nil {
 			if err != nil {
 				err = alertErr
 			}
@@ -248,14 +249,15 @@ func (s *handshakeFSM) prepare(ctx context.Context, c flightConn) (handshakeStat
 			nextEpoch = p.record.Header.Epoch
 		}
 		if h, ok := p.record.Content.(*handshake.Handshake); ok {
-			h.Header.MessageSequence = uint16(s.state.handshakeSendSequence)
+			h.Header.MessageSequence = uint16(s.state.handshakeSendSequence) //nolint:gosec // G115
 			s.state.handshakeSendSequence++
 		}
 	}
 	if epoch != nextEpoch {
 		s.cfg.log.Tracef("[handshake:%s] -> changeCipherSpec (epoch: %d)", srvCliStr(s.state.isClient), nextEpoch)
-		c.setLocalEpoch(nextEpoch)
+		conn.setLocalEpoch(nextEpoch)
 	}
+
 	return handshakeSending, nil
 }
 
@@ -268,32 +270,35 @@ func (s *handshakeFSM) send(ctx context.Context, c flightConn) (handshakeState, 
 	if s.currentFlight.isLastSendFlight() {
 		return handshakeFinished, nil
 	}
+
 	return handshakeWaiting, nil
 }
 
-func (s *handshakeFSM) wait(ctx context.Context, c flightConn) (handshakeState, error) { //nolint:gocognit
+func (s *handshakeFSM) wait(ctx context.Context, conn flightConn) (handshakeState, error) { //nolint:gocognit,cyclop
 	parse, errFlight := s.currentFlight.getFlightParser()
 	if errFlight != nil {
-		if alertErr := c.notify(ctx, alert.Fatal, alert.InternalError); alertErr != nil {
+		if alertErr := conn.notify(ctx, alert.Fatal, alert.InternalError); alertErr != nil {
 			return handshakeErrored, alertErr
 		}
+
 		return handshakeErrored, errFlight
 	}
 
 	retransmitTimer := time.NewTimer(s.retransmitInterval)
 	for {
 		select {
-		case state := <-c.recvHandshake():
+		case state := <-conn.recvHandshake():
 			if state.isRetransmit {
 				close(state.done)
+
 				return handshakeSending, nil
 			}
 
-			nextFlight, alert, err := parse(ctx, c, s.state, s.cache, s.cfg)
+			nextFlight, alert, err := parse(ctx, conn, s.state, s.cache, s.cfg)
 			s.retransmitInterval = s.cfg.initialRetransmitInterval
 			close(state.done)
 			if alert != nil {
-				if alertErr := c.notify(ctx, alert.Level, alert.Description); alertErr != nil {
+				if alertErr := conn.notify(ctx, alert.Level, alert.Description); alertErr != nil {
 					if err != nil {
 						err = alertErr
 					}
@@ -305,11 +310,17 @@ func (s *handshakeFSM) wait(ctx context.Context, c flightConn) (handshakeState, 
 			if nextFlight == 0 {
 				break
 			}
-			s.cfg.log.Tracef("[handshake:%s] %s -> %s", srvCliStr(s.state.isClient), s.currentFlight.String(), nextFlight.String())
+			s.cfg.log.Tracef(
+				"[handshake:%s] %s -> %s",
+				srvCliStr(s.state.isClient),
+				s.currentFlight.String(),
+				nextFlight.String(),
+			)
 			if nextFlight.isLastRecvFlight() && s.currentFlight == nextFlight {
 				return handshakeFinished, nil
 			}
 			s.currentFlight = nextFlight
+
 			return handshakePreparing, nil
 
 		case <-retransmitTimer.C:
@@ -326,9 +337,11 @@ func (s *handshakeFSM) wait(ctx context.Context, c flightConn) (handshakeState, 
 			if s.retransmitInterval > time.Second*60 {
 				s.retransmitInterval = time.Second * 60
 			}
+
 			return handshakeSending, nil
 		case <-ctx.Done():
 			s.retransmitInterval = s.cfg.initialRetransmitInterval
+
 			return handshakeErrored, ctx.Err()
 		}
 	}

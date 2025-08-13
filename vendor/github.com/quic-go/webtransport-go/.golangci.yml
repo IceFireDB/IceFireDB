@@ -1,0 +1,41 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - asciicheck
+    - copyloopvar
+    - depguard
+    - exhaustive
+    - govet
+    - ineffassign
+    - misspell
+    - nolintlint
+    - prealloc
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - usetesting
+  settings:
+    depguard:
+      rules:
+        random:
+          deny:
+            - pkg: "math/rand$"
+              desc: use math/rand/v2
+            - pkg: "golang.org/x/exp/rand"
+              desc: use math/rand/v2
+    # see https://github.com/ldez/usetesting/issues/10
+    usetesting:
+      context-background: false
+      context-todo: false
+  exclusions:
+    rules:
+      - linters:
+          - staticcheck
+        text: 'SA1019:.+quic\.ConnectionTracing(ID|Key)'
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports

@@ -41,7 +41,7 @@ func newSessionManager(timeout time.Duration) *sessionManager {
 // If the WebTransport session has not yet been established,
 // it starts a new go routine and waits for establishment of the session.
 // If that takes longer than timeout, the stream is reset.
-func (m *sessionManager) AddStream(connTracingID quic.ConnectionTracingID, str quic.Stream, id sessionID) {
+func (m *sessionManager) AddStream(connTracingID quic.ConnectionTracingID, str *quic.Stream, id sessionID) {
 	sess, isExisting := m.getOrCreateSession(connTracingID, id)
 	if isExisting {
 		sess.conn.addIncomingStream(str)
@@ -80,7 +80,7 @@ func (m *sessionManager) maybeDelete(connTracingID quic.ConnectionTracingID, id 
 // If the WebTransport session has not yet been established,
 // it starts a new go routine and waits for establishment of the session.
 // If that takes longer than timeout, the stream is reset.
-func (m *sessionManager) AddUniStream(connTracingID quic.ConnectionTracingID, str quic.ReceiveStream) {
+func (m *sessionManager) AddUniStream(connTracingID quic.ConnectionTracingID, str *quic.ReceiveStream) {
 	idv, err := quicvarint.Read(quicvarint.NewReader(str))
 	if err != nil {
 		str.CancelRead(1337)
@@ -132,7 +132,7 @@ func (m *sessionManager) getOrCreateSession(connTracingID quic.ConnectionTracing
 	return sess, false
 }
 
-func (m *sessionManager) handleStream(str quic.Stream, sess *session) {
+func (m *sessionManager) handleStream(str *quic.Stream, sess *session) {
 	t := time.NewTimer(m.timeout)
 	defer t.Stop()
 
@@ -148,7 +148,7 @@ func (m *sessionManager) handleStream(str quic.Stream, sess *session) {
 	}
 }
 
-func (m *sessionManager) handleUniStream(str quic.ReceiveStream, sess *session) {
+func (m *sessionManager) handleUniStream(str *quic.ReceiveStream, sess *session) {
 	t := time.NewTimer(m.timeout)
 	defer t.Stop()
 
@@ -164,8 +164,8 @@ func (m *sessionManager) handleUniStream(str quic.ReceiveStream, sess *session) 
 }
 
 // AddSession adds a new WebTransport session.
-func (m *sessionManager) AddSession(qconn http3.Connection, id sessionID, requestStr http3.Stream) *Session {
-	conn := newSession(id, qconn, requestStr)
+func (m *sessionManager) AddSession(qconn *http3.Conn, id sessionID, str http3Stream) *Session {
+	conn := newSession(id, qconn, str)
 	connTracingID := qconn.Context().Value(quic.ConnectionTracingKey).(quic.ConnectionTracingID)
 
 	m.mx.Lock()
