@@ -1,9 +1,6 @@
 // SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
-//go:build !js
-// +build !js
-
 package webrtc
 
 import (
@@ -62,28 +59,36 @@ func NewCertificate(key crypto.PrivateKey, tpl x509.Certificate) (*Certificate, 
 		return nil, &rtcerr.UnknownError{Err: err}
 	}
 
-	return &Certificate{privateKey: key, x509Cert: cert, statsID: fmt.Sprintf("certificate-%d", time.Now().UnixNano())}, nil
+	return &Certificate{
+		privateKey: key,
+		x509Cert:   cert,
+		statsID:    fmt.Sprintf("certificate-%d", time.Now().UnixNano()),
+	}, nil
 }
 
 // Equals determines if two certificates are identical by comparing both the
 // secretKeys and x509Certificates.
-func (c Certificate) Equals(o Certificate) bool {
+func (c Certificate) Equals(cert Certificate) bool {
 	switch cSK := c.privateKey.(type) {
 	case *rsa.PrivateKey:
-		if oSK, ok := o.privateKey.(*rsa.PrivateKey); ok {
+		if oSK, ok := cert.privateKey.(*rsa.PrivateKey); ok {
 			if cSK.N.Cmp(oSK.N) != 0 {
 				return false
 			}
-			return c.x509Cert.Equal(o.x509Cert)
+
+			return c.x509Cert.Equal(cert.x509Cert)
 		}
+
 		return false
 	case *ecdsa.PrivateKey:
-		if oSK, ok := o.privateKey.(*ecdsa.PrivateKey); ok {
+		if oSK, ok := cert.privateKey.(*ecdsa.PrivateKey); ok {
 			if cSK.X.Cmp(oSK.X) != 0 || cSK.Y.Cmp(oSK.Y) != 0 {
 				return false
 			}
-			return c.x509Cert.Equal(o.x509Cert)
+
+			return c.x509Cert.Equal(cert.x509Cert)
 		}
+
 		return false
 	default:
 		return false
@@ -95,6 +100,7 @@ func (c Certificate) Expires() time.Time {
 	if c.x509Cert == nil {
 		return time.Time{}
 	}
+
 	return c.x509Cert.NotAfter
 }
 
@@ -150,7 +156,7 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*Certificate, error) {
 
 // CertificateFromX509 creates a new WebRTC Certificate from a given PrivateKey and Certificate
 //
-// This can be used if you want to share a certificate across multiple PeerConnections
+// This can be used if you want to share a certificate across multiple PeerConnections.
 func CertificateFromX509(privateKey crypto.PrivateKey, certificate *x509.Certificate) Certificate {
 	return Certificate{privateKey, certificate, fmt.Sprintf("certificate-%d", time.Now().UnixNano())}
 }
@@ -176,48 +182,72 @@ func (c Certificate) collectStats(report *statsReportCollector) error {
 	}
 
 	report.Collect(stats.ID, stats)
+
 	return nil
 }
 
 // CertificateFromPEM creates a fresh certificate based on a string containing
-// pem blocks fort the private key and x509 certificate
-func CertificateFromPEM(pems string) (*Certificate, error) {
-	// decode & parse the certificate
-	block, more := pem.Decode([]byte(pems))
-	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, errCertificatePEMFormatError
+// pem blocks fort the private key and x509 certificate.
+func CertificateFromPEM(pems string) (*Certificate, error) { //nolint: cyclop
+	var cert *x509.Certificate
+	var privateKey crypto.PrivateKey
+
+	var block *pem.Block
+	more := []byte(pems)
+	for {
+		var err error
+		block, more = pem.Decode(more)
+		if block == nil {
+			break
+		}
+
+		// decode & parse the certificate
+		switch block.Type {
+		case "CERTIFICATE":
+			if cert != nil {
+				return nil, errCertificatePEMMultipleCert
+			}
+			cert, err = x509.ParseCertificate(block.Bytes)
+			// If parsing failed using block.Bytes, then parse the bytes as base64 and try again
+			if err != nil {
+				var n int
+				certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(block.Bytes)))
+				n, err = base64.StdEncoding.Decode(certBytes, block.Bytes)
+				if err == nil {
+					cert, err = x509.ParseCertificate(certBytes[:n])
+				}
+			}
+		case "PRIVATE KEY":
+			if privateKey != nil {
+				return nil, errCertificatePEMMultiplePriv
+			}
+			privateKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
+		}
+
+		// Report errors from parsing either the private key or the certificate
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode %s: %w", block.Type, err)
+		}
 	}
-	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(block.Bytes)))
-	n, err := base64.StdEncoding.Decode(certBytes, block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode ceritifcate: %w", err)
+
+	if cert == nil || privateKey == nil {
+		return nil, errCertificatePEMMissing
 	}
-	cert, err := x509.ParseCertificate(certBytes[:n])
-	if err != nil {
-		return nil, fmt.Errorf("failed parsing ceritifcate: %w", err)
-	}
-	// decode & parse the private key
-	block, _ = pem.Decode(more)
-	if block == nil || block.Type != "PRIVATE KEY" {
-		return nil, errCertificatePEMFormatError
-	}
-	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse private key: %w", err)
-	}
-	x := CertificateFromX509(privateKey, cert)
-	return &x, nil
+
+	ret := CertificateFromX509(privateKey, cert)
+
+	return &ret, nil
 }
 
 // PEM returns the certificate encoded as two pem block: once for the X509
-// certificate and the other for the private key
+// certificate and the other for the private key.
 func (c Certificate) PEM() (string, error) {
 	// First write the X509 certificate
-	var o strings.Builder
+	var builder strings.Builder
 	xcertBytes := make(
 		[]byte, base64.StdEncoding.EncodedLen(len(c.x509Cert.Raw)))
 	base64.StdEncoding.Encode(xcertBytes, c.x509Cert.Raw)
-	err := pem.Encode(&o, &pem.Block{Type: "CERTIFICATE", Bytes: xcertBytes})
+	err := pem.Encode(&builder, &pem.Block{Type: "CERTIFICATE", Bytes: xcertBytes})
 	if err != nil {
 		return "", fmt.Errorf("failed to pem encode the X certificate: %w", err)
 	}
@@ -226,9 +256,10 @@ func (c Certificate) PEM() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal private key: %w", err)
 	}
-	err = pem.Encode(&o, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
+	err = pem.Encode(&builder, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
 	if err != nil {
 		return "", fmt.Errorf("failed to encode private key: %w", err)
 	}
-	return o.String(), nil
+
+	return builder.String(), nil
 }

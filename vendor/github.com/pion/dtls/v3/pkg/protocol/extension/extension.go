@@ -11,7 +11,7 @@ import "encoding/binary"
 // https://www.iana.org/assignments/tls-extensiontype-values/tls-extensiontype-values.xhtml
 type TypeValue uint16
 
-// TypeValue constants
+// TypeValue constants.
 const (
 	ServerNameTypeValue                   TypeValue = 0
 	SupportedEllipticCurvesTypeValue      TypeValue = 10
@@ -24,15 +24,15 @@ const (
 	RenegotiationInfoTypeValue            TypeValue = 65281
 )
 
-// Extension represents a single TLS extension
+// Extension represents a single TLS extension.
 type Extension interface {
 	Marshal() ([]byte, error)
 	Unmarshal(data []byte) error
 	TypeValue() TypeValue
 }
 
-// Unmarshal many extensions at once
-func Unmarshal(buf []byte) ([]Extension, error) {
+// Unmarshal many extensions at once.
+func Unmarshal(buf []byte) ([]Extension, error) { //nolint:cyclop
 	switch {
 	case len(buf) == 0:
 		return []Extension{}, nil
@@ -52,6 +52,7 @@ func Unmarshal(buf []byte) ([]Extension, error) {
 			return err
 		}
 		extensions = append(extensions, e)
+
 		return nil
 	}
 
@@ -90,10 +91,11 @@ func Unmarshal(buf []byte) ([]Extension, error) {
 		extensionLength := binary.BigEndian.Uint16(buf[offset+2:])
 		offset += (4 + int(extensionLength))
 	}
+
 	return extensions, nil
 }
 
-// Marshal many extensions at once
+// Marshal many extensions at once.
 func Marshal(e []Extension) ([]byte, error) {
 	extensions := []byte{}
 	for _, e := range e {
@@ -104,6 +106,7 @@ func Marshal(e []Extension) ([]byte, error) {
 		extensions = append(extensions, raw...)
 	}
 	out := []byte{0x00, 0x00}
-	binary.BigEndian.PutUint16(out, uint16(len(extensions)))
+	binary.BigEndian.PutUint16(out, uint16(len(extensions))) //nolint:gosec // G115
+
 	return append(out, extensions...), nil
 }

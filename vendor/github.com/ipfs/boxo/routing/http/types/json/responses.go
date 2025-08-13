@@ -49,8 +49,10 @@ func (r *RecordsArray) UnmarshalJSON(b []byte) error {
 				return err
 			}
 			*r = append(*r, &prov)
+		//nolint:staticcheck
 		//lint:ignore SA1019 // ignore staticcheck
 		case types.SchemaBitswap:
+			//nolint:staticcheck
 			//lint:ignore SA1019 // ignore staticcheck
 			var prov types.BitswapRecord
 			err := json.Unmarshal(provBytes, &prov)
@@ -92,8 +94,10 @@ func (r *WriteProvidersResponse) UnmarshalJSON(b []byte) error {
 		}
 
 		switch rawProv.Schema {
+		//nolint:staticcheck
 		//lint:ignore SA1019 // ignore staticcheck
 		case types.SchemaBitswap:
+			//nolint:staticcheck
 			//lint:ignore SA1019 // ignore staticcheck
 			var prov types.WriteBitswapRecordResponse
 			err := json.Unmarshal(rawProv.Bytes, &prov)

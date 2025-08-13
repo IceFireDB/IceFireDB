@@ -6,7 +6,8 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"io"
+	"math"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/network"
 
-	httppeeridauth "github.com/libp2p/go-libp2p/p2p/http/auth"
 	"go.uber.org/zap"
 
 	"github.com/caddyserver/certmagic"
@@ -23,9 +23,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/mholt/acmez/v2"
-	"github.com/mholt/acmez/v2/acme"
-	"github.com/multiformats/go-multiaddr"
+	"github.com/mholt/acmez/v3"
+	"github.com/mholt/acmez/v3/acme"
+	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/multiformats/go-multibase"
 )
@@ -35,34 +35,49 @@ type P2PForgeCertMgr struct {
 	cancel                     func()
 	forgeDomain                string
 	forgeRegistrationEndpoint  string
+	registrationDelay          time.Duration
 	ProvideHost                func(host.Host)
 	hostFn                     func() host.Host
 	hasHost                    func() bool
-	cfg                        *certmagic.Config
+	certmagic                  *certmagic.Config
 	log                        *zap.SugaredLogger
 	allowPrivateForgeAddresses bool
+	produceShortAddrs          bool
 
 	hasCert     bool // tracking if we've received a certificate
 	certCheckMx sync.RWMutex
 }
 
-var (
-	defaultCertCache   *certmagic.Cache
-	defaultCertCacheMu sync.Mutex
-)
+func isRelayAddr(a ma.Multiaddr) bool {
+	for _, p := range a {
+		if p.Protocol().Code == ma.P_CIRCUIT {
+			return true
+		}
+	}
+	return false
+}
 
-func isRelayAddr(a multiaddr.Multiaddr) bool {
-	found := false
-	multiaddr.ForEach(a, func(c multiaddr.Component) bool {
-		found = c.Protocol().Code == multiaddr.P_CIRCUIT
-		return !found
-	})
-	return found
+func isTCPAddr(a ma.Multiaddr) bool {
+	for _, p := range a {
+		if p.Protocol().Code == ma.P_TCP {
+			return true
+		}
+	}
+	return false
 }
 
 // isPublicAddr follows the logic of manet.IsPublicAddr, except it uses
-// a stricter definition of "public" for ipv6 by excluding nat64 addresses.
-func isPublicAddr(a multiaddr.Multiaddr) bool {
+// a stricter definition of "public" for ipv6 by excluding nat64 addresses
+// and /p2p-circuit ones
+func isPublicAddr(a ma.Multiaddr) bool {
+	// skip p2p-circuit ones
+	for _, p := range a.Protocols() {
+		if p.Code == ma.P_CIRCUIT {
+			return false
+		}
+	}
+
+	// public vs private IPs
 	ip, err := manet.ToIP(a)
 	if err != nil {
 		return false
@@ -85,8 +100,13 @@ type P2PForgeCertMgrConfig struct {
 	storage                    certmagic.Storage
 	modifyForgeRequest         func(r *http.Request) error
 	onCertLoaded               func()
+	onCertRenewed              func()
 	log                        *zap.SugaredLogger
+	resolver                   *net.Resolver
 	allowPrivateForgeAddresses bool
+	produceShortAddrs          bool
+	renewCheckInterval         time.Duration
+	registrationDelay          time.Duration
 }
 
 type P2PForgeCertMgrOptions func(*P2PForgeCertMgrConfig) error
@@ -176,12 +196,53 @@ func WithTrustedRoots(trustedRoots *x509.CertPool) P2PForgeCertMgrOptions {
 	}
 }
 
+// WithOnCertRenewed is optional callback executed on cert renewal event
+func WithOnCertRenewed(fn func()) P2PForgeCertMgrOptions {
+	return func(config *P2PForgeCertMgrConfig) error {
+		config.onCertRenewed = fn
+		return nil
+	}
+}
+
+// WithRenewCheckInterval is meant for testing
+func WithRenewCheckInterval(renewCheckInterval time.Duration) P2PForgeCertMgrOptions {
+	return func(config *P2PForgeCertMgrConfig) error {
+		config.renewCheckInterval = renewCheckInterval
+		return nil
+	}
+}
+
+// WithRegistrationDelay allows delaying initial registration to ensure node was online for a while before requesting TLS cert.
+func WithRegistrationDelay(registrationDelay time.Duration) P2PForgeCertMgrOptions {
+	return func(config *P2PForgeCertMgrConfig) error {
+		config.registrationDelay = registrationDelay
+		return nil
+	}
+}
+
 // WithAllowPrivateForgeAddrs is meant for testing or skipping all the
 // connectivity checks libp2p node needs to pass before it can request domain
 // and start ACME DNS-01 challenge.
 func WithAllowPrivateForgeAddrs() P2PForgeCertMgrOptions {
 	return func(config *P2PForgeCertMgrConfig) error {
 		config.allowPrivateForgeAddresses = true
+		return nil
+	}
+}
+
+// WithShortForgeAddrs controls if final addresses produced by p2p-forge addr
+// factory are short and start with /dnsX or are longer and the DNS name is
+// fully resolved into /ipX /sni components.
+//
+// Using /dnsX may be beneficial when interop with older libp2p clients is
+// required, or when shorter addresses are preferred.
+//
+// Example multiaddr formats:
+//   - When true: /dnsX/<escaped-ip>.<peer-id>.<forge-domain>/tcp/<port>/tls/ws
+//   - When false:  /ipX/<ip>/tcp/<port>/tls/sni/<escaped-ip>.<peer-id>.<forge-domain>/ws
+func WithShortForgeAddrs(produceShortAddrs bool) P2PForgeCertMgrOptions {
+	return func(config *P2PForgeCertMgrConfig) error {
+		config.produceShortAddrs = produceShortAddrs
 		return nil
 	}
 }
@@ -193,33 +254,13 @@ func WithLogger(log *zap.SugaredLogger) P2PForgeCertMgrOptions {
 	}
 }
 
-// newCertmagicConfig is p2p-forge/client-specific version of
-// certmagic.NewDefault() that ensures we have our own cert cache. This is
-// necessary to ensure cert maintenance spawned by NewCache does not share
-// global certmagic.Default.Storage, and certmagic.Default.Logger and uses
-// storage path specific to p2p-forge, and no other instance of certmagic in
-// golang application.
-func newCertmagicConfig(mgrCfg *P2PForgeCertMgrConfig) *certmagic.Config {
-	clog := mgrCfg.log.Desugar()
-
-	defaultCertCacheMu.Lock()
-	if defaultCertCache == nil {
-		defaultCertCache = certmagic.NewCache(certmagic.CacheOptions{
-			GetConfigForCert: func(certmagic.Certificate) (*certmagic.Config, error) {
-				// default getter that does not depend on certmagic defaults
-				// and respects Config.Storage path
-				return newCertmagicConfig(mgrCfg), nil
-			},
-			Logger: clog,
-		})
+// WithResolver allows passing custom DNS resolver to be used for DNS-01 checks.
+// By default [net.DefaultResolver] is used.
+func WithResolver(resolver *net.Resolver) P2PForgeCertMgrOptions {
+	return func(config *P2PForgeCertMgrConfig) error {
+		config.resolver = resolver
+		return nil
 	}
-	certCache := defaultCertCache
-	defaultCertCacheMu.Unlock()
-
-	return certmagic.New(certCache, certmagic.Config{
-		Storage: mgrCfg.storage,
-		Logger:  clog,
-	})
 }
 
 // NewP2PForgeCertMgr handles the creation and management of certificates that are automatically granted by a forge
@@ -228,6 +269,7 @@ func newCertmagicConfig(mgrCfg *P2PForgeCertMgrConfig) *certmagic.Config {
 // Calling this function signifies your acceptance to
 // the CA's Subscriber Agreement and/or Terms of Service. Let's Encrypt is the default CA.
 func NewP2PForgeCertMgr(opts ...P2PForgeCertMgrOptions) (*P2PForgeCertMgr, error) {
+	// Init config + apply optional user settings
 	mgrCfg := &P2PForgeCertMgrConfig{}
 	for _, opt := range opts {
 		if err := opt(mgrCfg); err != nil {
@@ -243,6 +285,8 @@ func NewP2PForgeCertMgr(opts ...P2PForgeCertMgrOptions) (*P2PForgeCertMgr, error
 	}
 	if mgrCfg.caEndpoint == "" {
 		mgrCfg.caEndpoint = DefaultCAEndpoint
+	} else if mgrCfg.caEndpoint == DefaultCATestEndpoint {
+		mgrCfg.log.Errorf("initialized with staging endpoint (%s): certificate won't work correctly in web browser; make sure to change to WithCAEndpoint(DefaultCAEndpoint) (%s) before deploying to production or testing in web browser", DefaultCATestEndpoint, DefaultCAEndpoint)
 	}
 	if mgrCfg.forgeRegistrationEndpoint == "" {
 		if mgrCfg.forgeDomain == DefaultForgeDomain {
@@ -251,14 +295,16 @@ func NewP2PForgeCertMgr(opts ...P2PForgeCertMgrOptions) (*P2PForgeCertMgr, error
 			return nil, fmt.Errorf("must specify the forge registration endpoint if using a non-default forge")
 		}
 	}
-
-	const defaultStorageLocation = "p2p-forge-certs"
 	if mgrCfg.storage == nil {
-		mgrCfg.storage = &certmagic.FileStorage{Path: defaultStorageLocation}
+		mgrCfg.storage = &certmagic.FileStorage{Path: DefaultStorageLocation}
 	}
 
-	certCfg := newCertmagicConfig(mgrCfg)
+	// Wire up resolver for verifying DNS-01 TXT record got published correctly
+	if mgrCfg.resolver == nil {
+		mgrCfg.resolver = net.DefaultResolver
+	}
 
+	// Wire up p2p-forge manager instance
 	hostChan := make(chan host.Host, 1)
 	provideHost := func(host host.Host) { hostChan <- host }
 	hasHostChan := make(chan struct{})
@@ -274,37 +320,62 @@ func NewP2PForgeCertMgr(opts ...P2PForgeCertMgrOptions) (*P2PForgeCertMgr, error
 		defer close(hasHostChan)
 		return <-hostChan
 	})
-
-	myACME := certmagic.NewACMEIssuer(certCfg, certmagic.ACMEIssuer{ // TODO: UX around user passed emails + agreement
-		CA:     mgrCfg.caEndpoint,
-		Email:  mgrCfg.userEmail,
-		Agreed: true,
-		DNS01Solver: &dns01P2PForgeSolver{
-			forge:                      mgrCfg.forgeRegistrationEndpoint,
-			forgeAuth:                  mgrCfg.forgeAuth,
-			hostFn:                     hostFn,
-			modifyForgeRequest:         mgrCfg.modifyForgeRequest,
-			userAgent:                  mgrCfg.userAgent,
-			allowPrivateForgeAddresses: mgrCfg.allowPrivateForgeAddresses,
-		},
-		TrustedRoots: mgrCfg.trustedRoots,
-		Logger:       certCfg.Logger,
-	})
-
-	certCfg.Issuers = []certmagic.Issuer{myACME}
-
 	mgr := &P2PForgeCertMgr{
 		forgeDomain:                mgrCfg.forgeDomain,
 		forgeRegistrationEndpoint:  mgrCfg.forgeRegistrationEndpoint,
 		ProvideHost:                provideHost,
 		hostFn:                     hostFn,
 		hasHost:                    hasHostFn,
-		cfg:                        certCfg,
 		log:                        mgrCfg.log,
 		allowPrivateForgeAddresses: mgrCfg.allowPrivateForgeAddresses,
+		produceShortAddrs:          mgrCfg.produceShortAddrs,
+		registrationDelay:          mgrCfg.registrationDelay,
 	}
 
-	certCfg.OnEvent = func(ctx context.Context, event string, data map[string]any) error {
+	// NOTE: callback getter is necessary to avoid circular dependency
+	// but also structure code to avoid issues like https://github.com/ipshipyard/p2p-forge/issues/28
+	configGetter := func(cert certmagic.Certificate) (*certmagic.Config, error) {
+		if mgr.certmagic == nil {
+			return nil, errors.New("P2PForgeCertmgr.certmagic is not set")
+		}
+		return mgr.certmagic, nil
+	}
+
+	magicCache := certmagic.NewCache(certmagic.CacheOptions{
+		GetConfigForCert:   configGetter,
+		RenewCheckInterval: mgrCfg.renewCheckInterval,
+		Logger:             mgrCfg.log.Desugar(),
+	})
+
+	// Wire up final certmagic config by calling upstream New with sanity checks
+	mgr.certmagic = certmagic.New(magicCache, certmagic.Config{
+		Storage: mgrCfg.storage,
+		Logger:  mgrCfg.log.Desugar(),
+	})
+
+	// Wire up Issuer that does brokered DNS-01 ACME challenge
+	acmeLog := mgrCfg.log.Named("acme-broker")
+	brokeredDNS01Issuer := certmagic.NewACMEIssuer(mgr.certmagic, certmagic.ACMEIssuer{
+		CA:     mgrCfg.caEndpoint,
+		Email:  mgrCfg.userEmail,
+		Agreed: true,
+		DNS01Solver: &dns01P2PForgeSolver{
+			forgeRegistrationEndpoint:  mgrCfg.forgeRegistrationEndpoint,
+			forgeAuth:                  mgrCfg.forgeAuth,
+			hostFn:                     mgr.hostFn,
+			modifyForgeRequest:         mgrCfg.modifyForgeRequest,
+			userAgent:                  mgrCfg.userAgent,
+			allowPrivateForgeAddresses: mgrCfg.allowPrivateForgeAddresses,
+			log:                        acmeLog.Named("dns01solver"),
+			resolver:                   mgrCfg.resolver,
+		},
+		TrustedRoots: mgrCfg.trustedRoots,
+		Logger:       acmeLog.Desugar(),
+	})
+	mgr.certmagic.Issuers = []certmagic.Issuer{brokeredDNS01Issuer}
+
+	// Wire up onCertLoaded callback
+	mgr.certmagic.OnEvent = func(ctx context.Context, event string, data map[string]any) error {
 		if event == "cached_managed_cert" {
 			sans, ok := data["sans"]
 			if !ok {
@@ -331,6 +402,18 @@ func NewP2PForgeCertMgr(opts ...P2PForgeCertMgrOptions) (*P2PForgeCertMgr, error
 			}
 			return nil
 		}
+
+		// Execute user function for on certificate cert renewal
+		if event == "cert_obtained" && mgrCfg.onCertRenewed != nil {
+			if renewal, ok := data["renewal"].(bool); ok && renewal {
+				name := certName(hostFn().ID(), mgrCfg.forgeDomain)
+				if id, ok := data["identifier"].(string); ok && id == name {
+					mgrCfg.onCertRenewed()
+				}
+			}
+			return nil
+		}
+
 		return nil
 	}
 
@@ -338,17 +421,30 @@ func NewP2PForgeCertMgr(opts ...P2PForgeCertMgrOptions) (*P2PForgeCertMgr, error
 }
 
 func (m *P2PForgeCertMgr) Start() error {
-	if m.cfg == nil || m.hostFn == nil {
+	if m.certmagic == nil || m.hostFn == nil {
 		return errors.New("unable to start without a certmagic and libp2p host")
+	}
+	if m.certmagic.Storage == nil {
+		return errors.New("unable to start without a certmagic Cache and Storage set up")
 	}
 	m.ctx, m.cancel = context.WithCancel(context.Background())
 	go func() {
+		start := time.Now()
 		log := m.log.Named("start")
 		h := m.hostFn()
 		name := certName(h.ID(), m.forgeDomain)
-		certExists := localCertExists(m.ctx, m.cfg, name)
+		certExists := localCertExists(m.ctx, m.certmagic, name)
 		startCertManagement := func() {
-			if err := m.cfg.ManageAsync(m.ctx, []string{name}); err != nil {
+			// respect WithRegistrationDelay if no cert exists
+			if !certExists && m.registrationDelay != 0 {
+				remainingDelay := m.registrationDelay - time.Since(start)
+				if remainingDelay > 0 {
+					log.Infof("registration delay set to %s, sleeping for remaining %s", m.registrationDelay, remainingDelay)
+					time.Sleep(remainingDelay)
+				}
+			}
+			// start internal certmagic instance
+			if err := m.certmagic.ManageAsync(m.ctx, []string{name}); err != nil {
 				log.Error(err)
 			}
 		}
@@ -378,31 +474,76 @@ func (m *P2PForgeCertMgr) Start() error {
 }
 
 // withHostConnectivity executes callback func only after certain libp2p connectivity checks / criteria against passed host are fullfilled.
+// It will also delay registration to ensure user-set registrationDelay is respected.
 // The main purpose is to not bother CA ACME endpoint or p2p-forge registration endpoint if we know the peer is not
 // ready to use TLS cert.
 func withHostConnectivity(ctx context.Context, log *zap.SugaredLogger, h host.Host, callback func()) {
 	log.Infof("waiting until libp2p reports event network.ReachabilityPublic")
-	sub, err := h.EventBus().Subscribe(new(event.EvtLocalReachabilityChanged))
+	localReachabilitySub, err := h.EventBus().Subscribe(new(event.EvtLocalReachabilityChanged))
 	if err != nil {
 		log.Error(err)
 		return
 	}
-	defer sub.Close()
-	select {
-	case e := <-sub.Out():
-		evt := e.(event.EvtLocalReachabilityChanged) // guaranteed safe
-		log.Infof("libp2p reachability status changed to %s", evt.Reachability)
-		if evt.Reachability == network.ReachabilityPublic {
-			callback()
-			return
-		} else if evt.Reachability == network.ReachabilityPrivate {
-			log.Infof("certificate will not be requested while libp2p reachability status is %s", evt.Reachability)
-		}
-	case <-ctx.Done():
-		if ctx.Err() != context.Canceled {
-			log.Error(fmt.Errorf("aborted while waiting for libp2p reachability status discovery: %w", ctx.Err()))
-		}
+	defer localReachabilitySub.Close()
+
+	addrsReachabilitySub, err := h.EventBus().Subscribe(new(event.EvtHostReachableAddrsChanged))
+	if err != nil {
+		log.Error(err)
 		return
+	}
+	defer addrsReachabilitySub.Close()
+
+	// We handle both autonatv1 and autonatv2 events.
+	// In case we get an autonatv1 public event we wait till we actually have a public addr
+	// before returning.
+	// In a future release, we'll remove the dependence on v1 event completely and only use
+	// the autonatv2 event.
+	timer := time.NewTimer(math.MaxInt64)
+	defer timer.Stop()
+	currDelay := time.Second
+	minDelay := 5 * time.Second
+	maxDelay := time.Minute
+	for {
+		select {
+		case e := <-localReachabilitySub.Out():
+			evt := e.(event.EvtLocalReachabilityChanged) // guaranteed safe
+			log.Infof("libp2p reachability status changed to %s", evt.Reachability)
+			if evt.Reachability == network.ReachabilityPublic {
+				timer.Reset(-1 * time.Second)
+				currDelay = -1 * time.Second
+			} else {
+				log.Infof("certificate will not be requested while libp2p reachability status is not public")
+				timer.Reset(math.MaxInt64)
+			}
+		case <-timer.C:
+			addrs := h.Addrs()
+			for _, a := range addrs {
+				if !isRelayAddr(a) && isTCPAddr(a) && isPublicAddr(a) {
+					callback()
+					return
+				}
+			}
+			log.Infof("certificate will not be requested as we don't have any public addrs")
+			currDelay *= 2
+			currDelay = min(currDelay, maxDelay)
+			currDelay = max(currDelay, minDelay)
+			timer.Reset(currDelay)
+		case e := <-addrsReachabilitySub.Out():
+			evt := e.(event.EvtHostReachableAddrsChanged)
+			log.Infof("libp2p reachable addrs changed to %s", evt.Reachable)
+			for _, a := range evt.Reachable {
+				if !isRelayAddr(a) && isTCPAddr(a) { // guaranteed to be public
+					callback()
+					return
+				}
+			}
+			log.Infof("certificate will not be requested if we don't have any reachable tcp addrs")
+		case <-ctx.Done():
+			if ctx.Err() != context.Canceled {
+				log.Error(fmt.Errorf("aborted while waiting for libp2p reachability status discovery: %w", ctx.Err()))
+			}
+			return
+		}
 	}
 }
 
@@ -412,13 +553,15 @@ func (m *P2PForgeCertMgr) Stop() {
 
 // TLSConfig returns a tls.Config that managed by the P2PForgeCertMgr
 func (m *P2PForgeCertMgr) TLSConfig() *tls.Config {
-	tlsCfg := m.cfg.TLSConfig()
+	tlsCfg := m.certmagic.TLSConfig()
 	tlsCfg.NextProtos = nil // remove the ACME ALPN
+	tlsCfg.GetCertificate = m.certmagic.GetCertificate
 	return tlsCfg
 }
 
 func (m *P2PForgeCertMgr) AddrStrings() []string {
-	return []string{fmt.Sprintf("/ip4/0.0.0.0/tcp/0/tls/sni/*.%s/ws", m.forgeDomain),
+	return []string{
+		fmt.Sprintf("/ip4/0.0.0.0/tcp/0/tls/sni/*.%s/ws", m.forgeDomain),
 		fmt.Sprintf("/ip6/::/tcp/0/tls/sni/*.%s/ws", m.forgeDomain),
 	}
 }
@@ -427,10 +570,10 @@ func (m *P2PForgeCertMgr) AddrStrings() []string {
 // This should be used with the libp2p.AddrsFactory option to ensure that a libp2p host with forge managed addresses
 // only announces those that are active and valid.
 func (m *P2PForgeCertMgr) AddressFactory() config.AddrsFactory {
-	tlsCfg := m.cfg.TLSConfig()
+	tlsCfg := m.certmagic.TLSConfig()
 	tlsCfg.NextProtos = []string{"h2", "http/1.1"} // remove the ACME ALPN and set the HTTP 1.1 and 2 ALPNs
 
-	return m.createAddrsFactory(m.allowPrivateForgeAddresses)
+	return m.createAddrsFactory(m.allowPrivateForgeAddresses, m.produceShortAddrs)
 }
 
 // localCertExists returns true if a certificate matching passed name is already present in certmagic.Storage
@@ -449,10 +592,10 @@ func certName(id peer.ID, suffixDomain string) string {
 	return fmt.Sprintf("*.%s.%s", pb36, suffixDomain)
 }
 
-func (m *P2PForgeCertMgr) createAddrsFactory(allowPrivateForgeAddrs bool) config.AddrsFactory {
-	var p2pForgeWssComponent = multiaddr.StringCast(fmt.Sprintf("/tls/sni/*.%s/ws", m.forgeDomain))
+func (m *P2PForgeCertMgr) createAddrsFactory(allowPrivateForgeAddrs bool, produceShortAddrs bool) config.AddrsFactory {
+	p2pForgeWssComponent := ma.StringCast(fmt.Sprintf("/tls/sni/*.%s/ws", m.forgeDomain))
 
-	return func(multiaddrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+	return func(multiaddrs []ma.Multiaddr) []ma.Multiaddr {
 		var skipForgeAddrs bool
 		if !m.hasHost() {
 			skipForgeAddrs = true
@@ -463,33 +606,86 @@ func (m *P2PForgeCertMgr) createAddrsFactory(allowPrivateForgeAddrs bool) config
 		}
 		m.certCheckMx.RUnlock()
 
-		return addrFactoryFn(skipForgeAddrs, func() peer.ID { return m.hostFn().ID() }, m.forgeDomain, allowPrivateForgeAddrs, p2pForgeWssComponent, multiaddrs, m.log)
+		return addrFactoryFn(
+			skipForgeAddrs,
+			m.hostFn,
+			m.forgeDomain,
+			allowPrivateForgeAddrs,
+			produceShortAddrs,
+			p2pForgeWssComponent,
+			multiaddrs,
+			m.log,
+		)
 	}
 }
 
 type dns01P2PForgeSolver struct {
-	forge                      string
+	forgeRegistrationEndpoint  string
 	forgeAuth                  string
 	hostFn                     func() host.Host
 	modifyForgeRequest         func(r *http.Request) error
 	userAgent                  string
 	allowPrivateForgeAddresses bool
+	log                        *zap.SugaredLogger
+	resolver                   *net.Resolver
 }
 
 func (d *dns01P2PForgeSolver) Wait(ctx context.Context, challenge acme.Challenge) error {
-	// TODO: query the authoritative DNS
-	time.Sleep(time.Second * 5)
-	return nil
+	// Try as long the challenge remains valid.
+	// This acts both as sensible timeout and as a way to rate-limit clients using this library.
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+
+	// Extract the domain and expected TXT record value from the challenge
+	domain := fmt.Sprintf("_acme-challenge.%s", challenge.Identifier.Value)
+	expectedTXT := challenge.DNS01KeyAuthorization()
+	d.log.Infow("waiting for DNS-01 TXT record to be set", "domain", domain)
+
+	// Check if DNS-01 TXT record is correctly published by the p2p-forge
+	// backend. This step ensures we are good citizens: we don't want to move
+	// further and bother ACME endpoint with work if we are not confident
+	// DNS-01 chalelnge will be successful.
+	// We check fast, with backoff to avoid spamming DNS.
+	pollInterval := 1 * time.Second
+	maxPollInterval := 1 * time.Minute
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for DNS-01 TXT record to be set at %q: %v", domain, ctx.Err())
+		case <-ticker.C:
+			pollInterval *= 2
+			if pollInterval > maxPollInterval {
+				pollInterval = maxPollInterval
+			}
+			ticker.Reset(pollInterval)
+			txtRecords, err := d.resolver.LookupTXT(ctx, domain)
+			if err != nil {
+				d.log.Debugw("dns lookup error", "domain", domain, "error", err)
+				continue
+			}
+			for _, txt := range txtRecords {
+				if txt == expectedTXT {
+					d.log.Infow("confirmed TXT record for DNS-01 challenge is set", "domain", domain)
+					return nil
+				}
+			}
+			d.log.Debugw("no matching TXT record found yet, sleeping", "domain", domain)
+		}
+	}
 }
 
 func (d *dns01P2PForgeSolver) Present(ctx context.Context, challenge acme.Challenge) error {
+	d.log.Debugw("getting DNS-01 challenge value from CA", "acme_challenge", challenge)
+	dns01value := challenge.DNS01KeyAuthorization()
 	h := d.hostFn()
 	addrs := h.Addrs()
 
-	var advertisedAddrs []multiaddr.Multiaddr
+	var advertisedAddrs []ma.Multiaddr
 
 	if !d.allowPrivateForgeAddresses {
-		var publicAddrs []multiaddr.Multiaddr
+		var publicAddrs []ma.Multiaddr
 		for _, addr := range addrs {
 			if isPublicAddr(addr) {
 				publicAddrs = append(publicAddrs, addr)
@@ -503,51 +699,51 @@ func (d *dns01P2PForgeSolver) Present(ctx context.Context, challenge acme.Challe
 	} else {
 		advertisedAddrs = addrs
 	}
+	d.log.Debugw("advertised libp2p addrs for p2p-forge broker to try", "addrs", advertisedAddrs)
 
-	req, err := ChallengeRequest(ctx, d.forge, challenge.DNS01KeyAuthorization(), advertisedAddrs)
+	d.log.Debugw("asking p2p-forge broker to set DNS-01 TXT record", "url", d.forgeRegistrationEndpoint, "dns01_value", dns01value)
+	err := SendChallenge(ctx,
+		d.forgeRegistrationEndpoint,
+		h.Peerstore().PrivKey(h.ID()),
+		dns01value,
+		advertisedAddrs,
+		d.forgeAuth,
+		d.userAgent,
+		d.modifyForgeRequest,
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("p2p-forge broker registration error: %w", err)
 	}
 
-	// Add forge auth header if set
-	if d.forgeAuth != "" {
-		req.Header.Set(ForgeAuthHeader, d.forgeAuth)
-	}
-
-	// Always include User-Agent header
-	if d.userAgent == "" {
-		d.userAgent = defaultUserAgent
-	}
-	req.Header.Set("User-Agent", d.userAgent)
-
-	if d.modifyForgeRequest != nil {
-		if err := d.modifyForgeRequest(req); err != nil {
-			return err
-		}
-	}
-
-	client := &httppeeridauth.ClientPeerIDAuth{PrivKey: h.Peerstore().PrivKey(h.ID())}
-	_, resp, err := client.AuthenticatedDo(http.DefaultClient, req)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%s : %s", resp.Status, respBody)
-	}
 	return nil
 }
 
 func (d *dns01P2PForgeSolver) CleanUp(ctx context.Context, challenge acme.Challenge) error {
-	//TODO: Should we implement this, or is doing delete and Last-Writer-Wins enough?
+	// TODO: Should we implement this, or is doing delete and Last-Writer-Wins enough?
 	return nil
 }
 
-var _ acmez.Solver = (*dns01P2PForgeSolver)(nil)
-var _ acmez.Waiter = (*dns01P2PForgeSolver)(nil)
+var (
+	_ acmez.Solver = (*dns01P2PForgeSolver)(nil)
+	_ acmez.Waiter = (*dns01P2PForgeSolver)(nil)
+)
 
-func addrFactoryFn(skipForgeAddrs bool, peerIDFn func() peer.ID, forgeDomain string, allowPrivateForgeAddrs bool, p2pForgeWssComponent multiaddr.Multiaddr, multiaddrs []multiaddr.Multiaddr, log *zap.SugaredLogger) []multiaddr.Multiaddr {
-	retAddrs := make([]multiaddr.Multiaddr, 0, len(multiaddrs))
+func addrFactoryFn(skipForgeAddrs bool, hostFn func() host.Host, forgeDomain string, allowPrivateForgeAddrs bool, produceShortAddrs bool, p2pForgeWssComponent ma.Multiaddr, multiaddrs []ma.Multiaddr, log *zap.SugaredLogger) []ma.Multiaddr {
+	retAddrs := make([]ma.Multiaddr, 0, len(multiaddrs))
+	var unreachableAddrs []ma.Multiaddr
+	var peerID peer.ID
+	if !skipForgeAddrs {
+		// This is pretty ugly. We want the host for determining unreachable addrs. The host wants the address
+		// factory to set the signed peer record.
+		// Ideally, it'll be fixed with: https://github.com/libp2p/go-libp2p/issues/3300
+		h := hostFn()
+		if h, ok := h.(interface {
+			ConfirmedAddrs() ([]ma.Multiaddr, []ma.Multiaddr, []ma.Multiaddr)
+		}); ok {
+			_, unreachableAddrs, _ = h.ConfirmedAddrs()
+		}
+		peerID = h.ID()
+	}
 	for _, a := range multiaddrs {
 		if isRelayAddr(a) {
 			retAddrs = append(retAddrs, a)
@@ -564,17 +760,20 @@ func addrFactoryFn(skipForgeAddrs bool, peerIDFn func() peer.ID, forgeDomain str
 
 		index := 0
 		var escapedIPStr string
+		var ipVersion string
 		var ipMaStr string
 		var tcpPortStr string
-		multiaddr.ForEach(withoutForgeWSS, func(c multiaddr.Component) bool {
+		ma.ForEach(withoutForgeWSS, func(c ma.Component) bool {
 			switch index {
 			case 0:
 				switch c.Protocol().Code {
-				case multiaddr.P_IP4:
+				case ma.P_IP4:
+					ipVersion = "4"
 					ipMaStr = c.String()
 					ipAddr := c.Value()
 					escapedIPStr = strings.ReplaceAll(ipAddr, ".", "-")
-				case multiaddr.P_IP6:
+				case ma.P_IP6:
+					ipVersion = "6"
 					ipMaStr = c.String()
 					ipAddr := c.Value()
 					escapedIPStr = strings.ReplaceAll(ipAddr, ":", "-")
@@ -588,7 +787,7 @@ func addrFactoryFn(skipForgeAddrs bool, peerIDFn func() peer.ID, forgeDomain str
 					return false
 				}
 			case 1:
-				if c.Protocol().Code != multiaddr.P_TCP {
+				if c.Protocol().Code != ma.P_TCP {
 					return false
 				}
 				tcpPortStr = c.Value()
@@ -614,10 +813,22 @@ func addrFactoryFn(skipForgeAddrs bool, peerIDFn func() peer.ID, forgeDomain str
 			continue
 		}
 
-		pidStr := peer.ToCid(peerIDFn()).Encode(multibase.MustNewEncoder(multibase.Base36))
+		for _, ua := range unreachableAddrs {
+			// if the tcp component is unreachable, ignore the ws addr too
+			if ua.Equal(withoutForgeWSS) {
+				continue
+			}
+		}
 
-		newMaStr := fmt.Sprintf("%s/tcp/%s/tls/sni/%s.%s.%s/ws", ipMaStr, tcpPortStr, escapedIPStr, pidStr, forgeDomain)
-		newMA, err := multiaddr.NewMultiaddr(newMaStr)
+		b36PidStr := peer.ToCid(peerID).Encode(multibase.MustNewEncoder(multibase.Base36))
+
+		var newMaStr string
+		if produceShortAddrs {
+			newMaStr = fmt.Sprintf("/dns%s/%s.%s.%s/tcp/%s/tls/ws", ipVersion, escapedIPStr, b36PidStr, forgeDomain, tcpPortStr)
+		} else {
+			newMaStr = fmt.Sprintf("%s/tcp/%s/tls/sni/%s.%s.%s/ws", ipMaStr, tcpPortStr, escapedIPStr, b36PidStr, forgeDomain)
+		}
+		newMA, err := ma.NewMultiaddr(newMaStr)
 		if err != nil {
 			log.Errorf("error creating new multiaddr from %q: %s", newMaStr, err.Error())
 			retAddrs = append(retAddrs, a)

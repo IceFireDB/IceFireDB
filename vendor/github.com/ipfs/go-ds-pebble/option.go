@@ -1,7 +1,7 @@
 package pebbleds
 
 import (
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 )
 
 type config struct {
