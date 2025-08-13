@@ -107,7 +107,7 @@ func (db *DB) NewStream() *badger.Stream {
 }
 
 func (db *DB) Compact() error {
-	return nil
+	return db.db.RunValueLogGC(0.5)
 }
 
 func (db *DB) GetStorageEngine() interface{} {

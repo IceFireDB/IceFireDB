@@ -27,6 +27,11 @@ func (s Store) String() string {
 func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	db := new(DB)
 	db.cfg = cfg
+
+	// Note: BadgerDB options are hardcoded here because the current ledisdb
+	// configuration structure doesn't provide a generic way to pass them.
+	// For optimal performance, these settings should be made configurable
+	// if the config structure is extended in the future.
 	db.opts = badger.DefaultOptions(path)
 	db.opts.MemTableSize = 1000 << 20
 	db.opts.NumGoroutines = 100
