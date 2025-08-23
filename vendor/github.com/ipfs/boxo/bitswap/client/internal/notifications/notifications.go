@@ -24,16 +24,18 @@ type PubSub interface {
 }
 
 // New generates a new PubSub interface.
-func New() PubSub {
+func New(traceBlock bool) PubSub {
 	return &impl{
 		wrapped: *pubsub.New(bufferSize),
 		closed:  make(chan struct{}),
+		trace:   traceBlock,
 	}
 }
 
 type impl struct {
 	lk      sync.RWMutex
 	wrapped pubsub.PubSub
+	trace   bool
 
 	closed chan struct{}
 }
@@ -47,8 +49,14 @@ func (ps *impl) Publish(from peer.ID, blocks ...blocks.Block) {
 	default:
 	}
 
-	for _, block := range blocks {
-		ps.wrapped.Pub(traceability.Block{Block: block, From: from}, block.Cid().KeyString())
+	if ps.trace {
+		for _, block := range blocks {
+			ps.wrapped.Pub(traceability.Block{Block: block, From: from}, block.Cid().KeyString())
+		}
+	} else {
+		for _, block := range blocks {
+			ps.wrapped.Pub(block, block.Cid().KeyString())
+		}
 	}
 }
 
@@ -74,7 +82,7 @@ func (ps *impl) Subscribe(ctx context.Context, keys ...cid.Cid) <-chan blocks.Bl
 		return blocksCh
 	}
 
-	valuesCh := make(chan interface{}, len(keys)) // provide our own channel to control buffer, prevent blocking
+	valuesCh := make(chan any, len(keys)) // provide our own channel to control buffer, prevent blocking
 
 	// prevent shutdown
 	ps.lk.RLock()
@@ -87,7 +95,10 @@ func (ps *impl) Subscribe(ctx context.Context, keys ...cid.Cid) <-chan blocks.Bl
 	default:
 	}
 
-	subscribe := time.Now()
+	var subscribe time.Time
+	if ps.trace {
+		subscribe = time.Now()
+	}
 
 	// AddSubOnceEach listens for each key in the list, and closes the channel
 	// once all keys have been received
@@ -118,12 +129,14 @@ func (ps *impl) Subscribe(ctx context.Context, keys ...cid.Cid) <-chan blocks.Bl
 				if !ok {
 					return
 				}
-				block, ok := val.(traceability.Block)
-				if !ok {
-					// FIXME: silently dropping errors wtf ?
-					return
+				var block blocks.Block
+				if ps.trace {
+					tb := val.(traceability.Block)
+					tb.Delay = time.Since(subscribe)
+					block = tb
+				} else {
+					block = val.(blocks.Block)
 				}
-				block.Delay = time.Since(subscribe)
 
 				select {
 				case <-ctx.Done():

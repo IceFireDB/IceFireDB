@@ -43,7 +43,8 @@ type CertificateRequestInfo struct {
 // SupportsCertificate returns nil if the provided certificate is supported by
 // the server that sent the CertificateRequest. Otherwise, it returns an error
 // describing the reason for the incompatibility.
-// NOTE: original src: https://github.com/golang/go/blob/29b9a328d268d53833d2cc063d1d8b4bf6852675/src/crypto/tls/common.go#L1273
+// NOTE: original src:
+// https://github.com/golang/go/blob/29b9a328d268d53833d2cc063d1d8b4bf6852675/src/crypto/tls/common.go#L1273
 func (cri *CertificateRequestInfo) SupportsCertificate(c *tls.Certificate) error {
 	if len(cri.AcceptableCAs) == 0 {
 		return nil
@@ -66,6 +67,7 @@ func (cri *CertificateRequestInfo) SupportsCertificate(c *tls.Certificate) error
 			}
 		}
 	}
+
 	return errNotAcceptableCertificateChain
 }
 
@@ -91,6 +93,7 @@ func (c *handshakeConfig) setNameToCertificateLocked() {
 	c.nameToCertificate = nameToCertificate
 }
 
+//nolint:cyclop
 func (c *handshakeConfig) getCertificate(clientHelloInfo *ClientHelloInfo) (*tls.Certificate, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -141,7 +144,8 @@ func (c *handshakeConfig) getCertificate(clientHelloInfo *ClientHelloInfo) (*tls
 	return &c.localCertificates[0], nil
 }
 
-// NOTE: original src: https://github.com/golang/go/blob/29b9a328d268d53833d2cc063d1d8b4bf6852675/src/crypto/tls/handshake_client.go#L974
+// NOTE: original src:
+// https://github.com/golang/go/blob/29b9a328d268d53833d2cc063d1d8b4bf6852675/src/crypto/tls/handshake_client.go#L974
 func (c *handshakeConfig) getClientCertificate(cri *CertificateRequestInfo) (*tls.Certificate, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -154,6 +158,7 @@ func (c *handshakeConfig) getClientCertificate(cri *CertificateRequestInfo) (*tl
 		if err := cri.SupportsCertificate(&chain); err != nil {
 			continue
 		}
+
 		return &chain, nil
 	}
 

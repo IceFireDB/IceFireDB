@@ -207,7 +207,7 @@ func PublishWithEOL(eol time.Time) PublishOption {
 	}
 }
 
-// PublishWithEOL sets [PublishOptions.TTL].
+// PublishWithTTL sets [PublishOptions.TTL].
 func PublishWithTTL(ttl time.Duration) PublishOption {
 	return func(o *PublishOptions) {
 		o.TTL = ttl

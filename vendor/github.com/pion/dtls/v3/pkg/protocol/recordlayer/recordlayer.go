@@ -48,14 +48,14 @@ type RecordLayer struct {
 	Content protocol.Content
 }
 
-// Marshal encodes the RecordLayer to binary
+// Marshal encodes the RecordLayer to binary.
 func (r *RecordLayer) Marshal() ([]byte, error) {
 	contentRaw, err := r.Content.Marshal()
 	if err != nil {
 		return nil, err
 	}
 
-	r.Header.ContentLen = uint16(len(contentRaw))
+	r.Header.ContentLen = uint16(len(contentRaw)) //nolint:gosec // G115
 	r.Header.ContentType = r.Content.ContentType()
 
 	headerRaw, err := r.Header.Marshal()
@@ -66,7 +66,7 @@ func (r *RecordLayer) Marshal() ([]byte, error) {
 	return append(headerRaw, contentRaw...), nil
 }
 
-// Unmarshal populates the RecordLayer from binary
+// Unmarshal populates the RecordLayer from binary.
 func (r *RecordLayer) Unmarshal(data []byte) error {
 	if err := r.Header.Unmarshal(data); err != nil {
 		return err

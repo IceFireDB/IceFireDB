@@ -21,6 +21,7 @@ func RandomCIDGenerator(size int) func() []byte {
 		if _, err := rand.Read(cid); err != nil {
 			panic(err) //nolint -- nonrecoverable
 		}
+
 		return cid
 	}
 }
@@ -54,8 +55,10 @@ func cidDatagramRouter(size int) func([]byte) (string, bool) {
 			if h.ContentType != protocol.ContentTypeConnectionID {
 				continue
 			}
+
 			return string(h.ConnectionID), true
 		}
+
 		return "", false
 	}
 }
@@ -65,7 +68,7 @@ func cidDatagramRouter(size int) func([]byte) (string, bool) {
 // NOTE: a ServerHello should always be the first record in a datagram if
 // multiple are present, so we avoid iterating through all packets if the first
 // is not a ServerHello.
-func cidConnIdentifier() func([]byte) (string, bool) {
+func cidConnIdentifier() func([]byte) (string, bool) { //nolint:cyclop
 	return func(packet []byte) (string, bool) {
 		pkts, err := recordlayer.UnpackDatagram(packet)
 		if err != nil || len(pkts) < 1 {
@@ -96,6 +99,7 @@ func cidConnIdentifier() func([]byte) (string, bool) {
 				return string(e.CID), true
 			}
 		}
+
 		return "", false
 	}
 }

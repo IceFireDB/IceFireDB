@@ -3,26 +3,26 @@
 
 package protocol
 
-// CompressionMethodID is the ID for a CompressionMethod
+// CompressionMethodID is the ID for a CompressionMethod.
 type CompressionMethodID byte
 
 const (
 	compressionMethodNull CompressionMethodID = 0
 )
 
-// CompressionMethod represents a TLS Compression Method
+// CompressionMethod represents a TLS Compression Method.
 type CompressionMethod struct {
 	ID CompressionMethodID
 }
 
-// CompressionMethods returns all supported CompressionMethods
+// CompressionMethods returns all supported CompressionMethods.
 func CompressionMethods() map[CompressionMethodID]*CompressionMethod {
 	return map[CompressionMethodID]*CompressionMethod{
 		compressionMethodNull: {ID: compressionMethodNull},
 	}
 }
 
-// DecodeCompressionMethods the given compression methods
+// DecodeCompressionMethods the given compression methods.
 func DecodeCompressionMethods(buf []byte) ([]*CompressionMethod, error) {
 	if len(buf) < 1 {
 		return nil, errBufferTooSmall
@@ -38,14 +38,16 @@ func DecodeCompressionMethods(buf []byte) ([]*CompressionMethod, error) {
 			c = append(c, compressionMethod)
 		}
 	}
+
 	return c, nil
 }
 
-// EncodeCompressionMethods the given compression methods
+// EncodeCompressionMethods the given compression methods.
 func EncodeCompressionMethods(c []*CompressionMethod) []byte {
 	out := []byte{byte(len(c))}
 	for i := len(c); i > 0; i-- {
 		out = append(out, byte(c[i-1].ID))
 	}
+
 	return out
 }

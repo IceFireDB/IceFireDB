@@ -11,6 +11,4 @@ type (
 	TaskInfo               = decision.TaskInfo
 	ScoreLedger            = decision.ScoreLedger
 	ScorePeerFunc          = decision.ScorePeerFunc
-	PeerLedger             = decision.PeerLedger
-	PeerEntry              = decision.PeerEntry
 )

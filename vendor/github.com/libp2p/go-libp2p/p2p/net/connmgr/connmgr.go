@@ -141,11 +141,6 @@ func NewConnManager(low, hi int, opts ...Option) (*BasicConnMgr, error) {
 
 	cm.ctx, cm.cancel = context.WithCancel(context.Background())
 
-	if cfg.emergencyTrim {
-		// When we're running low on memory, immediately trigger a trim.
-		cm.unregisterMemoryWatcher = registerWatchdog(cm.memoryEmergency)
-	}
-
 	decay, _ := NewDecayer(cfg.decayer, cm)
 	cm.decayer = decay
 
@@ -154,11 +149,11 @@ func NewConnManager(low, hi int, opts ...Option) (*BasicConnMgr, error) {
 	return cm, nil
 }
 
-// memoryEmergency is run when we run low on memory.
-// Close connections until we right the low watermark.
-// We don't pay attention to the silence period or the grace period.
-// We try to not kill protected connections, but if that turns out to be necessary, not connection is safe!
-func (cm *BasicConnMgr) memoryEmergency() {
+// ForceTrim trims connections down to the low watermark ignoring silence period, grace period,
+// or protected status. It prioritizes closing Unprotected connections. If after closing all
+// unprotected connections, we still have more than lowWaterMark connections, it'll close
+// protected connections.
+func (cm *BasicConnMgr) ForceTrim() {
 	connCount := int(cm.connCount.Load())
 	target := connCount - cm.cfg.lowWater
 	if target < 0 {
@@ -175,7 +170,8 @@ func (cm *BasicConnMgr) memoryEmergency() {
 	// Trim connections without paying attention to the silence period.
 	for _, c := range cm.getConnsToCloseEmergency(target) {
 		log.Infow("low on memory. closing conn", "peer", c.RemotePeer())
-		c.Close()
+
+		c.CloseWithError(network.ConnGarbageCollected)
 	}
 
 	// finally, update the last trim time.
@@ -388,7 +384,7 @@ func (cm *BasicConnMgr) trim() {
 	// do the actual trim.
 	for _, c := range cm.getConnsToClose() {
 		log.Debugw("closing conn", "peer", c.RemotePeer())
-		c.Close()
+		c.CloseWithError(network.ConnGarbageCollected)
 	}
 }
 
@@ -664,7 +660,7 @@ func (nn *cmNotifee) cm() *BasicConnMgr {
 // Connected is called by notifiers to inform that a new connection has been established.
 // The notifee updates the BasicConnMgr to start tracking the connection. If the new connection
 // count exceeds the high watermark, a trim may be triggered.
-func (nn *cmNotifee) Connected(n network.Network, c network.Conn) {
+func (nn *cmNotifee) Connected(_ network.Network, c network.Conn) {
 	cm := nn.cm()
 
 	p := c.RemotePeer()
@@ -703,7 +699,7 @@ func (nn *cmNotifee) Connected(n network.Network, c network.Conn) {
 
 // Disconnected is called by notifiers to inform that an existing connection has been closed or terminated.
 // The notifee updates the BasicConnMgr accordingly to stop tracking the connection, and performs housekeeping.
-func (nn *cmNotifee) Disconnected(n network.Network, c network.Conn) {
+func (nn *cmNotifee) Disconnected(_ network.Network, c network.Conn) {
 	cm := nn.cm()
 
 	p := c.RemotePeer()
@@ -731,7 +727,7 @@ func (nn *cmNotifee) Disconnected(n network.Network, c network.Conn) {
 }
 
 // Listen is no-op in this implementation.
-func (nn *cmNotifee) Listen(n network.Network, addr ma.Multiaddr) {}
+func (nn *cmNotifee) Listen(_ network.Network, _ ma.Multiaddr) {}
 
 // ListenClose is no-op in this implementation.
-func (nn *cmNotifee) ListenClose(n network.Network, addr ma.Multiaddr) {}
+func (nn *cmNotifee) ListenClose(_ network.Network, _ ma.Multiaddr) {}

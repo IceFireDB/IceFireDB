@@ -26,7 +26,7 @@ const (
 	ackTimerClosed
 )
 
-// ackTimer provides the retnransmission timer conforms with RFC 4960 Sec 6.3.1
+// ackTimer provides the retnransmission timer conforms with RFC 4960 Sec 6.3.1.
 type ackTimer struct {
 	timer    *time.Timer
 	observer ackTimerObserver
@@ -40,6 +40,7 @@ func newAckTimer(observer ackTimerObserver) *ackTimer {
 	t := &ackTimer{observer: observer}
 	t.timer = time.AfterFunc(math.MaxInt64, t.timeout)
 	t.timer.Stop()
+
 	return t
 }
 
@@ -65,11 +66,12 @@ func (t *ackTimer) start() bool {
 	t.state = ackTimerStarted
 	t.pending++
 	t.timer.Reset(ackInterval)
+
 	return true
 }
 
 // stops the timer. this is similar to stop() but subsequent start() call
-// will fail (the timer is no longer usable)
+// will fail (the timer is no longer usable).
 func (t *ackTimer) stop() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -83,7 +85,7 @@ func (t *ackTimer) stop() {
 }
 
 // closes the timer. this is similar to stop() but subsequent start() call
-// will fail (the timer is no longer usable)
+// will fail (the timer is no longer usable).
 func (t *ackTimer) close() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -95,7 +97,7 @@ func (t *ackTimer) close() {
 }
 
 // isRunning tests if the timer is running.
-// Debug purpose only
+// Debug purpose only.
 func (t *ackTimer) isRunning() bool {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()

@@ -24,15 +24,18 @@ type cbcMode interface {
 	SetIV([]byte)
 }
 
-// CBC Provides an API to Encrypt/Decrypt DTLS 1.2 Packets
+// CBC Provides an API to Encrypt/Decrypt DTLS 1.2 Packets.
 type CBC struct {
 	writeCBC, readCBC cbcMode
 	writeMac, readMac []byte
 	h                 prf.HashFunc
 }
 
-// NewCBC creates a DTLS CBC Cipher
-func NewCBC(localKey, localWriteIV, localMac, remoteKey, remoteWriteIV, remoteMac []byte, h prf.HashFunc) (*CBC, error) {
+// NewCBC creates a DTLS CBC Cipher.
+func NewCBC(
+	localKey, localWriteIV, localMac, remoteKey, remoteWriteIV, remoteMac []byte,
+	hashFunc prf.HashFunc,
+) (*CBC, error) {
 	writeBlock, err := aes.NewCipher(localKey)
 	if err != nil {
 		return nil, err
@@ -59,11 +62,11 @@ func NewCBC(localKey, localWriteIV, localMac, remoteKey, remoteWriteIV, remoteMa
 
 		readCBC: readCBC,
 		readMac: remoteMac,
-		h:       h,
+		h:       hashFunc,
 	}, nil
 }
 
-// Encrypt encrypt a DTLS RecordLayer message
+// Encrypt encrypt a DTLS RecordLayer message.
 func (c *CBC) Encrypt(pkt *recordlayer.RecordLayer, raw []byte) ([]byte, error) {
 	payload := raw[pkt.Header.Size():]
 	raw = raw[:pkt.Header.Size()]
@@ -101,29 +104,29 @@ func (c *CBC) Encrypt(pkt *recordlayer.RecordLayer, raw []byte) ([]byte, error) 
 	// Set IV + Encrypt + Prepend IV
 	c.writeCBC.SetIV(iv)
 	c.writeCBC.CryptBlocks(payload, payload)
-	payload = append(iv, payload...)
+	payload = append(iv, payload...) //nolint:makezero // todo: FIX
 
 	// Prepend unencrypted header with encrypted payload
 	raw = append(raw, payload...)
 
 	// Update recordLayer size to include IV+MAC+Padding
-	binary.BigEndian.PutUint16(raw[pkt.Header.Size()-2:], uint16(len(raw)-pkt.Header.Size()))
+	binary.BigEndian.PutUint16(raw[pkt.Header.Size()-2:], uint16(len(raw)-pkt.Header.Size())) //nolint:gosec //G115
 
 	return raw, nil
 }
 
-// Decrypt decrypts a DTLS RecordLayer message
-func (c *CBC) Decrypt(h recordlayer.Header, in []byte) ([]byte, error) {
+// Decrypt decrypts a DTLS RecordLayer message.
+func (c *CBC) Decrypt(header recordlayer.Header, in []byte) ([]byte, error) {
 	blockSize := c.readCBC.BlockSize()
 	mac := c.h()
 
-	if err := h.Unmarshal(in); err != nil {
+	if err := header.Unmarshal(in); err != nil {
 		return nil, err
 	}
-	body := in[h.Size():]
+	body := in[header.Size():]
 
 	switch {
-	case h.ContentType == protocol.ContentTypeChangeCipherSpec:
+	case header.ContentType == protocol.ContentTypeChangeCipherSpec:
 		// Nothing to encrypt with ChangeCipherSpec
 		return in, nil
 	case len(body)%blockSize != 0 || len(body) < blockSize+util.Max(mac.Size()+1, blockSize):
@@ -154,21 +157,33 @@ func (c *CBC) Decrypt(h recordlayer.Header, in []byte) ([]byte, error) {
 	expectedMAC := body[dataEnd : dataEnd+macSize]
 	var err error
 	var actualMAC []byte
-	if h.ContentType == protocol.ContentTypeConnectionID {
-		actualMAC, err = c.hmacCID(h.Epoch, h.SequenceNumber, h.Version, body[:dataEnd], c.readMac, c.h, h.ConnectionID)
+	if header.ContentType == protocol.ContentTypeConnectionID {
+		actualMAC, err = c.hmacCID(
+			header.Epoch, header.SequenceNumber, header.Version, body[:dataEnd], c.readMac, c.h, header.ConnectionID,
+		)
 	} else {
-		actualMAC, err = c.hmac(h.Epoch, h.SequenceNumber, h.ContentType, h.Version, body[:dataEnd], c.readMac, c.h)
+		actualMAC, err = c.hmac(
+			header.Epoch, header.SequenceNumber, header.ContentType, header.Version, body[:dataEnd], c.readMac, c.h,
+		)
 	}
 	// Compute Local MAC and compare
 	if err != nil || !hmac.Equal(actualMAC, expectedMAC) {
 		return nil, errInvalidMAC
 	}
 
-	return append(in[:h.Size()], body[:dataEnd]...), nil
+	return append(in[:header.Size()], body[:dataEnd]...), nil
 }
 
-func (c *CBC) hmac(epoch uint16, sequenceNumber uint64, contentType protocol.ContentType, protocolVersion protocol.Version, payload []byte, key []byte, hf func() hash.Hash) ([]byte, error) {
-	h := hmac.New(hf, key)
+func (c *CBC) hmac(
+	epoch uint16,
+	sequenceNumber uint64,
+	contentType protocol.ContentType,
+	protocolVersion protocol.Version,
+	payload []byte,
+	key []byte,
+	hf func() hash.Hash,
+) ([]byte, error) {
+	hmacHash := hmac.New(hf, key)
 
 	msg := make([]byte, 13)
 
@@ -177,51 +192,59 @@ func (c *CBC) hmac(epoch uint16, sequenceNumber uint64, contentType protocol.Con
 	msg[8] = byte(contentType)
 	msg[9] = protocolVersion.Major
 	msg[10] = protocolVersion.Minor
-	binary.BigEndian.PutUint16(msg[11:], uint16(len(payload)))
+	binary.BigEndian.PutUint16(msg[11:], uint16(len(payload))) //nolint:gosec //G115
 
-	if _, err := h.Write(msg); err != nil {
+	if _, err := hmacHash.Write(msg); err != nil {
 		return nil, err
 	}
-	if _, err := h.Write(payload); err != nil {
+	if _, err := hmacHash.Write(payload); err != nil {
 		return nil, err
 	}
 
-	return h.Sum(nil), nil
+	return hmacHash.Sum(nil), nil
 }
 
 // hmacCID calculates a MAC according to
 // https://datatracker.ietf.org/doc/html/rfc9146#section-5.1
-func (c *CBC) hmacCID(epoch uint16, sequenceNumber uint64, protocolVersion protocol.Version, payload []byte, key []byte, hf func() hash.Hash, cid []byte) ([]byte, error) {
+func (c *CBC) hmacCID(
+	epoch uint16,
+	sequenceNumber uint64,
+	protocolVersion protocol.Version,
+	payload []byte,
+	key []byte,
+	hf func() hash.Hash,
+	cid []byte,
+) ([]byte, error) {
 	// Must unmarshal inner plaintext in orde to perform MAC.
 	ip := &recordlayer.InnerPlaintext{}
 	if err := ip.Unmarshal(payload); err != nil {
 		return nil, err
 	}
 
-	h := hmac.New(hf, key)
+	hmacHash := hmac.New(hf, key)
 
 	var msg cryptobyte.Builder
 
 	msg.AddUint64(seqNumPlaceholder)
 	msg.AddUint8(uint8(protocol.ContentTypeConnectionID))
-	msg.AddUint8(uint8(len(cid)))
+	msg.AddUint8(uint8(len(cid))) //nolint:gosec //G115
 	msg.AddUint8(uint8(protocol.ContentTypeConnectionID))
 	msg.AddUint8(protocolVersion.Major)
 	msg.AddUint8(protocolVersion.Minor)
 	msg.AddUint16(epoch)
 	util.AddUint48(&msg, sequenceNumber)
 	msg.AddBytes(cid)
-	msg.AddUint16(uint16(len(payload)))
+	msg.AddUint16(uint16(len(payload))) //nolint:gosec //G115
 	msg.AddBytes(ip.Content)
 	msg.AddUint8(uint8(ip.RealType))
 	msg.AddBytes(make([]byte, ip.Zeros))
 
-	if _, err := h.Write(msg.BytesOrPanic()); err != nil {
+	if _, err := hmacHash.Write(msg.BytesOrPanic()); err != nil {
 		return nil, err
 	}
-	if _, err := h.Write(payload); err != nil {
+	if _, err := hmacHash.Write(payload); err != nil {
 		return nil, err
 	}
 
-	return h.Sum(nil), nil
+	return hmacHash.Sum(nil), nil
 }

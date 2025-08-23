@@ -25,7 +25,7 @@ type Algorithm struct {
 	Signature signature.Algorithm
 }
 
-// Algorithms are all the know SignatureHash Algorithms
+// Algorithms are all the know SignatureHash Algorithms.
 func Algorithms() []Algorithm {
 	return []Algorithm{
 		{hash.SHA256, signature.ECDSA},
@@ -40,22 +40,27 @@ func Algorithms() []Algorithm {
 
 // SelectSignatureScheme returns most preferred and compatible scheme.
 func SelectSignatureScheme(sigs []Algorithm, privateKey crypto.PrivateKey) (Algorithm, error) {
+	signer, ok := privateKey.(crypto.Signer)
+	if !ok {
+		return Algorithm{}, errInvalidPrivateKey
+	}
 	for _, ss := range sigs {
-		if ss.isCompatible(privateKey) {
+		if ss.isCompatible(signer) {
 			return ss, nil
 		}
 	}
+
 	return Algorithm{}, errNoAvailableSignatureSchemes
 }
 
 // isCompatible checks that given private key is compatible with the signature scheme.
-func (a *Algorithm) isCompatible(privateKey crypto.PrivateKey) bool {
-	switch privateKey.(type) {
-	case ed25519.PrivateKey:
+func (a *Algorithm) isCompatible(signer crypto.Signer) bool {
+	switch signer.Public().(type) {
+	case ed25519.PublicKey:
 		return a.Signature == signature.Ed25519
-	case *ecdsa.PrivateKey:
+	case *ecdsa.PublicKey:
 		return a.Signature == signature.ECDSA
-	case *rsa.PrivateKey:
+	case *rsa.PublicKey:
 		return a.Signature == signature.RSA
 	default:
 		return false

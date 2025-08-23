@@ -291,6 +291,8 @@ func (t timerType) String() string {
 		return "ack"
 	case logging.TimerTypePTO:
 		return "pto"
+	case logging.TimerTypePathProbe:
+		return "path_probe"
 	default:
 		return "unknown timer type"
 	}
@@ -316,7 +318,6 @@ func (s congestionState) String() string {
 type ecn logging.ECN
 
 func (e ecn) String() string {
-	//nolint:exhaustive // The unsupported value is never logged.
 	switch logging.ECN(e) {
 	case logging.ECTNot:
 		return "Not-ECT"

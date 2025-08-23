@@ -4,22 +4,22 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"maps"
 
 	"github.com/ipfs/boxo/bitswap/client/wantlist"
 	pb "github.com/ipfs/boxo/bitswap/message/pb"
-
 	blocks "github.com/ipfs/go-block-format"
 	cid "github.com/ipfs/go-cid"
 	pool "github.com/libp2p/go-buffer-pool"
-	msgio "github.com/libp2p/go-msgio"
-
-	u "github.com/ipfs/boxo/util"
 	"github.com/libp2p/go-libp2p/core/network"
+	msgio "github.com/libp2p/go-msgio"
+	"google.golang.org/protobuf/proto"
 )
 
 // BitSwapMessage is the basic interface for interacting building, encoding,
 // and decoding messages sent on the BitSwap protocol.
 type BitSwapMessage interface {
+	FillWantlist([]Entry) []Entry
 	// Wantlist returns a slice of unique keys that represent data wanted by
 	// the sender.
 	Wantlist() []Entry
@@ -108,37 +108,18 @@ type Entry struct {
 
 // Get the size of the entry on the wire
 func (e *Entry) Size() int {
-	epb := e.ToPB()
-	return epb.Size()
+	return proto.Size(e.ToPB())
 }
 
 // Get the entry in protobuf form
-func (e *Entry) ToPB() pb.Message_Wantlist_Entry {
-	return pb.Message_Wantlist_Entry{
-		Block:        pb.Cid{Cid: e.Cid},
-		Priority:     int32(e.Priority),
+func (e *Entry) ToPB() *pb.Message_Wantlist_Entry {
+	return &pb.Message_Wantlist_Entry{
+		Block:        e.Cid.Bytes(),
+		Priority:     e.Priority,
 		Cancel:       e.Cancel,
 		WantType:     e.WantType,
 		SendDontHave: e.SendDontHave,
 	}
-}
-
-var MaxEntrySize = maxEntrySize()
-
-func maxEntrySize() int {
-	var maxInt32 int32 = (1 << 31) - 1
-
-	c := cid.NewCidV0(u.Hash([]byte("cid")))
-	e := Entry{
-		Entry: wantlist.Entry{
-			Cid:      c,
-			Priority: maxInt32,
-			WantType: pb.Message_Wantlist_Have,
-		},
-		SendDontHave: true, // true takes up more space than false
-		Cancel:       true,
-	}
-	return e.Size()
 }
 
 type impl struct {
@@ -150,11 +131,7 @@ type impl struct {
 }
 
 // New returns a new, empty bitswap message
-func New(full bool) BitSwapMessage {
-	return newMsg(full)
-}
-
-func newMsg(full bool) *impl {
+func New(full bool) *impl {
 	return &impl{
 		full:           full,
 		wantlist:       make(map[cid.Cid]*Entry),
@@ -165,18 +142,13 @@ func newMsg(full bool) *impl {
 
 // Clone the message fields
 func (m *impl) Clone() BitSwapMessage {
-	msg := newMsg(m.full)
-	for k := range m.wantlist {
-		msg.wantlist[k] = m.wantlist[k]
+	return &impl{
+		full:           m.full,
+		wantlist:       maps.Clone(m.wantlist),
+		blocks:         maps.Clone(m.blocks),
+		blockPresences: maps.Clone(m.blockPresences),
+		pendingBytes:   m.pendingBytes,
 	}
-	for k := range m.blocks {
-		msg.blocks[k] = m.blocks[k]
-	}
-	for k := range m.blockPresences {
-		msg.blockPresences[k] = m.blockPresences[k]
-	}
-	msg.pendingBytes = m.pendingBytes
-	return msg
 }
 
 // Reset the values in the message back to defaults, so it can be reused
@@ -190,13 +162,20 @@ func (m *impl) Reset(full bool) {
 
 var errCidMissing = errors.New("missing cid")
 
-func newMessageFromProto(pbm pb.Message) (BitSwapMessage, error) {
-	m := newMsg(pbm.Wantlist.Full)
-	for _, e := range pbm.Wantlist.Entries {
-		if !e.Block.Cid.Defined() {
-			return nil, errCidMissing
+func newMessageFromProto(pbm *pb.Message) (BitSwapMessage, error) {
+	m := New(pbm.Wantlist != nil && pbm.Wantlist.Full)
+
+	if pbm.Wantlist != nil {
+		for _, e := range pbm.Wantlist.Entries {
+			if len(e.Block) == 0 {
+				return nil, errCidMissing
+			}
+			c, err := cid.Cast(e.Block)
+			if err != nil {
+				return nil, err
+			}
+			m.addEntry(c, e.Priority, e.Cancel, e.WantType, e.SendDontHave)
 		}
-		m.addEntry(e.Block.Cid, e.Priority, e.Cancel, e.WantType, e.SendDontHave)
 	}
 
 	// deprecated
@@ -227,10 +206,17 @@ func newMessageFromProto(pbm pb.Message) (BitSwapMessage, error) {
 	}
 
 	for _, bi := range pbm.GetBlockPresences() {
-		if !bi.Cid.Cid.Defined() {
+		if len(bi.Cid) == 0 {
 			return nil, errCidMissing
 		}
-		m.AddBlockPresence(bi.Cid.Cid, bi.Type)
+		c, err := cid.Cast(bi.Cid)
+		if err != nil {
+			return nil, err
+		}
+		if !c.Defined() {
+			return nil, errCidMissing
+		}
+		m.AddBlockPresence(c, bi.Type)
 	}
 
 	m.pendingBytes = pbm.PendingBytes
@@ -246,32 +232,38 @@ func (m *impl) Empty() bool {
 	return len(m.blocks) == 0 && len(m.wantlist) == 0 && len(m.blockPresences) == 0
 }
 
-func (m *impl) Wantlist() []Entry {
-	out := make([]Entry, len(m.wantlist))
-	var i int
+func (m *impl) FillWantlist(out []Entry) []Entry {
+	if cap(out) < len(m.wantlist) {
+		out = make([]Entry, 0, len(m.wantlist))
+	} else {
+		out = out[:0]
+	}
 	for _, e := range m.wantlist {
-		out[i] = *e
-		i++
+		out = append(out, *e)
+	}
+	return out
+}
+
+func (m *impl) Wantlist() []Entry {
+	out := make([]Entry, 0, len(m.wantlist))
+	for _, e := range m.wantlist {
+		out = append(out, *e)
 	}
 	return out
 }
 
 func (m *impl) Blocks() []blocks.Block {
-	bs := make([]blocks.Block, len(m.blocks))
-	var i int
+	bs := make([]blocks.Block, 0, len(m.blocks))
 	for _, block := range m.blocks {
-		bs[i] = block
-		i++
+		bs = append(bs, block)
 	}
 	return bs
 }
 
 func (m *impl) BlockPresences() []BlockPresence {
-	bps := make([]BlockPresence, len(m.blockPresences))
-	var i int
+	bps := make([]BlockPresence, 0, len(m.blockPresences))
 	for c, t := range m.blockPresences {
-		bps[i] = BlockPresence{c, t}
-		i++
+		bps = append(bps, BlockPresence{c, t})
 	}
 	return bps
 }
@@ -387,38 +379,46 @@ func (m *impl) Size() int {
 }
 
 func BlockPresenceSize(c cid.Cid) int {
-	return (&pb.Message_BlockPresence{
-		Cid:  pb.Cid{Cid: c},
+	return proto.Size(&pb.Message_BlockPresence{
+		Cid:  c.Bytes(),
 		Type: pb.Message_Have,
-	}).Size()
+	})
 }
 
 // FromNet generates a new BitswapMessage from incoming data on an io.Reader.
-func FromNet(r io.Reader) (BitSwapMessage, error) {
+func FromNet(r io.Reader) (BitSwapMessage, int, error) {
 	reader := msgio.NewVarintReaderSize(r, network.MessageSizeMax)
 	return FromMsgReader(reader)
 }
 
-// FromPBReader generates a new Bitswap message from a gogo-protobuf reader
-func FromMsgReader(r msgio.Reader) (BitSwapMessage, error) {
+// FromPBReader generates a new Bitswap message from a protobuf reader.
+func FromMsgReader(r msgio.Reader) (BitSwapMessage, int, error) {
 	msg, err := r.ReadMsg()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	var pb pb.Message
-	err = pb.Unmarshal(msg)
+	pb := new(pb.Message)
+	err = proto.Unmarshal(msg, pb)
 	r.ReleaseMsg(msg)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return newMessageFromProto(pb)
+	m, err := newMessageFromProto(pb)
+	if err != nil {
+		return nil, 0, err
+	}
+	return m, len(msg), nil
 }
 
 func (m *impl) ToProtoV0() *pb.Message {
-	pbm := new(pb.Message)
-	pbm.Wantlist.Entries = make([]pb.Message_Wantlist_Entry, 0, len(m.wantlist))
+	pbm := &pb.Message{
+		Wantlist: &pb.Message_Wantlist{
+			Entries: make([]*pb.Message_Wantlist_Entry, 0, len(m.wantlist)),
+		},
+	}
+
 	for _, e := range m.wantlist {
 		pbm.Wantlist.Entries = append(pbm.Wantlist.Entries, e.ToPB())
 	}
@@ -433,26 +433,30 @@ func (m *impl) ToProtoV0() *pb.Message {
 }
 
 func (m *impl) ToProtoV1() *pb.Message {
-	pbm := new(pb.Message)
-	pbm.Wantlist.Entries = make([]pb.Message_Wantlist_Entry, 0, len(m.wantlist))
+	pbm := &pb.Message{
+		Wantlist: &pb.Message_Wantlist{
+			Entries: make([]*pb.Message_Wantlist_Entry, 0, len(m.wantlist)),
+		},
+	}
+
 	for _, e := range m.wantlist {
 		pbm.Wantlist.Entries = append(pbm.Wantlist.Entries, e.ToPB())
 	}
 	pbm.Wantlist.Full = m.full
 
 	blocks := m.Blocks()
-	pbm.Payload = make([]pb.Message_Block, 0, len(blocks))
+	pbm.Payload = make([]*pb.Message_Block, 0, len(blocks))
 	for _, b := range blocks {
-		pbm.Payload = append(pbm.Payload, pb.Message_Block{
+		pbm.Payload = append(pbm.Payload, &pb.Message_Block{
 			Data:   b.RawData(),
 			Prefix: b.Cid().Prefix().Bytes(),
 		})
 	}
 
-	pbm.BlockPresences = make([]pb.Message_BlockPresence, 0, len(m.blockPresences))
+	pbm.BlockPresences = make([]*pb.Message_BlockPresence, 0, len(m.blockPresences))
 	for c, t := range m.blockPresences {
-		pbm.BlockPresences = append(pbm.BlockPresences, pb.Message_BlockPresence{
-			Cid:  pb.Cid{Cid: c},
+		pbm.BlockPresences = append(pbm.BlockPresences, &pb.Message_BlockPresence{
+			Cid:  c.Bytes(),
 			Type: t,
 		})
 	}
@@ -471,20 +475,20 @@ func (m *impl) ToNetV1(w io.Writer) error {
 }
 
 func write(w io.Writer, m *pb.Message) error {
-	size := m.Size()
+	size := proto.Size(m)
 
 	buf := pool.Get(size + binary.MaxVarintLen64)
 	defer pool.Put(buf)
 
 	n := binary.PutUvarint(buf, uint64(size))
 
-	written, err := m.MarshalTo(buf[n:])
+	opts := proto.MarshalOptions{}
+	wrBuf, err := opts.MarshalAppend(buf[:n], m)
 	if err != nil {
 		return err
 	}
-	n += written
 
-	_, err = w.Write(buf[:n])
+	_, err = w.Write(wrBuf)
 	return err
 }
 
