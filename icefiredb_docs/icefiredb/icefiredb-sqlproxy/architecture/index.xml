@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Architecture on IceFireDB Documentation</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/</link><description>Recent content in Architecture on IceFireDB Documentation</description><generator>Hugo</generator><language>en</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/index.xml" rel="self" type="application/rss+xml"/><item><title>Overview</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/overview/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/overview/</guid><description>&lt;h1 id="architecture-overview">
+ Architecture Overview
+ &lt;a class="anchor" href="#architecture-overview">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="system-architecture">
+ System Architecture
+ &lt;a class="anchor" href="#system-architecture">#&lt;/a>
+&lt;/h2>
+&lt;p>IceFireDB-SQLProxy is designed as a decentralized proxy layer that enhances traditional MySQL deployments with P2P networking capabilities. The architecture consists of several key components that work together to provide decentralized SQL database functionality.&lt;/p>
+&lt;h3 id="core-components">
+ Core Components
+ &lt;a class="anchor" href="#core-components">#&lt;/a>
+&lt;/h3>
+&lt;ol>
+&lt;li>
+&lt;p>&lt;strong>MySQL Protocol Handler&lt;/strong>&lt;/p>
+&lt;ul>
+&lt;li>Listens on configured port (default: 33306)&lt;/li>
+&lt;li>Parses MySQL wire protocol requests&lt;/li>
+&lt;li>Handles authentication and connection management&lt;/li>
+&lt;li>Manages client connections and session state&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;strong>Backend MySQL Connector&lt;/strong>&lt;/p></description></item><item><title>NetWork</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/network/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/network/</guid><description>&lt;h1 id="network-details">
+ NetWork Details
+ &lt;a class="anchor" href="#network-details">#&lt;/a>
+&lt;/h1></description></item><item><title>Storage</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/storage/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/storage/</guid><description>&lt;h1 id="storage-engine-details">
+ Storage Engine Details
+ &lt;a class="anchor" href="#storage-engine-details">#&lt;/a>
+&lt;/h1></description></item><item><title>Protocol</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/protocol/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/protocol/</guid><description>&lt;h1 id="protocol-details">
+ Protocol Details
+ &lt;a class="anchor" href="#protocol-details">#&lt;/a>
+&lt;/h1></description></item></channel></rss>

@@ -1,0 +1,178 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content='
+  IceFireDB NoSQL Engine
+  #
+
+
+  Overview
+  #
+
+IceFireDB NoSQL is a high-performance, decentralized key-value database that provides Redis compatibility with advanced distributed systems capabilities. It supports multiple storage backends, P2P networking, and various consistency models.
+
+  Key Features
+  #
+
+
+Redis Protocol Compatibility: Full support for Redis RESP protocol
+Multiple Storage Backends: LevelDB, BadgerDB, IPFS, CRDT, and more
+Decentralized Architecture: P2P automatic networking and data synchronization
+High Performance: Optimized for low latency and high throughput
+Flexible Consistency: RAFT for strong consistency, CRDT for eventual consistency
+
+
+  Documentation Sections
+  #
+
+
+  Designs
+  #
+
+
+Architecture overview and system design
+Network layer implementation
+Storage engine details
+Protocol specifications
+Codec layer architecture
+
+
+  Develop
+  #
+
+
+API reference and command documentation
+Development guides and examples
+Custom driver development
+Extension development
+
+
+  Deploy
+  #
+
+
+Installation and configuration
+Deployment strategies
+Performance tuning
+Monitoring and maintenance
+
+
+  Quick Start
+  #
+
+
+Getting started tutorials
+Basic usage examples
+First steps with IceFireDB
+
+
+  Tutorials
+  #
+
+
+Step-by-step guides
+Practical examples
+Advanced usage scenarios
+Integration tutorials
+
+
+  Getting Started
+  #
+
+
+  Quick Installation
+  #
+
+# Using Docker
+docker run -d -p 11001:11001 icefiredb/icefiredb:latest
+
+# From source
+git clone https://github.com/IceFireDB/IceFireDB.git
+cd IceFireDB && make build
+
+  Basic Usage
+  #
+
+# Connect with redis-cli
+redis-cli -p 11001
+
+# Basic operations
+SET mykey "Hello IceFireDB"
+GET mykey
+
+  Use Cases
+  #
+
+
+  Web2 Applications
+  #
+
+
+Traditional distributed caching
+Session storage
+Real-time data processing
+High-performance key-value stores
+
+
+  Web3 Applications
+  #
+
+
+Decentralized application data storage
+P2P data synchronization
+Immutable data logging
+Blockchain-integrated databases
+
+
+  Hybrid Applications
+  #
+
+
+Tiered storage (hot/cold data)
+Multi-cloud data distribution
+Edge computing data persistence
+Cross-region data replication
+
+
+  Performance
+  #
+
+IceFireDB delivers excellent performance across different workloads:'><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="IceFireDB NoSQL Engine"><meta property="og:description" content=' IceFireDB NoSQL Engine # Overview # IceFireDB NoSQL is a high-performance, decentralized key-value database that provides Redis compatibility with advanced distributed systems capabilities. It supports multiple storage backends, P2P networking, and various consistency models.
+Key Features # Redis Protocol Compatibility: Full support for Redis RESP protocol Multiple Storage Backends: LevelDB, BadgerDB, IPFS, CRDT, and more Decentralized Architecture: P2P automatic networking and data synchronization High Performance: Optimized for low latency and high throughput Flexible Consistency: RAFT for strong consistency, CRDT for eventual consistency Documentation Sections # Designs # Architecture overview and system design Network layer implementation Storage engine details Protocol specifications Codec layer architecture Develop # API reference and command documentation Development guides and examples Custom driver development Extension development Deploy # Installation and configuration Deployment strategies Performance tuning Monitoring and maintenance Quick Start # Getting started tutorials Basic usage examples First steps with IceFireDB Tutorials # Step-by-step guides Practical examples Advanced usage scenarios Integration tutorials Getting Started # Quick Installation # # Using Docker docker run -d -p 11001:11001 icefiredb/icefiredb:latest # From source git clone https://github.com/IceFireDB/IceFireDB.git cd IceFireDB && make build Basic Usage # # Connect with redis-cli redis-cli -p 11001 # Basic operations SET mykey "Hello IceFireDB" GET mykey Use Cases # Web2 Applications # Traditional distributed caching Session storage Real-time data processing High-performance key-value stores Web3 Applications # Decentralized application data storage P2P data synchronization Immutable data logging Blockchain-integrated databases Hybrid Applications # Tiered storage (hot/cold data) Multi-cloud data distribution Edge computing data persistence Cross-region data replication Performance # IceFireDB delivers excellent performance across different workloads:'><meta property="og:locale" content="en"><meta property="og:type" content="website"><title>IceFireDB NoSQL Engine | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=stylesheet href=/icefiredb_docs/book.min.46181bc93375ba932026e753b37c40e6ff8bb16a9ef770c78bcc663e4577b1ba.css integrity="sha256-RhgbyTN1upMgJudTs3xA5v+LsWqe93DHi8xmPkV3sbo=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.c0bc9219fae0c08c8641e80a18f91c07ea4239ca2663a1c1f83228949a349785.js integrity="sha256-wLySGfrgwIyGQegKGPkcB+pCOcomY6HB+DIolJo0l4U=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/index.xml title="IceFireDB Documentation"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li class=book-section-flat><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/>Overview</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/engine_overview/>Engine Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/vocabulary/>Vocabulary</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/ class=active>IceFireDB NoSQL Engine</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/quick_start/>Quick Start</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/>Designs</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/network/>Network layer</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/storage/>Storage layer</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/protocol/>Protocol layer</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/codec/>Codec layer</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/storage-drivers/>Storage Drivers</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/>Tutorials</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/getting-started/>Getting Started Tutorial</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/performance-benchmarking/>Performance Benchmarking</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/deploy/>Deploy</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/deploy/configuration/>Configuration Guide</a></li></ul></li><li><span>Develop</span><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb-crdt-kv/>icefiredb-crdt-kv</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb-ipfs-log/>icefiredb-ipfs-log</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb_proxy/>icefiredb-proxy</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/redhub/>redhub-frame</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/api-reference/>API Reference</a></li></ul></li><li><span>Project Comparison</span><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/project-comparison/orbitdb/>OrbitDB</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/project-comparison/threaddb/>ThreadDB</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/>IceFireDB-SQLite</a><ul><li><input type=checkbox id=section-d28adc5f935baf9f2270b11342515dec class=toggle>
+<label for=section-d28adc5f935baf9f2270b11342515dec class="flex justify-between"><a role=button>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/overview/>Overview</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul><li><input type=checkbox id=section-197cd7a03ef88813eee099fa35466d3e class=toggle>
+<label for=section-197cd7a03ef88813eee099fa35466d3e class="flex justify-between"><a role=button>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-redis-proxy/architecture/overview/>Overview</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul><li><input type=checkbox id=section-87903bd5b525679072ad1825563a57f2 class=toggle>
+<label for=section-87903bd5b525679072ad1825563a57f2 class="flex justify-between"><a role=button>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/overview/>Overview</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-pubsub/>IceFireDB-PubSub</a><ul><li><input type=checkbox id=section-d2e27c9da60e491bca2bc610c135b235 class=toggle>
+<label for=section-d2e27c9da60e491bca2bc610c135b235 class="flex justify-between"><a role=button>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-pubsub/architecture/overview/>Overview</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/faqs/>Frequently Asked Questions</a><ul></ul></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>IceFireDB NoSQL Engine</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#overview>Overview</a></li><li><a href=#key-features>Key Features</a></li><li><a href=#documentation-sections>Documentation Sections</a><ul><li><a href=#designsdesigns><a href=./Designs/>Designs</a></a></li><li><a href=#developdevelop><a href=./Develop/>Develop</a></a></li><li><a href=#deploydeploy><a href=./Deploy/>Deploy</a></a></li><li><a href=#quick-startquick_start><a href=./Quick_Start/>Quick Start</a></a></li><li><a href=#tutorialstutorials><a href=./Tutorials/>Tutorials</a></a></li></ul></li><li><a href=#getting-started>Getting Started</a><ul><li><a href=#quick-installation>Quick Installation</a></li><li><a href=#basic-usage>Basic Usage</a></li></ul></li><li><a href=#use-cases>Use Cases</a><ul><li><a href=#web2-applications>Web2 Applications</a></li><li><a href=#web3-applications>Web3 Applications</a></li><li><a href=#hybrid-applications>Hybrid Applications</a></li></ul></li><li><a href=#performance>Performance</a></li><li><a href=#community-and-support>Community and Support</a></li><li><a href=#contributing>Contributing</a></li><li><a href=#license>License</a></li></ul></nav></aside></header><article class=markdown><h1 id=icefiredb-nosql-engine>IceFireDB NoSQL Engine
+<a class=anchor href=#icefiredb-nosql-engine>#</a></h1><h2 id=overview>Overview
+<a class=anchor href=#overview>#</a></h2><p>IceFireDB NoSQL is a high-performance, decentralized key-value database that provides Redis compatibility with advanced distributed systems capabilities. It supports multiple storage backends, P2P networking, and various consistency models.</p><h2 id=key-features>Key Features
+<a class=anchor href=#key-features>#</a></h2><ul><li><strong>Redis Protocol Compatibility</strong>: Full support for Redis RESP protocol</li><li><strong>Multiple Storage Backends</strong>: LevelDB, BadgerDB, IPFS, CRDT, and more</li><li><strong>Decentralized Architecture</strong>: P2P automatic networking and data synchronization</li><li><strong>High Performance</strong>: Optimized for low latency and high throughput</li><li><strong>Flexible Consistency</strong>: RAFT for strong consistency, CRDT for eventual consistency</li></ul><h2 id=documentation-sections>Documentation Sections
+<a class=anchor href=#documentation-sections>#</a></h2><h3 id=designsdesigns><a href=./Designs/>Designs</a>
+<a class=anchor href=#designsdesigns>#</a></h3><ul><li>Architecture overview and system design</li><li>Network layer implementation</li><li>Storage engine details</li><li>Protocol specifications</li><li>Codec layer architecture</li></ul><h3 id=developdevelop><a href=./Develop/>Develop</a>
+<a class=anchor href=#developdevelop>#</a></h3><ul><li>API reference and command documentation</li><li>Development guides and examples</li><li>Custom driver development</li><li>Extension development</li></ul><h3 id=deploydeploy><a href=./Deploy/>Deploy</a>
+<a class=anchor href=#deploydeploy>#</a></h3><ul><li>Installation and configuration</li><li>Deployment strategies</li><li>Performance tuning</li><li>Monitoring and maintenance</li></ul><h3 id=quick-startquick_start><a href=./Quick_Start/>Quick Start</a>
+<a class=anchor href=#quick-startquick_start>#</a></h3><ul><li>Getting started tutorials</li><li>Basic usage examples</li><li>First steps with IceFireDB</li></ul><h3 id=tutorialstutorials><a href=./Tutorials/>Tutorials</a>
+<a class=anchor href=#tutorialstutorials>#</a></h3><ul><li>Step-by-step guides</li><li>Practical examples</li><li>Advanced usage scenarios</li><li>Integration tutorials</li></ul><h2 id=getting-started>Getting Started
+<a class=anchor href=#getting-started>#</a></h2><h3 id=quick-installation>Quick Installation
+<a class=anchor href=#quick-installation>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Using Docker</span>
+</span></span><span style=display:flex><span>docker run -d -p 11001:11001 icefiredb/icefiredb:latest
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># From source</span>
+</span></span><span style=display:flex><span>git clone https://github.com/IceFireDB/IceFireDB.git
+</span></span><span style=display:flex><span>cd IceFireDB <span style=color:#f92672>&amp;&amp;</span> make build
+</span></span></code></pre></div><h3 id=basic-usage>Basic Usage
+<a class=anchor href=#basic-usage>#</a></h3><pre tabindex=0><code class=language-redis data-lang=redis># Connect with redis-cli
+redis-cli -p 11001
+
+# Basic operations
+SET mykey &#34;Hello IceFireDB&#34;
+GET mykey
+</code></pre><h2 id=use-cases>Use Cases
+<a class=anchor href=#use-cases>#</a></h2><h3 id=web2-applications>Web2 Applications
+<a class=anchor href=#web2-applications>#</a></h3><ul><li>Traditional distributed caching</li><li>Session storage</li><li>Real-time data processing</li><li>High-performance key-value stores</li></ul><h3 id=web3-applications>Web3 Applications
+<a class=anchor href=#web3-applications>#</a></h3><ul><li>Decentralized application data storage</li><li>P2P data synchronization</li><li>Immutable data logging</li><li>Blockchain-integrated databases</li></ul><h3 id=hybrid-applications>Hybrid Applications
+<a class=anchor href=#hybrid-applications>#</a></h3><ul><li>Tiered storage (hot/cold data)</li><li>Multi-cloud data distribution</li><li>Edge computing data persistence</li><li>Cross-region data replication</li></ul><h2 id=performance>Performance
+<a class=anchor href=#performance>#</a></h2><p>IceFireDB delivers excellent performance across different workloads:</p><ul><li><strong>LevelDB Driver</strong>: 250K+ SET ops/sec, 2M+ GET ops/sec</li><li><strong>Low Latency</strong>: Sub-millisecond response times</li><li><strong>High Concurrency</strong>: Support for thousands of concurrent connections</li><li><strong>Scalable Architecture</strong>: Linear scaling with node addition</li></ul><h2 id=community-and-support>Community and Support
+<a class=anchor href=#community-and-support>#</a></h2><ul><li><strong>GitHub</strong>: <a href=https://github.com/IceFireDB/IceFireDB>https://github.com/IceFireDB/IceFireDB</a></li><li><strong>Documentation</strong>: <a href=https://www.icefiredb.xyz/>https://www.icefiredb.xyz/</a></li><li><strong>Discussions</strong>: <a href=https://github.com/IceFireDB/IceFireDB/discussions>GitHub Discussions</a></li><li><strong>Issues</strong>: <a href=https://github.com/IceFireDB/IceFireDB/issues>GitHub Issues</a></li></ul><h2 id=contributing>Contributing
+<a class=anchor href=#contributing>#</a></h2><p>IceFireDB is open source and welcomes contributions. See the <a href=https://github.com/IceFireDB/IceFireDB/blob/main/CONTRIBUTING.md>CONTRIBUTING.md</a> guide for details.</p><h2 id=license>License
+<a class=anchor href=#license>#</a></h2><p>IceFireDB is released under the Apache License 2.0. See <a href=https://github.com/IceFireDB/IceFireDB/blob/main/LICENSE>LICENSE</a> for details.</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#overview>Overview</a></li><li><a href=#key-features>Key Features</a></li><li><a href=#documentation-sections>Documentation Sections</a><ul><li><a href=#designsdesigns><a href=./Designs/>Designs</a></a></li><li><a href=#developdevelop><a href=./Develop/>Develop</a></a></li><li><a href=#deploydeploy><a href=./Deploy/>Deploy</a></a></li><li><a href=#quick-startquick_start><a href=./Quick_Start/>Quick Start</a></a></li><li><a href=#tutorialstutorials><a href=./Tutorials/>Tutorials</a></a></li></ul></li><li><a href=#getting-started>Getting Started</a><ul><li><a href=#quick-installation>Quick Installation</a></li><li><a href=#basic-usage>Basic Usage</a></li></ul></li><li><a href=#use-cases>Use Cases</a><ul><li><a href=#web2-applications>Web2 Applications</a></li><li><a href=#web3-applications>Web3 Applications</a></li><li><a href=#hybrid-applications>Hybrid Applications</a></li></ul></li><li><a href=#performance>Performance</a></li><li><a href=#community-and-support>Community and Support</a></li><li><a href=#contributing>Contributing</a></li><li><a href=#license>License</a></li></ul></nav></div></aside></main></body></html>

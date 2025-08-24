@@ -1,0 +1,369 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  Getting Started with IceFireDB
+  #
+
+
+  Introduction
+  #
+
+This tutorial will guide you through setting up and using IceFireDB for the first time. We&rsquo;ll cover installation, basic operations, and some advanced features.
+
+  Prerequisites
+  #
+
+
+Go 1.18+ installed
+Basic understanding of Redis commands
+Terminal/shell access
+
+
+  Installation
+  #
+
+
+  Method 1: From Source
+  #
+
+# Clone the repository
+git clone https://github.com/IceFireDB/IceFireDB.git
+cd IceFireDB
+
+# Build the project
+make build
+
+# The binary will be in the bin/ directory
+ls bin/
+
+  Method 2: Using Docker
+  #
+
+# Pull the Docker image
+docker pull icefiredb/icefiredb:latest
+
+# Run the container
+docker run -d -p 11001:11001 --name icefiredb icefiredb/icefiredb:latest
+
+  Method 3: Pre-built Binaries
+  #
+
+Download the latest release from the GitHub releases page."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/getting-started/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Getting Started Tutorial"><meta property="og:description" content=" Getting Started with IceFireDB # Introduction # This tutorial will guide you through setting up and using IceFireDB for the first time. We’ll cover installation, basic operations, and some advanced features.
+Prerequisites # Go 1.18+ installed Basic understanding of Redis commands Terminal/shell access Installation # Method 1: From Source # # Clone the repository git clone https://github.com/IceFireDB/IceFireDB.git cd IceFireDB # Build the project make build # The binary will be in the bin/ directory ls bin/ Method 2: Using Docker # # Pull the Docker image docker pull icefiredb/icefiredb:latest # Run the container docker run -d -p 11001:11001 --name icefiredb icefiredb/icefiredb:latest Method 3: Pre-built Binaries # Download the latest release from the GitHub releases page."><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="article:section" content="icefiredb"><title>Getting Started Tutorial | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=stylesheet href=/icefiredb_docs/book.min.46181bc93375ba932026e753b37c40e6ff8bb16a9ef770c78bcc663e4577b1ba.css integrity="sha256-RhgbyTN1upMgJudTs3xA5v+LsWqe93DHi8xmPkV3sbo=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.c0bc9219fae0c08c8641e80a18f91c07ea4239ca2663a1c1f83228949a349785.js integrity="sha256-wLySGfrgwIyGQegKGPkcB+pCOcomY6HB+DIolJo0l4U=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li class=book-section-flat><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/>Overview</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/engine_overview/>Engine Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/vocabulary/>Vocabulary</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/>IceFireDB NoSQL Engine</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/quick_start/>Quick Start</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/>Designs</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/network/>Network layer</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/storage/>Storage layer</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/protocol/>Protocol layer</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/codec/>Codec layer</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/storage-drivers/>Storage Drivers</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/>Tutorials</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/getting-started/ class=active>Getting Started Tutorial</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/performance-benchmarking/>Performance Benchmarking</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/deploy/>Deploy</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/deploy/configuration/>Configuration Guide</a></li></ul></li><li><span>Develop</span><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb-crdt-kv/>icefiredb-crdt-kv</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb-ipfs-log/>icefiredb-ipfs-log</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb_proxy/>icefiredb-proxy</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/redhub/>redhub-frame</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/api-reference/>API Reference</a></li></ul></li><li><span>Project Comparison</span><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/project-comparison/orbitdb/>OrbitDB</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/project-comparison/threaddb/>ThreadDB</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/>IceFireDB-SQLite</a><ul><li><input type=checkbox id=section-d28adc5f935baf9f2270b11342515dec class=toggle>
+<label for=section-d28adc5f935baf9f2270b11342515dec class="flex justify-between"><a role=button>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/overview/>Overview</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul><li><input type=checkbox id=section-197cd7a03ef88813eee099fa35466d3e class=toggle>
+<label for=section-197cd7a03ef88813eee099fa35466d3e class="flex justify-between"><a role=button>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-redis-proxy/architecture/overview/>Overview</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul><li><input type=checkbox id=section-87903bd5b525679072ad1825563a57f2 class=toggle>
+<label for=section-87903bd5b525679072ad1825563a57f2 class="flex justify-between"><a role=button>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/overview/>Overview</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-pubsub/>IceFireDB-PubSub</a><ul><li><input type=checkbox id=section-d2e27c9da60e491bca2bc610c135b235 class=toggle>
+<label for=section-d2e27c9da60e491bca2bc610c135b235 class="flex justify-between"><a role=button>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-pubsub/architecture/overview/>Overview</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/faqs/>Frequently Asked Questions</a><ul></ul></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Getting Started Tutorial</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#introduction>Introduction</a></li><li><a href=#prerequisites>Prerequisites</a></li><li><a href=#installation>Installation</a><ul><li><a href=#method-1-from-source>Method 1: From Source</a></li><li><a href=#method-2-using-docker>Method 2: Using Docker</a></li><li><a href=#method-3-pre-built-binaries>Method 3: Pre-built Binaries</a></li></ul></li><li><a href=#basic-setup>Basic Setup</a><ul><li><a href=#1-start-icefiredb-with-default-settings>1. Start IceFireDB with Default Settings</a></li></ul></li><li><a href=#basic-redis-operations>Basic Redis Operations</a><ul><li><a href=#connecting-with-redis-cli>Connecting with redis-cli</a></li><li><a href=#basic-key-value-operations>Basic Key-Value Operations</a></li><li><a href=#hash-operations>Hash Operations</a></li><li><a href=#list-operations>List Operations</a></li></ul></li><li><a href=#using-different-storage-drivers>Using Different Storage Drivers</a><ul><li><a href=#switching-storage-backends>Switching Storage Backends</a></li><li><a href=#using-different-storage-drivers-1>Using Different Storage Drivers</a></li></ul></li><li><a href=#p2p-networking>P2P Networking</a><ul><li><a href=#setting-up-a-decentralized-cluster>Setting Up a Decentralized Cluster</a></li></ul></li><li><a href=#advanced-features>Advanced Features</a><ul><li><a href=#crdt-based-data-sync>CRDT-based Data Sync</a></li><li><a href=#hybrid-storage-mode>Hybrid Storage Mode</a></li></ul></li><li><a href=#programming-examples>Programming Examples</a><ul><li><a href=#python-example>Python Example</a></li><li><a href=#nodejs-example>Node.js Example</a></li><li><a href=#go-example>Go Example</a></li></ul></li><li><a href=#monitoring-and-maintenance>Monitoring and Maintenance</a><ul><li><a href=#checking-server-info>Checking Server Info</a></li><li><a href=#performance-monitoring>Performance Monitoring</a></li></ul></li><li><a href=#troubleshooting-common-issues>Troubleshooting Common Issues</a><ul><li><a href=#connection-issues>Connection Issues</a></li><li><a href=#storage-issues>Storage Issues</a></li><li><a href=#performance-issues>Performance Issues</a></li></ul></li><li><a href=#next-steps>Next Steps</a></li><li><a href=#additional-resources>Additional Resources</a></li><li><a href=#support>Support</a></li></ul></nav></aside></header><article class=markdown><h1 id=getting-started-with-icefiredb>Getting Started with IceFireDB
+<a class=anchor href=#getting-started-with-icefiredb>#</a></h1><h2 id=introduction>Introduction
+<a class=anchor href=#introduction>#</a></h2><p>This tutorial will guide you through setting up and using IceFireDB for the first time. We&rsquo;ll cover installation, basic operations, and some advanced features.</p><h2 id=prerequisites>Prerequisites
+<a class=anchor href=#prerequisites>#</a></h2><ul><li>Go 1.18+ installed</li><li>Basic understanding of Redis commands</li><li>Terminal/shell access</li></ul><h2 id=installation>Installation
+<a class=anchor href=#installation>#</a></h2><h3 id=method-1-from-source>Method 1: From Source
+<a class=anchor href=#method-1-from-source>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Clone the repository</span>
+</span></span><span style=display:flex><span>git clone https://github.com/IceFireDB/IceFireDB.git
+</span></span><span style=display:flex><span>cd IceFireDB
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Build the project</span>
+</span></span><span style=display:flex><span>make build
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># The binary will be in the bin/ directory</span>
+</span></span><span style=display:flex><span>ls bin/
+</span></span></code></pre></div><h3 id=method-2-using-docker>Method 2: Using Docker
+<a class=anchor href=#method-2-using-docker>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Pull the Docker image</span>
+</span></span><span style=display:flex><span>docker pull icefiredb/icefiredb:latest
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Run the container</span>
+</span></span><span style=display:flex><span>docker run -d -p 11001:11001 --name icefiredb icefiredb/icefiredb:latest
+</span></span></code></pre></div><h3 id=method-3-pre-built-binaries>Method 3: Pre-built Binaries
+<a class=anchor href=#method-3-pre-built-binaries>#</a></h3><p>Download the latest release from the <a href=https://github.com/IceFireDB/IceFireDB/releases>GitHub releases page</a>.</p><h2 id=basic-setup>Basic Setup
+<a class=anchor href=#basic-setup>#</a></h2><h3 id=1-start-icefiredb-with-default-settings>1. Start IceFireDB with Default Settings
+<a class=anchor href=#1-start-icefiredb-with-default-settings>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Start with default settings (LevelDB backend, port 11001)</span>
+</span></span><span style=display:flex><span>./bin/icefiredb-nosql
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Or specify basic options</span>
+</span></span><span style=display:flex><span>./bin/icefiredb-nosql -n <span style=color:#ae81ff>11001</span> -a 0.0.0.0 -j ./data
+</span></span></code></pre></div><p>You should see output like:</p><pre tabindex=0><code>[INFO] Starting IceFireDB on :11001
+[INFO] Storage driver: leveldb
+[INFO] Data directory: ./data
+</code></pre><h2 id=basic-redis-operations>Basic Redis Operations
+<a class=anchor href=#basic-redis-operations>#</a></h2><h3 id=connecting-with-redis-cli>Connecting with redis-cli
+<a class=anchor href=#connecting-with-redis-cli>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Connect to IceFireDB</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Or if using Docker</span>
+</span></span><span style=display:flex><span>redis-cli -h localhost -p <span style=color:#ae81ff>11001</span>
+</span></span></code></pre></div><h3 id=basic-key-value-operations>Basic Key-Value Operations
+<a class=anchor href=#basic-key-value-operations>#</a></h3><pre tabindex=0><code class=language-redis data-lang=redis># Set and get values
+127.0.0.1:11001&gt; SET mykey &#34;Hello IceFireDB&#34;
+OK
+127.0.0.1:11001&gt; GET mykey
+&#34;Hello IceFireDB&#34;
+
+# Work with numbers
+127.0.0.1:11001&gt; SET counter 100
+OK
+127.0.0.1:11001&gt; INCR counter
+(integer) 101
+127.0.0.1:11001&gt; INCRBY counter 50
+(integer) 151
+
+# Set with expiration
+127.0.0.1:11001&gt; SETEX session:user123 3600 &#34;active&#34;
+OK
+127.0.0.1:11001&gt; TTL session:user123
+(integer) 3600
+</code></pre><h3 id=hash-operations>Hash Operations
+<a class=anchor href=#hash-operations>#</a></h3><pre tabindex=0><code class=language-redis data-lang=redis># Store user data as hash
+127.0.0.1:11001&gt; HSET user:1000 name &#34;Alice&#34; email &#34;alice@example.com&#34; age 30
+(integer) 3
+
+# Get specific fields
+127.0.0.1:11001&gt; HGET user:1000 name
+&#34;Alice&#34;
+127.0.0.1:11001&gt; HGET user:1000 email
+&#34;alice@example.com&#34;
+
+# Get all fields
+127.0.0.1:11001&gt; HGETALL user:1000
+1) &#34;name&#34;
+2) &#34;Alice&#34;
+3) &#34;email&#34;
+4) &#34;alice@example.com&#34;
+5) &#34;age&#34;
+6) &#34;30&#34;
+</code></pre><h3 id=list-operations>List Operations
+<a class=anchor href=#list-operations>#</a></h3><pre tabindex=0><code class=language-redis data-lang=redis># Push items to list
+127.0.0.1:11001&gt; LPUSH tasks &#34;task1&#34;
+(integer) 1
+127.0.0.1:11001&gt; LPUSH tasks &#34;task2&#34;
+(integer) 2
+127.0.0.1:11001&gt; RPUSH tasks &#34;task3&#34;
+(integer) 3
+
+# Get list range
+127.0.0.1:11001&gt; LRANGE tasks 0 -1
+1) &#34;task2&#34;
+2) &#34;task1&#34;
+3) &#34;task3&#34;
+
+# Pop items
+127.0.0.1:11001&gt; LPOP tasks
+&#34;task2&#34;
+127.0.0.1:11001&gt; RPOP tasks
+&#34;task3&#34;
+</code></pre><h2 id=using-different-storage-drivers>Using Different Storage Drivers
+<a class=anchor href=#using-different-storage-drivers>#</a></h2><h3 id=switching-storage-backends>Switching Storage Backends
+<a class=anchor href=#switching-storage-backends>#</a></h3><pre tabindex=0><code class=language-redis data-lang=redis># Check current driver
+127.0.0.1:11001&gt; DRIVER.INFO
+1) &#34;leveldb&#34;
+2) &#34;./data&#34;
+
+# Switch to BadgerDB
+127.0.0.1:11001&gt; DRIVER.SELECT badger
+OK
+
+# Switch to IPFS (decentralized)
+127.0.0.1:11001&gt; DRIVER.SELECT ipfs
+OK
+</code></pre><h3 id=using-different-storage-drivers-1>Using Different Storage Drivers
+<a class=anchor href=#using-different-storage-drivers-1>#</a></h3><p>Start IceFireDB with different storage backends:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Use LevelDB (default)</span>
+</span></span><span style=display:flex><span>./bin/icefiredb-nosql -storage-backend leveldb -j ./leveldb_data
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Use BadgerDB for better write performance</span>
+</span></span><span style=display:flex><span>./bin/icefiredb-nosql -storage-backend badger -j ./badger_data
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Use IPFS for decentralized storage</span>
+</span></span><span style=display:flex><span>./bin/icefiredb-nosql -storage-backend ipfs -j ./ipfs_data --p2p-enable
+</span></span></code></pre></div><h2 id=p2p-networking>P2P Networking
+<a class=anchor href=#p2p-networking>#</a></h2><h3 id=setting-up-a-decentralized-cluster>Setting Up a Decentralized Cluster
+<a class=anchor href=#setting-up-a-decentralized-cluster>#</a></h3><ol><li><strong>First Node</strong></li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/icefiredb-nosql <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -storage-backend ipfs <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -n <span style=color:#ae81ff>11001</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -j ./node1_data <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --p2p-enable <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --discovery-id <span style=color:#e6db74>&#34;my_cluster&#34;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --p2p-listen <span style=color:#e6db74>&#34;/ip4/0.0.0.0/tcp/4001&#34;</span>
+</span></span></code></pre></div><ol start=2><li><strong>Second Node</strong></li></ol><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/icefiredb-nosql <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -storage-backend ipfs <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -n <span style=color:#ae81ff>11002</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -j ./node2_data <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --p2p-enable <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --discovery-id <span style=color:#e6db74>&#34;my_cluster&#34;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --p2p-listen <span style=color:#e6db74>&#34;/ip4/0.0.0.0/tcp/4002&#34;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --bootstrap-peers <span style=color:#e6db74>&#34;/ip4/192.168.1.100/tcp/4001/p2p/QmFirstNodePeerID&#34;</span>
+</span></span></code></pre></div><ol start=3><li><strong>Verify Connection</strong></li></ol><pre tabindex=0><code class=language-redis data-lang=redis># On either node
+127.0.0.1:11001&gt; P2P.PEERS
+1) &#34;/ip4/192.168.1.101/tcp/4002/p2p/QmSecondNodePeerID&#34;
+
+# Data will automatically sync between nodes
+127.0.0.1:11001&gt; SET shared_key &#34;cluster_value&#34;
+OK
+127.0.0.1:11002&gt; GET shared_key
+&#34;cluster_value&#34;
+</code></pre><h2 id=advanced-features>Advanced Features
+<a class=anchor href=#advanced-features>#</a></h2><h3 id=crdt-based-data-sync>CRDT-based Data Sync
+<a class=anchor href=#crdt-based-data-sync>#</a></h3><pre tabindex=0><code class=language-redis data-lang=redis># Enable CRDT mode
+127.0.0.1:11001&gt; DRIVER.SELECT crdt
+OK
+
+# Data written in CRDT mode will automatically resolve conflicts
+127.0.0.1:11001&gt; SET user:preferences &#39;{&#34;theme&#34;: &#34;dark&#34;, &#34;language&#34;: &#34;en&#34;}&#39;
+OK
+
+# Force synchronization
+127.0.0.1:11001&gt; CRDT.SYNC
+OK
+
+# Check sync status
+127.0.0.1:11001&gt; CRDT.STATUS
+1) &#34;synced&#34;
+2) &#34;2 nodes&#34;
+3) &#34;0 conflicts&#34;
+</code></pre><h3 id=hybrid-storage-mode>Hybrid Storage Mode
+<a class=anchor href=#hybrid-storage-mode>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Start with hybrid storage</span>
+</span></span><span style=display:flex><span>./bin/icefiredb-nosql <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -storage-backend hybriddb <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --hot-storage badger <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --cold-storage ipfs <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --hot-data-dir <span style=color:#e6db74>&#34;./data/hot&#34;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --cold-data-dir <span style=color:#e6db74>&#34;./data/cold&#34;</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --migration-threshold <span style=color:#ae81ff>604800</span>  <span style=color:#75715e># 7 days in seconds</span>
+</span></span></code></pre></div><pre tabindex=0><code class=language-redis data-lang=redis># Data automatically moves between hot and cold storage
+127.0.0.1:11001&gt; SET recent_data &#34;frequently accessed&#34;
+OK
+127.0.0.1:11001&gt; SET old_data &#34;rarely accessed&#34;
+OK
+
+# After threshold, old_data moves to cold storage
+</code></pre><h2 id=programming-examples>Programming Examples
+<a class=anchor href=#programming-examples>#</a></h2><h3 id=python-example>Python Example
+<a class=anchor href=#python-example>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>import</span> redis
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Connect to IceFireDB</span>
+</span></span><span style=display:flex><span>r <span style=color:#f92672>=</span> redis<span style=color:#f92672>.</span>Redis(host<span style=color:#f92672>=</span><span style=color:#e6db74>&#39;localhost&#39;</span>, port<span style=color:#f92672>=</span><span style=color:#ae81ff>11001</span>, decode_responses<span style=color:#f92672>=</span><span style=color:#66d9ef>True</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Basic operations</span>
+</span></span><span style=display:flex><span>r<span style=color:#f92672>.</span>set(<span style=color:#e6db74>&#39;python_key&#39;</span>, <span style=color:#e6db74>&#39;Hello from Python!&#39;</span>)
+</span></span><span style=display:flex><span>print(r<span style=color:#f92672>.</span>get(<span style=color:#e6db74>&#39;python_key&#39;</span>))
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Hash operations</span>
+</span></span><span style=display:flex><span>r<span style=color:#f92672>.</span>hset(<span style=color:#e6db74>&#39;user:python&#39;</span>, <span style=color:#e6db74>&#39;name&#39;</span>, <span style=color:#e6db74>&#39;Python User&#39;</span>, <span style=color:#e6db74>&#39;language&#39;</span>, <span style=color:#e6db74>&#39;python&#39;</span>)
+</span></span><span style=display:flex><span>print(r<span style=color:#f92672>.</span>hgetall(<span style=color:#e6db74>&#39;user:python&#39;</span>))
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Use IceFireDB extensions</span>
+</span></span><span style=display:flex><span>r<span style=color:#f92672>.</span>execute_command(<span style=color:#e6db74>&#39;DRIVER.SELECT&#39;</span>, <span style=color:#e6db74>&#39;ipfs&#39;</span>)
+</span></span></code></pre></div><h3 id=nodejs-example>Node.js Example
+<a class=anchor href=#nodejs-example>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-javascript data-lang=javascript><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>redis</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>require</span>(<span style=color:#e6db74>&#39;redis&#39;</span>);
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>client</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>redis</span>.<span style=color:#a6e22e>createClient</span>({
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>host</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#39;localhost&#39;</span>,
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>port</span><span style=color:#f92672>:</span> <span style=color:#ae81ff>11001</span>
+</span></span><span style=display:flex><span>});
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>client</span>.<span style=color:#a6e22e>on</span>(<span style=color:#e6db74>&#39;connect&#39;</span>, () =&gt; {
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>console</span>.<span style=color:#a6e22e>log</span>(<span style=color:#e6db74>&#39;Connected to IceFireDB&#39;</span>);
+</span></span><span style=display:flex><span>  
+</span></span><span style=display:flex><span>  <span style=color:#75715e>// Basic operations
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>  <span style=color:#a6e22e>client</span>.<span style=color:#a6e22e>set</span>(<span style=color:#e6db74>&#39;node_key&#39;</span>, <span style=color:#e6db74>&#39;Hello from Node.js!&#39;</span>, <span style=color:#a6e22e>redis</span>.<span style=color:#a6e22e>print</span>);
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>client</span>.<span style=color:#a6e22e>get</span>(<span style=color:#e6db74>&#39;node_key&#39;</span>, (<span style=color:#a6e22e>err</span>, <span style=color:#a6e22e>reply</span>) =&gt; {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>console</span>.<span style=color:#a6e22e>log</span>(<span style=color:#e6db74>&#39;Value:&#39;</span>, <span style=color:#a6e22e>reply</span>);
+</span></span><span style=display:flex><span>  });
+</span></span><span style=display:flex><span>  
+</span></span><span style=display:flex><span>  <span style=color:#75715e>// IceFireDB specific command
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>  <span style=color:#a6e22e>client</span>.<span style=color:#a6e22e>send_command</span>(<span style=color:#e6db74>&#39;DRIVER.INFO&#39;</span>, (<span style=color:#a6e22e>err</span>, <span style=color:#a6e22e>reply</span>) =&gt; {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>console</span>.<span style=color:#a6e22e>log</span>(<span style=color:#e6db74>&#39;Driver info:&#39;</span>, <span style=color:#a6e22e>reply</span>);
+</span></span><span style=display:flex><span>  });
+</span></span><span style=display:flex><span>});
+</span></span></code></pre></div><h3 id=go-example>Go Example
+<a class=anchor href=#go-example>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> (
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;context&#34;</span>
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;fmt&#34;</span>
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;github.com/go-redis/redis/v8&#34;</span>
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>main</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>ctx</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>context</span>.<span style=color:#a6e22e>Background</span>()
+</span></span><span style=display:flex><span>	
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Connect to IceFireDB
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>client</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>redis</span>.<span style=color:#a6e22e>NewClient</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>redis</span>.<span style=color:#a6e22e>Options</span>{
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>Addr</span>:     <span style=color:#e6db74>&#34;localhost:11001&#34;</span>,
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>Password</span>: <span style=color:#e6db74>&#34;&#34;</span>, <span style=color:#75715e>// no password set
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>DB</span>:       <span style=color:#ae81ff>0</span>,  <span style=color:#75715e>// use default DB
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	})
+</span></span><span style=display:flex><span>	
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Basic operations
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>err</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>client</span>.<span style=color:#a6e22e>Set</span>(<span style=color:#a6e22e>ctx</span>, <span style=color:#e6db74>&#34;go_key&#34;</span>, <span style=color:#e6db74>&#34;Hello from Go!&#34;</span>, <span style=color:#ae81ff>0</span>).<span style=color:#a6e22e>Err</span>()
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>err</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>		panic(<span style=color:#a6e22e>err</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>val</span>, <span style=color:#a6e22e>err</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>client</span>.<span style=color:#a6e22e>Get</span>(<span style=color:#a6e22e>ctx</span>, <span style=color:#e6db74>&#34;go_key&#34;</span>).<span style=color:#a6e22e>Result</span>()
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>err</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>		panic(<span style=color:#a6e22e>err</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#e6db74>&#34;go_key:&#34;</span>, <span style=color:#a6e22e>val</span>)
+</span></span><span style=display:flex><span>	
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// IceFireDB extension
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>result</span>, <span style=color:#a6e22e>err</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>client</span>.<span style=color:#a6e22e>Do</span>(<span style=color:#a6e22e>ctx</span>, <span style=color:#e6db74>&#34;DRIVER.INFO&#34;</span>).<span style=color:#a6e22e>Result</span>()
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#e6db74>&#34;Driver info:&#34;</span>, <span style=color:#a6e22e>result</span>)
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h2 id=monitoring-and-maintenance>Monitoring and Maintenance
+<a class=anchor href=#monitoring-and-maintenance>#</a></h2><h3 id=checking-server-info>Checking Server Info
+<a class=anchor href=#checking-server-info>#</a></h3><pre tabindex=0><code class=language-redis data-lang=redis># Get comprehensive server information
+127.0.0.1:11001&gt; INFO
+# Server
+redis_version:IceFireDB
+redis_mode:standalone
+os:Linux
+
+# Memory
+used_memory:1048576
+used_memory_human:1.00M
+
+# Stats
+total_connections_received:100
+total_commands_processed:500
+
+# Persistence
+rdb_last_save_time:1633046400
+
+# Replication
+role:master
+connected_slaves:0
+
+# CPU
+used_cpu_sys:10.50
+used_cpu_user:15.25
+</code></pre><h3 id=performance-monitoring>Performance Monitoring
+<a class=anchor href=#performance-monitoring>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Use redis-benchmark for performance testing</span>
+</span></span><span style=display:flex><span>redis-benchmark -h localhost -p <span style=color:#ae81ff>11001</span> -t set,get -c <span style=color:#ae81ff>50</span> -n <span style=color:#ae81ff>100000</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Example output:</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># SET: 253232.12 requests per second</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># GET: 2130875.50 requests per second</span>
+</span></span></code></pre></div><h2 id=troubleshooting-common-issues>Troubleshooting Common Issues
+<a class=anchor href=#troubleshooting-common-issues>#</a></h2><h3 id=connection-issues>Connection Issues
+<a class=anchor href=#connection-issues>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Check if IceFireDB is running</span>
+</span></span><span style=display:flex><span>netstat -tlnp | grep <span style=color:#ae81ff>11001</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Check logs</span>
+</span></span><span style=display:flex><span>tail -f icefiredb.log
+</span></span></code></pre></div><h3 id=storage-issues>Storage Issues
+<a class=anchor href=#storage-issues>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Check disk space</span>
+</span></span><span style=display:flex><span>df -h
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Check data directory</span>
+</span></span><span style=display:flex><span>ls -la ./data/
+</span></span></code></pre></div><h3 id=performance-issues>Performance Issues
+<a class=anchor href=#performance-issues>#</a></h3><pre tabindex=0><code class=language-redis data-lang=redis># Monitor memory usage
+127.0.0.1:11001&gt; INFO memory
+
+# Check slow logs
+127.0.0.1:11001&gt; SLOWLOG GET 10
+</code></pre><h2 id=next-steps>Next Steps
+<a class=anchor href=#next-steps>#</a></h2><ol><li><strong>Explore Advanced Features</strong>: Try CRDT mode, IPFS storage, and P2P clustering</li><li><strong>Read Architecture Docs</strong>: Understand how IceFireDB works internally</li><li><strong>Check Configuration Options</strong>: Optimize for your specific use case</li><li><strong>Join the Community</strong>: Contribute and get support on GitHub</li></ol><h2 id=additional-resources>Additional Resources
+<a class=anchor href=#additional-resources>#</a></h2><ul><li><a href=../Develop/api-reference.md>API Reference</a> - Complete command documentation</li><li><a href=../Deploy/configuration.md>Configuration Guide</a> - Detailed configuration options</li><li><a href=../Designs/overview.md>Architecture Overview</a> - System design and components</li><li><a href=https://github.com/IceFireDB/IceFireDB>GitHub Repository</a> - Source code and issues</li></ul><h2 id=support>Support
+<a class=anchor href=#support>#</a></h2><p>If you encounter issues:</p><ol><li>Check the <a href=https://github.com/IceFireDB/IceFireDB/issues>GitHub issues</a></li><li>Join the <a href=https://github.com/IceFireDB/IceFireDB/discussions>Discussions</a></li><li>Review the <a href=../>documentation</a></li></ol><p>Happy building with IceFireDB! 🚀</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#introduction>Introduction</a></li><li><a href=#prerequisites>Prerequisites</a></li><li><a href=#installation>Installation</a><ul><li><a href=#method-1-from-source>Method 1: From Source</a></li><li><a href=#method-2-using-docker>Method 2: Using Docker</a></li><li><a href=#method-3-pre-built-binaries>Method 3: Pre-built Binaries</a></li></ul></li><li><a href=#basic-setup>Basic Setup</a><ul><li><a href=#1-start-icefiredb-with-default-settings>1. Start IceFireDB with Default Settings</a></li></ul></li><li><a href=#basic-redis-operations>Basic Redis Operations</a><ul><li><a href=#connecting-with-redis-cli>Connecting with redis-cli</a></li><li><a href=#basic-key-value-operations>Basic Key-Value Operations</a></li><li><a href=#hash-operations>Hash Operations</a></li><li><a href=#list-operations>List Operations</a></li></ul></li><li><a href=#using-different-storage-drivers>Using Different Storage Drivers</a><ul><li><a href=#switching-storage-backends>Switching Storage Backends</a></li><li><a href=#using-different-storage-drivers-1>Using Different Storage Drivers</a></li></ul></li><li><a href=#p2p-networking>P2P Networking</a><ul><li><a href=#setting-up-a-decentralized-cluster>Setting Up a Decentralized Cluster</a></li></ul></li><li><a href=#advanced-features>Advanced Features</a><ul><li><a href=#crdt-based-data-sync>CRDT-based Data Sync</a></li><li><a href=#hybrid-storage-mode>Hybrid Storage Mode</a></li></ul></li><li><a href=#programming-examples>Programming Examples</a><ul><li><a href=#python-example>Python Example</a></li><li><a href=#nodejs-example>Node.js Example</a></li><li><a href=#go-example>Go Example</a></li></ul></li><li><a href=#monitoring-and-maintenance>Monitoring and Maintenance</a><ul><li><a href=#checking-server-info>Checking Server Info</a></li><li><a href=#performance-monitoring>Performance Monitoring</a></li></ul></li><li><a href=#troubleshooting-common-issues>Troubleshooting Common Issues</a><ul><li><a href=#connection-issues>Connection Issues</a></li><li><a href=#storage-issues>Storage Issues</a></li><li><a href=#performance-issues>Performance Issues</a></li></ul></li><li><a href=#next-steps>Next Steps</a></li><li><a href=#additional-resources>Additional Resources</a></li><li><a href=#support>Support</a></li></ul></nav></div></aside></main></body></html>

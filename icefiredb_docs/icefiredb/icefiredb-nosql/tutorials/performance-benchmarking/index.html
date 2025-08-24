@@ -1,0 +1,324 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  Performance Benchmarking Guide
+  #
+
+
+  Overview
+  #
+
+This guide covers performance testing and benchmarking methodologies for IceFireDB. Learn how to measure, analyze, and optimize IceFireDB performance for different workloads and storage drivers.
+
+  Benchmarking Tools
+  #
+
+
+  redis-benchmark (Recommended)
+  #
+
+The standard Redis benchmarking tool works perfectly with IceFireDB:
+# Basic benchmark
+redis-benchmark -h localhost -p 11001 -t set,get -c 50 -n 100000
+
+# Comprehensive test
+redis-benchmark -h localhost -p 11001 \
+  -t set,get,incr,lpush,lpop,sadd,spop,lpush,lrange \
+  -c 100 -n 1000000 -P 16
+
+# Specific command testing
+redis-benchmark -h localhost -p 11001 \
+  -t set -c 50 -n 500000 --csv
+
+# Pipeline testing
+redis-benchmark -h localhost -p 11001 \
+  -t set,get -c 100 -n 1000000 -P 100
+
+  memtier_benchmark
+  #
+
+For more advanced benchmarking:"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/performance-benchmarking/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Performance Benchmarking"><meta property="og:description" content=" Performance Benchmarking Guide # Overview # This guide covers performance testing and benchmarking methodologies for IceFireDB. Learn how to measure, analyze, and optimize IceFireDB performance for different workloads and storage drivers.
+Benchmarking Tools # redis-benchmark (Recommended) # The standard Redis benchmarking tool works perfectly with IceFireDB:
+# Basic benchmark redis-benchmark -h localhost -p 11001 -t set,get -c 50 -n 100000 # Comprehensive test redis-benchmark -h localhost -p 11001 \ -t set,get,incr,lpush,lpop,sadd,spop,lpush,lrange \ -c 100 -n 1000000 -P 16 # Specific command testing redis-benchmark -h localhost -p 11001 \ -t set -c 50 -n 500000 --csv # Pipeline testing redis-benchmark -h localhost -p 11001 \ -t set,get -c 100 -n 1000000 -P 100 memtier_benchmark # For more advanced benchmarking:"><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="article:section" content="icefiredb"><title>Performance Benchmarking | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=stylesheet href=/icefiredb_docs/book.min.46181bc93375ba932026e753b37c40e6ff8bb16a9ef770c78bcc663e4577b1ba.css integrity="sha256-RhgbyTN1upMgJudTs3xA5v+LsWqe93DHi8xmPkV3sbo=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.c0bc9219fae0c08c8641e80a18f91c07ea4239ca2663a1c1f83228949a349785.js integrity="sha256-wLySGfrgwIyGQegKGPkcB+pCOcomY6HB+DIolJo0l4U=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li class=book-section-flat><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/>Overview</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/engine_overview/>Engine Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/vocabulary/>Vocabulary</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/>IceFireDB NoSQL Engine</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/quick_start/>Quick Start</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/>Designs</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/network/>Network layer</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/storage/>Storage layer</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/protocol/>Protocol layer</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/codec/>Codec layer</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/storage-drivers/>Storage Drivers</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/>Tutorials</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/getting-started/>Getting Started Tutorial</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/performance-benchmarking/ class=active>Performance Benchmarking</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/deploy/>Deploy</a><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/deploy/configuration/>Configuration Guide</a></li></ul></li><li><span>Develop</span><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb-crdt-kv/>icefiredb-crdt-kv</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb-ipfs-log/>icefiredb-ipfs-log</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb_proxy/>icefiredb-proxy</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/redhub/>redhub-frame</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/api-reference/>API Reference</a></li></ul></li><li><span>Project Comparison</span><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/project-comparison/orbitdb/>OrbitDB</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/project-comparison/threaddb/>ThreadDB</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/>IceFireDB-SQLite</a><ul><li><input type=checkbox id=section-d28adc5f935baf9f2270b11342515dec class=toggle>
+<label for=section-d28adc5f935baf9f2270b11342515dec class="flex justify-between"><a role=button>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/overview/>Overview</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul><li><input type=checkbox id=section-197cd7a03ef88813eee099fa35466d3e class=toggle>
+<label for=section-197cd7a03ef88813eee099fa35466d3e class="flex justify-between"><a role=button>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-redis-proxy/architecture/overview/>Overview</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul><li><input type=checkbox id=section-87903bd5b525679072ad1825563a57f2 class=toggle>
+<label for=section-87903bd5b525679072ad1825563a57f2 class="flex justify-between"><a role=button>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlproxy/architecture/overview/>Overview</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-pubsub/>IceFireDB-PubSub</a><ul><li><input type=checkbox id=section-d2e27c9da60e491bca2bc610c135b235 class=toggle>
+<label for=section-d2e27c9da60e491bca2bc610c135b235 class="flex justify-between"><a role=button>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-pubsub/architecture/overview/>Overview</a></li></ul></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/faqs/>Frequently Asked Questions</a><ul></ul></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Performance Benchmarking</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#overview>Overview</a></li><li><a href=#benchmarking-tools>Benchmarking Tools</a><ul><li><a href=#redis-benchmark-recommended>redis-benchmark (Recommended)</a></li><li><a href=#memtier_benchmark>memtier_benchmark</a></li><li><a href=#custom-scripts>Custom Scripts</a></li></ul></li><li><a href=#benchmarking-methodology>Benchmarking Methodology</a><ul><li><a href=#test-environment-setup>Test Environment Setup</a></li><li><a href=#benchmark-scenarios>Benchmark Scenarios</a></li></ul></li><li><a href=#performance-by-storage-driver>Performance by Storage Driver</a><ul><li><a href=#leveldb-driver-performance>LevelDB Driver Performance</a></li><li><a href=#badgerdb-driver-performance>BadgerDB Driver Performance</a></li><li><a href=#ipfs-driver-performance>IPFS Driver Performance</a></li><li><a href=#crdt-driver-performance>CRDT Driver Performance</a></li></ul></li><li><a href=#advanced-benchmarking>Advanced Benchmarking</a><ul><li><a href=#long-running-tests>Long-running Tests</a></li><li><a href=#cluster-benchmarking>Cluster Benchmarking</a></li><li><a href=#custom-workload-generation>Custom Workload Generation</a></li></ul></li><li><a href=#performance-metrics>Performance Metrics</a><ul><li><a href=#key-metrics-to-monitor>Key Metrics to Monitor</a></li><li><a href=#monitoring-commands>Monitoring Commands</a></li></ul></li><li><a href=#optimization-techniques>Optimization Techniques</a><ul><li><a href=#configuration-optimizations>Configuration Optimizations</a></li><li><a href=#os-level-optimizations>OS-Level Optimizations</a></li><li><a href=#application-level-optimizations>Application-Level Optimizations</a></li></ul></li><li><a href=#troubleshooting-performance-issues>Troubleshooting Performance Issues</a><ul><li><a href=#common-performance-problems>Common Performance Problems</a></li><li><a href=#diagnostic-commands>Diagnostic Commands</a></li></ul></li><li><a href=#benchmark-results-interpretation>Benchmark Results Interpretation</a><ul><li><a href=#expected-performance-ranges>Expected Performance Ranges</a></li><li><a href=#factors-affecting-performance>Factors Affecting Performance</a></li></ul></li><li><a href=#continuous-performance-testing>Continuous Performance Testing</a><ul><li><a href=#automated-benchmarking>Automated Benchmarking</a></li><li><a href=#performance-regression-testing>Performance Regression Testing</a></li></ul></li><li><a href=#best-practices>Best Practices</a></li><li><a href=#see-also>See Also</a></li></ul></nav></aside></header><article class=markdown><h1 id=performance-benchmarking-guide>Performance Benchmarking Guide
+<a class=anchor href=#performance-benchmarking-guide>#</a></h1><h2 id=overview>Overview
+<a class=anchor href=#overview>#</a></h2><p>This guide covers performance testing and benchmarking methodologies for IceFireDB. Learn how to measure, analyze, and optimize IceFireDB performance for different workloads and storage drivers.</p><h2 id=benchmarking-tools>Benchmarking Tools
+<a class=anchor href=#benchmarking-tools>#</a></h2><h3 id=redis-benchmark-recommended>redis-benchmark (Recommended)
+<a class=anchor href=#redis-benchmark-recommended>#</a></h3><p>The standard Redis benchmarking tool works perfectly with IceFireDB:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Basic benchmark</span>
+</span></span><span style=display:flex><span>redis-benchmark -h localhost -p <span style=color:#ae81ff>11001</span> -t set,get -c <span style=color:#ae81ff>50</span> -n <span style=color:#ae81ff>100000</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Comprehensive test</span>
+</span></span><span style=display:flex><span>redis-benchmark -h localhost -p <span style=color:#ae81ff>11001</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -t set,get,incr,lpush,lpop,sadd,spop,lpush,lrange <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -c <span style=color:#ae81ff>100</span> -n <span style=color:#ae81ff>1000000</span> -P <span style=color:#ae81ff>16</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Specific command testing</span>
+</span></span><span style=display:flex><span>redis-benchmark -h localhost -p <span style=color:#ae81ff>11001</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -t set -c <span style=color:#ae81ff>50</span> -n <span style=color:#ae81ff>500000</span> --csv
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Pipeline testing</span>
+</span></span><span style=display:flex><span>redis-benchmark -h localhost -p <span style=color:#ae81ff>11001</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -t set,get -c <span style=color:#ae81ff>100</span> -n <span style=color:#ae81ff>1000000</span> -P <span style=color:#ae81ff>100</span>
+</span></span></code></pre></div><h3 id=memtier_benchmark>memtier_benchmark
+<a class=anchor href=#memtier_benchmark>#</a></h3><p>For more advanced benchmarking:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>memtier_benchmark -s localhost -p <span style=color:#ae81ff>11001</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --protocol<span style=color:#f92672>=</span>redis --clients<span style=color:#f92672>=</span><span style=color:#ae81ff>50</span> --threads<span style=color:#f92672>=</span><span style=color:#ae81ff>4</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --ratio<span style=color:#f92672>=</span>1:1 --test-time<span style=color:#f92672>=</span><span style=color:#ae81ff>300</span> --key-pattern<span style=color:#f92672>=</span>S:S
+</span></span></code></pre></div><h3 id=custom-scripts>Custom Scripts
+<a class=anchor href=#custom-scripts>#</a></h3><p>Python example for custom workload testing:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>import</span> redis
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> time
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> statistics
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>r <span style=color:#f92672>=</span> redis<span style=color:#f92672>.</span>Redis(host<span style=color:#f92672>=</span><span style=color:#e6db74>&#39;localhost&#39;</span>, port<span style=color:#f92672>=</span><span style=color:#ae81ff>11001</span>, decode_responses<span style=color:#f92672>=</span><span style=color:#66d9ef>True</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Warm up</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> i <span style=color:#f92672>in</span> range(<span style=color:#ae81ff>1000</span>):
+</span></span><span style=display:flex><span>    r<span style=color:#f92672>.</span>set(<span style=color:#e6db74>f</span><span style=color:#e6db74>&#39;key_</span><span style=color:#e6db74>{</span>i<span style=color:#e6db74>}</span><span style=color:#e6db74>&#39;</span>, <span style=color:#e6db74>f</span><span style=color:#e6db74>&#39;value_</span><span style=color:#e6db74>{</span>i<span style=color:#e6db74>}</span><span style=color:#e6db74>&#39;</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Benchmark SET operations</span>
+</span></span><span style=display:flex><span>times <span style=color:#f92672>=</span> []
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> i <span style=color:#f92672>in</span> range(<span style=color:#ae81ff>10000</span>):
+</span></span><span style=display:flex><span>    start <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time()
+</span></span><span style=display:flex><span>    r<span style=color:#f92672>.</span>set(<span style=color:#e6db74>f</span><span style=color:#e6db74>&#39;bench_</span><span style=color:#e6db74>{</span>i<span style=color:#e6db74>}</span><span style=color:#e6db74>&#39;</span>, <span style=color:#e6db74>&#39;x&#39;</span> <span style=color:#f92672>*</span> <span style=color:#ae81ff>100</span>)
+</span></span><span style=display:flex><span>    times<span style=color:#f92672>.</span>append(time<span style=color:#f92672>.</span>time() <span style=color:#f92672>-</span> start)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>print(<span style=color:#e6db74>f</span><span style=color:#e6db74>&#34;SET ops/sec: </span><span style=color:#e6db74>{</span><span style=color:#ae81ff>10000</span><span style=color:#f92672>/</span>sum(times)<span style=color:#e6db74>:</span><span style=color:#e6db74>.0f</span><span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span>)
+</span></span><span style=display:flex><span>print(<span style=color:#e6db74>f</span><span style=color:#e6db74>&#34;Average latency: </span><span style=color:#e6db74>{</span>statistics<span style=color:#f92672>.</span>mean(times)<span style=color:#f92672>*</span><span style=color:#ae81ff>1000</span><span style=color:#e6db74>:</span><span style=color:#e6db74>.2f</span><span style=color:#e6db74>}</span><span style=color:#e6db74>ms&#34;</span>)
+</span></span><span style=display:flex><span>print(<span style=color:#e6db74>f</span><span style=color:#e6db74>&#34;P95 latency: </span><span style=color:#e6db74>{</span>sorted(times)[<span style=color:#ae81ff>9500</span>]<span style=color:#f92672>*</span><span style=color:#ae81ff>1000</span><span style=color:#e6db74>:</span><span style=color:#e6db74>.2f</span><span style=color:#e6db74>}</span><span style=color:#e6db74>ms&#34;</span>)
+</span></span></code></pre></div><h2 id=benchmarking-methodology>Benchmarking Methodology
+<a class=anchor href=#benchmarking-methodology>#</a></h2><h3 id=test-environment-setup>Test Environment Setup
+<a class=anchor href=#test-environment-setup>#</a></h3><ol><li><p><strong>Hardware Considerations</strong>:</p><ul><li>CPU: Modern multi-core processor</li><li>Memory: Sufficient RAM for workload</li><li>Storage: SSD recommended for disk-based drivers</li><li>Network: Gigabit Ethernet for distributed tests</li></ul></li><li><p><strong>IceFireDB Configuration</strong>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#f92672>network</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>max_connections</span>: <span style=color:#ae81ff>10000</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>performance</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>cache_size</span>: <span style=color:#ae81ff>2048</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>max_memory</span>: <span style=color:#ae81ff>4294967296</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>log</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>level</span>: <span style=color:#e6db74>&#34;warn&#34;</span>  <span style=color:#75715e># Reduce logging overhead</span>
+</span></span></code></pre></div></li><li><p><strong>System Tuning</strong>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Increase file limits</span>
+</span></span><span style=display:flex><span>ulimit -n <span style=color:#ae81ff>100000</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Network tuning</span>
+</span></span><span style=display:flex><span>sysctl -w net.core.somaxconn<span style=color:#f92672>=</span><span style=color:#ae81ff>65535</span>
+</span></span><span style=display:flex><span>sysctl -w net.ipv4.tcp_max_syn_backlog<span style=color:#f92672>=</span><span style=color:#ae81ff>65535</span>
+</span></span></code></pre></div></li></ol><h3 id=benchmark-scenarios>Benchmark Scenarios
+<a class=anchor href=#benchmark-scenarios>#</a></h3><h4 id=1-throughput-testing>1. Throughput Testing
+<a class=anchor href=#1-throughput-testing>#</a></h4><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Maximum throughput test</span>
+</span></span><span style=display:flex><span>redis-benchmark -h localhost -p <span style=color:#ae81ff>11001</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -t set -c <span style=color:#ae81ff>512</span> -n <span style=color:#ae81ff>10000000</span> -P <span style=color:#ae81ff>512</span> -q
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Expected output:</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># SET: 253232.12 requests per second</span>
+</span></span></code></pre></div><h4 id=2-latency-testing>2. Latency Testing
+<a class=anchor href=#2-latency-testing>#</a></h4><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Low concurrency latency test</span>
+</span></span><span style=display:flex><span>redis-benchmark -h localhost -p <span style=color:#ae81ff>11001</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -t set -c <span style=color:#ae81ff>1</span> -n <span style=color:#ae81ff>10000</span> -P <span style=color:#ae81ff>1</span> --csv
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># High percentiles</span>
+</span></span><span style=display:flex><span>memtier_benchmark -s localhost -p <span style=color:#ae81ff>11001</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --protocol<span style=color:#f92672>=</span>redis --clients<span style=color:#f92672>=</span><span style=color:#ae81ff>10</span> --threads<span style=color:#f92672>=</span><span style=color:#ae81ff>2</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --ratio<span style=color:#f92672>=</span>1:0 --test-time<span style=color:#f92672>=</span><span style=color:#ae81ff>60</span> --key-pattern<span style=color:#f92672>=</span>S:S <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --hide-histogram
+</span></span></code></pre></div><h4 id=3-mixed-workload-testing>3. Mixed Workload Testing
+<a class=anchor href=#3-mixed-workload-testing>#</a></h4><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Read-heavy workload (80% read, 20% write)</span>
+</span></span><span style=display:flex><span>memtier_benchmark -s localhost -p <span style=color:#ae81ff>11001</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --protocol<span style=color:#f92672>=</span>redis --clients<span style=color:#f92672>=</span><span style=color:#ae81ff>50</span> --threads<span style=color:#f92672>=</span><span style=color:#ae81ff>4</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --ratio<span style=color:#f92672>=</span>4:1 --test-time<span style=color:#f92672>=</span><span style=color:#ae81ff>300</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Write-heavy workload</span>
+</span></span><span style=display:flex><span>memtier_benchmark -s localhost -p <span style=color:#ae81ff>11001</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --protocol<span style=color:#f92672>=</span>redis --clients<span style=color:#f92672>=</span><span style=color:#ae81ff>50</span> --threads<span style=color:#f92672>=</span><span style=color:#ae81ff>4</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --ratio<span style=color:#f92672>=</span>1:4 --test-time<span style=color:#f92672>=</span><span style=color:#ae81ff>300</span>
+</span></span></code></pre></div><h4 id=4-data-size-impact>4. Data Size Impact
+<a class=anchor href=#4-data-size-impact>#</a></h4><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Different value sizes</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> size in <span style=color:#ae81ff>100</span> <span style=color:#ae81ff>500</span> <span style=color:#ae81ff>1000</span> 5000; <span style=color:#66d9ef>do</span>
+</span></span><span style=display:flex><span>    redis-benchmark -h localhost -p <span style=color:#ae81ff>11001</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>      -t set -c <span style=color:#ae81ff>50</span> -n <span style=color:#ae81ff>100000</span> -d $size -q
+</span></span><span style=display:flex><span>    echo <span style=color:#e6db74>&#34;Value size: </span>$size<span style=color:#e6db74> bytes&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>done</span>
+</span></span></code></pre></div><h2 id=performance-by-storage-driver>Performance by Storage Driver
+<a class=anchor href=#performance-by-storage-driver>#</a></h2><h3 id=leveldb-driver-performance>LevelDB Driver Performance
+<a class=anchor href=#leveldb-driver-performance>#</a></h3><p><strong>Best for</strong>: Balanced read/write workloads</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># LevelDB benchmark results</span>
+</span></span><span style=display:flex><span>SET: 250,000 - 300,000 ops/sec
+</span></span><span style=display:flex><span>GET: 2,000,000 - 2,500,000 ops/sec
+</span></span><span style=display:flex><span>Latency: 0.1 - 2ms <span style=color:#f92672>(</span>P99<span style=color:#f92672>)</span>
+</span></span></code></pre></div><p><strong>Optimization Tips</strong>:</p><ul><li>Increase <code>write_buffer_size</code> for write-heavy workloads</li><li>Use compression for smaller data sizes</li><li>Adjust <code>block_size</code> for your access patterns</li></ul><h3 id=badgerdb-driver-performance>BadgerDB Driver Performance
+<a class=anchor href=#badgerdb-driver-performance>#</a></h3><p><strong>Best for</strong>: Write-intensive workloads</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># BadgerDB benchmark results  </span>
+</span></span><span style=display:flex><span>SET: 300,000 - 400,000 ops/sec
+</span></span><span style=display:flex><span>GET: 1,800,000 - 2,200,000 ops/sec
+</span></span><span style=display:flex><span>Latency: 0.1 - 3ms <span style=color:#f92672>(</span>P99<span style=color:#f92672>)</span>
+</span></span></code></pre></div><p><strong>Optimization Tips</strong>:</p><ul><li>Use SSD storage for best performance</li><li>Tune <code>value_log_file_size</code> for your workload</li><li>Enable compression for value logs</li></ul><h3 id=ipfs-driver-performance>IPFS Driver Performance
+<a class=anchor href=#ipfs-driver-performance>#</a></h3><p><strong>Best for</strong>: Decentralized storage</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># IPFS benchmark results (local node)</span>
+</span></span><span style=display:flex><span>SET: 15,000 - 25,000 ops/sec  
+</span></span><span style=display:flex><span>GET: 40,000 - 60,000 ops/sec
+</span></span><span style=display:flex><span>Latency: <span style=color:#ae81ff>5</span> - 50ms <span style=color:#f92672>(</span>P99<span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># IPFS benchmark results (remote nodes)</span>
+</span></span><span style=display:flex><span>SET: 5,000 - 10,000 ops/sec
+</span></span><span style=display:flex><span>GET: 10,000 - 20,000 ops/sec  
+</span></span><span style=display:flex><span>Latency: <span style=color:#ae81ff>20</span> - 200ms <span style=color:#f92672>(</span>P99<span style=color:#f92672>)</span>
+</span></span></code></pre></div><p><strong>Optimization Tips</strong>:</p><ul><li>Increase <code>hot_cache_size</code> for better read performance</li><li>Use local IPFS nodes for lower latency</li><li>Optimize network connectivity between nodes</li></ul><h3 id=crdt-driver-performance>CRDT Driver Performance
+<a class=anchor href=#crdt-driver-performance>#</a></h3><p><strong>Best for</strong>: Distributed consistency</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># CRDT benchmark results</span>
+</span></span><span style=display:flex><span>SET: 120,000 - 180,000 ops/sec
+</span></span><span style=display:flex><span>GET: 700,000 - 900,000 ops/sec  
+</span></span><span style=display:flex><span>Latency: <span style=color:#ae81ff>1</span> - 5ms <span style=color:#f92672>(</span>P99<span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span>Sync Latency: <span style=color:#ae81ff>10</span> - 100ms <span style=color:#f92672>(</span>cross-node<span style=color:#f92672>)</span>
+</span></span></code></pre></div><p><strong>Optimization Tips</strong>:</p><ul><li>Adjust <code>sync_interval</code> based on consistency requirements</li><li>Monitor conflict resolution overhead</li><li>Use appropriate conflict resolution strategy</li></ul><h2 id=advanced-benchmarking>Advanced Benchmarking
+<a class=anchor href=#advanced-benchmarking>#</a></h2><h3 id=long-running-tests>Long-running Tests
+<a class=anchor href=#long-running-tests>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># 24-hour endurance test</span>
+</span></span><span style=display:flex><span>memtier_benchmark -s localhost -p <span style=color:#ae81ff>11001</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --protocol<span style=color:#f92672>=</span>redis --clients<span style=color:#f92672>=</span><span style=color:#ae81ff>100</span> --threads<span style=color:#f92672>=</span><span style=color:#ae81ff>8</span> <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --ratio<span style=color:#f92672>=</span>1:1 --test-time<span style=color:#f92672>=</span><span style=color:#ae81ff>86400</span> --key-pattern<span style=color:#f92672>=</span>R:R
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Monitor memory usage over time</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>while</span> true; <span style=color:#66d9ef>do</span>
+</span></span><span style=display:flex><span>    redis-cli -p <span style=color:#ae81ff>11001</span> info memory | grep used_memory_human
+</span></span><span style=display:flex><span>    sleep <span style=color:#ae81ff>60</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>done</span>
+</span></span></code></pre></div><h3 id=cluster-benchmarking>Cluster Benchmarking
+<a class=anchor href=#cluster-benchmarking>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Multi-node cluster test</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># On node 1</span>
+</span></span><span style=display:flex><span>memtier_benchmark -s node1 -p <span style=color:#ae81ff>11001</span> --clients<span style=color:#f92672>=</span><span style=color:#ae81ff>50</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># On node 2  </span>
+</span></span><span style=display:flex><span>memtier_benchmark -s node2 -p <span style=color:#ae81ff>11001</span> --clients<span style=color:#f92672>=</span><span style=color:#ae81ff>50</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Monitor cluster sync performance</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> info replication
+</span></span></code></pre></div><h3 id=custom-workload-generation>Custom Workload Generation
+<a class=anchor href=#custom-workload-generation>#</a></h3><p>Python script for realistic workload simulation:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>import</span> redis
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> random
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> time
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>r <span style=color:#f92672>=</span> redis<span style=color:#f92672>.</span>Redis(host<span style=color:#f92672>=</span><span style=color:#e6db74>&#39;localhost&#39;</span>, port<span style=color:#f92672>=</span><span style=color:#ae81ff>11001</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Realistic key distribution (power law)</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>generate_key</span>():
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> random<span style=color:#f92672>.</span>random() <span style=color:#f92672>&lt;</span> <span style=color:#ae81ff>0.8</span>:  <span style=color:#75715e># 80% hot keys</span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#e6db74>f</span><span style=color:#e6db74>&#39;hot_</span><span style=color:#e6db74>{</span>random<span style=color:#f92672>.</span>randint(<span style=color:#ae81ff>1</span>, <span style=color:#ae81ff>1000</span>)<span style=color:#e6db74>}</span><span style=color:#e6db74>&#39;</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>else</span>:  <span style=color:#75715e># 20% cold keys</span>
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#e6db74>f</span><span style=color:#e6db74>&#39;cold_</span><span style=color:#e6db74>{</span>random<span style=color:#f92672>.</span>randint(<span style=color:#ae81ff>1</span>, <span style=color:#ae81ff>100000</span>)<span style=color:#e6db74>}</span><span style=color:#e6db74>&#39;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Simulate real workload</span>
+</span></span><span style=display:flex><span>operations <span style=color:#f92672>=</span> []
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> _ <span style=color:#f92672>in</span> range(<span style=color:#ae81ff>1000000</span>):
+</span></span><span style=display:flex><span>    key <span style=color:#f92672>=</span> generate_key()
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> random<span style=color:#f92672>.</span>random() <span style=color:#f92672>&lt;</span> <span style=color:#ae81ff>0.7</span>:  <span style=color:#75715e># 70% reads</span>
+</span></span><span style=display:flex><span>        operations<span style=color:#f92672>.</span>append((<span style=color:#e6db74>&#39;GET&#39;</span>, key))
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>else</span>:  <span style=color:#75715e># 30% writes</span>
+</span></span><span style=display:flex><span>        operations<span style=color:#f92672>.</span>append((<span style=color:#e6db74>&#39;SET&#39;</span>, key, <span style=color:#e6db74>f</span><span style=color:#e6db74>&#39;value_</span><span style=color:#e6db74>{</span>random<span style=color:#f92672>.</span>randint(<span style=color:#ae81ff>1</span>, <span style=color:#ae81ff>10000</span>)<span style=color:#e6db74>}</span><span style=color:#e6db74>&#39;</span>))
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Execute and measure</span>
+</span></span><span style=display:flex><span>start <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time()
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> op <span style=color:#f92672>in</span> operations:
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> op[<span style=color:#ae81ff>0</span>] <span style=color:#f92672>==</span> <span style=color:#e6db74>&#39;GET&#39;</span>:
+</span></span><span style=display:flex><span>        r<span style=color:#f92672>.</span>get(op[<span style=color:#ae81ff>1</span>])
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>else</span>:
+</span></span><span style=display:flex><span>        r<span style=color:#f92672>.</span>set(op[<span style=color:#ae81ff>1</span>], op[<span style=color:#ae81ff>2</span>])
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>duration <span style=color:#f92672>=</span> time<span style=color:#f92672>.</span>time() <span style=color:#f92672>-</span> start
+</span></span><span style=display:flex><span>print(<span style=color:#e6db74>f</span><span style=color:#e6db74>&#34;Operations: </span><span style=color:#e6db74>{</span>len(operations)<span style=color:#e6db74>}</span><span style=color:#e6db74>&#34;</span>)
+</span></span><span style=display:flex><span>print(<span style=color:#e6db74>f</span><span style=color:#e6db74>&#34;Duration: </span><span style=color:#e6db74>{</span>duration<span style=color:#e6db74>:</span><span style=color:#e6db74>.2f</span><span style=color:#e6db74>}</span><span style=color:#e6db74>s&#34;</span>)
+</span></span><span style=display:flex><span>print(<span style=color:#e6db74>f</span><span style=color:#e6db74>&#34;Throughput: </span><span style=color:#e6db74>{</span>len(operations)<span style=color:#f92672>/</span>duration<span style=color:#e6db74>:</span><span style=color:#e6db74>.0f</span><span style=color:#e6db74>}</span><span style=color:#e6db74> ops/sec&#34;</span>)
+</span></span></code></pre></div><h2 id=performance-metrics>Performance Metrics
+<a class=anchor href=#performance-metrics>#</a></h2><h3 id=key-metrics-to-monitor>Key Metrics to Monitor
+<a class=anchor href=#key-metrics-to-monitor>#</a></h3><ol><li><strong>Throughput</strong>: Operations per second</li><li><strong>Latency</strong>: Response time percentiles (P50, P95, P99)</li><li><strong>Memory Usage</strong>: RSS, used_memory, peak memory</li><li><strong>CPU Utilization</strong>: User vs system time</li><li><strong>Network I/O</strong>: Bytes in/out, connections</li><li><strong>Disk I/O</strong>: Read/write operations, throughput</li></ol><h3 id=monitoring-commands>Monitoring Commands
+<a class=anchor href=#monitoring-commands>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Real-time monitoring</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> --stat
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Detailed metrics</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> info all
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Specific sections</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> info memory
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> info stats
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> info persistence
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Slow log analysis</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> slowlog get <span style=color:#ae81ff>10</span>
+</span></span></code></pre></div><h2 id=optimization-techniques>Optimization Techniques
+<a class=anchor href=#optimization-techniques>#</a></h2><h3 id=configuration-optimizations>Configuration Optimizations
+<a class=anchor href=#configuration-optimizations>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#75715e># High-performance configuration</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>network</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>max_connections</span>: <span style=color:#ae81ff>100000</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>tcp_keepalive</span>: <span style=color:#ae81ff>300</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>performance</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>cache_size</span>: <span style=color:#ae81ff>4096</span>  <span style=color:#75715e># 4GB</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>max_memory</span>: <span style=color:#ae81ff>8589934592</span>  <span style=color:#75715e># 8GB</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>max_memory_policy</span>: <span style=color:#e6db74>&#34;volatile-lru&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>storage</span>:
+</span></span><span style=display:flex><span>  <span style=color:#f92672>driver</span>: <span style=color:#e6db74>&#34;badger&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>value_log_file_size</span>: <span style=color:#ae81ff>2147483648</span>  <span style=color:#75715e># 2GB</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>num_compactors</span>: <span style=color:#ae81ff>4</span>
+</span></span><span style=display:flex><span>  <span style=color:#f92672>num_level_zero_tables</span>: <span style=color:#ae81ff>8</span>
+</span></span></code></pre></div><h3 id=os-level-optimizations>OS-Level Optimizations
+<a class=anchor href=#os-level-optimizations>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Linux performance tuning</span>
+</span></span><span style=display:flex><span>echo <span style=color:#e6db74>&#39;net.core.somaxconn=65535&#39;</span> &gt;&gt; /etc/sysctl.conf
+</span></span><span style=display:flex><span>echo <span style=color:#e6db74>&#39;vm.overcommit_memory=1&#39;</span> &gt;&gt; /etc/sysctl.conf
+</span></span><span style=display:flex><span>echo <span style=color:#e6db74>&#39;vm.swappiness=1&#39;</span> &gt;&gt; /etc/sysctl.conf
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># SSD optimization</span>
+</span></span><span style=display:flex><span>echo <span style=color:#e6db74>&#39;deadline&#39;</span> &gt; /sys/block/sda/queue/scheduler
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Memory management</span>
+</span></span><span style=display:flex><span>echo <span style=color:#e6db74>&#39;never&#39;</span> &gt; /sys/kernel/mm/transparent_hugepage/enabled
+</span></span></code></pre></div><h3 id=application-level-optimizations>Application-Level Optimizations
+<a class=anchor href=#application-level-optimizations>#</a></h3><ol><li><strong>Use pipelining</strong> for bulk operations</li><li><strong>Batch small operations</strong> together</li><li><strong>Use appropriate data types</strong> for your workload</li><li><strong>Monitor and evict</strong> unused keys regularly</li><li><strong>Use compression</strong> for large values</li></ol><h2 id=troubleshooting-performance-issues>Troubleshooting Performance Issues
+<a class=anchor href=#troubleshooting-performance-issues>#</a></h2><h3 id=common-performance-problems>Common Performance Problems
+<a class=anchor href=#common-performance-problems>#</a></h3><ol><li><p><strong>High Latency</strong>:</p><ul><li>Check network connectivity</li><li>Monitor system resource usage</li><li>Review slow log queries</li></ul></li><li><p><strong>Low Throughput</strong>:</p><ul><li>Verify client configuration</li><li>Check for resource bottlenecks</li><li>Review storage driver performance</li></ul></li><li><p><strong>Memory Issues</strong>:</p><ul><li>Monitor memory usage patterns</li><li>Adjust max memory policy</li><li>Implement key eviction strategies</li></ul></li></ol><h3 id=diagnostic-commands>Diagnostic Commands
+<a class=anchor href=#diagnostic-commands>#</a></h3><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Check current performance</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> info commandstats
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Monitor real-time performance</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> monitor | head -100
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Analyze memory usage</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> memory stats
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Check persistence performance</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> info persistence
+</span></span></code></pre></div><h2 id=benchmark-results-interpretation>Benchmark Results Interpretation
+<a class=anchor href=#benchmark-results-interpretation>#</a></h2><h3 id=expected-performance-ranges>Expected Performance Ranges
+<a class=anchor href=#expected-performance-ranges>#</a></h3><table><thead><tr><th style=text-align:left>Driver</th><th style=text-align:left>SET ops/sec</th><th style=text-align:left>GET ops/sec</th><th style=text-align:left>P99 Latency</th></tr></thead><tbody><tr><td style=text-align:left>LevelDB</td><td style=text-align:left>200-300K</td><td style=text-align:left>1.8-2.5M</td><td style=text-align:left>1-2ms</td></tr><tr><td style=text-align:left>BadgerDB</td><td style=text-align:left>300-400K</td><td style=text-align:left>1.6-2.2M</td><td style=text-align:left>1-3ms</td></tr><tr><td style=text-align:left>IPFS</td><td style=text-align:left>15-25K</td><td style=text-align:left>40-60K</td><td style=text-align:left>5-50ms</td></tr><tr><td style=text-align:left>CRDT</td><td style=text-align:left>120-180K</td><td style=text-align:left>700-900K</td><td style=text-align:left>1-5ms</td></tr></tbody></table><h3 id=factors-affecting-performance>Factors Affecting Performance
+<a class=anchor href=#factors-affecting-performance>#</a></h3><ol><li><strong>Data Size</strong>: Larger values reduce throughput</li><li><strong>Concurrency</strong>: Higher concurrency increases throughput but may increase latency</li><li><strong>Network</strong>: Latency and bandwidth affect distributed performance</li><li><strong>Hardware</strong>: CPU, memory, and storage speed determine maximum performance</li><li><strong>Workload Pattern</strong>: Read vs write ratio affects optimal configuration</li></ol><h2 id=continuous-performance-testing>Continuous Performance Testing
+<a class=anchor href=#continuous-performance-testing>#</a></h2><h3 id=automated-benchmarking>Automated Benchmarking
+<a class=anchor href=#automated-benchmarking>#</a></h3><p>Set up automated performance testing:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e>#!/bin/bash
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#75715e># daily-benchmark.sh</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>DATE<span style=color:#f92672>=</span><span style=color:#66d9ef>$(</span>date +%Y%m%d<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>RESULTS<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;benchmark_results_</span>$DATE<span style=color:#e6db74>.csv&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>echo <span style=color:#e6db74>&#34;date,driver,test,throughput,latency_p99&#34;</span> &gt; $RESULTS
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Test different drivers</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> driver in leveldb badger ipfs; <span style=color:#66d9ef>do</span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e># Switch driver</span>
+</span></span><span style=display:flex><span>    redis-cli -p <span style=color:#ae81ff>11001</span> DRIVER.SELECT $driver
+</span></span><span style=display:flex><span>    
+</span></span><span style=display:flex><span>    <span style=color:#75715e># Run benchmarks</span>
+</span></span><span style=display:flex><span>    redis-benchmark -h localhost -p <span style=color:#ae81ff>11001</span> -t set -c <span style=color:#ae81ff>50</span> -n <span style=color:#ae81ff>100000</span> -q | <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>        awk -v d<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$driver<span style=color:#e6db74>&#34;</span> -v date<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$DATE<span style=color:#e6db74>&#34;</span> <span style=color:#e6db74>&#39;{print date &#34;,&#34; d &#34;,set,&#34; $1 &#34;,&#34;}&#39;</span> &gt;&gt; $RESULTS
+</span></span><span style=display:flex><span>    
+</span></span><span style=display:flex><span>    redis-benchmark -h localhost -p <span style=color:#ae81ff>11001</span> -t get -c <span style=color:#ae81ff>50</span> -n <span style=color:#ae81ff>100000</span> -q | <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>        awk -v d<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$driver<span style=color:#e6db74>&#34;</span> -v date<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;</span>$DATE<span style=color:#e6db74>&#34;</span> <span style=color:#e6db74>&#39;{print date &#34;,&#34; d &#34;,get,&#34; $1 &#34;,&#34;}&#39;</span> &gt;&gt; $RESULTS
+</span></span><span style=display:flex><span><span style=color:#66d9ef>done</span>
+</span></span></code></pre></div><h3 id=performance-regression-testing>Performance Regression Testing
+<a class=anchor href=#performance-regression-testing>#</a></h3><p>Monitor performance over time to detect regressions:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># Weekly performance report</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>#!/bin/bash</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>WEEK<span style=color:#f92672>=</span><span style=color:#66d9ef>$(</span>date +%Y-%U<span style=color:#66d9ef>)</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> info stats &gt; <span style=color:#e6db74>&#34;stats_</span>$WEEK<span style=color:#e6db74>.log&#34;</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> info memory &gt; <span style=color:#e6db74>&#34;memory_</span>$WEEK<span style=color:#e6db74>.log&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Compare with previous week</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Alert on significant changes</span>
+</span></span></code></pre></div><h2 id=best-practices>Best Practices
+<a class=anchor href=#best-practices>#</a></h2><ol><li><strong>Test realistic workloads</strong> that match production usage</li><li><strong>Run long-term tests</strong> to identify memory leaks or degradation</li><li><strong>Monitor system resources</strong> during testing</li><li><strong>Document benchmark configurations</strong> for reproducibility</li><li><strong>Compare across versions</strong> to track performance improvements</li><li><strong>Test failure scenarios</strong> and recovery performance</li><li><strong>Validate with multiple tools</strong> for comprehensive analysis</li></ol><h2 id=see-also>See Also
+<a class=anchor href=#see-also>#</a></h2><ul><li><a href=../Designs/storage-drivers.md>Storage Drivers</a> - Driver-specific performance characteristics</li><li><a href=../Deploy/configuration.md>Configuration Guide</a> - Performance-related configuration options</li><li><a href=../Develop/api-reference.md>API Reference</a> - Performance monitoring commands</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#overview>Overview</a></li><li><a href=#benchmarking-tools>Benchmarking Tools</a><ul><li><a href=#redis-benchmark-recommended>redis-benchmark (Recommended)</a></li><li><a href=#memtier_benchmark>memtier_benchmark</a></li><li><a href=#custom-scripts>Custom Scripts</a></li></ul></li><li><a href=#benchmarking-methodology>Benchmarking Methodology</a><ul><li><a href=#test-environment-setup>Test Environment Setup</a></li><li><a href=#benchmark-scenarios>Benchmark Scenarios</a></li></ul></li><li><a href=#performance-by-storage-driver>Performance by Storage Driver</a><ul><li><a href=#leveldb-driver-performance>LevelDB Driver Performance</a></li><li><a href=#badgerdb-driver-performance>BadgerDB Driver Performance</a></li><li><a href=#ipfs-driver-performance>IPFS Driver Performance</a></li><li><a href=#crdt-driver-performance>CRDT Driver Performance</a></li></ul></li><li><a href=#advanced-benchmarking>Advanced Benchmarking</a><ul><li><a href=#long-running-tests>Long-running Tests</a></li><li><a href=#cluster-benchmarking>Cluster Benchmarking</a></li><li><a href=#custom-workload-generation>Custom Workload Generation</a></li></ul></li><li><a href=#performance-metrics>Performance Metrics</a><ul><li><a href=#key-metrics-to-monitor>Key Metrics to Monitor</a></li><li><a href=#monitoring-commands>Monitoring Commands</a></li></ul></li><li><a href=#optimization-techniques>Optimization Techniques</a><ul><li><a href=#configuration-optimizations>Configuration Optimizations</a></li><li><a href=#os-level-optimizations>OS-Level Optimizations</a></li><li><a href=#application-level-optimizations>Application-Level Optimizations</a></li></ul></li><li><a href=#troubleshooting-performance-issues>Troubleshooting Performance Issues</a><ul><li><a href=#common-performance-problems>Common Performance Problems</a></li><li><a href=#diagnostic-commands>Diagnostic Commands</a></li></ul></li><li><a href=#benchmark-results-interpretation>Benchmark Results Interpretation</a><ul><li><a href=#expected-performance-ranges>Expected Performance Ranges</a></li><li><a href=#factors-affecting-performance>Factors Affecting Performance</a></li></ul></li><li><a href=#continuous-performance-testing>Continuous Performance Testing</a><ul><li><a href=#automated-benchmarking>Automated Benchmarking</a></li><li><a href=#performance-regression-testing>Performance Regression Testing</a></li></ul></li><li><a href=#best-practices>Best Practices</a></li><li><a href=#see-also>See Also</a></li></ul></nav></div></aside></main></body></html>
