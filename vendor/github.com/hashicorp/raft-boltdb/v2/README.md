@@ -5,9 +5,34 @@ This implementation uses the maintained version of BoltDB, [BBolt](https://githu
 
 There is no breaking API change to the library. However, there is the potential for disk format incompatibilities so it was decided to be conservative and making it a separate import path. This separate import path will allow both versions (original and v2) to be imported to perform a safe in-place upgrade of old files read with the old version and written back out with the new one. 
 
+## Metrics Emission and Compatibility
+
+This library can emit metrics using either `github.com/armon/go-metrics` or `github.com/hashicorp/go-metrics`. Choosing between the libraries is controlled via build tags. 
+
+**Build Tags**
+* `armonmetrics` - Using this tag will cause metrics to be routed to `armon/go-metrics`
+* `hashicorpmetrics` - Using this tag will cause all metrics to be routed to `hashicorp/go-metrics`
+
+If no build tag is specified, the default behavior is to use `armon/go-metrics`. 
+
+**Deprecating `armon/go-metrics`**
+
+Emitting metrics to `armon/go-metrics` is officially deprecated. Usage of `armon/go-metrics` will remain the default until mid-2025 with opt-in support continuing to the end of 2025.
+
+**Migration**
+To migrate an application currently using the older `armon/go-metrics` to instead use `hashicorp/go-metrics` the following should be done.
+
+1. Upgrade libraries using `armon/go-metrics` to consume `hashicorp/go-metrics/compat` instead. This should involve only changing import statements. All repositories in the `hashicorp` namespace
+2. Update an applications library dependencies to those that have the compatibility layer configured.
+3. Update the application to use `hashicorp/go-metrics` for configuring metrics export instead of `armon/go-metrics`
+   * Replace all application imports of `github.com/armon/go-metrics` with `github.com/hashicorp/go-metrics`
+   * Instrument your build system to build with the `hashicorpmetrics` tag.
+
+   Eventually once the default behavior changes to use `hashicorp/go-metrics` by default (mid-2025), you can drop the `hashicorpmetrics` build tag.
+
 ## Metrics
 
-The raft-boldb library emits a number of metrics utilizing github.com/armon/go-metrics. Those metrics are detailed in the following table. One note is that the application which pulls in this library may add its own prefix to the metric names. For example within [Consul](https://github.com/hashicorp/consul), the metrics will be prefixed with `consul.`.
+The following table details all the metrics emitted by this library. One note is that the application which pulls in this library may add its own prefix to the metric names. For example within [Consul](https://github.com/hashicorp/consul), the metrics will be prefixed with `consul.`.
 
 | Metric                              | Unit         | Type    | Description           |
 | ----------------------------------- | ------------:| -------:|:--------------------- |
@@ -35,3 +60,4 @@ The raft-boldb library emits a number of metrics utilizing github.com/armon/go-m
 | `raft.boltdb.txstats.write`         | writes       | counter | Counts the number of writes to the db since Consul was started. |
 | `raft.boltdb.txstats.writeTime`     | ms           | timer   | Measures the amount of time spent performing writes to the db. |
 | `raft.boltdb.writeCapacity`         | logs/second  | sample  | Theoretical write capacity in terms of the number of logs that can be written per second. Each sample outputs what the capacity would be if future batched log write operations were similar to this one. This similarity encompasses 4 things: batch size, byte size, disk performance and boltdb performance. While none of these will be static and its highly likely individual samples of this metric will vary, aggregating this metric over a larger time window should provide a decent picture into how this BoltDB store can perform |
+
