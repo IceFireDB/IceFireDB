@@ -1,0 +1,406 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Develop on IceFireDB Documentation</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/</link><description>Recent content in Develop on IceFireDB Documentation</description><generator>Hugo</generator><language>en</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/index.xml" rel="self" type="application/rss+xml"/><item><title>icefiredb-crdt-kv</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb-crdt-kv/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb-crdt-kv/</guid><description>&lt;h1 id="icefiredb-crdt-kv">
+ icefiredb-crdt-kv
+ &lt;a class="anchor" href="#icefiredb-crdt-kv">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="project-introduction">
+ Project introduction
+ &lt;a class="anchor" href="#project-introduction">#&lt;/a>
+&lt;/h2>
+&lt;p>The IceFireDB-CRDT-KV engine can support decentralized P2P networking, data synchronization and consistency between nodes. It is a component of the IceFireDB software ecosystem, thanks to the open source of IPFS.&lt;/p>
+&lt;h2 id="features">
+ Features
+ &lt;a class="anchor" href="#features">#&lt;/a>
+&lt;/h2>
+&lt;ol>
+&lt;li>Easy access to P2P data consistency function&lt;/li>
+&lt;li>Stable decentralized networking function&lt;/li>
+&lt;li>Friendly program access interface&lt;/li>
+&lt;/ol>
+&lt;h2 id="installing">
+ Installing
+ &lt;a class="anchor" href="#installing">#&lt;/a>
+&lt;/h2>
+&lt;pre tabindex="0">&lt;code>go get -u github.com/IceFireDB/icefiredb-crdt-kv
+&lt;/code>&lt;/pre>&lt;h2 id="example">
+ Example
+ &lt;a class="anchor" href="#example">#&lt;/a>
+&lt;/h2>
+&lt;pre tabindex="0">&lt;code>package main
+
+import (
+	&amp;#34;bufio&amp;#34;
+	&amp;#34;context&amp;#34;
+	&amp;#34;fmt&amp;#34;
+	icefiredb_crdt_kv &amp;#34;github.com/IceFireDB/icefiredb-crdt-kv/kv&amp;#34;
+	badger2 &amp;#34;github.com/dgraph-io/badger&amp;#34;
+	&amp;#34;github.com/ipfs/go-datastore/query&amp;#34;
+	&amp;#34;github.com/sirupsen/logrus&amp;#34;
+	&amp;#34;os&amp;#34;
+	&amp;#34;strings&amp;#34;
+)
+
+func main() {
+	ctx := context.TODO()
+	log := logrus.New()
+	db, err := icefiredb_crdt_kv.NewCRDTKeyValueDB(ctx, icefiredb_crdt_kv.Config{
+		NodeServiceName: &amp;#34;icefiredb-crdt-kv&amp;#34;,
+		DataSyncChannel: &amp;#34;icefiredb-crdt-kv-data&amp;#34;,
+		NetDiscoveryChannel: &amp;#34;icefiredb-crdt-kv-net&amp;#34;,
+		Namespace: &amp;#34;test&amp;#34;,
+		Logger: log,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	defer db.Close()
+
+	fmt.Printf(&amp;#34;&amp;gt; &amp;#34;)
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		text := scanner.Text()
+		fields := strings.Fields(text)
+		if len(fields) == 0 {
+			fmt.Printf(&amp;#34;&amp;gt; &amp;#34;)
+			continue
+		}
+
+		cmd := fields[0]
+		switch cmd {
+		case &amp;#34;exit&amp;#34;, &amp;#34;quit&amp;#34;:
+			return
+		case &amp;#34;get&amp;#34;:
+			if len(fields) &amp;lt; 2 {
+				printVal(&amp;#34;missing key&amp;#34;)
+				continue
+			}
+			val, err := db.Get(ctx, []byte(fields[1]))
+			if err != nil {
+				printVal(err)
+				continue
+			}
+			printVal(string(val))
+		case &amp;#34;put&amp;#34;:
+			if len(fields) &amp;lt; 3 {
+				printVal(&amp;#34;Missing parameters&amp;#34;)
+				continue
+			}
+
+			printVal(db.Put(ctx, []byte(fields[1]), []byte(fields[2])))
+		case &amp;#34;delete&amp;#34;:
+			if len(fields) &amp;lt; 2 {
+				printVal(&amp;#34;missing key&amp;#34;)
+				continue
+			}
+			printVal(db.Delete(ctx, []byte(fields[1])))
+		case &amp;#34;has&amp;#34;:
+			if len(fields) &amp;lt; 2 {
+				printVal(&amp;#34;missing key&amp;#34;)
+				continue
+			}
+			is, err := db.Has(ctx, []byte(fields[1]))
+			if err != nil {
+				printVal(err)
+				continue
+			}
+			printVal(is)
+		case &amp;#34;list&amp;#34;:
+			result, err := db.Query(ctx, query.Query{})
+			if err != nil {
+				printVal(err)
+				continue
+			}
+			for val := range result.Next() {
+				fmt.Printf(fmt.Sprintf(&amp;#34;%s =&amp;gt; %v\n&amp;#34;, val.Key, string(val.Value)))
+			}
+			fmt.Print(&amp;#34;&amp;gt; &amp;#34;)
+		case &amp;#34;query&amp;#34;:
+			if len(fields) &amp;lt; 2 {
+				printVal(&amp;#34;missing query condition&amp;#34;)
+				continue
+			}
+			//fmt.Println(fields[1], len(fields[1]))
+			q := query.Query{
+				//Prefix: fields[1],
+				Filters: []query.Filter{
+					query.FilterKeyPrefix{
+						Prefix: fields[1],
+					},
+				},
+			}
+			result, err := db.Query(ctx, q)
+			if err != nil {
+				printVal(err)
+				continue
+			}
+			//time.Sleep(time.Second)
+			for val := range result.Next() {
+				fmt.Printf(fmt.Sprintf(&amp;#34;%s =&amp;gt; %v\n&amp;#34;, val.Key, string(val.Value)))
+			}
+			fmt.Print(&amp;#34;&amp;gt; &amp;#34;)
+
+		case &amp;#34;connect&amp;#34;: // 主动连接
+			if len(fields) &amp;lt; 2 {
+				printVal(&amp;#34;Missing connection address&amp;#34;)
+				continue
+			}
+			err = db.Connect(fields[1])
+			if err == nil {
+				printVal(&amp;#34;connection succeeded!&amp;#34;)
+			} else {
+				printVal(err)
+			}
+		case &amp;#34;slist&amp;#34;:
+			result, err := db.Store().Query(ctx, query.Query{})
+			if err != nil {
+				printVal(err)
+				continue
+			}
+			for val := range result.Next() {
+				fmt.Printf(fmt.Sprintf(&amp;#34;%s =&amp;gt; %v\n&amp;#34;, val.Key, string(val.Value)))
+			}
+			fmt.Print(&amp;#34;&amp;gt; &amp;#34;)
+		case &amp;#34;bquery&amp;#34;:
+			if len(fields) &amp;lt; 2 {
+				printVal(&amp;#34;missing query condition&amp;#34;)
+				continue
+			}
+			db.DB().View(func(txn *badger2.Txn) error {
+				opts := badger2.DefaultIteratorOptions
+				opts.PrefetchSize = 10
+				it := txn.NewIterator(opts)
+				defer it.Close()
+				prefix := []byte(fields[1])
+				for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+					item := it.Item()
+					k := item.Key()
+					err := item.Value(func(v []byte) error {
+						fmt.Printf(&amp;#34;key=%s, value=%s\n&amp;#34;, k, v)
+						return nil
+					})
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+
+		case &amp;#34;blist&amp;#34;:
+			db.DB().View(func(txn *badger2.Txn) error {
+				opts := badger2.DefaultIteratorOptions
+				opts.PrefetchSize = 10
+				it := txn.NewIterator(opts)
+				defer it.Close()
+				for it.Rewind(); it.Valid(); it.Next() {
+					item := it.Item()
+					k := item.Key()
+					err := item.Value(func(v []byte) error {
+						fmt.Printf(&amp;#34;key=%s, value=%s\n&amp;#34;, k, v)
+						return nil
+					})
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		default:
+			printVal(&amp;#34;&amp;#34;)
+		}
+	}
+}
+
+func printVal(v interface{}) {
+	fmt.Printf(&amp;#34;%v\n&amp;gt; &amp;#34;, v)
+}
+&lt;/code>&lt;/pre>&lt;h2 id="roadmap">
+ RoadMap
+ &lt;a class="anchor" href="#roadmap">#&lt;/a>
+&lt;/h2>
+&lt;ol>
+&lt;li>Optimize project structure.&lt;/li>
+&lt;li>Encapsulates the kv engine layer for easy reference by upper-layer applications.&lt;/li>
+&lt;/ol></description></item><item><title>icefiredb-ipfs-log</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb-ipfs-log/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb-ipfs-log/</guid><description>&lt;h1 id="icefiredb-ipfs-log">
+ icefiredb-ipfs-log
+ &lt;a class="anchor" href="#icefiredb-ipfs-log">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="project-introduction">
+ Project introduction
+ &lt;a class="anchor" href="#project-introduction">#&lt;/a>
+&lt;/h2>
+&lt;p>icefiredb-ipfs-log is a distributed immutable, operation-based conflict-free replication data structure that relies on ipfs to store data and merges each peer node data based on pubsub conflict-free. You can easily implement custom data structures such as kv, event, nosql, etc. based on icefiredb-ipfs-log.&lt;/p>
+&lt;p>&lt;strong>Conflict-free log replication model&lt;/strong>&lt;/p>
+&lt;pre tabindex="0">&lt;code> Log A Log B
+ | |
+ logA.append(&amp;#34;one&amp;#34;) logB.append(&amp;#34;hello&amp;#34;)
+ | |
+ v v
+ +-----+ +-------+
+ |&amp;#34;one&amp;#34;| |&amp;#34;hello&amp;#34;|
+ +-----+ +-------+
+ | |
+ logA.append(&amp;#34;two&amp;#34;) logB.append(&amp;#34;world&amp;#34;)
+ | |
+ v v
+ +-----------+ +---------------+
+ |&amp;#34;one&amp;#34;,&amp;#34;two&amp;#34;| |&amp;#34;hello&amp;#34;,&amp;#34;world&amp;#34;|
+ +-----------+ +---------------+
+ | |
+ | |
+ logA.join(logB) &amp;lt;----------+
+ |
+ v
++---------------------------+
+|&amp;#34;one&amp;#34;,&amp;#34;hello&amp;#34;,&amp;#34;two&amp;#34;,&amp;#34;world&amp;#34;|
++---------------------------+
+&lt;/code>&lt;/pre>&lt;h2 id="features">
+ Features
+ &lt;a class="anchor" href="#features">#&lt;/a>
+&lt;/h2>
+&lt;ol>
+&lt;li>Easy access to P2P &amp;amp;&amp;amp; ipfs-log data consistency function&lt;/li>
+&lt;li>Stable decentralized networking function&lt;/li>
+&lt;li>Friendly program access interface&lt;/li>
+&lt;/ol>
+&lt;h2 id="installing">
+ Installing
+ &lt;a class="anchor" href="#installing">#&lt;/a>
+&lt;/h2>
+&lt;pre tabindex="0">&lt;code>go get -u github.com/IceFireDB/icefiredb-ipfs-log
+&lt;/code>&lt;/pre>&lt;h2 id="example">
+ Example
+ &lt;a class="anchor" href="#example">#&lt;/a>
+&lt;/h2>
+&lt;h3 id="example-of-building-a-key-value-database-using-icefiredb-ipfs-log">
+ Example of building a key-value database using icefiredb-ipfs-log
+ &lt;a class="anchor" href="#example-of-building-a-key-value-database-using-icefiredb-ipfs-log">#&lt;/a>
+&lt;/h3>
+&lt;ul>
+&lt;li>memory key-value：&lt;a href="https://github.com/IceFireDB/icefiredb-ipfs-log/blob/main/stores/kv/db.go">memory-kv&lt;/a>&lt;/li>
+&lt;li>leveldb kv ：&lt;a href="https://github.com/IceFireDB/icefiredb-ipfs-log/blob/main/stores/levelkv/db.go">leveldb-kv&lt;/a>&lt;/li>
+&lt;/ul>
+&lt;h3 id="use-of-key-value-databases">
+ Use of key-value databases
+ &lt;a class="anchor" href="#use-of-key-value-databases">#&lt;/a>
+&lt;/h3>
+&lt;p>&lt;a href="https://github.com/IceFireDB/icefiredb-ipfs-log/tree/main/example">Detailed usage example reference&lt;/a>&lt;/p></description></item><item><title>icefiredb-proxy</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb_proxy/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/icefiredb_proxy/</guid><description>&lt;h1 id="icefiredb-proxy">
+ IceFireDB-Proxy
+ &lt;a class="anchor" href="#icefiredb-proxy">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="project-introduction">
+ Project introduction
+ &lt;a class="anchor" href="#project-introduction">#&lt;/a>
+&lt;/h2>
+&lt;p>IceFireDB-Proxy is a high-performance, high-availability, and user-friendly Resp protocol cluster proxy solution. It is supporting P2P networking and is a network component in the IceFireDB ecosystem.&lt;/p>
+&lt;h2 id="features">
+ Features
+ &lt;a class="anchor" href="#features">#&lt;/a>
+&lt;/h2>
+&lt;ol>
+&lt;li>Complete data source mode support: stand-alone, cluster mode&lt;/li>
+&lt;li>Rich command support&lt;/li>
+&lt;li>Excellent cluster state management and failover&lt;/li>
+&lt;li>Excellent traffic control policies: Traffic read/write separation and multi-tenant data isolation&lt;/li>
+&lt;li>Excellent command telemetry features&lt;/li>
+&lt;li>Bottom-fishing use of mind and base abilities that are closer to cloud native&lt;/li>
+&lt;li>Supports P2P automatic networking, and Proxy helps traditional Redis databases achieve data decentralization.&lt;/li>
+&lt;li>New framework for faster network, will be upgraded soon. &lt;a href="https://github.com/IceFireDB/redhub">redhub&lt;/a>&lt;/li>
+&lt;/ol>
+&lt;h2 id="architecture">
+ Architecture
+ &lt;a class="anchor" href="#architecture">#&lt;/a>
+&lt;/h2>
+&lt;center>
+&lt;img width="550" alt="image" src="https://res.cloudinary.com/malloc/image/upload/v1669104023/icefiredb/docs/comp-archotecture_wwj4id.png">
+&lt;/center>
+&lt;h2 id="network-communication-model">
+ Network Communication Model
+ &lt;a class="anchor" href="#network-communication-model">#&lt;/a>
+&lt;/h2>
+&lt;center>
+&lt;img width="550" alt="image" src="https://res.cloudinary.com/malloc/image/upload/v1669104116/icefiredb/docs/usage-architecture_t42qov.png">
+&lt;/center>
+&lt;h2 id="installing">
+ Installing
+ &lt;a class="anchor" href="#installing">#&lt;/a>
+&lt;/h2>
+&lt;pre tabindex="0">&lt;code>1. Install Go
+2. git clone https://github.com/IceFireDB/IceFireDB-Proxy.git $GOPATH/src/github.com/IceFireDB/IceFireDB-Proxy
+3. cd $GOPATH/src/github.com/IceFireDB/IceFireDB-Proxy
+4. make
+&lt;/code>&lt;/pre>&lt;h2 id="usage">
+ Usage
+ &lt;a class="anchor" href="#usage">#&lt;/a>
+&lt;/h2>
+&lt;p>Run a binary file directly, if you need to run in the background can be added to the systemd system management&lt;/p></description></item><item><title>redhub-frame</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/redhub/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/redhub/</guid><description>&lt;h1 id="redhub-frame">
+ redhub-frame
+ &lt;a class="anchor" href="#redhub-frame">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="project-introduction">
+ Project introduction
+ &lt;a class="anchor" href="#project-introduction">#&lt;/a>
+&lt;/h2>
+&lt;p>High-performance Redis-Server multi-threaded framework, based on RawEpoll model.&lt;/p>
+&lt;h2 id="features">
+ Features
+ &lt;a class="anchor" href="#features">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>Ultra high performance&lt;/li>
+&lt;li>Fully multi-threaded support&lt;/li>
+&lt;li>Low CPU resource consumption&lt;/li>
+&lt;li>Compatible with redis protocol&lt;/li>
+&lt;li>Create a Redis compatible server with RawEpoll model in Go&lt;/li>
+&lt;/ul>
+&lt;h2 id="installing">
+ Installing
+ &lt;a class="anchor" href="#installing">#&lt;/a>
+&lt;/h2>
+&lt;pre tabindex="0">&lt;code>go get -u github.com/IceFireDB/redhub
+&lt;/code>&lt;/pre>&lt;h2 id="example">
+ Example
+ &lt;a class="anchor" href="#example">#&lt;/a>
+&lt;/h2>
+&lt;p>Here is a simple framework usage example,support the following redis commands:&lt;/p>
+&lt;ul>
+&lt;li>SET key value&lt;/li>
+&lt;li>GET key&lt;/li>
+&lt;li>DEL key&lt;/li>
+&lt;li>PING&lt;/li>
+&lt;li>QUIT&lt;/li>
+&lt;/ul>
+&lt;p>You can run this example in terminal:&lt;/p></description></item><item><title>API Reference</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/api-reference/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/develop/api-reference/</guid><description>&lt;h1 id="icefiredb-nosql-api-reference">
+ IceFireDB NoSQL API Reference
+ &lt;a class="anchor" href="#icefiredb-nosql-api-reference">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="overview">
+ Overview
+ &lt;a class="anchor" href="#overview">#&lt;/a>
+&lt;/h2>
+&lt;p>IceFireDB provides a Redis-compatible API with additional commands for decentralized operations. This document covers the supported commands, their syntax, and usage examples.&lt;/p>
+&lt;h2 id="command-categories">
+ Command Categories
+ &lt;a class="anchor" href="#command-categories">#&lt;/a>
+&lt;/h2>
+&lt;h3 id="server-management-commands">
+ Server Management Commands
+ &lt;a class="anchor" href="#server-management-commands">#&lt;/a>
+&lt;/h3>
+&lt;h4 id="info">
+ &lt;code>INFO&lt;/code>
+ &lt;a class="anchor" href="#info">#&lt;/a>
+&lt;/h4>
+&lt;p>Returns server information and statistics.&lt;/p>
+&lt;p>&lt;strong>Syntax:&lt;/strong>&lt;/p>
+&lt;pre tabindex="0">&lt;code class="language-redis" data-lang="redis">INFO [section]
+&lt;/code>&lt;/pre>&lt;p>&lt;strong>Example:&lt;/strong>&lt;/p>
+&lt;pre tabindex="0">&lt;code class="language-redis" data-lang="redis">INFO
+INFO memory
+INFO replication
+&lt;/code>&lt;/pre>&lt;p>&lt;strong>Response:&lt;/strong>
+Returns a multi-bulk string with server information.&lt;/p>
+&lt;h4 id="flushall">
+ &lt;code>FLUSHALL&lt;/code>
+ &lt;a class="anchor" href="#flushall">#&lt;/a>
+&lt;/h4>
+&lt;p>Removes all keys from all databases.&lt;/p></description></item></channel></rss>

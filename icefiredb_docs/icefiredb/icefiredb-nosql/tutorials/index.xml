@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Tutorials on IceFireDB Documentation</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/</link><description>Recent content in Tutorials on IceFireDB Documentation</description><generator>Hugo</generator><language>en</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/index.xml" rel="self" type="application/rss+xml"/><item><title>Getting Started Tutorial</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/getting-started/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/getting-started/</guid><description>&lt;h1 id="getting-started-with-icefiredb">
+ Getting Started with IceFireDB
+ &lt;a class="anchor" href="#getting-started-with-icefiredb">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="introduction">
+ Introduction
+ &lt;a class="anchor" href="#introduction">#&lt;/a>
+&lt;/h2>
+&lt;p>This tutorial will guide you through setting up and using IceFireDB for the first time. We&amp;rsquo;ll cover installation, basic operations, and some advanced features.&lt;/p>
+&lt;h2 id="prerequisites">
+ Prerequisites
+ &lt;a class="anchor" href="#prerequisites">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>Go 1.18+ installed&lt;/li>
+&lt;li>Basic understanding of Redis commands&lt;/li>
+&lt;li>Terminal/shell access&lt;/li>
+&lt;/ul>
+&lt;h2 id="installation">
+ Installation
+ &lt;a class="anchor" href="#installation">#&lt;/a>
+&lt;/h2>
+&lt;h3 id="method-1-from-source">
+ Method 1: From Source
+ &lt;a class="anchor" href="#method-1-from-source">#&lt;/a>
+&lt;/h3>
+&lt;pre tabindex="0">&lt;code># Clone the repository
+git clone https://github.com/IceFireDB/IceFireDB.git
+cd IceFireDB
+
+# Build the project
+make build
+
+# The binary will be in the bin/ directory
+ls bin/
+&lt;/code>&lt;/pre>&lt;h3 id="method-2-using-docker">
+ Method 2: Using Docker
+ &lt;a class="anchor" href="#method-2-using-docker">#&lt;/a>
+&lt;/h3>
+&lt;pre tabindex="0">&lt;code># Pull the Docker image
+docker pull icefiredb/icefiredb:latest
+
+# Run the container
+docker run -d -p 11001:11001 --name icefiredb icefiredb/icefiredb:latest
+&lt;/code>&lt;/pre>&lt;h3 id="method-3-pre-built-binaries">
+ Method 3: Pre-built Binaries
+ &lt;a class="anchor" href="#method-3-pre-built-binaries">#&lt;/a>
+&lt;/h3>
+&lt;p>Download the latest release from the &lt;a href="https://github.com/IceFireDB/IceFireDB/releases">GitHub releases page&lt;/a>.&lt;/p></description></item><item><title>Performance Benchmarking</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/performance-benchmarking/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/tutorials/performance-benchmarking/</guid><description>&lt;h1 id="performance-benchmarking-guide">
+ Performance Benchmarking Guide
+ &lt;a class="anchor" href="#performance-benchmarking-guide">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="overview">
+ Overview
+ &lt;a class="anchor" href="#overview">#&lt;/a>
+&lt;/h2>
+&lt;p>This guide covers performance testing and benchmarking methodologies for IceFireDB. Learn how to measure, analyze, and optimize IceFireDB performance for different workloads and storage drivers.&lt;/p>
+&lt;h2 id="benchmarking-tools">
+ Benchmarking Tools
+ &lt;a class="anchor" href="#benchmarking-tools">#&lt;/a>
+&lt;/h2>
+&lt;h3 id="redis-benchmark-recommended">
+ redis-benchmark (Recommended)
+ &lt;a class="anchor" href="#redis-benchmark-recommended">#&lt;/a>
+&lt;/h3>
+&lt;p>The standard Redis benchmarking tool works perfectly with IceFireDB:&lt;/p>
+&lt;pre tabindex="0">&lt;code># Basic benchmark
+redis-benchmark -h localhost -p 11001 -t set,get -c 50 -n 100000
+
+# Comprehensive test
+redis-benchmark -h localhost -p 11001 \
+ -t set,get,incr,lpush,lpop,sadd,spop,lpush,lrange \
+ -c 100 -n 1000000 -P 16
+
+# Specific command testing
+redis-benchmark -h localhost -p 11001 \
+ -t set -c 50 -n 500000 --csv
+
+# Pipeline testing
+redis-benchmark -h localhost -p 11001 \
+ -t set,get -c 100 -n 1000000 -P 100
+&lt;/code>&lt;/pre>&lt;h3 id="memtier_benchmark">
+ memtier_benchmark
+ &lt;a class="anchor" href="#memtier_benchmark">#&lt;/a>
+&lt;/h3>
+&lt;p>For more advanced benchmarking:&lt;/p></description></item></channel></rss>

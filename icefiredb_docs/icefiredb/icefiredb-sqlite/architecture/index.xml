@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Architecture on IceFireDB Documentation</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/</link><description>Recent content in Architecture on IceFireDB Documentation</description><generator>Hugo</generator><language>en</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/index.xml" rel="self" type="application/rss+xml"/><item><title>Overview</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/overview/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/overview/</guid><description>&lt;h1 id="architecture-overview">
+ Architecture Overview
+ &lt;a class="anchor" href="#architecture-overview">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="system-architecture">
+ System Architecture
+ &lt;a class="anchor" href="#system-architecture">#&lt;/a>
+&lt;/h2>
+&lt;p>IceFireDB-SQLite is designed as a decentralized SQL database system that combines traditional SQLite storage with peer-to-peer networking capabilities. The architecture consists of several key components:&lt;/p>
+&lt;h3 id="core-components">
+ Core Components
+ &lt;a class="anchor" href="#core-components">#&lt;/a>
+&lt;/h3>
+&lt;ol>
+&lt;li>
+&lt;p>&lt;strong>MySQL Protocol Handler&lt;/strong>&lt;/p>
+&lt;ul>
+&lt;li>Listens on configured port (default: 23306)&lt;/li>
+&lt;li>Parses MySQL wire protocol requests&lt;/li>
+&lt;li>Handles authentication and connection management&lt;/li>
+&lt;li>Translates SQL commands to SQLite operations&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;strong>SQLite Storage Engine&lt;/strong>&lt;/p>
+&lt;ul>
+&lt;li>Local SQLite database file storage&lt;/li>
+&lt;li>Transaction management and query execution&lt;/li>
+&lt;li>Data persistence and integrity maintenance&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;strong>P2P Networking Layer&lt;/strong>&lt;/p></description></item><item><title>NetWork</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/network/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/network/</guid><description>&lt;h1 id="network-details">
+ NetWork Details
+ &lt;a class="anchor" href="#network-details">#&lt;/a>
+&lt;/h1></description></item><item><title>Storage</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/storage/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/storage/</guid><description>&lt;h1 id="storage-engine-details">
+ Storage Engine Details
+ &lt;a class="anchor" href="#storage-engine-details">#&lt;/a>
+&lt;/h1></description></item><item><title>Protocol</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/protocol/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/protocol/</guid><description>&lt;h1 id="protocol-details">
+ Protocol Details
+ &lt;a class="anchor" href="#protocol-details">#&lt;/a>
+&lt;/h1></description></item><item><title>Codec</title><link>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/codec/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-sqlite/architecture/codec/</guid><description>&lt;h1 id="codec-engine-details">
+ Codec Engine Details
+ &lt;a class="anchor" href="#codec-engine-details">#&lt;/a>
+&lt;/h1></description></item></channel></rss>
