@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package raft
 
 import (
@@ -7,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/armon/go-metrics"
+	"github.com/hashicorp/go-metrics/compat"
 )
 
 const (
@@ -60,7 +63,7 @@ type followerReplication struct {
 	triggerCh chan struct{}
 
 	// triggerDeferErrorCh is used to provide a backchannel. By sending a
-	// deferErr, the sender can be notifed when the replication is done.
+	// deferErr, the sender can be notified when the replication is done.
 	triggerDeferErrorCh chan *deferError
 
 	// lastContact is updated to the current time whenever any response is
@@ -230,7 +233,7 @@ START:
 		s.failures++
 		return
 	}
-	appendStats(string(peer.ID), start, float32(len(req.Entries)))
+	appendStats(string(peer.ID), start, float32(len(req.Entries)), r.noLegacyTelemetry)
 
 	// Check for a newer term, stop running
 	if resp.Term > req.Term {
@@ -308,6 +311,7 @@ func (r *Raft) sendLatestSnapshot(s *followerReplication) (bool, error) {
 
 	// Open the most recent snapshot
 	snapID := snapshots[0].ID
+	r.logger.Info("opening snapshot", "id", snapID)
 	meta, snapshot, err := r.snapshots.Open(snapID)
 	if err != nil {
 		r.logger.Error("failed to open snapshot", "id", snapID, "error", err)
@@ -334,18 +338,22 @@ func (r *Raft) sendLatestSnapshot(s *followerReplication) (bool, error) {
 	peer := s.peer
 	s.peerLock.RUnlock()
 
+	r.logger.Info("installing snapshot on", "peer", peer.ID, "id", snapID, "size", req.Size)
 	// Make the call
 	start := time.Now()
 	var resp InstallSnapshotResponse
 	if err := r.trans.InstallSnapshot(peer.ID, peer.Address, &req, &resp, snapshot); err != nil {
-		r.logger.Error("failed to install snapshot", "id", snapID, "error", err)
+		r.logger.Error("failed to install snapshot", "peer", peer.ID, "id", snapID, "error", err)
 		s.failures++
 		return false, err
 	}
 	labels := []metrics.Label{{Name: "peer_id", Value: string(peer.ID)}}
 	metrics.MeasureSinceWithLabels([]string{"raft", "replication", "installSnapshot"}, start, labels)
-	// Duplicated information. Kept for backward compatibility.
-	metrics.MeasureSince([]string{"raft", "replication", "installSnapshot", string(peer.ID)}, start)
+
+	if !r.noLegacyTelemetry {
+		// Duplicated information. Kept for backward compatibility.
+		metrics.MeasureSince([]string{"raft", "replication", "installSnapshot", string(peer.ID)}, start)
+	}
 
 	// Check for a newer term, stop running
 	if resp.Term > req.Term {
@@ -369,7 +377,7 @@ func (r *Raft) sendLatestSnapshot(s *followerReplication) (bool, error) {
 		s.notifyAll(true)
 	} else {
 		s.failures++
-		r.logger.Warn("installSnapshot rejected to", "peer", peer)
+		r.logger.Warn("installSnapshot rejected to", "peer", peer.ID, "id", snapID)
 	}
 	return false, nil
 }
@@ -420,8 +428,12 @@ func (r *Raft) heartbeat(s *followerReplication, stopCh chan struct{}) {
 			failures = 0
 			labels := []metrics.Label{{Name: "peer_id", Value: string(peer.ID)}}
 			metrics.MeasureSinceWithLabels([]string{"raft", "replication", "heartbeat"}, start, labels)
-			// Duplicated information. Kept for backward compatibility.
-			metrics.MeasureSince([]string{"raft", "replication", "heartbeat", string(peer.ID)}, start)
+
+			if !r.noLegacyTelemetry {
+				// Duplicated information. Kept for backward compatibility.
+				metrics.MeasureSince([]string{"raft", "replication", "heartbeat", string(peer.ID)}, start)
+			}
+
 			s.notifyAll(resp.Success)
 		}
 	}
@@ -530,7 +542,7 @@ func (r *Raft) pipelineDecode(s *followerReplication, p AppendPipeline, stopCh, 
 			s.peerLock.RUnlock()
 
 			req, resp := ready.Request(), ready.Response()
-			appendStats(string(peer.ID), ready.Start(), float32(len(req.Entries)))
+			appendStats(string(peer.ID), ready.Start(), float32(len(req.Entries)), r.noLegacyTelemetry)
 
 			// Check for a newer term, stop running
 			if resp.Term > req.Term {
@@ -618,13 +630,16 @@ func (r *Raft) setNewLogs(req *AppendEntriesRequest, nextIndex, lastIndex uint64
 }
 
 // appendStats is used to emit stats about an AppendEntries invocation.
-func appendStats(peer string, start time.Time, logs float32) {
+func appendStats(peer string, start time.Time, logs float32, skipLegacy bool) {
 	labels := []metrics.Label{{Name: "peer_id", Value: peer}}
 	metrics.MeasureSinceWithLabels([]string{"raft", "replication", "appendEntries", "rpc"}, start, labels)
 	metrics.IncrCounterWithLabels([]string{"raft", "replication", "appendEntries", "logs"}, logs, labels)
-	// Duplicated information. Kept for backward compatibility.
-	metrics.MeasureSince([]string{"raft", "replication", "appendEntries", "rpc", peer}, start)
-	metrics.IncrCounter([]string{"raft", "replication", "appendEntries", "logs", peer}, logs)
+
+	if !skipLegacy {
+		// Duplicated information. Kept for backward compatibility.
+		metrics.MeasureSince([]string{"raft", "replication", "appendEntries", "rpc", peer}, start)
+		metrics.IncrCounter([]string{"raft", "replication", "appendEntries", "logs", peer}, logs)
+	}
 }
 
 // handleStaleTerm is used when a follower indicates that we have a stale term.

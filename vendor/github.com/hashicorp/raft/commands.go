@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package raft
 
 // RPCHeader is a common sub-structure used to pass along protocol version and
@@ -114,6 +117,40 @@ type RequestVoteResponse struct {
 
 // GetRPCHeader - See WithRPCHeader.
 func (r *RequestVoteResponse) GetRPCHeader() RPCHeader {
+	return r.RPCHeader
+}
+
+// RequestPreVoteRequest is the command used by a candidate to ask a Raft peer
+// for a vote in an election.
+type RequestPreVoteRequest struct {
+	RPCHeader
+
+	// Provide the term and our id
+	Term uint64
+
+	// Used to ensure safety
+	LastLogIndex uint64
+	LastLogTerm  uint64
+}
+
+// GetRPCHeader - See WithRPCHeader.
+func (r *RequestPreVoteRequest) GetRPCHeader() RPCHeader {
+	return r.RPCHeader
+}
+
+// RequestPreVoteResponse is the response returned from a RequestPreVoteRequest.
+type RequestPreVoteResponse struct {
+	RPCHeader
+
+	// Newer term if leader is out of date.
+	Term uint64
+
+	// Is the vote granted.
+	Granted bool
+}
+
+// GetRPCHeader - See WithRPCHeader.
+func (r *RequestPreVoteResponse) GetRPCHeader() RPCHeader {
 	return r.RPCHeader
 }
 
