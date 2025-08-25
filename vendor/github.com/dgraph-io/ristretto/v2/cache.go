@@ -207,15 +207,15 @@ func NewCache[K Key, V any](config *Config[K, V]) (*Cache[K, V], error) {
 	case config.NumCounters == 0:
 		return nil, errors.New("NumCounters can't be zero")
 	case config.NumCounters < 0:
-		return nil, errors.New("NumCounters can't be negative number")
+		return nil, errors.New("NumCounters can't be negative")
 	case config.MaxCost == 0:
 		return nil, errors.New("MaxCost can't be zero")
 	case config.MaxCost < 0:
-		return nil, errors.New("MaxCost can't be be negative number")
+		return nil, errors.New("MaxCost can't be negative")
 	case config.BufferItems == 0:
 		return nil, errors.New("BufferItems can't be zero")
 	case config.BufferItems < 0:
-		return nil, errors.New("BufferItems can't be be negative number")
+		return nil, errors.New("BufferItems can't be negative")
 	case config.TtlTickerDurationInSec == 0:
 		config.TtlTickerDurationInSec = bucketDurationSecs
 	}
@@ -487,6 +487,14 @@ func (c *Cache[K, V]) UpdateMaxCost(maxCost int64) {
 		return
 	}
 	c.cachePolicy.UpdateMaxCost(maxCost)
+}
+
+// RemainingCost returns the remaining cost capacity (MaxCost - Used) of an existing cache.
+func (c *Cache[K, V]) RemainingCost() int64 {
+	if c == nil {
+		return 0
+	}
+	return c.cachePolicy.Cap()
 }
 
 // processItems is ran by goroutines processing the Set buffer.
