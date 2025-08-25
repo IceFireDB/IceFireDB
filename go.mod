@@ -11,7 +11,7 @@ require (
 	github.com/dgraph-io/badger/v4 v4.8.0
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/dgraph-io/ristretto/v2 v2.3.0
-	github.com/ipfs/go-datastore v0.7.0
+	github.com/ipfs/go-datastore v0.8.3
 	github.com/ipfs/go-ipfs-api v0.3.0
 	github.com/ipfs/kubo v0.32.1
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6

@@ -117,7 +117,7 @@ func (d *Datastore) Flush(ctx context.Context) error {
 		}
 	}
 	// clear out buffer
-	d.buffer = make(map[ds.Key]op, d.maxBufferEntries)
+	clear(d.buffer)
 
 	return b.Commit(ctx)
 }
