@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	mc "github.com/multiformats/go-multicodec"
-
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -53,7 +52,7 @@ func (i *handler) serveDefaults(ctx context.Context, w http.ResponseWriter, r *h
 	case http.MethodGet:
 		rangeHeader := r.Header.Get("Range")
 		if rangeHeader != "" {
-			// TODO: Add tests for range parsing
+			// Note: proper tests for Range parsing live in https://github.com/ipfs/gateway-conformance
 			ranges, err = parseRangeWithoutLength(rangeHeader)
 			if err != nil {
 				i.webError(w, r, fmt.Errorf("invalid range request: %w", err), http.StatusBadRequest)
@@ -186,7 +185,7 @@ func parseRangeWithoutLength(s string) ([]ByteRange, error) {
 		start, end = textproto.TrimString(start), textproto.TrimString(end)
 		var r ByteRange
 		if start == "" {
-			r.From = 0
+			r.To = nil
 			// If no start is specified, end specifies the
 			// range start relative to the end of the file,
 			// and we are dealing with <suffix-length>
@@ -199,9 +198,9 @@ func parseRangeWithoutLength(s string) ([]ByteRange, error) {
 			if i < 0 || err != nil {
 				return nil, errors.New("invalid range")
 			}
-			r.To = &i
+			r.From = -i
 		} else {
-			i, err := strconv.ParseUint(start, 10, 64)
+			i, err := strconv.ParseInt(start, 10, 64)
 			if err != nil {
 				return nil, errors.New("invalid range")
 			}
@@ -211,7 +210,7 @@ func parseRangeWithoutLength(s string) ([]ByteRange, error) {
 				r.To = nil
 			} else {
 				i, err := strconv.ParseInt(end, 10, 64)
-				if err != nil || i < 0 || r.From > uint64(i) {
+				if err != nil || i < 0 || r.From > i {
 					return nil, errors.New("invalid range")
 				}
 				r.To = &i

@@ -10,18 +10,18 @@ import (
 	"path"
 	"sync"
 
+	"github.com/ipfs/boxo/ipld/merkledag"
+	"github.com/ipfs/boxo/ipld/merkledag/dagutils"
+	ipfspinner "github.com/ipfs/boxo/pinning/pinner"
+	"github.com/ipfs/boxo/pinning/pinner/dsindex"
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
 	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/polydawn/refmt/cbor"
 	"github.com/polydawn/refmt/obj/atlas"
-
-	"github.com/ipfs/boxo/ipld/merkledag"
-	"github.com/ipfs/boxo/ipld/merkledag/dagutils"
-	ipfspinner "github.com/ipfs/boxo/pinning/pinner"
-	"github.com/ipfs/boxo/pinning/pinner/dsindex"
 )
 
 const (
@@ -97,6 +97,9 @@ type pinner struct {
 
 	clean int64
 	dirty int64
+
+	rootsProvider  routing.ContentProviding
+	pinnedProvider routing.ContentProviding
 }
 
 var _ ipfspinner.Pinner = (*pinner)(nil)
@@ -127,13 +130,35 @@ type syncDAGService interface {
 	Sync() error
 }
 
+type Option struct {
+	f func(p *pinner)
+}
+
+// WithPinnedProvider sets a provider for all pinned CIDs to be provided
+// (directly or recursively).
+func WithPinnedProvider(prov routing.ContentProviding) Option {
+	return Option{func(p *pinner) {
+		log.Debug("pinned-providing configured")
+		p.pinnedProvider = prov
+	}}
+}
+
+// WithRootsProvider sets a provider for root CIDs and direct pins to be
+// provided.
+func WithRootsProvider(prov routing.ContentProviding) Option {
+	return Option{func(p *pinner) {
+		log.Debug("roots-providing configured")
+		p.rootsProvider = prov
+	}}
+}
+
 // New creates a new pinner and loads its keysets from the given datastore. If
 // there is no data present in the datastore, then an empty pinner is returned.
 //
 // By default, changes are automatically flushed to the datastore.  This can be
 // disabled by calling SetAutosync(false), which will require that Flush be
 // called explicitly.
-func New(ctx context.Context, dstore ds.Datastore, dserv ipld.DAGService) (*pinner, error) {
+func New(ctx context.Context, dstore ds.Datastore, dserv ipld.DAGService, opts ...Option) (*pinner, error) {
 	p := &pinner{
 		autoSync:  true,
 		cidDIndex: dsindex.New(dstore, ds.NewKey(pinCidDIndexPath)),
@@ -141,6 +166,10 @@ func New(ctx context.Context, dstore ds.Datastore, dserv ipld.DAGService) (*pinn
 		nameIndex: dsindex.New(dstore, ds.NewKey(pinNameIndexPath)),
 		dserv:     dserv,
 		dstore:    dstore,
+	}
+
+	for _, o := range opts {
+		o.f(p)
 	}
 
 	data, err := dstore.Get(ctx, dirtyKey)
@@ -214,7 +243,11 @@ func (p *pinner) doPinRecursive(ctx context.Context, c cid.Cid, fetch bool, name
 		// temporary unlock to fetch the entire graph
 		p.lock.Unlock()
 		// Fetch graph starting at node identified by cid
-		err = merkledag.FetchGraph(ctx, c, p.dserv)
+		var opts []merkledag.WalkOption
+		if p.pinnedProvider != nil {
+			opts = append(opts, merkledag.WithProvider(p.pinnedProvider))
+		}
+		err = merkledag.FetchGraph(ctx, c, p.dserv, opts...)
 		p.lock.Lock()
 		if err != nil {
 			return err
@@ -254,7 +287,20 @@ func (p *pinner) doPinRecursive(ctx context.Context, c cid.Cid, fetch bool, name
 	if err != nil {
 		return err
 	}
-	return p.flushPins(ctx, false)
+	err = p.flushPins(ctx, false)
+	if err != nil {
+		return err
+	}
+
+	// Provide only if we have not set pinnedProvider, as otherwise
+	// we would provide the roots twice.
+	if p.rootsProvider != nil && p.pinnedProvider == nil {
+		log.Debugf("pinner: provide root %s", c)
+		if err := p.rootsProvider.Provide(ctx, c, true); err != nil {
+			log.Debugf("error providing %s: %s", c, err)
+		}
+	}
+	return nil
 }
 
 func (p *pinner) doPinDirect(ctx context.Context, c cid.Cid, name string) error {
@@ -292,7 +338,19 @@ func (p *pinner) doPinDirect(ctx context.Context, c cid.Cid, name string) error 
 		return err
 	}
 
-	return p.flushPins(ctx, false)
+	err = p.flushPins(ctx, false)
+	if err != nil {
+		return err
+	}
+
+	if p.rootsProvider != nil {
+		log.Debugf("pinner: provide direct pin %s", c)
+		if err := p.rootsProvider.Provide(ctx, c, true); err != nil {
+			log.Debugf("error providing %s: %s", c, err)
+		}
+	}
+
+	return nil
 }
 
 func (p *pinner) addPin(ctx context.Context, c cid.Cid, mode ipfspinner.Mode, name string) (string, error) {
@@ -707,11 +765,19 @@ func (p *pinner) streamIndex(ctx context.Context, index dsindex.Indexer, detaile
 		defer p.lock.RUnlock()
 
 		cidSet := cid.NewSet()
+		send := func(sp ipfspinner.StreamedPin) (ok bool) {
+			select {
+			case <-ctx.Done():
+				return false
+			case out <- sp:
+				return true
+			}
+		}
 
 		err := index.ForEach(ctx, "", func(key, value string) bool {
 			c, err := cid.Cast([]byte(key))
 			if err != nil {
-				out <- ipfspinner.StreamedPin{Err: err}
+				send(ipfspinner.StreamedPin{Err: err})
 				return false
 			}
 
@@ -719,7 +785,7 @@ func (p *pinner) streamIndex(ctx context.Context, index dsindex.Indexer, detaile
 			if detailed {
 				pp, err := p.loadPin(ctx, value)
 				if err != nil {
-					out <- ipfspinner.StreamedPin{Err: err}
+					send(ipfspinner.StreamedPin{Err: err})
 					return false
 				}
 
@@ -731,17 +797,16 @@ func (p *pinner) streamIndex(ctx context.Context, index dsindex.Indexer, detaile
 			}
 
 			if !cidSet.Has(c) {
-				select {
-				case <-ctx.Done():
+				if !send(ipfspinner.StreamedPin{Pin: pin}) {
 					return false
-				case out <- ipfspinner.StreamedPin{Pin: pin}:
 				}
 				cidSet.Add(c)
 			}
 			return true
 		})
 		if err != nil {
-			out <- ipfspinner.StreamedPin{Err: err}
+			send(ipfspinner.StreamedPin{Err: err})
+			return
 		}
 	}()
 

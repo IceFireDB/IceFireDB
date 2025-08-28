@@ -24,6 +24,16 @@ var (
 	ErrBadGateway          = NewErrorStatusCodeFromStatus(http.StatusBadGateway)
 	ErrServiceUnavailable  = NewErrorStatusCodeFromStatus(http.StatusServiceUnavailable)
 	ErrTooManyRequests     = NewErrorStatusCodeFromStatus(http.StatusTooManyRequests)
+
+	// Errors for user input validation (prevent user input in logs)
+	errUnsupportedFormat        = errors.New("unsupported response format requested")
+	errConversionNotSupported   = errors.New("converting to requested format is not supported")
+	errInvalidURIQueryParameter = errors.New("failed to parse uri query parameter")
+	errInvalidURIScheme         = errors.New("uri query parameter scheme must be ipfs or ipns")
+	errUnsupportedCarScope      = errors.New("unsupported application/vnd.ipld.car scope parameter")
+	errUnsupportedCarOrder      = errors.New("unsupported application/vnd.ipld.car order parameter")
+	errUnsupportedCarDups       = errors.New("unsupported application/vnd.ipld.car dups parameter")
+	errIndexNotReadable         = errors.New("index.html could not be read: not a file")
 )
 
 // ErrorRetryAfter wraps any error with "retry after" hint. When an error of this type
@@ -166,6 +176,35 @@ func (epr ErrPartialResponse) Error() string {
 	return "received a partial CAR response from the backend"
 }
 
+// writeErrorResponse writes an error response with the given status code and message.
+// It returns HTML or plain text based on the Accept header and DisableHTMLErrors config.
+func writeErrorResponse(w http.ResponseWriter, r *http.Request, c *Config, statusCode int, message string) {
+	// Check if HTML response is appropriate
+	acceptsHTML := false
+	if c != nil && !c.DisableHTMLErrors {
+		acceptsHTML = strings.Contains(r.Header.Get("Accept"), "text/html")
+	}
+
+	if acceptsHTML {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(statusCode)
+		err := assets.ErrorTemplate.Execute(w, assets.ErrorTemplateData{
+			GlobalData: assets.GlobalData{
+				Menu: c.Menu,
+			},
+			StatusCode: statusCode,
+			StatusText: http.StatusText(statusCode),
+			Error:      message,
+		})
+		if err != nil {
+			fmt.Fprintf(w, "error during body generation: %v", err)
+		}
+	} else {
+		// plain text response
+		http.Error(w, message, statusCode)
+	}
+}
+
 func webError(w http.ResponseWriter, r *http.Request, c *Config, err error, defaultCode int) {
 	code := defaultCode
 
@@ -200,24 +239,13 @@ func webError(w http.ResponseWriter, r *http.Request, c *Config, err error, defa
 		code = gwErr.StatusCode
 	}
 
-	acceptsHTML := !c.DisableHTMLErrors && strings.Contains(r.Header.Get("Accept"), "text/html")
-	if acceptsHTML {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(code)
-		err = assets.ErrorTemplate.Execute(w, assets.ErrorTemplateData{
-			GlobalData: assets.GlobalData{
-				Menu: c.Menu,
-			},
-			StatusCode: code,
-			StatusText: http.StatusText(code),
-			Error:      err.Error(),
-		})
-		if err != nil {
-			_, _ = w.Write([]byte(fmt.Sprintf("error during body generation: %v", err)))
-		}
-	} else {
-		http.Error(w, err.Error(), code)
-	}
+	log.Debugw("serving error response",
+		"path", r.URL.Path,
+		"method", r.Method,
+		"error", err,
+		"code", code)
+
+	writeErrorResponse(w, r, c, code, err.Error())
 }
 
 // isErrNotFound returns true for IPLD errors that should return 4xx errors (e.g. the path doesn't exist, the data is

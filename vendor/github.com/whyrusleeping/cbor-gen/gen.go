@@ -32,6 +32,9 @@ type Gen struct {
 	MaxArrayLength  int // Default: 8192 (MaxLength)
 	MaxByteLength   int // Default: 2<<20 (ByteArrayMaxLen)
 	MaxStringLength int // Default: 8192 (MaxLength)
+
+	// Write output file in order of type names
+	SortTypeNames bool
 }
 
 func (g Gen) maxArrayLength() int {
@@ -144,6 +147,7 @@ type Field struct {
 	Const   *string
 
 	OmitEmpty   bool
+	Optional    bool
 	PreserveNil bool
 	IterLabel   string
 
@@ -193,9 +197,10 @@ func (f Field) Len() int {
 }
 
 type GenTypeInfo struct {
-	Name        string
-	Fields      []Field
-	Transparent bool
+	Name                string
+	Fields              []Field
+	MandatoryFieldCount int
+	Transparent         bool
 }
 
 func (gti *GenTypeInfo) Imports() []Import {
@@ -217,12 +222,30 @@ func (gti *GenTypeInfo) Imports() []Import {
 	return imports
 }
 
+func (gti *GenTypeInfo) MaxMapKeyLength() int {
+	var mlen int
+	for _, f := range gti.Fields {
+		if len(f.MapKey) > mlen {
+			mlen = len(f.MapKey)
+		}
+	}
+	return mlen
+}
+
 func nameIsExported(name string) bool {
 	return strings.ToUpper(name[0:1]) == name[0:1]
 }
 
 func ParseTypeInfo(itype interface{}) (*GenTypeInfo, error) {
-	t := reflect.TypeOf(itype)
+	// If we're handed *Foo instead of value Foo, deref the pointer.
+	// ParseTypeInfo is only every handed a top level type, so this shouldn't violate any expectations.
+	iv := reflect.ValueOf(itype)
+	switch iv.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		iv = iv.Elem()
+	default:
+	}
+	t := iv.Type()
 
 	pkg := t.PkgPath()
 
@@ -308,6 +331,7 @@ func ParseTypeInfo(itype interface{}) (*GenTypeInfo, error) {
 		out.Transparent = transparent
 
 		_, omitempty := tags["omitempty"]
+		_, optional := tags["optional"]
 		_, preservenil := tags["preservenil"]
 
 		if preservenil && ft.Kind() != reflect.Slice {
@@ -324,7 +348,18 @@ func ParseTypeInfo(itype interface{}) (*GenTypeInfo, error) {
 			PreserveNil: preservenil,
 			MaxLen:      usrMaxLen,
 			Const:       constval,
+			Optional:    optional,
 		})
+	}
+
+	for i, field := range out.Fields {
+		if field.Optional {
+			continue
+		}
+		if out.MandatoryFieldCount != i {
+			return nil, fmt.Errorf("mandatory field %T.%s cannot come after optional fields", itype, field.Name)
+		}
+		out.MandatoryFieldCount++
 	}
 
 	return &out, nil
@@ -353,6 +388,8 @@ func tagparse(v string) (map[string]string, error) {
 			out["ignore"] = "true"
 		} else if elem == "transparent" {
 			out["transparent"] = "true"
+		} else if elem == "optional" {
+			out["optional"] = "true"
 		} else {
 			out["name"] = elem
 		}
@@ -440,6 +477,9 @@ func (g Gen) emitCborMarshalStructField(w io.Writer, f Field) error {
 	case bigIntType:
 		return g.doTemplate(w, f, `
 	{
+		if {{ .Name }} != nil && {{ .Name }}.Sign() < 0 {
+			return xerrors.Errorf("Value in field {{ .Name | js }} was a negative big-integer (not supported)")
+		}
 		if err := cw.CborWriteHeader(cbg.MajTag, 2); err != nil {
 			return err
 		}
@@ -1369,9 +1409,10 @@ func (g Gen) emitCborUnmarshalSliceField(w io.Writer, f Field) error {
 
 	case reflect.String:
 		subf := Field{
-			Type: e,
-			Pkg:  f.Pkg,
-			Name: f.Name + "[" + f.IterLabel + "]",
+			Type:    e,
+			Pkg:     f.Pkg,
+			Pointer: pointer,
+			Name:    f.Name + "[" + f.IterLabel + "]",
 		}
 		err := g.emitCborUnmarshalStringField(w, subf)
 		if err != nil {
@@ -1570,10 +1611,21 @@ func (t *{{ .Name}}) UnmarshalCBOR(r io.Reader) (err error) {
 	if maj != cbg.MajArray {
 		return fmt.Errorf("cbor input should be of type array")
 	}
-
-	if extra != {{ len .Fields }} {
+{{ if eq (len .Fields) .MandatoryFieldCount }}
+	if extra != {{ .MandatoryFieldCount }} {
 		return fmt.Errorf("cbor input had wrong number of fields")
 	}
+{{ else }}
+	if extra > {{ len .Fields }} {
+		return fmt.Errorf("cbor input has too many fields %d > {{ len .Fields }}", extra)
+	}
+
+	if extra < {{ .MandatoryFieldCount }} {
+		return fmt.Errorf("cbor input has too few fields %d < {{ .MandatoryFieldCount }}", extra)
+	}
+	
+	fieldCount := extra
+{{ end }}
 
 `)
 	}
@@ -1581,13 +1633,18 @@ func (t *{{ .Name}}) UnmarshalCBOR(r io.Reader) (err error) {
 		return err
 	}
 
-	for _, f := range gti.Fields {
+	for fieldIndex, f := range gti.Fields {
 		if f.Name == FieldNameSelf {
 			f.Name = "(*t)" // self
 		} else {
 			f.Name = "t." + f.Name
 		}
+
 		fmt.Fprintf(w, "\t// %s (%s) (%s)\n", f.Name, f.Type, f.Type.Kind())
+
+		if f.Optional {
+			fmt.Fprintf(w, "\tif fieldCount < %d {\n\t\treturn nil\n\t}\n", fieldIndex+1)
+		}
 
 		switch f.Type.Kind() {
 		case reflect.String:
@@ -1679,7 +1736,7 @@ func (g Gen) emitCborMarshalStructMap(w io.Writer, gti *GenTypeInfo) error {
 	}
 
 	if gti.Transparent {
-		return fmt.Errorf("transparent fields not supported in map mode, use tuple encoding (outcome should be the same)")
+		return fmt.Errorf("%#v: transparent fields not supported in map mode, use tuple encoding (outcome should be the same)", gti.Name)
 	}
 
 	err := g.doTemplate(w, gti, `func (t *{{ .Name }}) MarshalCBOR(w io.Writer) error {
@@ -1838,21 +1895,30 @@ func (t *{{ .Name}}) UnmarshalCBOR(r io.Reader) (err error) {
 		return fmt.Errorf("{{ .Name }}: map struct too large (%d)", extra)
 	}
 
-	var name string
 	n := extra
 
+	nameBuf := make([]byte, {{ .MaxMapKeyLength }})
 	for i := uint64(0); i < n; i++ {
+		nameLen, ok, err := cbg.ReadFullStringIntoBuf(cr, nameBuf, {{ MaxLen 0 "String" }})
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			// Field doesn't exist on this type, so ignore it
+			if err := cbg.ScanForLinks(cr, func(cid.Cid){}); err != nil {
+				return err
+			}
+			continue
+		}
+
 `)
 	if err != nil {
 		return err
 	}
 
-	if err := g.emitCborUnmarshalStringField(w, Field{Name: "name"}); err != nil {
-		return err
-	}
-
 	err = g.doTemplate(w, gti, `
-		switch name {
+		switch string(nameBuf[:nameLen]) {
 `)
 	if err != nil {
 		return err
@@ -1915,7 +1981,9 @@ func (t *{{ .Name}}) UnmarshalCBOR(r io.Reader) (err error) {
 	return g.doTemplate(w, gti, `
 		default:
 			// Field doesn't exist on this type, so ignore it
-			cbg.ScanForLinks(r, func(cid.Cid){})
+			if err := cbg.ScanForLinks(r, func(cid.Cid){}); err != nil {
+				return err
+			}
 		}
 	}
 

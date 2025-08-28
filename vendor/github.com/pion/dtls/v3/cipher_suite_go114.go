@@ -11,10 +11,10 @@ import (
 )
 
 // VersionDTLS12 is the DTLS version in the same style as
-// VersionTLSXX from crypto/tls
+// VersionTLSXX from crypto/tls.
 const VersionDTLS12 = 0xfefd
 
-// Convert from our cipherSuite interface to a tls.CipherSuite struct
+// Convert from our cipherSuite interface to a tls.CipherSuite struct.
 func toTLSCipherSuite(c CipherSuite) *tls.CipherSuite {
 	return &tls.CipherSuite{
 		ID:                uint16(c.ID()),
@@ -33,6 +33,7 @@ func CipherSuites() []*tls.CipherSuite {
 	for i, c := range suites {
 		res[i] = toTLSCipherSuite(c)
 	}
+
 	return res
 }
 
@@ -40,5 +41,6 @@ func CipherSuites() []*tls.CipherSuite {
 // this package and which have security issues.
 func InsecureCipherSuites() []*tls.CipherSuite {
 	var res []*tls.CipherSuite
+
 	return res
 }

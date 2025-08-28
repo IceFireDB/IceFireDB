@@ -31,12 +31,12 @@ const (
 	messageCertificateRequestMinLength = 5
 )
 
-// Type returns the Handshake Type
+// Type returns the Handshake Type.
 func (m MessageCertificateRequest) Type() Type {
 	return TypeCertificateRequest
 }
 
-// Marshal encodes the Handshake
+// Marshal encodes the Handshake.
 func (m *MessageCertificateRequest) Marshal() ([]byte, error) {
 	out := []byte{byte(len(m.CertificateTypes))}
 	for _, v := range m.CertificateTypes {
@@ -44,7 +44,7 @@ func (m *MessageCertificateRequest) Marshal() ([]byte, error) {
 	}
 
 	out = append(out, []byte{0x00, 0x00}...)
-	binary.BigEndian.PutUint16(out[len(out)-2:], uint16(len(m.SignatureHashAlgorithms)*2))
+	binary.BigEndian.PutUint16(out[len(out)-2:], uint16(len(m.SignatureHashAlgorithms)*2)) //nolint:gosec //G115
 	for _, v := range m.SignatureHashAlgorithms {
 		out = append(out, byte(v.Hash))
 		out = append(out, byte(v.Signature))
@@ -56,19 +56,20 @@ func (m *MessageCertificateRequest) Marshal() ([]byte, error) {
 		casLength += len(ca) + 2
 	}
 	out = append(out, []byte{0x00, 0x00}...)
-	binary.BigEndian.PutUint16(out[len(out)-2:], uint16(casLength))
+	binary.BigEndian.PutUint16(out[len(out)-2:], uint16(casLength)) //nolint:gosec //G115
 	if casLength > 0 {
 		for _, ca := range m.CertificateAuthoritiesNames {
 			out = append(out, []byte{0x00, 0x00}...)
-			binary.BigEndian.PutUint16(out[len(out)-2:], uint16(len(ca)))
+			binary.BigEndian.PutUint16(out[len(out)-2:], uint16(len(ca))) //nolint:gosec //G115
 			out = append(out, ca...)
 		}
 	}
+
 	return out, nil
 }
 
-// Unmarshal populates the message from encoded data
-func (m *MessageCertificateRequest) Unmarshal(data []byte) error {
+// Unmarshal populates the message from encoded data.
+func (m *MessageCertificateRequest) Unmarshal(data []byte) error { //nolint:cyclop
 	if len(data) < messageCertificateRequestMinLength {
 		return errBufferTooSmall
 	}

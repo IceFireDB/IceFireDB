@@ -68,7 +68,34 @@ type handler struct {
 //
 // [IPFS HTTP Gateway]: https://specs.ipfs.tech/http-gateways/
 func NewHandler(c Config, backend IPFSBackend) http.Handler {
-	return newHandlerWithMetrics(&c, backend)
+	// Get registry from config or use default
+	reg := c.MetricsRegistry
+	if reg == nil {
+		reg = prometheus.DefaultRegisterer
+	}
+
+	// Initialize middleware metrics with the registry
+	metrics := newMiddlewareMetrics(reg)
+
+	h := newHandlerWithMetrics(&c, backend, reg)
+
+	// Apply middleware in order (innermost to outermost)
+	var handler http.Handler = h
+
+	// Retrieval timeout middleware (innermost after main handler)
+	if c.RetrievalTimeout > 0 {
+		handler = withRetrievalTimeout(handler, c.RetrievalTimeout, &c, metrics)
+	}
+
+	// Concurrent request limiter middleware
+	if c.MaxConcurrentRequests > 0 {
+		handler = withConcurrentRequestLimiter(handler, c.MaxConcurrentRequests, &c, metrics)
+	}
+
+	// Response metrics wrapper (outermost - records ALL responses including middleware responses)
+	handler = withResponseMetrics(handler, metrics)
+
+	return handler
 }
 
 // serveContent replies to the request using the content in the provided Reader
@@ -319,8 +346,7 @@ func (i *handler) getOrHeadHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Debugw("serving codec", "path", contentPath)
 		success = i.serveCodec(r.Context(), w, r, rq)
 	default: // catch-all for unsuported application/vnd.*
-		err := fmt.Errorf("unsupported format %q", responseFormat)
-		i.webError(w, r, err, http.StatusBadRequest)
+		i.webError(w, r, errUnsupportedFormat, http.StatusBadRequest)
 	}
 }
 
@@ -873,21 +899,48 @@ func (i *handler) handleWebRequestErrors(w http.ResponseWriter, r *http.Request,
 // Detect 'Cache-Control: only-if-cached' in request and return data if it is already in the local datastore.
 // https://github.com/ipfs/specs/blob/main/http-gateways/PATH_GATEWAY.md#cache-control-request-header
 func (i *handler) handleOnlyIfCached(w http.ResponseWriter, r *http.Request, contentPath path.Path) bool {
-	if r.Header.Get("Cache-Control") == "only-if-cached" {
-		if !i.backend.IsCached(r.Context(), contentPath) {
-			if r.Method == http.MethodHead {
-				w.WriteHeader(http.StatusPreconditionFailed)
-				return true
-			}
+	if r.Header.Get("Cache-Control") != "only-if-cached" {
+		return false
+	}
+
+	// If RetrievalTimeout is configured, use a timeout for the IsCached check to avoid
+	// returning 504 Gateway Timeout when the remote backend is slow.
+	// If the content is not immediately available, we should return 412 Precondition Failed.
+	// Use 80% of RetrievalTimeout for cache checks. This ensures that if the backend
+	// is slow or unresponsive, we timeout and return 412 before the overall request
+	// would hit RetrievalTimeout and return 504. This distinction is important for
+	// correct HTTP semantics: 412 means "content not in cache" while 504 means
+	// "gateway timeout", and clients may handle these differently.
+	ctx := r.Context()
+	if i.config.RetrievalTimeout != 0 {
+		cacheCheckTimeout := i.config.RetrievalTimeout * 80 / 100
+		checkCtx, cancel := context.WithTimeout(ctx, cacheCheckTimeout)
+		defer cancel()
+		ctx = checkCtx
+	}
+
+	isCached := i.backend.IsCached(ctx, contentPath)
+
+	// If the context timed out, treat as not cached
+	if ctx.Err() != nil {
+		isCached = false
+	}
+
+	if isCached && r.Method == http.MethodHead {
+		w.WriteHeader(http.StatusOK)
+		return true
+	}
+
+	if !isCached {
+		if r.Method == http.MethodHead {
+			w.WriteHeader(http.StatusPreconditionFailed)
+		} else {
 			errMsg := fmt.Sprintf("%q not in local datastore", contentPath.String())
 			http.Error(w, errMsg, http.StatusPreconditionFailed)
-			return true
 		}
-		if r.Method == http.MethodHead {
-			w.WriteHeader(http.StatusOK)
-			return true
-		}
+		return true
 	}
+
 	return false
 }
 
@@ -899,16 +952,17 @@ func handleProtocolHandlerRedirect(w http.ResponseWriter, r *http.Request, c *Co
 	if uriParam := r.URL.Query().Get("uri"); uriParam != "" {
 		u, err := url.Parse(uriParam)
 		if err != nil {
-			webError(w, r, c, fmt.Errorf("failed to parse uri query parameter: %w", err), http.StatusBadRequest)
+			webError(w, r, c, errInvalidURIQueryParameter, http.StatusBadRequest)
 			return true
 		}
 		if u.Scheme != "ipfs" && u.Scheme != "ipns" {
-			webError(w, r, c, fmt.Errorf("uri query parameter scheme must be ipfs or ipns: %w", err), http.StatusBadRequest)
+			webError(w, r, c, errInvalidURIScheme, http.StatusBadRequest)
 			return true
 		}
-		path := u.Path
+
+		path := u.EscapedPath()
 		if u.RawQuery != "" { // preserve query if present
-			path = path + "?" + u.RawQuery
+			path += "?" + url.PathEscape(u.RawQuery)
 		}
 
 		redirectURL := gopath.Join("/", u.Scheme, u.Host, path)
@@ -989,7 +1043,7 @@ func (i *handler) handleSuperfluousNamespace(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Attempt to fix the superflous namespace
-	intendedPath, err := path.NewPath(strings.TrimPrefix(r.URL.Path, "/ipfs"))
+	intendedPath, err := path.NewPath(strings.TrimPrefix(r.URL.EscapedPath(), "/ipfs"))
 	if err != nil {
 		i.webError(w, r, fmt.Errorf("invalid ipfs path: %w", err), http.StatusBadRequest)
 		return true

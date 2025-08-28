@@ -1,13 +1,10 @@
 syntax = "proto3";
 
-package bitswap.message.v1.pb;
+package ipfs.boxo.bitswap.message.v1.pb;
 
-import "gogoproto/gogo.proto";
-
-option go_package = "bitswap_message_pb";
+option go_package = "github.com/ipfs/boxo/bitswap/message/pb";
 
 message Message {
-
   message Wantlist {
     enum WantType {
       Block = 0;
@@ -15,19 +12,19 @@ message Message {
     }
 
     message Entry {
-			bytes block = 1 [(gogoproto.customtype) = "Cid", (gogoproto.nullable) = false];		// the block cid (cidV0 in bitswap 1.0.0, cidV1 in bitswap 1.1.0)
-			int32 priority = 2;	// the priority (normalized). default to 1
-			bool cancel = 3;		// whether this revokes an entry
-      WantType wantType = 4; // Note: defaults to enum 0, ie Block
-      bool sendDontHave = 5; // Note: defaults to false
-		}
+      bytes block = 1;			// the block cid (cidV0 in bitswap 1.0.0, cidV1 in bitswap 1.1.0)
+      int32 priority = 2;		// the priority (normalized). default to 1
+      bool cancel = 3;			// whether this revokes an entry
+      WantType wantType = 4; 	// Note: defaults to enum 0, ie Block
+      bool sendDontHave = 5; 	// Note: defaults to false
+    }
 
-    repeated Entry entries = 1 [(gogoproto.nullable) = false];	// a list of wantlist entries
-    bool full = 2;							// whether this is the full wantlist. default to false
+    repeated Entry entries = 1;	// a list of wantlist entries
+    bool full = 2;				// whether this is the full wantlist. default to false
   }
 
   message Block {
-    bytes prefix = 1;		// CID prefix (cid version, multicodec and multihash prefix (type + length)
+    bytes prefix = 1;	// CID prefix (cid version, multicodec and multihash prefix (type + length)
     bytes data = 2;
   }
 
@@ -35,14 +32,15 @@ message Message {
     Have = 0;
     DontHave = 1;
   }
+
   message BlockPresence {
-    bytes cid = 1 [(gogoproto.customtype) = "Cid", (gogoproto.nullable) = false];
+    bytes cid = 1;
     BlockPresenceType type = 2;
   }
 
-  Wantlist wantlist = 1 [(gogoproto.nullable) = false];
-  repeated bytes blocks = 2;		// used to send Blocks in bitswap 1.0.0
-  repeated Block payload = 3 [(gogoproto.nullable) = false];		// used to send Blocks in bitswap 1.1.0
-  repeated BlockPresence blockPresences = 4 [(gogoproto.nullable) = false];
+  Wantlist wantlist = 1;
+  repeated bytes blocks = 2;	// used to send Blocks in bitswap 1.0.0
+  repeated Block payload = 3;	// used to send Blocks in bitswap 1.1.0
+  repeated BlockPresence blockPresences = 4;
   int32 pendingBytes = 5;
 }

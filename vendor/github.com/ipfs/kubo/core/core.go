@@ -19,6 +19,7 @@ import (
 	pin "github.com/ipfs/boxo/pinning/pinner"
 	"github.com/ipfs/go-datastore"
 
+	bitswap "github.com/ipfs/boxo/bitswap"
 	bserv "github.com/ipfs/boxo/blockservice"
 	bstore "github.com/ipfs/boxo/blockstore"
 	exchange "github.com/ipfs/boxo/exchange"
@@ -27,8 +28,7 @@ import (
 	pathresolver "github.com/ipfs/boxo/path/resolver"
 	provider "github.com/ipfs/boxo/provider"
 	ipld "github.com/ipfs/go-ipld-format"
-	logging "github.com/ipfs/go-log"
-	goprocess "github.com/jbenet/goprocess"
+	logging "github.com/ipfs/go-log/v2"
 	ddht "github.com/libp2p/go-libp2p-kad-dht/dual"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	psrouter "github.com/libp2p/go-libp2p-pubsub-router"
@@ -97,14 +97,18 @@ type IpfsNode struct {
 	Filters                   *ma.Filters                `optional:"true"`
 	Bootstrapper              io.Closer                  `optional:"true"` // the periodic bootstrapper
 	Routing                   irouting.ProvideManyRouter `optional:"true"` // the routing system. recommend ipfs-dht
+	ContentDiscovery          routing.ContentDiscovery   `optional:"true"` // the discovery part of the routing system
 	DNSResolver               *madns.Resolver            // the DNS resolver
 	IPLDPathResolver          pathresolver.Resolver      `name:"ipldPathResolver"`          // The IPLD path resolver
 	UnixFSPathResolver        pathresolver.Resolver      `name:"unixFSPathResolver"`        // The UnixFS path resolver
 	OfflineIPLDPathResolver   pathresolver.Resolver      `name:"offlineIpldPathResolver"`   // The IPLD path resolver that uses only locally available blocks
 	OfflineUnixFSPathResolver pathresolver.Resolver      `name:"offlineUnixFSPathResolver"` // The UnixFS path resolver that uses only locally available blocks
-	Exchange                  exchange.Interface         // the block exchange + strategy (bitswap)
+	Exchange                  exchange.Interface         // the block exchange + strategy
+	Bitswap                   *bitswap.Bitswap           `optional:"true"` // The Bitswap instance
 	Namesys                   namesys.NameSystem         // the name system, resolves paths to hashes
 	Provider                  provider.System            // the value provider system
+	ProvidingStrategy         config.ReproviderStrategy  `optional:"true"`
+	ProvidingKeyChanFunc      provider.KeyChanFunc       `optional:"true"`
 	IpnsRepub                 *ipnsrp.Republisher        `optional:"true"`
 	ResourceManager           network.ResourceManager    `optional:"true"`
 
@@ -116,8 +120,7 @@ type IpfsNode struct {
 
 	P2P *p2p.P2P `optional:"true"`
 
-	Process goprocess.Process
-	ctx     context.Context
+	ctx context.Context
 
 	stop func() error
 
@@ -132,6 +135,7 @@ type IpfsNode struct {
 type Mounts struct {
 	Ipfs mount.Mount
 	Ipns mount.Mount
+	Mfs  mount.Mount
 }
 
 // Close calls Close() on the App object
@@ -209,7 +213,8 @@ func (n *IpfsNode) loadBootstrapPeers() ([]peer.AddrInfo, error) {
 		return nil, err
 	}
 
-	return cfg.BootstrapPeers()
+	// Use auto-config resolution for actual bootstrap connectivity
+	return cfg.BootstrapPeersWithAutoConf()
 }
 
 func (n *IpfsNode) saveTempBootstrapPeers(ctx context.Context, peerList []peer.AddrInfo) error {

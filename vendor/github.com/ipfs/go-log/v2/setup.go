@@ -86,6 +86,7 @@ var levels = make(map[string]zap.AtomicLevel)
 var primaryFormat LogFormat = ColorizedOutput
 
 // defaultLevel is the default log level
+// New loggers will be set to `defaultLevel` when created
 var defaultLevel LogLevel = LevelError
 
 // primaryCore is the primary logging core
@@ -197,7 +198,7 @@ func setAllLoggers(lvl LogLevel) {
 // SetLogLevel changes the log level of a specific subsystem
 // name=="*" changes all subsystems
 func SetLogLevel(name, level string) error {
-	lvl, err := LevelFromString(level)
+	lvl, err := Parse(level)
 	if err != nil {
 		return err
 	}
@@ -205,6 +206,7 @@ func SetLogLevel(name, level string) error {
 	// wildcard, change all
 	if name == "*" {
 		SetAllLoggers(lvl)
+		defaultLevel = lvl
 		return nil
 	}
 
@@ -224,7 +226,7 @@ func SetLogLevel(name, level string) error {
 // SetLogLevelRegex sets all loggers to level `l` that match expression `e`.
 // An error is returned if `e` fails to compile.
 func SetLogLevelRegex(e, l string) error {
-	lvl, err := LevelFromString(l)
+	lvl, err := Parse(l)
 	if err != nil {
 		return err
 	}
@@ -319,7 +321,7 @@ func configFromEnv() Config {
 	if lvl != "" {
 		for _, kvs := range strings.Split(lvl, ",") {
 			kv := strings.SplitN(kvs, "=", 2)
-			lvl, err := LevelFromString(kv[len(kv)-1])
+			lvl, err := Parse(kv[len(kv)-1])
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error setting log level %q: %s\n", kvs, err)
 				continue
@@ -340,15 +342,16 @@ func configFromEnv() Config {
 		cfg.Stderr = false
 	}
 
+	var stderrOpt, stdoutOpt bool
 	cfg.URL = os.Getenv(envLoggingURL)
 	output := os.Getenv(envLoggingOutput)
 	outputOptions := strings.Split(output, "+")
 	for _, opt := range outputOptions {
 		switch opt {
 		case "stdout":
-			cfg.Stdout = true
+			stdoutOpt = true
 		case "stderr":
-			cfg.Stderr = true
+			stderrOpt = true
 		case "file":
 			if cfg.File == "" {
 				fmt.Fprint(os.Stderr, "please specify a GOLOG_FILE value to write to")
@@ -358,6 +361,11 @@ func configFromEnv() Config {
 				fmt.Fprint(os.Stderr, "please specify a GOLOG_URL value to write to")
 			}
 		}
+	}
+
+	if stdoutOpt || stderrOpt {
+		cfg.Stdout = stdoutOpt
+		cfg.Stderr = stderrOpt
 	}
 
 	// Check that neither of the requested Std* nor the file are TTYs

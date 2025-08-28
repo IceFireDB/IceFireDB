@@ -9,11 +9,11 @@ import (
 	"os"
 	"time"
 
-	proto "github.com/gogo/protobuf/proto"
 	files "github.com/ipfs/boxo/files"
 	dag "github.com/ipfs/boxo/ipld/merkledag"
 	pb "github.com/ipfs/boxo/ipld/unixfs/pb"
 	ipld "github.com/ipfs/go-ipld-format"
+	"google.golang.org/protobuf/proto"
 )
 
 // A LinkResult for any parallel enumeration of links
@@ -111,7 +111,7 @@ func FolderPBDataWithStat(mode os.FileMode, mtime time.Time) []byte {
 
 	data, err := proto.Marshal(pbfile)
 	if err != nil {
-		//this really shouldnt happen, i promise
+		// this really shouldnt happen, i promise
 		panic(err)
 	}
 	return data

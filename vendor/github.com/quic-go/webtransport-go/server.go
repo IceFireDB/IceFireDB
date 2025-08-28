@@ -86,7 +86,7 @@ func (s *Server) init() error {
 	if s.H3.StreamHijacker != nil {
 		return errors.New("StreamHijacker already set")
 	}
-	s.H3.StreamHijacker = func(ft http3.FrameType, connTracingID quic.ConnectionTracingID, str quic.Stream, err error) (bool /* hijacked */, error) {
+	s.H3.StreamHijacker = func(ft http3.FrameType, connTracingID quic.ConnectionTracingID, str *quic.Stream, err error) (bool /* hijacked */, error) {
 		if isWebTransportError(err) {
 			return true, nil
 		}
@@ -105,7 +105,7 @@ func (s *Server) init() error {
 		s.conns.AddStream(connTracingID, str, sessionID(id))
 		return true, nil
 	}
-	s.H3.UniStreamHijacker = func(st http3.StreamType, connTracingID quic.ConnectionTracingID, str quic.ReceiveStream, err error) (hijacked bool) {
+	s.H3.UniStreamHijacker = func(st http3.StreamType, connTracingID quic.ConnectionTracingID, str *quic.ReceiveStream, err error) (hijacked bool) {
 		if st != webTransportUniStreamType && !isWebTransportError(err) {
 			return false
 		}
@@ -123,7 +123,7 @@ func (s *Server) Serve(conn net.PacketConn) error {
 }
 
 // ServeQUICConn serves a single QUIC connection.
-func (s *Server) ServeQUICConn(conn quic.Connection) error {
+func (s *Server) ServeQUICConn(conn *quic.Conn) error {
 	if err := s.initialize(); err != nil {
 		return err
 	}

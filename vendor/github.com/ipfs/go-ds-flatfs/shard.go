@@ -2,7 +2,6 @@ package flatfs
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -31,6 +30,8 @@ func (f *ShardIdV1) Func() ShardFunc {
 	return f.fun
 }
 
+// Prefix returns a sharding function taking the first prefixLen characters of the key.
+// If too short, the key is padded with "_".
 func Prefix(prefixLen int) *ShardIdV1 {
 	padding := strings.Repeat("_", prefixLen)
 	return &ShardIdV1{
@@ -42,6 +43,8 @@ func Prefix(prefixLen int) *ShardIdV1 {
 	}
 }
 
+// Prefix returns a sharding function taking the last suffixLen characters of the key.
+// If too short, the key is padded with "_".
 func Suffix(suffixLen int) *ShardIdV1 {
 	padding := strings.Repeat("_", suffixLen)
 	return &ShardIdV1{
@@ -54,6 +57,9 @@ func Suffix(suffixLen int) *ShardIdV1 {
 	}
 }
 
+// Prefix returns a sharding function taking the suffixLen characters of the key
+// before the very last character.
+// If too short, the key is padded with "_".
 func NextToLast(suffixLen int) *ShardIdV1 {
 	padding := strings.Repeat("_", suffixLen+1)
 	return &ShardIdV1{
@@ -111,7 +117,7 @@ func ParseShardFunc(str string) (*ShardIdV1, error) {
 }
 
 func ReadShardFunc(dir string) (*ShardIdV1, error) {
-	buf, err := ioutil.ReadFile(filepath.Join(dir, SHARDING_FN))
+	buf, err := os.ReadFile(filepath.Join(dir, SHARDING_FN))
 	if os.IsNotExist(err) {
 		return nil, ErrShardingFileMissing
 	} else if err != nil {
@@ -136,7 +142,7 @@ func WriteShardFunc(dir string, id *ShardIdV1) error {
 
 func WriteReadme(dir string, id *ShardIdV1) error {
 	if id.String() == IPFS_DEF_SHARD.String() {
-		err := ioutil.WriteFile(filepath.Join(dir, README_FN), []byte(README_IPFS_DEF_SHARD), 0444)
+		err := os.WriteFile(filepath.Join(dir, README_FN), []byte(README_IPFS_DEF_SHARD), 0444)
 		if err != nil {
 			return err
 		}
