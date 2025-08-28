@@ -23,20 +23,20 @@ type SupportedSignatureAlgorithms struct {
 	SignatureHashAlgorithms []signaturehash.Algorithm
 }
 
-// TypeValue returns the extension TypeValue
+// TypeValue returns the extension TypeValue.
 func (s SupportedSignatureAlgorithms) TypeValue() TypeValue {
 	return SupportedSignatureAlgorithmsTypeValue
 }
 
-// Marshal encodes the extension
+// Marshal encodes the extension.
 func (s *SupportedSignatureAlgorithms) Marshal() ([]byte, error) {
 	out := make([]byte, supportedSignatureAlgorithmsHeaderSize)
 
 	binary.BigEndian.PutUint16(out, uint16(s.TypeValue()))
-	binary.BigEndian.PutUint16(out[2:], uint16(2+(len(s.SignatureHashAlgorithms)*2)))
-	binary.BigEndian.PutUint16(out[4:], uint16(len(s.SignatureHashAlgorithms)*2))
+	binary.BigEndian.PutUint16(out[2:], uint16(2+(len(s.SignatureHashAlgorithms)*2))) //nolint:gosec // G115
+	binary.BigEndian.PutUint16(out[4:], uint16(len(s.SignatureHashAlgorithms)*2))     //nolint:gosec // G115
 	for _, v := range s.SignatureHashAlgorithms {
-		out = append(out, []byte{0x00, 0x00}...)
+		out = append(out, []byte{0x00, 0x00}...) //nolint:makezero // todo: fix
 		out[len(out)-2] = byte(v.Hash)
 		out[len(out)-1] = byte(v.Signature)
 	}
@@ -44,7 +44,7 @@ func (s *SupportedSignatureAlgorithms) Marshal() ([]byte, error) {
 	return out, nil
 }
 
-// Unmarshal populates the extension from encoded data
+// Unmarshal populates the extension from encoded data.
 func (s *SupportedSignatureAlgorithms) Unmarshal(data []byte) error {
 	if len(data) <= supportedSignatureAlgorithmsHeaderSize {
 		return errBufferTooSmall

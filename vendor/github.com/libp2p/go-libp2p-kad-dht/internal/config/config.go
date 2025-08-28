@@ -1,6 +1,8 @@
 package config
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,10 +12,11 @@ import (
 	"github.com/libp2p/go-libp2p-kad-dht/amino"
 	"github.com/libp2p/go-libp2p-kad-dht/internal/net"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
-	"github.com/libp2p/go-libp2p-kad-dht/providers"
+	"github.com/libp2p/go-libp2p-kad-dht/records"
 	"github.com/libp2p/go-libp2p-kbucket/peerdiversity"
 	record "github.com/libp2p/go-libp2p-record"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	ma "github.com/multiformats/go-multiaddr"
@@ -46,7 +49,7 @@ type Config struct {
 	MaxRecordAge           time.Duration
 	EnableProviders        bool
 	EnableValues           bool
-	ProviderStore          providers.ProviderStore
+	ProviderStore          records.ProviderStore
 	QueryPeerFilter        QueryFilterFunc
 	LookupCheckConcurrency int
 	MsgSenderBuilder       func(h host.Host, protos []protocol.ID) pb.MessageSenderWithDisconnect
@@ -63,6 +66,7 @@ type Config struct {
 
 	BootstrapPeers func() []peer.AddrInfo
 	AddressFilter  func([]ma.Multiaddr) []ma.Multiaddr
+	OnRequestHook  func(ctx context.Context, s network.Stream, req *pb.Message)
 
 	// test specific Config options
 	DisableFixLowPeers          bool
@@ -98,7 +102,7 @@ func (c *Config) ApplyFallbacks(h host.Host) error {
 				nsval["ipns"] = ipns.Validator{KeyBook: h.Peerstore()}
 			}
 		} else {
-			return fmt.Errorf("the default Validator was changed without being marked as changed")
+			return errors.New("the default Validator was changed without being marked as changed")
 		}
 	}
 	return nil
@@ -124,7 +128,7 @@ var Defaults = func(o *Config) error {
 	o.RoutingTable.AutoRefresh = true
 	o.RoutingTable.PeerFilter = EmptyRTFilter
 
-	o.MaxRecordAge = providers.ProvideValidity
+	o.MaxRecordAge = records.ProvideValidity
 
 	o.BucketSize = amino.DefaultBucketSize
 	o.Concurrency = amino.DefaultConcurrency

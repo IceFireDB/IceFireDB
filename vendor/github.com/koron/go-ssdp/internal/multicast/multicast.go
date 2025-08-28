@@ -124,11 +124,8 @@ func joinGroupIPv4(conn *net.UDPConn, ifplist []*net.Interface, gaddr net.Addr) 
 
 // Close closes a multicast connection.
 func (mc *Conn) Close() error {
-	if err := mc.pconn.Close(); err != nil {
-		return err
-	}
 	// based net.UDPConn will be closed by mc.pconn.Close()
-	return nil
+	return mc.pconn.Close()
 }
 
 // DataProvider provides a body of multicast message to send.

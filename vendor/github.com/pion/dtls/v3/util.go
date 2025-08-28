@@ -11,6 +11,7 @@ func findMatchingSRTPProfile(a, b []SRTPProtectionProfile) (SRTPProtectionProfil
 			}
 		}
 	}
+
 	return 0, false
 }
 
@@ -22,6 +23,7 @@ func findMatchingCipherSuite(a, b []CipherSuite) (CipherSuite, bool) {
 			}
 		}
 	}
+
 	return nil, false
 }
 

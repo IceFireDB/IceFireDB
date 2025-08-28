@@ -6,16 +6,17 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"math"
 	"time"
 
+	chunker "github.com/ipfs/boxo/chunker"
+	mdag "github.com/ipfs/boxo/ipld/merkledag"
 	ft "github.com/ipfs/boxo/ipld/unixfs"
 	help "github.com/ipfs/boxo/ipld/unixfs/importer/helpers"
 	trickle "github.com/ipfs/boxo/ipld/unixfs/importer/trickle"
 	uio "github.com/ipfs/boxo/ipld/unixfs/io"
-
-	chunker "github.com/ipfs/boxo/chunker"
-	mdag "github.com/ipfs/boxo/ipld/merkledag"
 	cid "github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
 )
@@ -47,6 +48,7 @@ type DagModifier struct {
 
 	Prefix    cid.Prefix
 	RawLeaves bool
+	MaxLinks  int
 
 	read uio.DagReader
 }
@@ -77,6 +79,7 @@ func NewDagModifier(ctx context.Context, from ipld.Node, serv ipld.DAGService, s
 		ctx:       ctx,
 		Prefix:    prefix,
 		RawLeaves: rawLeaves,
+		MaxLinks:  help.DefaultLinksPerBlock,
 	}, nil
 }
 
@@ -290,8 +293,22 @@ func (dm *DagModifier) modifyDag(n ipld.Node, offset uint64) (cid.Cid, error) {
 			}
 
 			// copy remaining data
-			offsetPlusN := int(offset) + n
-			if offsetPlusN < len(origData) {
+
+			// calculate offsetPlusN in uint64 to avoid overflow in int
+			offsetPlusN := offset + uint64(n)
+
+			// check if offsetPlusN exceeds the maximum value of int to prevent overflow
+			// when converting to int for slice indexing. On 32-bit systems, math.MaxInt
+			// is 2^31-1 (~2.14 billion); on 64-bit systems, it’s 2^63-1. This ensures
+			// safe conversion for Go's slice indexing, which requires int.
+			// See: https://github.com/ipfs/boxo/security/code-scanning/7
+			if offsetPlusN > uint64(math.MaxInt) {
+				return cid.Cid{}, fmt.Errorf("offset %d exceeds max int", offsetPlusN)
+			}
+
+			// Convert to int for slice indexing and check against origData length
+			// to ensure we don’t access out-of-bounds data.
+			if int(offsetPlusN) < len(origData) {
 				copy(bytes[offsetPlusN:], origData[offsetPlusN:])
 			}
 
@@ -359,7 +376,7 @@ func (dm *DagModifier) appendData(nd ipld.Node, spl chunker.Splitter) (ipld.Node
 	case *mdag.ProtoNode, *mdag.RawNode:
 		dbp := &help.DagBuilderParams{
 			Dagserv:    dm.dagserv,
-			Maxlinks:   help.DefaultLinksPerBlock,
+			Maxlinks:   dm.MaxLinks,
 			CidBuilder: dm.Prefix,
 			RawLeaves:  dm.RawLeaves,
 		}
@@ -498,13 +515,13 @@ func (dm *DagModifier) Truncate(size int64) error {
 	if err != nil {
 		return err
 	}
-	if size == int64(realSize) {
+	if size == realSize {
 		return nil
 	}
 
 	// Truncate can also be used to expand the file
-	if size > int64(realSize) {
-		return dm.expandSparse(int64(size) - realSize)
+	if size > realSize {
+		return dm.expandSparse(size - realSize)
 	}
 
 	nnode, err := dm.dagTruncate(dm.ctx, dm.curNode, uint64(size))

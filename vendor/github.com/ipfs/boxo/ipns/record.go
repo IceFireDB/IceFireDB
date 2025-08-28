@@ -1,16 +1,18 @@
-//go:generate protoc -I=pb --go_out=pb pb/record.proto
 package ipns
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
+	"strings"
 	"time"
 
 	ipns_pb "github.com/ipfs/boxo/ipns/pb"
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/boxo/util"
+	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
@@ -18,7 +20,6 @@ import (
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 	ic "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"go.uber.org/multierr"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -29,6 +30,9 @@ type ValidityType int64
 // ValidityEOL means "this record is valid until {Validity}". This is currently
 // the only supported Validity type.
 const ValidityEOL ValidityType = 0
+
+// NoopValue is an identity CID that points at zero bytes.
+const NoopValue = "/ipfs/bafkqaaa"
 
 // Record represents an [IPNS Record].
 //
@@ -51,7 +55,7 @@ func UnmarshalRecord(data []byte) (*Record, error) {
 	var pb ipns_pb.IpnsRecord
 	err := proto.Unmarshal(data, &pb)
 	if err != nil {
-		return nil, multierr.Combine(ErrInvalidRecord, err)
+		return nil, errors.Join(ErrInvalidRecord, err)
 	}
 
 	record := &Record{
@@ -60,13 +64,13 @@ func UnmarshalRecord(data []byte) (*Record, error) {
 
 	// Ensure the record has DAG-CBOR data because we need it.
 	if len(pb.GetData()) == 0 {
-		return nil, multierr.Combine(ErrInvalidRecord, ErrDataMissing)
+		return nil, errors.Join(ErrInvalidRecord, ErrDataMissing)
 	}
 
 	// Decode CBOR data.
 	builder := basicnode.Prototype__Map{}.NewBuilder()
 	if err := dagcbor.Decode(builder, bytes.NewReader(pb.GetData())); err != nil {
-		return nil, multierr.Combine(ErrInvalidRecord, err)
+		return nil, errors.Join(ErrInvalidRecord, err)
 	}
 	record.node = builder.Build()
 
@@ -80,18 +84,39 @@ func MarshalRecord(rec *Record) ([]byte, error) {
 	return proto.Marshal(rec.pb)
 }
 
-// Value returns the [path.Path] that is embedded in this IPNS Record. If the
-// path is invalid, an [ErrInvalidPath] is returned.
+// Value returns the [path.Path] that is embedded in this IPNS Record.
+// If the path is invalid, an error is returned.
+// If the value is a binary CID, it is converted to a [path.Path].
+// If the value is empty, a [NoopValue] is used instead.
 func (rec *Record) Value() (path.Path, error) {
 	value, err := rec.getBytesValue(cborValueKey)
 	if err != nil {
 		return nil, err
 	}
 
-	p, err := path.NewPath(string(value))
-	if err != nil {
-		return nil, multierr.Combine(ErrInvalidPath, err)
+	if len(value) == 0 {
+		// To maximize interop across implementations, turn empty value into zero-length identity CID.
+		// This is a convenience placeholder used when the value in record is empty or does
+		// not matter because IPNS is used for custom CBOR in the Data field.
+		value = []byte(NoopValue)
 	}
+
+	// parse as a string with content path
+	if value[0] == '/' {
+		p, err := path.NewPath(string(value))
+		if err != nil {
+			return nil, errors.Join(ErrInvalidPath, err)
+		}
+		// done, finish fast
+		return p, nil
+	}
+
+	// fallback: for legacy/optimization reasons, the value could be a valid CID in byte form
+	binaryCid, err := cid.Cast(value)
+	if err != nil {
+		return nil, errors.Join(ErrInvalidPath, err)
+	}
+	p := path.FromCid(binaryCid)
 
 	return p, nil
 }
@@ -123,7 +148,7 @@ func (rec *Record) Validity() (time.Time, error) {
 
 		v, err := util.ParseRFC3339(string(value))
 		if err != nil {
-			return time.Time{}, multierr.Combine(ErrInvalidValidity, err)
+			return time.Time{}, errors.Join(ErrInvalidValidity, err)
 		}
 		return v, nil
 	default:
@@ -160,12 +185,12 @@ func (rec *Record) PubKey() (ic.PubKey, error) {
 func (rec *Record) getBytesValue(key string) ([]byte, error) {
 	node, err := rec.node.LookupByString(key)
 	if err != nil {
-		return nil, multierr.Combine(ErrInvalidRecord, err)
+		return nil, errors.Join(ErrInvalidRecord, err)
 	}
 
 	value, err := node.AsBytes()
 	if err != nil {
-		return nil, multierr.Combine(ErrInvalidRecord, err)
+		return nil, errors.Join(ErrInvalidRecord, err)
 	}
 
 	return value, nil
@@ -174,12 +199,12 @@ func (rec *Record) getBytesValue(key string) ([]byte, error) {
 func (rec *Record) getIntValue(key string) (int64, error) {
 	node, err := rec.node.LookupByString(key)
 	if err != nil {
-		return -1, multierr.Combine(ErrInvalidRecord, err)
+		return -1, errors.Join(ErrInvalidRecord, err)
 	}
 
 	value, err := node.AsInt()
 	if err != nil {
-		return -1, multierr.Combine(ErrInvalidRecord, err)
+		return -1, errors.Join(ErrInvalidRecord, err)
 	}
 
 	return value, nil
@@ -231,6 +256,11 @@ func processOptions(opts ...Option) *options {
 // option [WithPublicKey]. In addition, records are, by default created with V1
 // compatibility.
 func NewRecord(sk ic.PrivKey, value path.Path, seq uint64, eol time.Time, ttl time.Duration, opts ...Option) (*Record, error) {
+	return newRecord(sk, []byte(value.String()), seq, eol, ttl, opts...)
+}
+
+// newRecord is a private version of NewRecord that allows arbitrary []byte values (used internally for testing)
+func newRecord(sk ic.PrivKey, value []byte, seq uint64, eol time.Time, ttl time.Duration, opts ...Option) (*Record, error) {
 	options := processOptions(opts...)
 
 	node, err := createNode(value, seq, eol, ttl)
@@ -259,7 +289,7 @@ func NewRecord(sk ic.PrivKey, value path.Path, seq uint64, eol time.Time, ttl ti
 	}
 
 	if options.v1Compatibility {
-		pb.Value = []byte(value.String())
+		pb.Value = value
 		typ := ipns_pb.IpnsRecord_EOL
 		pb.ValidityType = &typ
 		pb.Sequence = &seq
@@ -302,11 +332,11 @@ func NewRecord(sk ic.PrivKey, value path.Path, seq uint64, eol time.Time, ttl ti
 	}, nil
 }
 
-func createNode(value path.Path, seq uint64, eol time.Time, ttl time.Duration) (datamodel.Node, error) {
+func createNode(value []byte, seq uint64, eol time.Time, ttl time.Duration) (datamodel.Node, error) {
 	m := make(map[string]ipld.Node)
 	var keys []string
 
-	m[cborValueKey] = basicnode.NewBytes([]byte(value.String()))
+	m[cborValueKey] = basicnode.NewBytes(value)
 	keys = append(keys, cborValueKey)
 
 	m[cborValidityKey] = basicnode.NewBytes([]byte(util.FormatRFC3339(eol)))
@@ -321,12 +351,12 @@ func createNode(value path.Path, seq uint64, eol time.Time, ttl time.Duration) (
 	m[cborTTLKey] = basicnode.NewInt(int64(ttl))
 	keys = append(keys, cborTTLKey)
 
-	sort.Slice(keys, func(i, j int) bool {
-		li, lj := len(keys[i]), len(keys[j])
-		if li == lj {
-			return keys[i] < keys[j]
+	slices.SortFunc(keys, func(a, b string) int {
+		la, lb := len(a), len(b)
+		if la == lb {
+			return strings.Compare(a, b)
 		}
-		return li < lj
+		return cmp.Compare(la, lb)
 	})
 
 	newNd := basicnode.Prototype__Map{}.NewBuilder()
@@ -452,20 +482,22 @@ func compare(a, b *Record) (int, error) {
 // ExtractPublicKey extracts a [crypto.PubKey] matching the given [Name] from
 // the IPNS Record, if possible.
 func ExtractPublicKey(rec *Record, name Name) (ic.PubKey, error) {
-	if pk, err := rec.PubKey(); err == nil {
-		expPid, err := peer.IDFromPublicKey(pk)
-		if err != nil {
-			return nil, multierr.Combine(ErrInvalidPublicKey, err)
+	pk, err := rec.PubKey()
+	if err != nil {
+		if !errors.Is(err, ErrPublicKeyNotFound) {
+			return nil, errors.Join(ErrInvalidPublicKey, err)
 		}
-
-		if !name.Equal(NameFromPeer(expPid)) {
-			return nil, ErrPublicKeyMismatch
-		}
-
-		return pk, nil
-	} else if !errors.Is(err, ErrPublicKeyNotFound) {
-		return nil, multierr.Combine(ErrInvalidPublicKey, err)
-	} else {
 		return name.Peer().ExtractPublicKey()
 	}
+
+	expPid, err := peer.IDFromPublicKey(pk)
+	if err != nil {
+		return nil, errors.Join(ErrInvalidPublicKey, err)
+	}
+
+	if !name.Equal(NameFromPeer(expPid)) {
+		return nil, ErrPublicKeyMismatch
+	}
+
+	return pk, nil
 }

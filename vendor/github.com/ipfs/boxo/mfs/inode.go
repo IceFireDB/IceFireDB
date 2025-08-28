@@ -2,6 +2,7 @@ package mfs
 
 import (
 	ipld "github.com/ipfs/go-ipld-format"
+	"github.com/libp2p/go-libp2p/core/routing"
 )
 
 // inode abstracts the common characteristics of the MFS `File`
@@ -18,4 +19,7 @@ type inode struct {
 	// dagService used to store modifications made to the contents
 	// of the file or directory the `inode` belongs to.
 	dagService ipld.DAGService
+
+	// provider used to announce CIDs
+	prov routing.ContentProviding
 }

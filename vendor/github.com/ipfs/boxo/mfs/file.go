@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
+	chunker "github.com/ipfs/boxo/chunker"
 	dag "github.com/ipfs/boxo/ipld/merkledag"
 	ft "github.com/ipfs/boxo/ipld/unixfs"
 	mod "github.com/ipfs/boxo/ipld/unixfs/mod"
-
-	chunker "github.com/ipfs/boxo/chunker"
 	ipld "github.com/ipfs/go-ipld-format"
+	"github.com/libp2p/go-libp2p/core/routing"
 )
 
 // File represents a file in the MFS, its logic its mainly targeted
@@ -24,10 +24,11 @@ type File struct {
 	// Lock to coordinate the `FileDescriptor`s associated to this file.
 	desclock sync.RWMutex
 
-	// This isn't any node, it's the root node that represents the
-	// entire DAG of nodes that comprise the file.
-	// TODO: Rename, there should be an explicit term for these root nodes
-	// of a particular sub-DAG that abstract an upper layer's entity.
+	// This isn't any node, it's the root node that represents the entire DAG
+	// of nodes that comprise the file.
+	//
+	// TODO: Rename, there should be an explicit term for these root nodes of a
+	// particular sub-DAG that abstract an upper layer's entity.
 	node ipld.Node
 
 	// Lock around the `node` that represents this file, necessary because
@@ -37,14 +38,16 @@ type File struct {
 	RawLeaves bool
 }
 
-// NewFile returns a NewFile object with the given parameters.  If the
-// Cid version is non-zero RawLeaves will be enabled.
-func NewFile(name string, node ipld.Node, parent parent, dserv ipld.DAGService) (*File, error) {
+// NewFile returns a NewFile object with the given parameters. If the CID
+// version is non-zero RawLeaves will be enabled. A nil providing parameter
+// means that MFS will not provide content to the routing system.
+func NewFile(name string, node ipld.Node, parent parent, dserv ipld.DAGService, providing routing.ContentProviding) (*File, error) {
 	fi := &File{
 		inode: inode{
 			name:       name,
 			parent:     parent,
 			dagService: dserv,
+			prov:       providing,
 		},
 		node: node,
 	}
@@ -77,10 +80,9 @@ func (fi *File) Open(flags Flags) (_ FileDescriptor, _retErr error) {
 	node := fi.node
 	fi.nodeLock.RUnlock()
 
-	// TODO: Move this `switch` logic outside (maybe even
-	// to another package, this seems like a job of UnixFS),
-	// `NewDagModifier` uses the IPLD node, we're not
-	// extracting anything just doing a safety check.
+	// TODO: Move this `switch` logic outside (maybe even to another package,
+	// this seems like a job of UnixFS), `NewDagModifier` uses the IPLD node,
+	// we're not extracting anything just doing a safety check.
 	switch node := node.(type) {
 	case *dag.ProtoNode:
 		fsn, err := ft.FSNodeFromBytes(node.Data())
@@ -117,11 +119,13 @@ func (fi *File) Open(flags Flags) (_ FileDescriptor, _retErr error) {
 }
 
 // Size returns the size of this file
+//
 // TODO: Should we be providing this API?
-// TODO: There's already a `FileDescriptor.Size()` that
-// through the `DagModifier`'s `fileSize` function is doing
-// pretty much the same thing as here, we should at least call
-// that function and wrap the `ErrNotUnixfs` with an MFS text.
+//
+// TODO: There's already a `FileDescriptor.Size()` that through the
+// `DagModifier`'s `fileSize` function is doing pretty much the same thing as
+// here, we should at least call that function and wrap the `ErrNotUnixfs` with
+// an MFS text.
 func (fi *File) Size() (int64, error) {
 	fi.nodeLock.RLock()
 	defer fi.nodeLock.RUnlock()
@@ -140,6 +144,7 @@ func (fi *File) Size() (int64, error) {
 }
 
 // GetNode returns the dag node associated with this file
+//
 // TODO: Use this method and do not access the `nodeLock` directly anywhere else.
 func (fi *File) GetNode() (ipld.Node, error) {
 	fi.nodeLock.RLock()
@@ -147,14 +152,13 @@ func (fi *File) GetNode() (ipld.Node, error) {
 	return fi.node, nil
 }
 
-// TODO: Tight coupling with the `FileDescriptor`, at the
-// very least this should be an independent function that
-// takes a `File` argument and automates the open/flush/close
-// operations.
-// TODO: Why do we need to flush a file that isn't opened?
-// (the `OpenWriteOnly` seems to implicitly be targeting a
-// closed file, a file we forgot to flush? can we close
-// a file without flushing?)
+// TODO: Tight coupling with the `FileDescriptor`, at the very least this
+// should be an independent function that takes a `File` argument and automates
+// the open/flush/close operations.
+//
+// TODO: Why do we need to flush a file that isn't opened? (the `OpenWriteOnly`
+// seems to implicitly be targeting a closed file, a file we forgot to flush?
+// can we close a file without flushing?)
 func (fi *File) Flush() error {
 	// open the file in fullsync mode
 	fd, err := fi.Open(Flags{Write: true, Sync: true})
@@ -175,7 +179,7 @@ func (fi *File) Sync() error {
 	return nil
 }
 
-// Type returns the type FSNode this is
+// Type returns the type FSNode this is.
 func (fi *File) Type() NodeType {
 	return TFile
 }
@@ -220,7 +224,7 @@ func (fi *File) SetMode(mode os.FileMode) error {
 	return fi.setNodeData(data)
 }
 
-// ModTime returns the files' last modification time
+// ModTime returns the files' last modification time.
 func (fi *File) ModTime() (time.Time, error) {
 	fi.nodeLock.RLock()
 	defer fi.nodeLock.RUnlock()
@@ -236,7 +240,7 @@ func (fi *File) ModTime() (time.Time, error) {
 	return fsn.ModTime(), nil
 }
 
-// SetModTime sets the files' last modification time
+// SetModTime sets the files' last modification time.
 func (fi *File) SetModTime(ts time.Time) error {
 	nd, err := fi.GetNode()
 	if err != nil {
@@ -264,16 +268,22 @@ func (fi *File) SetModTime(ts time.Time) error {
 
 func (fi *File) setNodeData(data []byte) error {
 	nd := dag.NodeWithData(data)
-	err := fi.inode.dagService.Add(context.TODO(), nd)
+	err := fi.dagService.Add(context.TODO(), nd)
 	if err != nil {
 		return err
 	}
 
-	fi.nodeLock.Lock()
-	defer fi.nodeLock.Unlock()
-	fi.node = nd
-	parent := fi.inode.parent
-	name := fi.inode.name
+	if fi.prov != nil {
+		log.Debugf("mfs: provide: %s", nd.Cid())
+		if err = fi.prov.Provide(context.TODO(), nd.Cid(), true); err != nil {
+			log.Errorf("error providing %s: %s", nd.Cid(), err)
+		}
+	}
 
+	fi.nodeLock.Lock()
+	fi.node = nd
+	parent := fi.parent
+	name := fi.name
+	fi.nodeLock.Unlock()
 	return parent.updateChildEntry(child{name, fi.node})
 }

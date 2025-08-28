@@ -157,25 +157,45 @@ func (p *IPNSPublisher) updateRecord(ctx context.Context, k crypto.PrivKey, valu
 		return nil, err
 	}
 
-	seq := uint64(0)
-	if rec != nil {
-		seq, err = rec.Sequence()
-		if err != nil {
-			return nil, err
-		}
-
-		p, err := rec.Value()
-		if err != nil {
-			return nil, err
-		}
-		if value.String() != p.String() {
-			// Don't bother incrementing the sequence number unless the
-			// value changes.
-			seq++
-		}
-	}
-
 	opts := ProcessPublishOptions(options)
+
+	seq := uint64(0)
+
+	if rec != nil {
+		currentSeq, err := rec.Sequence()
+		if err != nil {
+			return nil, err
+		}
+
+		if opts.Sequence != nil {
+			// Custom sequence provided - validate it's greater than current.
+			// IPNS records must have monotonically increasing sequence numbers
+			// to prevent unintentional replay attacks or broken updates that would
+			// be ignored by clients that have an older record with higher sequence.
+			if *opts.Sequence <= currentSeq {
+				return nil, ErrInvalidSequence
+			}
+			seq = *opts.Sequence
+		} else {
+			// No custom sequence - use existing logic
+			seq = currentSeq
+			p, err := rec.Value()
+			if err != nil {
+				return nil, err
+			}
+			if value.String() != p.String() {
+				// Don't bother incrementing the sequence number unless the
+				// value changes.
+				// TODO: also compare Data field (https://specs.ipfs.tech/ipns/ipns-record/#extensible-data-dag-cbor)
+				// if we ever expose ability to set custom CBOR in PublishOptions
+				seq++
+			}
+		}
+	} else if opts.Sequence != nil {
+		// No existing record, custom sequence provided
+		seq = *opts.Sequence
+	}
+	// If no existing record and no custom sequence, seq remains 0
 
 	// Create record
 	r, err := ipns.NewRecord(k, value, seq, opts.EOL, opts.TTL, opts.IPNSOptions...)

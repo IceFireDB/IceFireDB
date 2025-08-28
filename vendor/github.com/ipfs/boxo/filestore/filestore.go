@@ -239,9 +239,4 @@ func (f *Filestore) PutMany(ctx context.Context, bs []blocks.Block) error {
 	return nil
 }
 
-// HashOnRead calls blockstore.HashOnRead.
-func (f *Filestore) HashOnRead(enabled bool) {
-	f.bs.HashOnRead(enabled)
-}
-
 var _ blockstore.Blockstore = (*Filestore)(nil)

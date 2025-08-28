@@ -70,6 +70,11 @@ func (logger *ZapEventLogger) Warningf(format string, args ...interface{}) {
 	logger.skipLogger.Warnf(format, args...)
 }
 
+// LevelEnabled returns true if the LogLevel is enabled for the logger.
+func (logger *ZapEventLogger) LevelEnabled(level LogLevel) bool {
+	return logger.Level().Enabled(zapcore.Level(level))
+}
+
 // FormatRFC3339 returns the given time in UTC with RFC3999Nano format.
 func FormatRFC3339(t time.Time) string {
 	return t.UTC().Format(time.RFC3339Nano)

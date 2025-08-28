@@ -24,7 +24,7 @@ type ipfsBackendWithMetrics struct {
 	backendCallMetric *prometheus.HistogramVec
 }
 
-func newIPFSBackendWithMetrics(backend IPFSBackend) *ipfsBackendWithMetrics {
+func newIPFSBackendWithMetrics(backend IPFSBackend, reg prometheus.Registerer) *ipfsBackendWithMetrics {
 	// We can add buckets as a parameter in the future, but for now using static defaults
 	// suggested in https://github.com/ipfs/kubo/issues/8441
 
@@ -39,7 +39,7 @@ func newIPFSBackendWithMetrics(backend IPFSBackend) *ipfsBackendWithMetrics {
 		[]string{"name", "result"},
 	)
 
-	if err := prometheus.Register(backendCallMetric); err != nil {
+	if err := reg.Register(backendCallMetric); err != nil {
 		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
 			backendCallMetric = are.ExistingCollector.(*prometheus.HistogramVec)
 		} else {
@@ -178,8 +178,10 @@ func (b *ipfsBackendWithMetrics) GetDNSLinkRecord(ctx context.Context, fqdn stri
 	return p, err
 }
 
-var _ IPFSBackend = (*ipfsBackendWithMetrics)(nil)
-var _ WithContextHint = (*ipfsBackendWithMetrics)(nil)
+var (
+	_ IPFSBackend     = (*ipfsBackendWithMetrics)(nil)
+	_ WithContextHint = (*ipfsBackendWithMetrics)(nil)
+)
 
 func (b *ipfsBackendWithMetrics) WrapContextForRequest(ctx context.Context) context.Context {
 	if withCtxWrap, ok := b.backend.(WithContextHint); ok {
@@ -188,76 +190,88 @@ func (b *ipfsBackendWithMetrics) WrapContextForRequest(ctx context.Context) cont
 	return ctx
 }
 
-func newHandlerWithMetrics(c *Config, backend IPFSBackend) *handler {
+func newHandlerWithMetrics(c *Config, backend IPFSBackend, reg prometheus.Registerer) *handler {
 	i := &handler{
 		config:  c,
-		backend: newIPFSBackendWithMetrics(backend),
+		backend: newIPFSBackendWithMetrics(backend, reg),
 
 		// Response-type specific metrics
 		// ----------------------------
 		requestTypeMetric: newRequestTypeMetric(
 			"gw_request_types",
 			"The number of requests per implicit or explicit request type.",
+			reg,
 		),
 		// Generic: time it takes to execute a successful gateway request (all request types)
 		getMetric: newHistogramMetric(
 			"gw_get_duration_seconds",
 			"The time to GET a successful response to a request (all content types).",
+			reg,
 		),
 		// UnixFS: time it takes to return a file
 		unixfsFileGetMetric: newHistogramMetric(
 			"gw_unixfs_file_get_duration_seconds",
 			"The time to serve an entire UnixFS file from the gateway.",
+			reg,
 		),
 		// UnixFS: time it takes to find and serve an index.html file on behalf of a directory.
 		unixfsDirIndexGetMetric: newHistogramMetric(
 			"gw_unixfs_dir_indexhtml_get_duration_seconds",
 			"The time to serve an index.html file on behalf of a directory from the gateway. This is a subset of gw_unixfs_file_get_duration_seconds.",
+			reg,
 		),
 		// UnixFS: time it takes to generate static HTML with directory listing
 		unixfsGenDirListingGetMetric: newHistogramMetric(
 			"gw_unixfs_gen_dir_listing_get_duration_seconds",
 			"The time to serve a generated UnixFS HTML directory listing from the gateway.",
+			reg,
 		),
 		// CAR: time it takes to return requested CAR stream
 		carStreamGetMetric: newHistogramMetric(
 			"gw_car_stream_get_duration_seconds",
 			"The time to GET an entire CAR stream from the gateway.",
+			reg,
 		),
 		carStreamFailMetric: newHistogramMetric(
 			"gw_car_stream_fail_duration_seconds",
 			"How long a CAR was streamed before failing mid-stream.",
+			reg,
 		),
 		// Block: time it takes to return requested Block
 		rawBlockGetMetric: newHistogramMetric(
 			"gw_raw_block_get_duration_seconds",
 			"The time to GET an entire raw Block from the gateway.",
+			reg,
 		),
 		// TAR: time it takes to return requested TAR stream
 		tarStreamGetMetric: newHistogramMetric(
 			"gw_tar_stream_get_duration_seconds",
 			"The time to GET an entire TAR stream from the gateway.",
+			reg,
 		),
 		// TAR: time it takes to return requested TAR stream
 		tarStreamFailMetric: newHistogramMetric(
 			"gw_tar_stream_fail_duration_seconds",
 			"How long a TAR was streamed before failing mid-stream.",
+			reg,
 		),
 		// JSON/CBOR: time it takes to return requested DAG-JSON/-CBOR document
 		jsoncborDocumentGetMetric: newHistogramMetric(
 			"gw_jsoncbor_get_duration_seconds",
 			"The time to GET an entire DAG-JSON/CBOR block from the gateway.",
+			reg,
 		),
 		// IPNS Record: time it takes to return IPNS record
 		ipnsRecordGetMetric: newHistogramMetric(
 			"gw_ipns_record_get_duration_seconds",
 			"The time to GET an entire IPNS Record from the gateway.",
+			reg,
 		),
 	}
 	return i
 }
 
-func newRequestTypeMetric(name string, help string) *prometheus.CounterVec {
+func newRequestTypeMetric(name string, help string, reg prometheus.Registerer) *prometheus.CounterVec {
 	// We can add buckets as a parameter in the future, but for now using static defaults
 	// suggested in https://github.com/ipfs/kubo/issues/8441
 	metric := prometheus.NewCounterVec(
@@ -269,7 +283,7 @@ func newRequestTypeMetric(name string, help string) *prometheus.CounterVec {
 		},
 		[]string{"gateway", "type"},
 	)
-	if err := prometheus.Register(metric); err != nil {
+	if err := reg.Register(metric); err != nil {
 		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
 			metric = are.ExistingCollector.(*prometheus.CounterVec)
 		} else {
@@ -279,7 +293,7 @@ func newRequestTypeMetric(name string, help string) *prometheus.CounterVec {
 	return metric
 }
 
-func newHistogramMetric(name string, help string) *prometheus.HistogramVec {
+func newHistogramMetric(name string, help string, reg prometheus.Registerer) *prometheus.HistogramVec {
 	// We can add buckets as a parameter in the future, but for now using static defaults
 	// suggested in https://github.com/ipfs/kubo/issues/8441
 	histogramMetric := prometheus.NewHistogramVec(
@@ -292,7 +306,7 @@ func newHistogramMetric(name string, help string) *prometheus.HistogramVec {
 		},
 		[]string{"gateway"},
 	)
-	if err := prometheus.Register(histogramMetric); err != nil {
+	if err := reg.Register(histogramMetric); err != nil {
 		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
 			histogramMetric = are.ExistingCollector.(*prometheus.HistogramVec)
 		} else {
@@ -306,4 +320,15 @@ var tracer = otel.Tracer("boxo/gateway")
 
 func spanTrace(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	return tracer.Start(ctx, "Gateway."+spanName, opts...)
+}
+
+// registerMetric registers metrics in registry or logs an error.
+//
+// Registration may error if metric is alreadyregistered. we are not using
+// MustRegister here to allow people to run tests in parallel without having to
+// write tedious  glue code that creates unique registry for each unit test
+func registerMetric(registry prometheus.Registerer, metric prometheus.Collector) {
+	if err := registry.Register(metric); err != nil {
+		log.Errorf("failed to register %v: %v", metric, err)
+	}
 }

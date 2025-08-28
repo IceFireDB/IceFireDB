@@ -44,3 +44,15 @@ func PendingBlocksGauge(ctx context.Context) metrics.Gauge {
 func ActiveBlocksGauge(ctx context.Context) metrics.Gauge {
 	return metrics.NewCtx(ctx, "active_block_tasks", "Total number of active blockstore tasks").Gauge()
 }
+
+func HavesReceivedGauge(ctx context.Context) metrics.Gauge {
+	return metrics.NewCtx(ctx, "haves_received", "Number of have blocks received.").Gauge()
+}
+
+func BlocksReceivedGauge(ctx context.Context) metrics.Gauge {
+	return metrics.NewCtx(ctx, "blocks_received", "Number of blocks received.").Gauge()
+}
+
+func BroadcastSkipGauge(ctx context.Context) metrics.Gauge {
+	return metrics.NewCtx(ctx, "bcast_skips_total", "Number of broadcasts to peers avoided.").Gauge()
+}
