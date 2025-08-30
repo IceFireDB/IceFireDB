@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"hash/fnv"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/ledisdb/ledisdb/ledis"
@@ -10,6 +12,17 @@ import (
 	"github.com/tidwall/redcon"
 	"github.com/tidwall/uhaha"
 )
+
+// Key-based mutex lock to ensure atomicity of RPOPLPUSH operations
+const mutexCount = 256 // Sufficient locks to reduce contention
+var listMutexes [mutexCount]sync.Mutex
+
+// keyMutexIndex calculates mutex index based on key
+func keyMutexIndex(key []byte) uint32 {
+	h := fnv.New32a()
+	h.Write(key)
+	return h.Sum32() % mutexCount
+}
 
 func init() {
 	//All block type instructions of the queue need to be avoided, dangerous operation
@@ -24,10 +37,10 @@ func init() {
 	conf.AddReadCommand("LLEN", cmdLLEN)
 	conf.AddWriteCommand("RPOPLPUSH", cmdRPOPLPUSH)
 
-	//IceFireDB special command
+	// IceFireDB special commands
 	conf.AddWriteCommand("LCLEAR", cmdLCLEAR)
 	conf.AddWriteCommand("LMCLEAR", cmdLMCLEAR)
-	//Timeout instruction: be cautious, the raft log is rolled back, causing dirty data: timeout LEXPIRE => LEXPIREAT
+	// Timeout instructions: be cautious, raft log rollback causes dirty data: timeout LEXPIRE => LEXPIREAT
 	conf.AddWriteCommand("LEXPIRE", cmdLEXPIRE)
 	conf.AddWriteCommand("LEXPIREAT", cmdLEXPIREAT)
 	conf.AddReadCommand("LTTL", cmdLTTL)
@@ -186,13 +199,22 @@ func cmdRPOPLPUSH(m uhaha.Machine, args []string) (interface{}, error) {
 	source, dest := []byte(args[1]), []byte(args[2])
 
 	var ttl int64 = -1
+	var expireTime int64 = -1
 	if bytes.Compare(source, dest) == 0 {
 		var err error
 		ttl, err = ldb.LTTL(source)
 		if err != nil {
 			return nil, err
 		}
+		if ttl != -1 {
+			expireTime = m.Now().Unix() + ttl
+		}
 	}
+
+	// Use key-based mutex lock to ensure atomicity
+	mutexIndex := keyMutexIndex(source)
+	listMutexes[mutexIndex].Lock()
+	defer listMutexes[mutexIndex].Unlock()
 
 	data, err := ldb.RPop(source)
 	if err != nil {
@@ -208,9 +230,9 @@ func cmdRPOPLPUSH(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	//reset ttl
-	if ttl != -1 {
-		ldb.LExpire(source, ttl)
+	//reset ttl using absolute time
+	if expireTime != -1 {
+		ldb.LExpireAt(source, expireTime)
 	}
 
 	return data, nil
