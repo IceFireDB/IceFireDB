@@ -96,14 +96,14 @@ type ClusterOptions struct {
 	// Larger buffers can improve performance for commands that return large responses.
 	// Smaller buffers can improve memory usage for larger pools.
 	//
-	// default: 256KiB (262144 bytes)
+	// default: 32KiB (32768 bytes)
 	ReadBufferSize int
 
 	// WriteBufferSize is the size of the bufio.Writer buffer for each connection.
 	// Larger buffers can improve performance for large pipelines and commands with many arguments.
 	// Smaller buffers can improve memory usage for larger pools.
 	//
-	// default: 256KiB (262144 bytes)
+	// default: 32KiB (32768 bytes)
 	WriteBufferSize int
 
 	TLSConfig *tls.Config
@@ -124,6 +124,11 @@ type ClusterOptions struct {
 
 	// UnstableResp3 enables Unstable mode for Redis Search module with RESP3.
 	UnstableResp3 bool
+
+	// FailingTimeoutSeconds is the timeout in seconds for marking a cluster node as failing.
+	// When a node is marked as failing, it will be avoided for this duration.
+	// Default is 15 seconds.
+	FailingTimeoutSeconds int
 }
 
 func (opt *ClusterOptions) init() {
@@ -179,6 +184,10 @@ func (opt *ClusterOptions) init() {
 
 	if opt.NewClient == nil {
 		opt.NewClient = NewClient
+	}
+
+	if opt.FailingTimeoutSeconds == 0 {
+		opt.FailingTimeoutSeconds = 15
 	}
 }
 
@@ -284,6 +293,7 @@ func setupClusterQueryParams(u *url.URL, o *ClusterOptions) (*ClusterOptions, er
 	o.PoolTimeout = q.duration("pool_timeout")
 	o.ConnMaxLifetime = q.duration("conn_max_lifetime")
 	o.ConnMaxIdleTime = q.duration("conn_max_idle_time")
+	o.FailingTimeoutSeconds = q.int("failing_timeout_seconds")
 
 	if q.err != nil {
 		return nil, q.err
@@ -330,20 +340,21 @@ func (opt *ClusterOptions) clientOptions() *Options {
 		WriteTimeout:          opt.WriteTimeout,
 		ContextTimeoutEnabled: opt.ContextTimeoutEnabled,
 
-		PoolFIFO:         opt.PoolFIFO,
-		PoolSize:         opt.PoolSize,
-		PoolTimeout:      opt.PoolTimeout,
-		MinIdleConns:     opt.MinIdleConns,
-		MaxIdleConns:     opt.MaxIdleConns,
-		MaxActiveConns:   opt.MaxActiveConns,
-		ConnMaxIdleTime:  opt.ConnMaxIdleTime,
-		ConnMaxLifetime:  opt.ConnMaxLifetime,
-		ReadBufferSize:   opt.ReadBufferSize,
-		WriteBufferSize:  opt.WriteBufferSize,
-		DisableIdentity:  opt.DisableIdentity,
-		DisableIndentity: opt.DisableIdentity,
-		IdentitySuffix:   opt.IdentitySuffix,
-		TLSConfig:        opt.TLSConfig,
+		PoolFIFO:              opt.PoolFIFO,
+		PoolSize:              opt.PoolSize,
+		PoolTimeout:           opt.PoolTimeout,
+		MinIdleConns:          opt.MinIdleConns,
+		MaxIdleConns:          opt.MaxIdleConns,
+		MaxActiveConns:        opt.MaxActiveConns,
+		ConnMaxIdleTime:       opt.ConnMaxIdleTime,
+		ConnMaxLifetime:       opt.ConnMaxLifetime,
+		ReadBufferSize:        opt.ReadBufferSize,
+		WriteBufferSize:       opt.WriteBufferSize,
+		DisableIdentity:       opt.DisableIdentity,
+		DisableIndentity:      opt.DisableIdentity,
+		IdentitySuffix:        opt.IdentitySuffix,
+		FailingTimeoutSeconds: opt.FailingTimeoutSeconds,
+		TLSConfig:             opt.TLSConfig,
 		// If ClusterSlots is populated, then we probably have an artificial
 		// cluster whose nodes are not in clustering mode (otherwise there isn't
 		// much use for ClusterSlots config).  This means we cannot execute the
@@ -432,7 +443,7 @@ func (n *clusterNode) MarkAsFailing() {
 }
 
 func (n *clusterNode) Failing() bool {
-	const timeout = 15 // 15 seconds
+	timeout := int64(n.Client.opt.FailingTimeoutSeconds)
 
 	failing := atomic.LoadUint32(&n.failing)
 	if failing == 0 {
@@ -770,12 +781,25 @@ func replaceLoopbackHost(nodeAddr, originHost string) string {
 	return net.JoinHostPort(originHost, nodePort)
 }
 
+// isLoopback returns true if the host is a loopback address.
+// For IP addresses, it uses net.IP.IsLoopback().
+// For hostnames, it recognizes well-known loopback hostnames like "localhost"
+// and Docker-specific loopback patterns like "*.docker.internal".
 func isLoopback(host string) bool {
 	ip := net.ParseIP(host)
-	if ip == nil {
+	if ip != nil {
+		return ip.IsLoopback()
+	}
+
+	if strings.ToLower(host) == "localhost" {
 		return true
 	}
-	return ip.IsLoopback()
+
+	if strings.HasSuffix(strings.ToLower(host), ".docker.internal") {
+		return true
+	}
+
+	return false
 }
 
 func (c *clusterState) slotMasterNode(slot int) (*clusterNode, error) {
@@ -1810,14 +1834,33 @@ func (c *ClusterClient) pubSub() *PubSub {
 			}
 
 			var err error
+
 			if len(channels) > 0 {
 				slot := hashtag.Slot(channels[0])
-				node, err = c.slotMasterNode(ctx, slot)
+
+				// newConn in PubSub is only used for subscription connections, so it is safe to
+				// assume that a slave node can always be used when client options specify ReadOnly.
+				if c.opt.ReadOnly {
+					state, err := c.state.Get(ctx)
+					if err != nil {
+						return nil, err
+					}
+
+					node, err = c.slotReadOnlyNode(state, slot)
+					if err != nil {
+						return nil, err
+					}
+				} else {
+					node, err = c.slotMasterNode(ctx, slot)
+					if err != nil {
+						return nil, err
+					}
+				}
 			} else {
 				node, err = c.nodes.Random()
-			}
-			if err != nil {
-				return nil, err
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			cn, err := node.Client.newConn(context.TODO())
