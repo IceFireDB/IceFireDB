@@ -130,13 +130,12 @@ orders:
 			continue
 		case dsq.OrderByKey, *dsq.OrderByKey,
 			dsq.OrderByKeyDescending, *dsq.OrderByKeyDescending:
-			// if the key transform preserves order, we can delegate
-			// to the child datastore.
+			// if the key transform preserves order, we can delegate to the
+			// child datastore.
 			if orderPreserving {
-				// When sorting, we compare with the first
-				// Order, then, if equal, we compare with the
-				// second Order, etc. However, keys are _unique_
-				// so we'll never apply any additional orders
+				// When sorting, we compare with the first Order, then, if
+				// equal, we compare with the second Order, etc. However, keys
+				// are _unique_ so we'll never apply any additional orders
 				// after ordering by key.
 				child.Orders = child.Orders[:i+1]
 				break orders
