@@ -349,8 +349,14 @@ func (t *Topic) validate(ctx context.Context, data []byte, opts ...PubOpt) (*Mes
 	}
 
 	msg := &Message{m, "", t.p.host.ID(), pub.validatorData, pub.local}
-	t.p.eval <- func() {
+	select {
+	case t.p.eval <- func() {
 		t.p.rt.Preprocess(t.p.host.ID(), []*Message{msg})
+	}:
+	case <-t.p.ctx.Done():
+		return nil, t.p.ctx.Err()
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
 	err := t.p.val.ValidateLocal(msg)
 	if err != nil {
