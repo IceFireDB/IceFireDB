@@ -3,6 +3,7 @@ package datastore
 import (
 	"encoding/json"
 	"path"
+	"slices"
 	"strings"
 
 	dsq "github.com/ipfs/go-datastore/query"
@@ -90,26 +91,37 @@ func (k Key) Equal(k2 Key) bool {
 	return k.string == k2.string
 }
 
-// Less checks whether this key is sorted lower than another.
-func (k Key) Less(k2 Key) bool {
+// Compare returns -1 if this key is sorted lower than another, 1 if this key
+// is sorted greater that another, and 0 if the two keys sort the same.
+func (k Key) Compare(k2 Key) int {
 	list1 := k.List()
 	list2 := k2.List()
+	list2end := len(list2) - 1
 	for i, c1 := range list1 {
-		if len(list2) < (i + 1) {
-			return false
+		if list2end < i {
+			return 1
 		}
-
 		c2 := list2[i]
 		if c1 < c2 {
-			return true
-		} else if c1 > c2 {
-			return false
+			return -1
+		}
+		if c1 > c2 {
+			return 1
 		}
 		// c1 == c2, continue
 	}
 
-	// list1 is shorter or exactly the same.
-	return len(list1) < len(list2)
+	// if list1 is shorter.
+	if len(list1) < len(list2) {
+		return -1
+	}
+	// Lists are the same.
+	return 0
+}
+
+// Less checks whether this key is sorted lower than another.
+func (k Key) Less(k2 Key) bool {
+	return k.Compare(k2) == -1
 }
 
 // List returns the `list` representation of this Key.
@@ -126,11 +138,8 @@ func (k Key) List() []string {
 //	NewKey("/Actor:JohnCleese/MontyPython/Comedy")
 func (k Key) Reverse() Key {
 	l := k.List()
-	r := make([]string, len(l))
-	for i, e := range l {
-		r[len(l)-i-1] = e
-	}
-	return KeyWithNamespaces(r)
+	slices.Reverse(l)
+	return KeyWithNamespaces(l)
 }
 
 // Namespaces returns the `namespaces` making up this Key.
