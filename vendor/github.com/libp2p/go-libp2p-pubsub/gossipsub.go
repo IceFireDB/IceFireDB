@@ -241,6 +241,26 @@ type GossipSubParams struct {
 	IDontWantMessageTTL int
 }
 
+func (params *GossipSubParams) validate() error {
+	if !(params.Dlo <= params.D && params.D <= params.Dhi) {
+		return fmt.Errorf("param D=%d must be between Dlo=%d and Dhi=%d", params.D, params.Dlo, params.Dhi)
+	}
+
+	if !(params.Dscore <= params.Dhi) {
+		return fmt.Errorf("param Dscore=%d must be less than Dhi=%d", params.Dscore, params.Dhi)
+	}
+
+	if !(params.Dout < params.Dlo && params.Dout < (params.D/2)) {
+		return fmt.Errorf("param Dout=%d must be less than Dlo=%d and Dout must not exceed D=%d / 2", params.Dout, params.Dlo, params.D)
+	}
+
+	if !(params.HistoryGossip <= params.HistoryLength) {
+		return fmt.Errorf("param HistoryGossip=%d must be less than or equal to HistoryLength=%d", params.HistoryGossip, params.HistoryLength)
+	}
+
+	return nil
+}
+
 // NewGossipSub returns a new PubSub object using the default GossipSubRouter as the router.
 func NewGossipSub(ctx context.Context, h host.Host, opts ...Option) (*PubSub, error) {
 	rt := DefaultGossipSubRouter(h)
@@ -441,6 +461,9 @@ func WithDirectConnectTicks(t uint64) Option {
 // config to be set when instantiating the gossipsub router.
 func WithGossipSubParams(cfg GossipSubParams) Option {
 	return func(ps *PubSub) error {
+		if err := cfg.validate(); err != nil {
+			return err
+		}
 		gs, ok := ps.rt.(*GossipSubRouter)
 		if !ok {
 			return fmt.Errorf("pubsub router is not gossipsub")
