@@ -47,7 +47,7 @@ func (p *PubSub) handleNewStream(s network.Stream) {
 	p.inboundStreamsMx.Lock()
 	other, dup := p.inboundStreams[peer]
 	if dup {
-		log.Debugf("duplicate inbound stream from %s; resetting other stream", peer)
+		p.logger.Debug("duplicate inbound stream from; resetting other stream", "peer", peer)
 		other.Reset()
 	}
 	p.inboundStreams[peer] = s
@@ -63,12 +63,16 @@ func (p *PubSub) handleNewStream(s network.Stream) {
 
 	r := msgio.NewVarintReaderSize(s, p.maxMessageSize)
 	for {
+		// Peek at the message length to know when we should mark the start time
+		// for measuring how long it took to receive a message.
+		_, _ = r.NextMsgLen()
+		start := time.Now()
 		msgbytes, err := r.ReadMsg()
 		if err != nil {
 			r.ReleaseMsg(msgbytes)
 			if err != io.EOF {
 				s.Reset()
-				log.Debugf("error reading rpc from %s: %s", s.Conn().RemotePeer(), err)
+				p.rpcLogger.Debug("error reading rpc", "from", s.Conn().RemotePeer(), "err", err)
 			} else {
 				// Just be nice. They probably won't read this
 				// but it doesn't hurt to send it.
@@ -86,9 +90,13 @@ func (p *PubSub) handleNewStream(s network.Stream) {
 		r.ReleaseMsg(msgbytes)
 		if err != nil {
 			s.Reset()
-			log.Warnf("bogus rpc from %s: %s", s.Conn().RemotePeer(), err)
+
+			p.rpcLogger.Warn("bogus rpc from", "peer", s.Conn().RemotePeer(), "err", err)
 			return
 		}
+
+		timeToReceive := time.Since(start)
+		p.rpcLogger.Debug("received", "peer", s.Conn().RemotePeer(), "duration_s", timeToReceive.Seconds(), "rpc", rpc)
 
 		rpc.from = peer
 		select {
@@ -117,7 +125,7 @@ func (p *PubSub) notifyPeerDead(pid peer.ID) {
 func (p *PubSub) handleNewPeer(ctx context.Context, pid peer.ID, outgoing *rpcQueue) {
 	s, err := p.host.NewStream(p.ctx, pid, p.rt.Protocols()...)
 	if err != nil {
-		log.Debug("opening new stream to peer: ", err, pid)
+		p.logger.Debug("error opening new stream to peer", "err", err, "peer", pid)
 
 		select {
 		case p.newPeerError <- pid:
@@ -149,7 +157,7 @@ func (p *PubSub) handlePeerDead(s network.Stream) {
 
 	_, err := s.Read([]byte{0})
 	if err == nil {
-		log.Debugf("unexpected message from %s", pid)
+		p.logger.Debug("unexpected message from peer", "peer", pid)
 	}
 
 	s.Reset()
@@ -170,21 +178,26 @@ func (p *PubSub) handleSendingMessages(ctx context.Context, s network.Stream, ou
 		}
 
 		_, err = s.Write(buf)
-		return err
+		if err != nil {
+			p.rpcLogger.Debug("failed to send message", "peer", s.Conn().RemotePeer(), "rpc", rpc, "err", err)
+			return err
+		}
+		p.rpcLogger.Debug("sent", "peer", s.Conn().RemotePeer(), "rpc", rpc)
+		return nil
 	}
 
 	defer s.Close()
 	for ctx.Err() == nil {
 		rpc, err := outgoing.Pop(ctx)
 		if err != nil {
-			log.Debugf("popping message from the queue to send to %s: %s", s.Conn().RemotePeer(), err)
+			p.logger.Debug("error popping message from the queue to send to peer", "peer", s.Conn().RemotePeer(), "err", err)
 			return
 		}
 
 		err = writeRpc(rpc)
 		if err != nil {
 			s.Reset()
-			log.Debugf("writing message to %s: %s", s.Conn().RemotePeer(), err)
+			p.logger.Debug("error writing message to peer", "peer", s.Conn().RemotePeer(), "err", err)
 			return
 		}
 	}

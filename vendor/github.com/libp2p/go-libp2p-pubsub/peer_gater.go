@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"sort"
 	"sync"
@@ -138,6 +139,9 @@ type peerGater struct {
 
 	// for unit tests
 	getIP func(peer.ID) string
+
+	// logger for gater events
+	logger *slog.Logger
 }
 
 type peerGaterStats struct {
@@ -173,7 +177,7 @@ func WithPeerGater(params *PeerGaterParams) Option {
 			return err
 		}
 
-		gs.gate = newPeerGater(ps.ctx, ps.host, params)
+		gs.gate = newPeerGater(ps.ctx, ps.host, params, ps.logger)
 
 		// hook the tracer
 		if ps.tracer != nil {
@@ -190,12 +194,13 @@ func WithPeerGater(params *PeerGaterParams) Option {
 	}
 }
 
-func newPeerGater(ctx context.Context, host host.Host, params *PeerGaterParams) *peerGater {
+func newPeerGater(ctx context.Context, host host.Host, params *PeerGaterParams, logger *slog.Logger) *peerGater {
 	pg := &peerGater{
 		params:    params,
 		peerStats: make(map[peer.ID]*peerGaterStats),
 		ipStats:   make(map[string]*peerGaterStats),
 		host:      host,
+		logger:    logger,
 	}
 	go pg.background(ctx)
 	return pg
@@ -286,7 +291,7 @@ func (pg *peerGater) getPeerIP(p peer.ID) string {
 		remote := c.RemoteMultiaddr()
 		ip, err := manet.ToIP(remote)
 		if err != nil {
-			log.Warnf("error determining IP for remote peer in %s: %s", remote, err)
+			pg.logger.Warn("error determining IP for remote peer", "address", remote, "err", err)
 			return "<unknown>"
 		}
 		return ip.String()
@@ -358,7 +363,7 @@ func (pg *peerGater) AcceptFrom(p peer.ID) AcceptStatus {
 		return AcceptAll
 	}
 
-	log.Debugf("throttling peer %s with threshold %f", p, threshold)
+	pg.logger.Debug("throttling peer", "peer", p, "threshold", threshold)
 	return AcceptControl
 }
 

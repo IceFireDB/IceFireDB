@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"runtime"
 	"sync"
 	"time"
@@ -105,6 +106,7 @@ type validatorImpl struct {
 	validateTimeout  time.Duration
 	validateThrottle chan struct{}
 	validateInline   bool
+	logger           *slog.Logger
 }
 
 // async request to add a topic validators
@@ -145,7 +147,7 @@ func (v *validation) Start(p *PubSub) {
 
 // AddValidator adds a new validator
 func (v *validation) AddValidator(req *addValReq) {
-	val, err := v.makeValidator(req)
+	val, err := v.makeValidator(req, v.p.logger)
 	if err != nil {
 		req.resp <- err
 		return
@@ -166,7 +168,7 @@ func (v *validation) AddValidator(req *addValReq) {
 	req.resp <- nil
 }
 
-func (v *validation) makeValidator(req *addValReq) (*validatorImpl, error) {
+func (v *validation) makeValidator(req *addValReq, logger *slog.Logger) (*validatorImpl, error) {
 	makeValidatorEx := func(v Validator) ValidatorEx {
 		return func(ctx context.Context, p peer.ID, msg *Message) ValidationResult {
 			if v(ctx, p, msg) {
@@ -203,6 +205,7 @@ func (v *validation) makeValidator(req *addValReq) (*validatorImpl, error) {
 		validateTimeout:  0,
 		validateThrottle: make(chan struct{}, defaultValidateConcurrency),
 		validateInline:   req.inline,
+		logger:           logger,
 	}
 
 	if req.timeout > 0 {
@@ -257,7 +260,7 @@ func (v *validation) Push(src peer.ID, msg *Message) bool {
 		select {
 		case v.validateQ <- &validateReq{vals, src, msg}:
 		default:
-			log.Debugf("message validation throttled: queue full; dropping message from %s", src)
+			v.p.logger.Debug("message validation throttled: queue full; dropping message from peer", "peer", src)
 			v.tracer.RejectMessage(msg, RejectValidationQueueFull)
 		}
 		return false
@@ -313,7 +316,7 @@ func (v *validation) validate(vals []*validatorImpl, src peer.ID, msg *Message, 
 	// the Signature is required to be nil upon receiving the message in PubSub.pushMsg.
 	if msg.Signature != nil {
 		if !v.validateSignature(msg) {
-			log.Debugf("message signature validation failed; dropping message from %s", src)
+			v.p.logger.Debug("message signature validation failed; dropping message from peer", "peer", src)
 			v.tracer.RejectMessage(msg, RejectInvalidSignature)
 			return ValidationError{Reason: RejectInvalidSignature}
 		}
@@ -353,7 +356,7 @@ loop:
 	}
 
 	if result == ValidationReject {
-		log.Debugf("message validation failed; dropping message from %s", src)
+		v.p.logger.Debug("message validation failed; dropping message from peer", "peer", src)
 		v.tracer.RejectMessage(msg, RejectValidationFailed)
 		return ValidationError{Reason: RejectValidationFailed}
 	}
@@ -367,7 +370,7 @@ loop:
 				<-v.validateThrottle
 			}()
 		default:
-			log.Debugf("message validation throttled; dropping message from %s", src)
+			v.p.logger.Debug("message validation throttled; dropping message from peer", "peer", src)
 			v.tracer.RejectMessage(msg, RejectValidationThrottled)
 		}
 		return nil
@@ -385,7 +388,7 @@ loop:
 func (v *validation) validateSignature(msg *Message) bool {
 	err := verifyMessageSignature(msg.Message)
 	if err != nil {
-		log.Debugf("signature verification error: %s", err.Error())
+		v.p.logger.Debug("signature verification error", "err", err)
 		return false
 	}
 
@@ -403,15 +406,15 @@ func (v *validation) doValidateTopic(vals []*validatorImpl, src peer.ID, msg *Me
 	case ValidationAccept:
 		_ = onValid(msg)
 	case ValidationReject:
-		log.Debugf("message validation failed; dropping message from %s", src)
+		v.p.logger.Debug("message validation failed; dropping message from peer", "peer", src)
 		v.tracer.RejectMessage(msg, RejectValidationFailed)
 		return
 	case ValidationIgnore:
-		log.Debugf("message validation punted; ignoring message from %s", src)
+		v.p.logger.Debug("message validation punted; ignoring message from peer", "peer", src)
 		v.tracer.RejectMessage(msg, RejectValidationIgnored)
 		return
 	case validationThrottled:
-		log.Debugf("message validation throttled; ignoring message from %s", src)
+		v.p.logger.Debug("message validation throttled; ignoring message from peer", "peer", src)
 		v.tracer.RejectMessage(msg, RejectValidationThrottled)
 
 	default:
@@ -442,7 +445,7 @@ func (v *validation) validateTopic(vals []*validatorImpl, src peer.ID, msg *Mess
 			}(val)
 
 		default:
-			log.Debugf("validation throttled for topic %s", val.topic)
+			v.p.logger.Debug("validation throttled for topic", "topic", val.topic)
 			rch <- validationThrottled
 		}
 	}
@@ -478,7 +481,7 @@ func (v *validation) validateSingleTopic(val *validatorImpl, src peer.ID, msg *M
 		return res
 
 	default:
-		log.Debugf("validation throttled for topic %s", val.topic)
+		v.p.logger.Debug("validation throttled for topic", "topic", val.topic)
 		return validationThrottled
 	}
 }
@@ -486,7 +489,7 @@ func (v *validation) validateSingleTopic(val *validatorImpl, src peer.ID, msg *M
 func (val *validatorImpl) validateMsg(ctx context.Context, src peer.ID, msg *Message) ValidationResult {
 	start := time.Now()
 	defer func() {
-		log.Debugf("validation done; took %s", time.Since(start))
+		val.logger.Debug("validation done", "duration", time.Since(start))
 	}()
 
 	if val.validateTimeout > 0 {
@@ -505,7 +508,7 @@ func (val *validatorImpl) validateMsg(ctx context.Context, src peer.ID, msg *Mes
 		return r
 
 	default:
-		log.Warnf("Unexpected result from validator: %d; ignoring message", r)
+		val.logger.Warn("Unexpected result from validator; ignoring message", "result", r)
 		return ValidationIgnore
 	}
 }
@@ -527,7 +530,7 @@ func WithDefaultValidator(val interface{}, opts ...ValidatorOpt) Option {
 			}
 		}
 
-		val, err := ps.val.makeValidator(addVal)
+		val, err := ps.val.makeValidator(addVal, ps.logger)
 		if err != nil {
 			return err
 		}

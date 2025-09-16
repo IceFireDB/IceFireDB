@@ -190,7 +190,7 @@ func (d *discover) Advertise(topic string) {
 	go func() {
 		next, err := d.discovery.Advertise(advertisingCtx, topic)
 		if err != nil {
-			log.Warnf("bootstrap: error providing rendezvous for %s: %s", topic, err.Error())
+			d.p.logger.Warn("bootstrap: error providing rendezvous for topic", "topic", topic, "err", err)
 			if next == 0 {
 				next = discoveryAdvertiseRetryInterval
 			}
@@ -204,7 +204,7 @@ func (d *discover) Advertise(topic string) {
 			case <-t.C:
 				next, err = d.discovery.Advertise(advertisingCtx, topic)
 				if err != nil {
-					log.Warnf("bootstrap: error providing rendezvous for %s: %s", topic, err.Error())
+					d.p.logger.Warn("bootstrap: error providing rendezvous for topic", "topic", topic, "err", err)
 					if next == 0 {
 						next = discoveryAdvertiseRetryInterval
 					}
@@ -302,7 +302,7 @@ func (d *discover) handleDiscovery(ctx context.Context, topic string, opts []dis
 
 	peerCh, err := d.discovery.FindPeers(discoverCtx, topic, opts...)
 	if err != nil {
-		log.Debugf("error finding peers for topic %s: %v", topic, err)
+		d.p.logger.Debug("error finding peers for topic", "topic", topic, "err", err)
 		return
 	}
 

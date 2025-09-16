@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"sync"
 	"time"
@@ -77,7 +78,11 @@ type peerScore struct {
 	deliveries *messageDeliveries
 
 	idGen *msgIDGenerator
-	host  host.Host
+
+	// logger for score events
+	logger *slog.Logger
+
+	host host.Host
 
 	// debugging inspection
 	inspect       PeerScoreInspectFn
@@ -180,7 +185,7 @@ func WithPeerScoreInspect(inspect interface{}, period time.Duration) Option {
 }
 
 // implementation
-func newPeerScore(params *PeerScoreParams) *peerScore {
+func newPeerScore(params *PeerScoreParams, logger *slog.Logger) *peerScore {
 	seenMsgTTL := params.SeenMsgTTL
 	if seenMsgTTL == 0 {
 		seenMsgTTL = TimeCacheDuration
@@ -191,6 +196,7 @@ func newPeerScore(params *PeerScoreParams) *peerScore {
 		peerIPs:    make(map[string]map[peer.ID]struct{}),
 		deliveries: &messageDeliveries{seenMsgTTL: seenMsgTTL, records: make(map[string]*deliveryRecord)},
 		idGen:      newMsgIdGenerator(),
+		logger:     logger,
 	}
 }
 
@@ -709,7 +715,7 @@ func (ps *peerScore) DeliverMessage(msg *Message) {
 
 	// defensive check that this is the first delivery trace -- delivery status should be unknown
 	if drec.status != deliveryUnknown {
-		log.Debugf("unexpected delivery trace: message from %s was first seen %s ago and has delivery status %d", msg.ReceivedFrom, time.Since(drec.firstSeen), drec.status)
+		ps.logger.Debug("unexpected delivery trace", "from", msg.ReceivedFrom, "firstSeenAgo", time.Since(drec.firstSeen), "deliveryStatus", drec.status)
 		return
 	}
 
@@ -760,7 +766,7 @@ func (ps *peerScore) RejectMessage(msg *Message, reason string) {
 
 	// defensive check that this is the first rejection trace -- delivery status should be unknown
 	if drec.status != deliveryUnknown {
-		log.Debugf("unexpected rejection trace: message from %s was first seen %s ago and has delivery status %d", msg.ReceivedFrom, time.Since(drec.firstSeen), drec.status)
+		ps.logger.Debug("unexpected rejection trace", "from", msg.ReceivedFrom, "firstSeenAgo", time.Since(drec.firstSeen), "deliveryStatus", drec.status)
 		return
 	}
 

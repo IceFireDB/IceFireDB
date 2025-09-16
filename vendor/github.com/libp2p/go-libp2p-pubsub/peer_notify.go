@@ -17,7 +17,7 @@ func (ps *PubSub) watchForNewPeers(ctx context.Context) {
 		&event.EvtPeerProtocolsUpdated{},
 	})
 	if err != nil {
-		log.Errorf("failed to subscribe to peer identification events: %v", err)
+		ps.logger.Error("failed to subscribe to peer identification events", "err", err)
 		return
 	}
 	defer sub.Close()

@@ -45,9 +45,10 @@ func (rs *RandomSubRouter) Attach(p *PubSub) {
 	rs.tracer = p.tracer
 }
 
-func (rs *RandomSubRouter) AddPeer(p peer.ID, proto protocol.ID) {
+func (rs *RandomSubRouter) AddPeer(p peer.ID, proto protocol.ID, hello *RPC) *RPC {
 	rs.tracer.AddPeer(p, proto)
 	rs.peers[p] = proto
+	return hello
 }
 
 func (rs *RandomSubRouter) RemovePeer(p peer.ID) {
@@ -153,7 +154,7 @@ func (rs *RandomSubRouter) Publish(msg *Message) {
 
 		err := q.Push(out, false)
 		if err != nil {
-			log.Infof("dropping message to peer %s: queue full", p)
+			rs.p.logger.Info("dropping message to peer: queue full", "peer", p)
 			rs.tracer.DropRPC(out, p)
 			continue
 		}

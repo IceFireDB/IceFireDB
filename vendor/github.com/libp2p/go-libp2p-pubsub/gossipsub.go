@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"log/slog"
 	"math/rand"
+	"slices"
 	"sort"
 	"time"
 
@@ -20,8 +22,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/record"
 	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
-
-	"go.uber.org/zap/zapcore"
+	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 const (
@@ -39,6 +41,10 @@ const (
 	// See the spec for details about how v1.2.0 compares to v1.1.0:
 	// https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.2.md
 	GossipSubID_v12 = protocol.ID("/meshsub/1.2.0")
+
+	// GossipSubID_v13 is the protocol ID for version 1.3.0 of the GossipSub
+	// protocol. It adds the extensions control message.
+	GossipSubID_v13 = protocol.ID("/meshsub/1.3.0")
 )
 
 // Defines the default gossipsub parameters.
@@ -242,6 +248,20 @@ type GossipSubParams struct {
 }
 
 func (params *GossipSubParams) validate() error {
+	if !(params.HistoryGossip <= params.HistoryLength) {
+		return fmt.Errorf("param HistoryGossip=%d must be less than or equal to HistoryLength=%d", params.HistoryGossip, params.HistoryLength)
+	}
+
+	if !(params.Dscore <= params.Dhi) {
+		return fmt.Errorf("param Dscore=%d must be lower than or equal to  Dhi=%d", params.Dscore, params.Dhi)
+	}
+
+	// Bootstrappers set D=D_lo=D_hi=D_out=0
+	// See https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.1.md#recommendations-for-network-operators
+	if params.D == 0 && params.Dlo == 0 && params.Dhi == 0 && params.Dout == 0 {
+		return nil
+	}
+
 	if !(params.Dlo <= params.D && params.D <= params.Dhi) {
 		return fmt.Errorf("param D=%d must be between Dlo=%d and Dhi=%d", params.D, params.Dlo, params.Dhi)
 	}
@@ -252,10 +272,6 @@ func (params *GossipSubParams) validate() error {
 
 	if !(params.Dout < params.Dlo && params.Dout < (params.D/2)) {
 		return fmt.Errorf("param Dout=%d must be less than Dlo=%d and Dout must not exceed D=%d / 2", params.Dout, params.Dlo, params.D)
-	}
-
-	if !(params.HistoryGossip <= params.HistoryLength) {
-		return fmt.Errorf("param HistoryGossip=%d must be less than or equal to HistoryLength=%d", params.HistoryGossip, params.HistoryLength)
 	}
 
 	return nil
@@ -276,27 +292,36 @@ func NewGossipSubWithRouter(ctx context.Context, h host.Host, rt PubSubRouter, o
 // DefaultGossipSubRouter returns a new GossipSubRouter with default parameters.
 func DefaultGossipSubRouter(h host.Host) *GossipSubRouter {
 	params := DefaultGossipSubParams()
-	return &GossipSubRouter{
-		peers:        make(map[peer.ID]protocol.ID),
-		mesh:         make(map[string]map[peer.ID]struct{}),
-		fanout:       make(map[string]map[peer.ID]struct{}),
-		lastpub:      make(map[string]int64),
-		gossip:       make(map[peer.ID][]*pb.ControlIHave),
-		control:      make(map[peer.ID]*pb.ControlMessage),
-		backoff:      make(map[string]map[peer.ID]time.Time),
-		peerhave:     make(map[peer.ID]int),
-		peerdontwant: make(map[peer.ID]int),
-		unwanted:     make(map[peer.ID]map[checksum]int),
-		iasked:       make(map[peer.ID]int),
-		outbound:     make(map[peer.ID]bool),
-		connect:      make(chan connectInfo, params.MaxPendingConnections),
-		cab:          pstoremem.NewAddrBook(),
-		mcache:       NewMessageCache(params.HistoryGossip, params.HistoryLength),
-		protos:       GossipSubDefaultProtocols,
-		feature:      GossipSubDefaultFeatures,
-		tagTracer:    newTagTracer(h.ConnManager()),
-		params:       params,
+	rt := &GossipSubRouter{
+		peers:           make(map[peer.ID]protocol.ID),
+		mesh:            make(map[string]map[peer.ID]struct{}),
+		fanout:          make(map[string]map[peer.ID]struct{}),
+		lastpub:         make(map[string]int64),
+		gossip:          make(map[peer.ID][]*pb.ControlIHave),
+		control:         make(map[peer.ID]*pb.ControlMessage),
+		backoff:         make(map[string]map[peer.ID]time.Time),
+		peerhave:        make(map[peer.ID]int),
+		peerdontwant:    make(map[peer.ID]int),
+		unwanted:        make(map[peer.ID]map[checksum]int),
+		iasked:          make(map[peer.ID]int),
+		outbound:        make(map[peer.ID]bool),
+		connect:         make(chan connectInfo, params.MaxPendingConnections),
+		cab:             pstoremem.NewAddrBook(),
+		mcache:          NewMessageCache(params.HistoryGossip, params.HistoryLength),
+		protos:          GossipSubDefaultProtocols,
+		feature:         GossipSubDefaultFeatures,
+		tagTracer:       newTagTracer(h.ConnManager()),
+		params:          params,
+		reducePXRecords: defaultPXRecordReducer,
 	}
+
+	rt.extensions = newExtensionsState(PeerExtensions{}, func(p peer.ID) {
+		if rt.score != nil {
+			rt.score.AddPenalty(p, 10)
+		}
+	}, rt.sendRPC)
+
+	return rt
 }
 
 // DefaultGossipSubParams returns the default gossip sub parameters
@@ -358,7 +383,7 @@ func WithPeerScore(params *PeerScoreParams, thresholds *PeerScoreThresholds) Opt
 			return err
 		}
 
-		gs.score = newPeerScore(params)
+		gs.score = newPeerScore(params, ps.logger)
 		gs.gossipThreshold = thresholds.GossipThreshold
 		gs.publishThreshold = thresholds.PublishThreshold
 		gs.graylistThreshold = thresholds.GraylistThreshold
@@ -409,9 +434,82 @@ func WithPeerExchange(doPX bool) Option {
 		}
 
 		gs.doPX = doPX
-
 		return nil
 	}
+}
+
+type PXRecordReducer func(pxRecords []*pb.PeerInfo, logger *slog.Logger, p peer.ID, addrs []ma.Multiaddr, record *record.Envelope) []*pb.PeerInfo
+
+// WithCustomPXRecordReducer enables custom filtering of PX Records. See
+// the implementation of OnlyPublicAddrsOnPeerExchange for an example.
+func WithCustomPXRecordReducer(f PXRecordReducer) Option {
+	return func(ps *PubSub) error {
+		gs, ok := ps.rt.(*GossipSubRouter)
+		if !ok {
+			return fmt.Errorf("pubsub router is not gossipsub")
+		}
+		gs.reducePXRecords = f
+		return nil
+	}
+}
+
+// defaultPXRecordReducer serializes the Signed Peer Records within the record envelop
+func defaultPXRecordReducer(pxRecords []*pb.PeerInfo, logger *slog.Logger, p peer.ID, addrs []ma.Multiaddr, record *record.Envelope) []*pb.PeerInfo {
+	var recordBytes []byte
+	if record != nil {
+		var err error
+		recordBytes, err = record.Marshal()
+		if err != nil {
+			logger.Warn("error marshaling signed peer record for", "peer", p, "err", err)
+			return pxRecords
+		}
+	}
+	return append(pxRecords, &pb.PeerInfo{PeerID: []byte(p), SignedPeerRecord: recordBytes})
+}
+
+// OnlyPublicAddrsOnPeerExchange is a gossipsub router option that defines ensures that only Signed Peer Records with
+// public addresses are shared over the gossipsub PeerExchange method
+func OnlyPublicAddrsOnPeerExchange() Option {
+	return func(ps *PubSub) error {
+		gs, ok := ps.rt.(*GossipSubRouter)
+		if !ok {
+			return fmt.Errorf("pubsub router is not gossipsub")
+		}
+		gs.reducePXRecords = publicAddrsPXRecordReducer
+		return nil
+	}
+}
+
+// publicAddrsPXRecordReducer checks if the given record.Envelop includes any public IP address and returns the pb.PeerInfo accordingly.
+// If the Signed Peer Record includes at least a public IP, the record is shared,
+// If not, we return an empty PeerRecord, at least notify the remote node that there is a peer in that topic.
+func publicAddrsPXRecordReducer(pxRecords []*pb.PeerInfo, logger *slog.Logger, p peer.ID, addrs []ma.Multiaddr, record *record.Envelope) []*pb.PeerInfo {
+	if !slices.ContainsFunc(addrs, manet.IsPublicAddr) {
+		return defaultPXRecordReducer(pxRecords, logger, p, addrs, nil)
+	}
+	if !checkPubAddrsOnSignedPeerRecord(logger, p, record) {
+		logger.Warn("no public address on signed peer record for", "peer", p)
+		record = nil
+	}
+	return defaultPXRecordReducer(pxRecords, logger, p, addrs, record)
+}
+
+func checkPubAddrsOnSignedPeerRecord(logger *slog.Logger, p peer.ID, env *record.Envelope) bool {
+	if env == nil {
+		return false
+	}
+	rec, err := env.Record()
+	if err != nil {
+		logger.Warn("error getting peer record for from signed envelop", "peer", p, "err", err)
+		return false
+	}
+
+	pRec, ok := rec.(*peer.PeerRecord)
+	if !ok {
+		logger.Warn("unable to convert peer record from envelop")
+	}
+
+	return slices.ContainsFunc(pRec.Addrs, manet.IsPublicAddr)
 }
 
 // WithDirectPeers is a gossipsub router option that specifies peers with direct
@@ -485,8 +583,11 @@ func WithGossipSubParams(cfg GossipSubParams) Option {
 // is the fanout map. Fanout peer lists are expired if we don't publish any
 // messages to their topic for GossipSubFanoutTTL.
 type GossipSubRouter struct {
-	p            *PubSub
-	peers        map[peer.ID]protocol.ID          // peer protocols
+	p          *PubSub
+	logger     *slog.Logger
+	peers      map[peer.ID]protocol.ID // peer protocols
+	extensions *extensionsState
+
 	direct       map[peer.ID]struct{}             // direct peers
 	mesh         map[string]map[peer.ID]struct{}  // topic meshes
 	fanout       map[string]map[peer.ID]struct{}  // topic fanout
@@ -517,7 +618,8 @@ type GossipSubRouter struct {
 
 	// whether PX is enabled; this should be enabled in bootstrappers and other well connected/trusted
 	// nodes.
-	doPX bool
+	doPX            bool
+	reducePXRecords PXRecordReducer
 
 	// threshold for accepting PX from a peer; this should be positive and limited to scores
 	// attainable by bootstrappers and trusted nodes
@@ -559,6 +661,7 @@ func (gs *GossipSubRouter) Protocols() []protocol.ID {
 
 func (gs *GossipSubRouter) Attach(p *PubSub) {
 	gs.p = p
+	gs.logger = p.logger
 	gs.tracer = p.tracer
 
 	// start the scoring
@@ -568,7 +671,7 @@ func (gs *GossipSubRouter) Attach(p *PubSub) {
 	gs.gossipTracer.Start(gs)
 
 	// and the tracer for connmgr tags
-	gs.tagTracer.Start(gs)
+	gs.tagTracer.Start(gs, p.logger)
 
 	// start using the same msg ID function as PubSub for caching messages.
 	gs.mcache.SetMsgIdFn(p.idGen.ID)
@@ -603,7 +706,7 @@ func (gs *GossipSubRouter) manageAddrBook() {
 		&event.EvtPeerConnectednessChanged{},
 	})
 	if err != nil {
-		log.Errorf("failed to subscribe to peer identification events: %v", err)
+		gs.logger.Error("failed to subscribe to peer identification events", "err", err)
 		return
 	}
 	defer sub.Close()
@@ -615,7 +718,7 @@ func (gs *GossipSubRouter) manageAddrBook() {
 			if ok {
 				errClose := cabCloser.Close()
 				if errClose != nil {
-					log.Warnf("failed to close addr book: %v", errClose)
+					gs.logger.Warn("failed to close addr book", "err", errClose)
 				}
 			}
 			return
@@ -631,7 +734,7 @@ func (gs *GossipSubRouter) manageAddrBook() {
 						}
 						_, err := cab.ConsumePeerRecord(ev.SignedPeerRecord, ttl)
 						if err != nil {
-							log.Warnf("failed to consume signed peer record: %v", err)
+							gs.logger.Warn("failed to consume signed peer record", "err", err)
 						}
 					}
 				}
@@ -644,8 +747,8 @@ func (gs *GossipSubRouter) manageAddrBook() {
 	}
 }
 
-func (gs *GossipSubRouter) AddPeer(p peer.ID, proto protocol.ID) {
-	log.Debugf("PEERUP: Add new peer %s using %s", p, proto)
+func (gs *GossipSubRouter) AddPeer(p peer.ID, proto protocol.ID, helloPacket *RPC) *RPC {
+	gs.logger.Debug("PEERUP: Add new peer using protocol", "peer", p, "protocol", proto)
 	gs.tracer.AddPeer(p, proto)
 	gs.peers[p] = proto
 
@@ -671,11 +774,18 @@ loop:
 		}
 	}
 	gs.outbound[p] = outbound
+	if gs.feature(GossipSubFeatureExtensions, proto) {
+		helloPacket = gs.extensions.AddPeer(p, helloPacket)
+	}
+	return helloPacket
 }
 
 func (gs *GossipSubRouter) RemovePeer(p peer.ID) {
-	log.Debugf("PEERDOWN: Remove disconnected peer %s", p)
+	gs.logger.Debug("PEERDOWN: Remove disconnected peer", "peer", p)
 	gs.tracer.RemovePeer(p)
+	if gs.feature(GossipSubFeatureExtensions, gs.peers[p]) {
+		gs.extensions.RemovePeer(p)
+	}
 	delete(gs.peers, p)
 	for _, peers := range gs.mesh {
 		delete(peers, p)
@@ -765,6 +875,8 @@ func (gs *GossipSubRouter) Preprocess(from peer.ID, msgs []*Message) {
 }
 
 func (gs *GossipSubRouter) HandleRPC(rpc *RPC) {
+	gs.extensions.HandleRPC(rpc)
+
 	ctl := rpc.GetControl()
 	if ctl == nil {
 		return
@@ -788,18 +900,18 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 	// we ignore IHAVE gossip from any peer whose score is below the gossip threshold
 	score := gs.score.Score(p)
 	if score < gs.gossipThreshold {
-		log.Debugf("IHAVE: ignoring peer %s with score below threshold [score = %f]", p, score)
+		gs.logger.Debug("IHAVE: ignoring peer with score below threshold", "peer", p, "score", score)
 		return nil
 	}
 
 	// IHAVE flood protection
 	gs.peerhave[p]++
 	if gs.peerhave[p] > gs.params.MaxIHaveMessages {
-		log.Debugf("IHAVE: peer %s has advertised too many times (%d) within this heartbeat interval; ignoring", p, gs.peerhave[p])
+		gs.logger.Debug("IHAVE: peer has advertised too many times within this heartbeat interval; ignoring", "peer", p, "count", gs.peerhave[p])
 		return nil
 	}
 	if gs.iasked[p] >= gs.params.MaxIHaveLength {
-		log.Debugf("IHAVE: peer %s has already advertised too many messages (%d); ignoring", p, gs.iasked[p])
+		gs.logger.Debug("IHAVE: peer has already advertised too many messages; ignoring", "peer", p, "messageCount", gs.iasked[p])
 		return nil
 	}
 
@@ -819,7 +931,7 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 		for msgIdx, mid := range ihave.GetMessageIDs() {
 			// prevent remote peer from sending too many msg_ids on a single IHAVE message
 			if msgIdx >= gs.params.MaxIHaveLength {
-				log.Debugf("IHAVE: peer %s has sent IHAVE on topic %s with too many messages (%d); ignoring remaining msgs", p, topic, len(ihave.MessageIDs))
+				gs.logger.Debug("IHAVE: peer has sent IHAVE on topic with too many messages; ignoring remaining msgs", "peer", p, "topic", topic, "messageCount", len(ihave.MessageIDs))
 				break checkIwantMsgsLoop
 			}
 
@@ -839,7 +951,7 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 		iask = gs.params.MaxIHaveLength - gs.iasked[p]
 	}
 
-	log.Debugf("IHAVE: Asking for %d out of %d messages from %s", iask, len(iwant), p)
+	gs.logger.Debug("IHAVE: Asking for messages from peer", "asking", iask, "total", len(iwant), "peer", p)
 
 	iwantlst := make([]string, 0, len(iwant))
 	for mid := range iwant {
@@ -862,7 +974,7 @@ func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.
 	// we don't respond to IWANT requests from any peer whose score is below the gossip threshold
 	score := gs.score.Score(p)
 	if score < gs.gossipThreshold {
-		log.Debugf("IWANT: ignoring peer %s with score below threshold [score = %f]", p, score)
+		gs.logger.Debug("IWANT: ignoring peer with score below threshold", "peer", p, "score", score)
 		return nil
 	}
 
@@ -884,7 +996,7 @@ func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.
 			}
 
 			if count > gs.params.GossipRetransmission {
-				log.Debugf("IWANT: Peer %s has asked for message %s too many times; ignoring request", p, mid)
+				gs.logger.Debug("IWANT: Peer has asked for message too many times; ignoring request", "peer", p, "messageID", mid)
 				continue
 			}
 
@@ -896,7 +1008,7 @@ func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.
 		return nil
 	}
 
-	log.Debugf("IWANT: Sending %d messages to %s", len(ihave), p)
+	gs.logger.Debug("IWANT: Sending messages to peer", "messageCount", len(ihave), "peer", p)
 
 	msgs := make([]*pb.Message, 0, len(ihave))
 	for _, msg := range ihave {
@@ -937,7 +1049,7 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 		// we don't GRAFT to/from direct peers; complain loudly if this happens
 		_, direct := gs.direct[p]
 		if direct {
-			log.Warnf("GRAFT: ignoring request from direct peer %s", p)
+			gs.logger.Warn("GRAFT: ignoring request from direct peer", "peer", p)
 			// this is possibly a bug from non-reciprocal configuration; send a PRUNE
 			prune = append(prune, topic)
 			// but don't PX
@@ -948,7 +1060,7 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 		// make sure we are not backing off that peer
 		expire, backoff := gs.backoff[topic][p]
 		if backoff && now.Before(expire) {
-			log.Debugf("GRAFT: ignoring backed off peer %s", p)
+			gs.logger.Debug("GRAFT: ignoring backed off peer", "peer", p)
 			// add behavioural penalty
 			gs.score.AddPenalty(p, 1)
 			// no PX
@@ -968,7 +1080,7 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 		// check the score
 		if score < 0 {
 			// we don't GRAFT peers with negative score
-			log.Debugf("GRAFT: ignoring peer %s with negative score [score = %f, topic = %s]", p, score, topic)
+			gs.logger.Debug("GRAFT: ignoring peer with negative score", "peer", p, "score", score, "topic", topic)
 			// we do send them PRUNE however, because it's a matter of protocol correctness
 			prune = append(prune, topic)
 			// but we won't PX to them
@@ -987,7 +1099,7 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 			continue
 		}
 
-		log.Debugf("GRAFT: add mesh link from %s in %s", p, topic)
+		gs.logger.Debug("GRAFT: add mesh link from peer in topic", "peer", p, "topic", topic)
 		gs.tracer.Graft(p, topic)
 		peers[p] = struct{}{}
 	}
@@ -1014,7 +1126,7 @@ func (gs *GossipSubRouter) handlePrune(p peer.ID, ctl *pb.ControlMessage) {
 			continue
 		}
 
-		log.Debugf("PRUNE: Remove mesh link to %s in %s", p, topic)
+		gs.logger.Debug("PRUNE: Remove mesh link to peer in topic", "peer", p, "topic", topic)
 		gs.tracer.Prune(p, topic)
 		delete(peers, p)
 		// is there a backoff specified by the peer? if so obey it.
@@ -1029,7 +1141,7 @@ func (gs *GossipSubRouter) handlePrune(p peer.ID, ctl *pb.ControlMessage) {
 		if len(px) > 0 {
 			// we ignore PX from peers with insufficient score
 			if score < gs.acceptPXThreshold {
-				log.Debugf("PRUNE: ignoring PX from peer %s with insufficient score [score = %f, topic = %s]", p, score, topic)
+				gs.logger.Debug("PRUNE: ignoring PX from peer with insufficient score", "peer", p, "score", score, "topic", topic)
 				continue
 			}
 
@@ -1045,7 +1157,7 @@ func (gs *GossipSubRouter) handleIDontWant(p peer.ID, ctl *pb.ControlMessage) {
 
 	// IDONTWANT flood protection
 	if gs.peerdontwant[p] >= gs.params.MaxIDontWantMessages {
-		log.Debugf("IDONWANT: peer %s has advertised too many times (%d) within this heartbeat interval; ignoring", p, gs.peerdontwant[p])
+		gs.logger.Debug("IDONWANT: peer has advertised too many times within this heartbeat interval; ignoring", "peer", p, "count", gs.peerdontwant[p])
 		return
 	}
 	gs.peerdontwant[p]++
@@ -1057,7 +1169,7 @@ mainIDWLoop:
 		for _, mid := range idontwant.GetMessageIDs() {
 			// IDONTWANT flood protection
 			if totalUnwantedIds >= gs.params.MaxIDontWantLength {
-				log.Debugf("IDONWANT: peer %s has advertised too many ids (%d) within this message; ignoring", p, totalUnwantedIds)
+				gs.logger.Debug("IDONWANT: peer has advertised too many ids within this message; ignoring", "peer", p, "idCount", totalUnwantedIds)
 				break mainIDWLoop
 			}
 
@@ -1108,16 +1220,16 @@ func (gs *GossipSubRouter) pxConnect(peers []*pb.PeerInfo) {
 			// the peer sent us a signed record; ensure that it is valid
 			envelope, r, err := record.ConsumeEnvelope(pi.SignedPeerRecord, peer.PeerRecordEnvelopeDomain)
 			if err != nil {
-				log.Warnf("error unmarshalling peer record obtained through px: %s", err)
+				gs.logger.Warn("error unmarshalling peer record obtained through px", "err", err)
 				continue
 			}
 			rec, ok := r.(*peer.PeerRecord)
 			if !ok {
-				log.Warnf("bogus peer record obtained through px: envelope payload is not PeerRecord")
+				gs.logger.Warn("bogus peer record obtained through px: envelope payload is not PeerRecord")
 				continue
 			}
 			if rec.PeerID != p {
-				log.Warnf("bogus peer record obtained through px: peer ID %s doesn't match expected peer %s", rec.PeerID, p)
+				gs.logger.Warn("bogus peer record obtained through px: peer ID doesn't match expected peer", "recordPeerID", rec.PeerID, "expectedPeer", p)
 				continue
 			}
 			spr = envelope
@@ -1134,7 +1246,7 @@ func (gs *GossipSubRouter) pxConnect(peers []*pb.PeerInfo) {
 		select {
 		case gs.connect <- ci:
 		default:
-			log.Debugf("ignoring peer connection attempt; too many pending connections")
+			gs.logger.Debug("ignoring peer connection attempt; too many pending connections")
 		}
 	}
 }
@@ -1147,12 +1259,12 @@ func (gs *GossipSubRouter) connector() {
 				continue
 			}
 
-			log.Debugf("connecting to %s", ci.p)
+			gs.logger.Debug("connecting to peer", "peer", ci.p)
 			cab, ok := peerstore.GetCertifiedAddrBook(gs.cab)
 			if ok && ci.spr != nil {
 				_, err := cab.ConsumePeerRecord(ci.spr, peerstore.TempAddrTTL)
 				if err != nil {
-					log.Debugf("error processing peer record: %s", err)
+					gs.logger.Debug("error processing peer record", "err", err)
 				}
 			}
 
@@ -1160,7 +1272,7 @@ func (gs *GossipSubRouter) connector() {
 			err := gs.p.host.Connect(ctx, peer.AddrInfo{ID: ci.p, Addrs: gs.cab.Addrs(ci.p)})
 			cancel()
 			if err != nil {
-				log.Debugf("error connecting to %s: %s", ci.p, err)
+				gs.logger.Debug("error connecting to peer", "peer", ci.p, "err", err)
 			}
 
 		case <-gs.p.ctx.Done():
@@ -1277,7 +1389,7 @@ func (gs *GossipSubRouter) Join(topic string) {
 		return
 	}
 
-	log.Debugf("JOIN %s", topic)
+	gs.logger.Debug("JOIN topic", "topic", topic)
 	gs.tracer.Join(topic)
 
 	gmap, ok = gs.fanout[topic]
@@ -1322,7 +1434,7 @@ func (gs *GossipSubRouter) Join(topic string) {
 	}
 
 	for p := range gmap {
-		log.Debugf("JOIN: Add mesh link to %s in %s", p, topic)
+		gs.logger.Debug("JOIN: Add mesh link to peer in topic", "peer", p, "topic", topic)
 		gs.tracer.Graft(p, topic)
 		gs.sendGraft(p, topic)
 	}
@@ -1334,13 +1446,13 @@ func (gs *GossipSubRouter) Leave(topic string) {
 		return
 	}
 
-	log.Debugf("LEAVE %s", topic)
+	gs.logger.Debug("LEAVE topic", "topic", topic)
 	gs.tracer.Leave(topic)
 
 	delete(gs.mesh, topic)
 
 	for p := range gmap {
-		log.Debugf("LEAVE: Remove mesh link to %s in %s", p, topic)
+		gs.logger.Debug("LEAVE: Remove mesh link to peer in topic", "peer", p, "topic", topic)
 		gs.tracer.Prune(p, topic)
 		gs.sendPrune(p, topic, true)
 		// Add a backoff to this peer to prevent us from eagerly
@@ -1409,9 +1521,7 @@ func (gs *GossipSubRouter) sendRPC(p peer.ID, out *RPC, urgent bool) {
 }
 
 func (gs *GossipSubRouter) doDropRPC(rpc *RPC, p peer.ID, reason string) {
-	if log.Level() <= zapcore.DebugLevel {
-		log.Debugf("dropping message to peer %s: %s", p, reason)
-	}
+	gs.logger.Debug("dropping message to peer", "peer", p, "reason", reason)
 	gs.tracer.DropRPC(rpc, p)
 	// push control messages that need to be retried
 	ctl := rpc.GetControl()
@@ -1465,7 +1575,7 @@ func (gs *GossipSubRouter) heartbeat() {
 		if gs.params.SlowHeartbeatWarning > 0 {
 			slowWarning := time.Duration(gs.params.SlowHeartbeatWarning * float64(gs.params.HeartbeatInterval))
 			if dt := time.Since(start); dt > slowWarning {
-				log.Warnw("slow heartbeat", "took", dt)
+				gs.logger.Warn("slow heartbeat", "took", dt)
 			}
 		}
 	}()
@@ -1513,7 +1623,7 @@ func (gs *GossipSubRouter) heartbeat() {
 		}
 
 		graftPeer := func(p peer.ID) {
-			log.Debugf("HEARTBEAT: Add mesh link to %s in %s", p, topic)
+			gs.logger.Debug("HEARTBEAT: Add mesh link to peer in topic", "peer", p, "topic", topic)
 			gs.tracer.Graft(p, topic)
 			peers[p] = struct{}{}
 			topics := tograft[p]
@@ -1523,7 +1633,7 @@ func (gs *GossipSubRouter) heartbeat() {
 		// drop all peers with negative score, without PX
 		for p := range peers {
 			if score(p) < 0 {
-				log.Debugf("HEARTBEAT: Prune peer %s with negative score [score = %f, topic = %s]", p, score(p), topic)
+				gs.logger.Debug("HEARTBEAT: Prune peer with negative score", "peer", p, "score", score(p), "topic", topic)
 				prunePeer(p)
 				noPX[p] = true
 			}
@@ -1604,7 +1714,7 @@ func (gs *GossipSubRouter) heartbeat() {
 
 			// prune the excess peers
 			for _, p := range plst[gs.params.D:] {
-				log.Debugf("HEARTBEAT: Remove mesh link to %s in %s", p, topic)
+				gs.logger.Debug("HEARTBEAT: Remove mesh link to peer in topic", "peer", p, "topic", topic)
 				prunePeer(p)
 			}
 		}
@@ -1665,7 +1775,7 @@ func (gs *GossipSubRouter) heartbeat() {
 				})
 
 				for _, p := range plst {
-					log.Debugf("HEARTBEAT: Opportunistically graft peer %s on topic %s", p, topic)
+					gs.logger.Debug("HEARTBEAT: Opportunistically graft peer on topic", "peer", p, "topic", topic)
 					graftPeer(p)
 				}
 			}
@@ -1756,7 +1866,7 @@ func (gs *GossipSubRouter) clearIDontWantCounters() {
 
 func (gs *GossipSubRouter) applyIwantPenalties() {
 	for p, count := range gs.gossipTracer.GetBrokenPromises() {
-		log.Infof("peer %s didn't follow up in %d IWANT requests; adding penalty", p, count)
+		gs.logger.Info("peer didn't follow up in IWANT requests; adding penalty", "peer", p, "requestCount", count)
 		gs.score.AddPenalty(p, count)
 	}
 }
@@ -1857,7 +1967,7 @@ func (gs *GossipSubRouter) emitGossip(topic string, exclude map[peer.ID]struct{}
 	// if we are emitting more than GossipSubMaxIHaveLength mids, truncate the list
 	if len(mids) > gs.params.MaxIHaveLength {
 		// we do the truncation (with shuffling) per peer below
-		log.Debugf("too many messages for gossip; will truncate IHAVE list (%d messages)", len(mids))
+		gs.logger.Debug("too many messages for gossip; will truncate IHAVE list", "messageCount", len(mids))
 	}
 
 	// Send gossip to GossipFactor peers above threshold, with a minimum of D_lazy.
@@ -2009,24 +2119,14 @@ func (gs *GossipSubRouter) makePrune(p peer.ID, topic string, doPX bool, isUnsub
 			return p != xp && gs.score.Score(xp) >= 0
 		})
 
-		cab, ok := peerstore.GetCertifiedAddrBook(gs.cab)
+		cab, cabOK := peerstore.GetCertifiedAddrBook(gs.cab)
 		px = make([]*pb.PeerInfo, 0, len(peers))
 		for _, p := range peers {
-			// see if we have a signed peer record to send back; if we don't, just send
-			// the peer ID and let the pruned peer find them in the DHT -- we can't trust
-			// unsigned address records through px anyway.
-			var recordBytes []byte
-			if ok {
-				spr := cab.GetPeerRecord(p)
-				var err error
-				if spr != nil {
-					recordBytes, err = spr.Marshal()
-					if err != nil {
-						log.Warnf("error marshaling signed peer record for %s: %s", p, err)
-					}
-				}
+			var record *record.Envelope
+			if cabOK {
+				record = cab.GetPeerRecord(p)
 			}
-			px = append(px, &pb.PeerInfo{PeerID: []byte(p), SignedPeerRecord: recordBytes})
+			px = gs.reducePXRecords(px, gs.logger, p, gs.p.host.Peerstore().Addrs(p), record)
 		}
 	}
 

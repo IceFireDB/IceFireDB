@@ -41,8 +41,9 @@ func (fs *FloodSubRouter) Attach(p *PubSub) {
 	fs.tracer = p.tracer
 }
 
-func (fs *FloodSubRouter) AddPeer(p peer.ID, proto protocol.ID) {
+func (fs *FloodSubRouter) AddPeer(p peer.ID, proto protocol.ID, hello *RPC) *RPC {
 	fs.tracer.AddPeer(p, proto)
+	return hello
 }
 
 func (fs *FloodSubRouter) RemovePeer(p peer.ID) {
@@ -92,7 +93,7 @@ func (fs *FloodSubRouter) Publish(msg *Message) {
 
 		err := q.Push(out, false)
 		if err != nil {
-			log.Infof("dropping message to peer %s: queue full", pid)
+			fs.p.logger.Info("dropping message to peer: queue full", "peer", pid)
 			fs.tracer.DropRPC(out, pid)
 			// Drop it. The peer is too slow.
 			continue
