@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -53,12 +54,16 @@ type tagTracer struct {
 	// a map of message ids to the set of peers who delivered the message after the first delivery,
 	// but before the message was finished validating
 	nearFirst map[string]map[peer.ID]struct{}
+
+	// logger for tag tracer events
+	logger *slog.Logger
 }
 
 func newTagTracer(cmgr connmgr.ConnManager) *tagTracer {
+	logger := slog.Default()
 	decayer, ok := connmgr.SupportsDecay(cmgr)
 	if !ok {
-		log.Debugf("connection manager does not support decaying tags, delivery tags will not be applied")
+		logger.Debug("connection manager does not support decaying tags, delivery tags will not be applied")
 	}
 	return &tagTracer{
 		cmgr:      cmgr,
@@ -66,13 +71,16 @@ func newTagTracer(cmgr connmgr.ConnManager) *tagTracer {
 		decayer:   decayer,
 		decaying:  make(map[string]connmgr.DecayingTag),
 		nearFirst: make(map[string]map[peer.ID]struct{}),
+		direct:    make(map[peer.ID]struct{}),
+		logger:    logger, // Overridden in Start
 	}
 }
 
-func (t *tagTracer) Start(gs *GossipSubRouter) {
+func (t *tagTracer) Start(gs *GossipSubRouter, logger *slog.Logger) {
 	if t == nil {
 		return
 	}
+	t.logger = logger
 
 	t.idGen = gs.p.idGen
 	t.direct = gs.direct
@@ -119,7 +127,7 @@ func (t *tagTracer) addDeliveryTag(topic string) {
 		connmgr.BumpSumBounded(0, GossipSubConnTagMessageDeliveryCap))
 
 	if err != nil {
-		log.Warnf("unable to create decaying delivery tag: %s", err)
+		t.logger.Warn("unable to create decaying delivery tag", "err", err)
 		return
 	}
 	t.decaying[topic] = tag
@@ -134,7 +142,7 @@ func (t *tagTracer) removeDeliveryTag(topic string) {
 	}
 	err := tag.Close()
 	if err != nil {
-		log.Warnf("error closing decaying connmgr tag: %s", err)
+		t.logger.Warn("error closing decaying connmgr tag", "err", err)
 	}
 	delete(t.decaying, topic)
 }
@@ -154,7 +162,7 @@ func (t *tagTracer) bumpTagsForMessage(p peer.ID, msg *Message) {
 	topic := msg.GetTopic()
 	err := t.bumpDeliveryTag(p, topic)
 	if err != nil {
-		log.Warnf("error bumping delivery tag: %s", err)
+		t.logger.Warn("error bumping delivery tag", "err", err)
 	}
 }
 

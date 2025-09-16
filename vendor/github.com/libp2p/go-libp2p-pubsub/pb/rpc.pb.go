@@ -5,11 +5,10 @@ package pubsub_pb
 
 import (
 	fmt "fmt"
+	proto "github.com/gogo/protobuf/proto"
 	io "io"
 	math "math"
 	math_bits "math/bits"
-
-	proto "github.com/gogo/protobuf/proto"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -24,12 +23,16 @@ var _ = math.Inf
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type RPC struct {
-	Subscriptions        []*RPC_SubOpts  `protobuf:"bytes,1,rep,name=subscriptions" json:"subscriptions,omitempty"`
-	Publish              []*Message      `protobuf:"bytes,2,rep,name=publish" json:"publish,omitempty"`
-	Control              *ControlMessage `protobuf:"bytes,3,opt,name=control" json:"control,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
-	XXX_unrecognized     []byte          `json:"-"`
-	XXX_sizecache        int32           `json:"-"`
+	Subscriptions []*RPC_SubOpts  `protobuf:"bytes,1,rep,name=subscriptions" json:"subscriptions,omitempty"`
+	Publish       []*Message      `protobuf:"bytes,2,rep,name=publish" json:"publish,omitempty"`
+	Control       *ControlMessage `protobuf:"bytes,3,opt,name=control" json:"control,omitempty"`
+	// Experimental Extensions should register their messages here. They
+	// must use field numbers larger than 0x200000 to be encoded with at least 4
+	// bytes
+	TestExtension        *TestExtension `protobuf:"bytes,6492434,opt,name=testExtension" json:"testExtension,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
+	XXX_unrecognized     []byte         `json:"-"`
+	XXX_sizecache        int32          `json:"-"`
 }
 
 func (m *RPC) Reset()         { *m = RPC{} }
@@ -82,6 +85,13 @@ func (m *RPC) GetPublish() []*Message {
 func (m *RPC) GetControl() *ControlMessage {
 	if m != nil {
 		return m.Control
+	}
+	return nil
+}
+
+func (m *RPC) GetTestExtension() *TestExtension {
+	if m != nil {
+		return m.TestExtension
 	}
 	return nil
 }
@@ -234,6 +244,7 @@ type ControlMessage struct {
 	Graft                []*ControlGraft     `protobuf:"bytes,3,rep,name=graft" json:"graft,omitempty"`
 	Prune                []*ControlPrune     `protobuf:"bytes,4,rep,name=prune" json:"prune,omitempty"`
 	Idontwant            []*ControlIDontWant `protobuf:"bytes,5,rep,name=idontwant" json:"idontwant,omitempty"`
+	Extensions           *ControlExtensions  `protobuf:"bytes,6,opt,name=extensions" json:"extensions,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
 	XXX_unrecognized     []byte              `json:"-"`
 	XXX_sizecache        int32               `json:"-"`
@@ -303,6 +314,13 @@ func (m *ControlMessage) GetPrune() []*ControlPrune {
 func (m *ControlMessage) GetIdontwant() []*ControlIDontWant {
 	if m != nil {
 		return m.Idontwant
+	}
+	return nil
+}
+
+func (m *ControlMessage) GetExtensions() *ControlExtensions {
+	if m != nil {
+		return m.Extensions
 	}
 	return nil
 }
@@ -569,6 +587,55 @@ func (m *ControlIDontWant) GetMessageIDs() []string {
 	return nil
 }
 
+type ControlExtensions struct {
+	// Experimental extensions must use field numbers larger than 0x200000 to be
+	// encoded with 4 bytes
+	TestExtension        *bool    `protobuf:"varint,6492434,opt,name=testExtension" json:"testExtension,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ControlExtensions) Reset()         { *m = ControlExtensions{} }
+func (m *ControlExtensions) String() string { return proto.CompactTextString(m) }
+func (*ControlExtensions) ProtoMessage()    {}
+func (*ControlExtensions) Descriptor() ([]byte, []int) {
+	return fileDescriptor_77a6da22d6a3feb1, []int{8}
+}
+func (m *ControlExtensions) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ControlExtensions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ControlExtensions.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ControlExtensions) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ControlExtensions.Merge(m, src)
+}
+func (m *ControlExtensions) XXX_Size() int {
+	return m.Size()
+}
+func (m *ControlExtensions) XXX_DiscardUnknown() {
+	xxx_messageInfo_ControlExtensions.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ControlExtensions proto.InternalMessageInfo
+
+func (m *ControlExtensions) GetTestExtension() bool {
+	if m != nil && m.TestExtension != nil {
+		return *m.TestExtension
+	}
+	return false
+}
+
 type PeerInfo struct {
 	PeerID               []byte   `protobuf:"bytes,1,opt,name=peerID" json:"peerID,omitempty"`
 	SignedPeerRecord     []byte   `protobuf:"bytes,2,opt,name=signedPeerRecord" json:"signedPeerRecord,omitempty"`
@@ -581,7 +648,7 @@ func (m *PeerInfo) Reset()         { *m = PeerInfo{} }
 func (m *PeerInfo) String() string { return proto.CompactTextString(m) }
 func (*PeerInfo) ProtoMessage()    {}
 func (*PeerInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_77a6da22d6a3feb1, []int{8}
+	return fileDescriptor_77a6da22d6a3feb1, []int{9}
 }
 func (m *PeerInfo) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -624,6 +691,45 @@ func (m *PeerInfo) GetSignedPeerRecord() []byte {
 	return nil
 }
 
+type TestExtension struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *TestExtension) Reset()         { *m = TestExtension{} }
+func (m *TestExtension) String() string { return proto.CompactTextString(m) }
+func (*TestExtension) ProtoMessage()    {}
+func (*TestExtension) Descriptor() ([]byte, []int) {
+	return fileDescriptor_77a6da22d6a3feb1, []int{10}
+}
+func (m *TestExtension) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *TestExtension) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_TestExtension.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *TestExtension) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TestExtension.Merge(m, src)
+}
+func (m *TestExtension) XXX_Size() int {
+	return m.Size()
+}
+func (m *TestExtension) XXX_DiscardUnknown() {
+	xxx_messageInfo_TestExtension.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TestExtension proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*RPC)(nil), "pubsub.pb.RPC")
 	proto.RegisterType((*RPC_SubOpts)(nil), "pubsub.pb.RPC.SubOpts")
@@ -634,45 +740,52 @@ func init() {
 	proto.RegisterType((*ControlGraft)(nil), "pubsub.pb.ControlGraft")
 	proto.RegisterType((*ControlPrune)(nil), "pubsub.pb.ControlPrune")
 	proto.RegisterType((*ControlIDontWant)(nil), "pubsub.pb.ControlIDontWant")
+	proto.RegisterType((*ControlExtensions)(nil), "pubsub.pb.ControlExtensions")
 	proto.RegisterType((*PeerInfo)(nil), "pubsub.pb.PeerInfo")
+	proto.RegisterType((*TestExtension)(nil), "pubsub.pb.TestExtension")
 }
 
 func init() { proto.RegisterFile("rpc.proto", fileDescriptor_77a6da22d6a3feb1) }
 
 var fileDescriptor_77a6da22d6a3feb1 = []byte{
-	// 511 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x92, 0xcd, 0x6e, 0x13, 0x31,
-	0x10, 0xc7, 0xe5, 0x7c, 0x34, 0xdd, 0xe9, 0x82, 0x22, 0x83, 0x8a, 0xf9, 0x50, 0x14, 0xed, 0x29,
-	0x20, 0xd8, 0x43, 0x38, 0x21, 0x71, 0x81, 0x44, 0xa2, 0x39, 0x00, 0x91, 0x39, 0x70, 0xde, 0xdd,
-	0x38, 0xe9, 0xaa, 0x8d, 0x6d, 0x6c, 0x6f, 0x11, 0x4f, 0xc0, 0x89, 0xf7, 0xe2, 0xc8, 0x23, 0xa0,
-	0xdc, 0x78, 0x0b, 0xe4, 0x59, 0xe7, 0xa3, 0x4d, 0x03, 0x37, 0xcf, 0xf8, 0x37, 0xfe, 0xff, 0x67,
-	0xc6, 0x10, 0x19, 0x5d, 0xa4, 0xda, 0x28, 0xa7, 0x68, 0xa4, 0xab, 0xdc, 0x56, 0x79, 0xaa, 0xf3,
-	0xe4, 0x0f, 0x81, 0x26, 0x9f, 0x8e, 0xe8, 0x6b, 0xb8, 0x63, 0xab, 0xdc, 0x16, 0xa6, 0xd4, 0xae,
-	0x54, 0xd2, 0x32, 0xd2, 0x6f, 0x0e, 0x4e, 0x86, 0xa7, 0xe9, 0x06, 0x4d, 0xf9, 0x74, 0x94, 0x7e,
-	0xaa, 0xf2, 0x8f, 0xda, 0x59, 0x7e, 0x1d, 0xa6, 0xcf, 0xa1, 0xa3, 0xab, 0xfc, 0xb2, 0xb4, 0xe7,
-	0xac, 0x81, 0x75, 0x74, 0xa7, 0xee, 0xbd, 0xb0, 0x36, 0x5b, 0x08, 0xbe, 0x46, 0xe8, 0x4b, 0xe8,
-	0x14, 0x4a, 0x3a, 0xa3, 0x2e, 0x59, 0xb3, 0x4f, 0x06, 0x27, 0xc3, 0x87, 0x3b, 0xf4, 0xa8, 0xbe,
-	0xd9, 0x14, 0x05, 0xf2, 0xd1, 0x1b, 0xe8, 0x04, 0x71, 0xfa, 0x04, 0xa2, 0x20, 0x9f, 0x0b, 0x46,
-	0xfa, 0x64, 0x70, 0xcc, 0xb7, 0x09, 0xca, 0xa0, 0xe3, 0x94, 0x2e, 0x8b, 0x72, 0xc6, 0x1a, 0x7d,
-	0x32, 0x88, 0xf8, 0x3a, 0x4c, 0x7e, 0x10, 0xe8, 0x84, 0x77, 0x29, 0x85, 0xd6, 0xdc, 0xa8, 0x25,
-	0x96, 0xc7, 0x1c, 0xcf, 0x3e, 0x37, 0xcb, 0x5c, 0x86, 0x65, 0x31, 0xc7, 0x33, 0xbd, 0x0f, 0x6d,
-	0x2b, 0xbe, 0x48, 0x85, 0x4e, 0x63, 0x5e, 0x07, 0x3e, 0x8b, 0x8f, 0xb2, 0x16, 0x2a, 0xd4, 0x01,
-	0xfa, 0x2a, 0x17, 0x32, 0x73, 0x95, 0x11, 0xac, 0x8d, 0xfc, 0x36, 0x41, 0xbb, 0xd0, 0xbc, 0x10,
-	0xdf, 0xd8, 0x11, 0xe6, 0xfd, 0x31, 0xf9, 0xde, 0x80, 0xbb, 0xd7, 0xdb, 0xa5, 0x2f, 0xa0, 0x5d,
-	0x9e, 0x67, 0x57, 0x22, 0x8c, 0xff, 0xc1, 0xfe, 0x60, 0x26, 0x67, 0xd9, 0x95, 0xe0, 0x35, 0x85,
-	0xf8, 0xd7, 0x4c, 0xba, 0x30, 0xf5, 0xdb, 0xf0, 0xcf, 0x99, 0x74, 0xbc, 0xa6, 0x3c, 0xbe, 0x30,
-	0xd9, 0xdc, 0xb1, 0xe6, 0x21, 0xfc, 0x9d, 0xbf, 0xe6, 0x35, 0xe5, 0x71, 0x6d, 0x2a, 0x29, 0x58,
-	0xeb, 0x10, 0x3e, 0xf5, 0xd7, 0xbc, 0xa6, 0xe8, 0x2b, 0x88, 0xca, 0x99, 0x92, 0x0e, 0x0d, 0xb5,
-	0xb1, 0xe4, 0xf1, 0x2d, 0x86, 0xc6, 0x4a, 0x3a, 0x34, 0xb5, 0xa5, 0x93, 0x33, 0x88, 0x77, 0xdb,
-	0xdb, 0xec, 0x70, 0x32, 0xc6, 0x05, 0xad, 0x77, 0x38, 0x19, 0xd3, 0x1e, 0xc0, 0xb2, 0x9e, 0xd5,
-	0x64, 0x6c, 0xb1, 0xed, 0x88, 0xef, 0x64, 0x92, 0x74, 0xfb, 0x92, 0x17, 0xb9, 0xc1, 0x93, 0x3d,
-	0x7e, 0xb0, 0xe1, 0xb1, 0xf5, 0xc3, 0xca, 0xc9, 0x72, 0x43, 0x62, 0xd7, 0xff, 0xf0, 0xf8, 0x14,
-	0xda, 0x5a, 0x08, 0x63, 0xc3, 0x56, 0xee, 0xed, 0x0c, 0x61, 0x2a, 0x84, 0x99, 0xc8, 0xb9, 0xe2,
-	0x35, 0xe1, 0x1f, 0xc9, 0xb3, 0xe2, 0x42, 0xcd, 0xe7, 0xf8, 0xc1, 0x5a, 0x7c, 0x1d, 0x26, 0x43,
-	0xe8, 0xde, 0x9c, 0xd8, 0x7f, 0x9b, 0xf9, 0x00, 0xc7, 0x6b, 0x01, 0x7a, 0x0a, 0x47, 0x5e, 0x22,
-	0xb8, 0x8b, 0x79, 0x88, 0xe8, 0x33, 0xe8, 0xfa, 0x3f, 0x29, 0x66, 0x9e, 0xe4, 0xa2, 0x50, 0x66,
-	0x16, 0x3e, 0xfc, 0x5e, 0xfe, 0x6d, 0xfc, 0x73, 0xd5, 0x23, 0xbf, 0x56, 0x3d, 0xf2, 0x7b, 0xd5,
-	0x23, 0x7f, 0x03, 0x00, 0x00, 0xff, 0xff, 0xba, 0x73, 0x8e, 0xbf, 0x41, 0x04, 0x00, 0x00,
+	// 583 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x94, 0xcd, 0x8e, 0xd3, 0x3e,
+	0x14, 0xc5, 0x95, 0x7e, 0x4c, 0x9b, 0xdb, 0xf4, 0xff, 0x2f, 0x06, 0x0d, 0x06, 0x46, 0x55, 0x95,
+	0x0d, 0x05, 0x41, 0x16, 0x65, 0x85, 0xd4, 0xcd, 0xd0, 0x22, 0xa6, 0x0b, 0xa0, 0x32, 0x48, 0xac,
+	0x93, 0xd4, 0xed, 0x44, 0x33, 0xb5, 0x83, 0xed, 0x0c, 0xf0, 0x0e, 0xb0, 0xe1, 0x11, 0x58, 0xf3,
+	0x1a, 0x48, 0x2c, 0x79, 0x04, 0xd4, 0x27, 0x41, 0x76, 0x3e, 0x9a, 0x36, 0x53, 0xd8, 0xd9, 0xd7,
+	0xbf, 0xe3, 0x1c, 0x9f, 0x6b, 0x07, 0x6c, 0x11, 0x87, 0x5e, 0x2c, 0xb8, 0xe2, 0xc8, 0x8e, 0x93,
+	0x40, 0x26, 0x81, 0x17, 0x07, 0xee, 0xf7, 0x1a, 0xd4, 0xc9, 0x7c, 0x82, 0xc6, 0xd0, 0x95, 0x49,
+	0x20, 0x43, 0x11, 0xc5, 0x2a, 0xe2, 0x4c, 0x62, 0x6b, 0x50, 0x1f, 0x76, 0x46, 0xc7, 0x5e, 0x81,
+	0x7a, 0x64, 0x3e, 0xf1, 0xde, 0x24, 0xc1, 0xeb, 0x58, 0x49, 0xb2, 0x0b, 0xa3, 0x47, 0xd0, 0x8a,
+	0x93, 0xe0, 0x32, 0x92, 0xe7, 0xb8, 0x66, 0x74, 0xa8, 0xa4, 0x7b, 0x49, 0xa5, 0xf4, 0x57, 0x94,
+	0xe4, 0x08, 0x7a, 0x02, 0xad, 0x90, 0x33, 0x25, 0xf8, 0x25, 0xae, 0x0f, 0xac, 0x61, 0x67, 0x74,
+	0xa7, 0x44, 0x4f, 0xd2, 0x95, 0x42, 0x94, 0x91, 0xe8, 0x14, 0xba, 0x8a, 0x4a, 0xf5, 0xfc, 0xa3,
+	0xa2, 0x4c, 0x46, 0x9c, 0xe1, 0xaf, 0xdf, 0x3e, 0xa7, 0x6a, 0x5c, 0x52, 0xbf, 0x2d, 0x23, 0x64,
+	0x57, 0x71, 0xf7, 0x14, 0x5a, 0x99, 0x7f, 0x74, 0x02, 0x76, 0x76, 0x82, 0x80, 0x62, 0x6b, 0x60,
+	0x0d, 0xdb, 0x64, 0x5b, 0x40, 0x18, 0x5a, 0x8a, 0xc7, 0x51, 0x18, 0x2d, 0x70, 0x6d, 0x60, 0x0d,
+	0x6d, 0x92, 0x4f, 0xdd, 0x2f, 0x16, 0xb4, 0x32, 0x6b, 0x08, 0x41, 0x63, 0x29, 0xf8, 0xda, 0xc8,
+	0x1d, 0x62, 0xc6, 0xba, 0xb6, 0xf0, 0x95, 0x6f, 0x64, 0x0e, 0x31, 0x63, 0x74, 0x0b, 0x9a, 0x92,
+	0xbe, 0x67, 0xdc, 0x1c, 0xd6, 0x21, 0xe9, 0x44, 0x57, 0xcd, 0xa6, 0xb8, 0x61, 0xbe, 0x90, 0x4e,
+	0x8c, 0xaf, 0x68, 0xc5, 0x7c, 0x95, 0x08, 0x8a, 0x9b, 0x86, 0xdf, 0x16, 0x50, 0x0f, 0xea, 0x17,
+	0xf4, 0x13, 0x3e, 0x32, 0x75, 0x3d, 0x74, 0x7f, 0xd4, 0xe0, 0xbf, 0xdd, 0xc4, 0xd0, 0x63, 0x68,
+	0x46, 0xe7, 0xfe, 0x15, 0xcd, 0x3a, 0x78, 0xbb, 0x9a, 0xed, 0xec, 0xcc, 0xbf, 0xa2, 0x24, 0xa5,
+	0x0c, 0xfe, 0xc1, 0x67, 0x2a, 0x6b, 0xdc, 0x75, 0xf8, 0x3b, 0x9f, 0x29, 0x92, 0x52, 0x1a, 0x5f,
+	0x09, 0x7f, 0xa9, 0x70, 0xfd, 0x10, 0xfe, 0x42, 0x2f, 0x93, 0x94, 0xd2, 0x78, 0x2c, 0x12, 0x46,
+	0x71, 0xe3, 0x10, 0x3e, 0xd7, 0xcb, 0x24, 0xa5, 0xd0, 0x53, 0xb0, 0xa3, 0x05, 0x67, 0xca, 0x18,
+	0x6a, 0x1a, 0xc9, 0xbd, 0x6b, 0x0c, 0x4d, 0x39, 0x53, 0xc6, 0xd4, 0x96, 0x46, 0x63, 0x00, 0x9a,
+	0x77, 0x5a, 0x9a, 0x88, 0x3a, 0xa3, 0x93, 0xaa, 0xb6, 0xb8, 0x0d, 0x92, 0x94, 0x78, 0xf7, 0x0c,
+	0x9c, 0x72, 0x38, 0xc5, 0x0d, 0x98, 0x4d, 0x4d, 0x7b, 0xf3, 0x1b, 0x30, 0x9b, 0xa2, 0x3e, 0xc0,
+	0x3a, 0x4d, 0x7a, 0x36, 0x95, 0x26, 0x34, 0x9b, 0x94, 0x2a, 0xae, 0xb7, 0xdd, 0x49, 0x5b, 0xdc,
+	0xe3, 0xad, 0x0a, 0x3f, 0x2c, 0x78, 0x13, 0xdc, 0xe1, 0x2f, 0xbb, 0xeb, 0x82, 0x34, 0x99, 0xfd,
+	0xc5, 0xe3, 0x03, 0x68, 0xc6, 0x94, 0x0a, 0x99, 0xf5, 0xf4, 0x66, 0x29, 0x86, 0x39, 0xa5, 0x62,
+	0xc6, 0x96, 0x9c, 0xa4, 0x84, 0xde, 0x24, 0xf0, 0xc3, 0x0b, 0xbe, 0x5c, 0x9a, 0xeb, 0xd9, 0x20,
+	0xf9, 0xd4, 0x1d, 0x41, 0x6f, 0x3f, 0xef, 0x7f, 0x1e, 0x66, 0x0c, 0x37, 0x2a, 0x39, 0xa3, 0xfb,
+	0x07, 0x5e, 0x6e, 0x7b, 0xef, 0x7d, 0xba, 0xaf, 0xa0, 0x9d, 0xdb, 0x43, 0xc7, 0x70, 0xa4, 0x0d,
+	0x66, 0x67, 0x73, 0x48, 0x36, 0x43, 0x0f, 0xa1, 0xa7, 0xdf, 0x03, 0x5d, 0x68, 0x92, 0xd0, 0x90,
+	0x8b, 0x45, 0xf6, 0xd8, 0x2a, 0x75, 0xf7, 0x7f, 0xe8, 0xee, 0xfc, 0x0f, 0x9e, 0x39, 0x3f, 0x37,
+	0x7d, 0xeb, 0xd7, 0xa6, 0x6f, 0xfd, 0xde, 0xf4, 0xad, 0x3f, 0x01, 0x00, 0x00, 0xff, 0xff, 0xa2,
+	0x64, 0xfc, 0x1b, 0x11, 0x05, 0x00, 0x00,
 }
 
 func (m *RPC) Marshal() (dAtA []byte, err error) {
@@ -698,6 +811,24 @@ func (m *RPC) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	if m.XXX_unrecognized != nil {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if m.TestExtension != nil {
+		{
+			size, err := m.TestExtension.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintRpc(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x18
+		i--
+		dAtA[i] = 0xe2
+		i--
+		dAtA[i] = 0x91
+		i--
+		dAtA[i] = 0x92
 	}
 	if m.Control != nil {
 		{
@@ -878,6 +1009,18 @@ func (m *ControlMessage) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	if m.XXX_unrecognized != nil {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if m.Extensions != nil {
+		{
+			size, err := m.Extensions.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintRpc(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x32
 	}
 	if len(m.Idontwant) > 0 {
 		for iNdEx := len(m.Idontwant) - 1; iNdEx >= 0; iNdEx-- {
@@ -1154,6 +1297,49 @@ func (m *ControlIDontWant) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *ControlExtensions) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ControlExtensions) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ControlExtensions) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if m.TestExtension != nil {
+		i--
+		if *m.TestExtension {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x18
+		i--
+		dAtA[i] = 0xe2
+		i--
+		dAtA[i] = 0x91
+		i--
+		dAtA[i] = 0x90
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *PeerInfo) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1195,6 +1381,33 @@ func (m *PeerInfo) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *TestExtension) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TestExtension) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *TestExtension) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintRpc(dAtA []byte, offset int, v uint64) int {
 	offset -= sovRpc(v)
 	base := offset
@@ -1227,6 +1440,10 @@ func (m *RPC) Size() (n int) {
 	if m.Control != nil {
 		l = m.Control.Size()
 		n += 1 + l + sovRpc(uint64(l))
+	}
+	if m.TestExtension != nil {
+		l = m.TestExtension.Size()
+		n += 4 + l + sovRpc(uint64(l))
 	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
@@ -1324,6 +1541,10 @@ func (m *ControlMessage) Size() (n int) {
 			l = e.Size()
 			n += 1 + l + sovRpc(uint64(l))
 		}
+	}
+	if m.Extensions != nil {
+		l = m.Extensions.Size()
+		n += 1 + l + sovRpc(uint64(l))
 	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
@@ -1430,6 +1651,21 @@ func (m *ControlIDontWant) Size() (n int) {
 	return n
 }
 
+func (m *ControlExtensions) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.TestExtension != nil {
+		n += 5
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
 func (m *PeerInfo) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1444,6 +1680,18 @@ func (m *PeerInfo) Size() (n int) {
 		l = len(m.SignedPeerRecord)
 		n += 1 + l + sovRpc(uint64(l))
 	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *TestExtension) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -1586,6 +1834,42 @@ func (m *RPC) Unmarshal(dAtA []byte) error {
 				m.Control = &ControlMessage{}
 			}
 			if err := m.Control.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 6492434:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TestExtension", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.TestExtension == nil {
+				m.TestExtension = &TestExtension{}
+			}
+			if err := m.TestExtension.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -2169,6 +2453,42 @@ func (m *ControlMessage) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Extensions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Extensions == nil {
+				m.Extensions = &ControlExtensions{}
+			}
+			if err := m.Extensions.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipRpc(dAtA[iNdEx:])
@@ -2695,6 +3015,78 @@ func (m *ControlIDontWant) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *ControlExtensions) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ControlExtensions: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ControlExtensions: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 6492434:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TestExtension", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.TestExtension = &b
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *PeerInfo) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2792,6 +3184,57 @@ func (m *PeerInfo) Unmarshal(dAtA []byte) error {
 				m.SignedPeerRecord = []byte{}
 			}
 			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TestExtension) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TestExtension: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TestExtension: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
 		default:
 			iNdEx = preIndex
 			skippy, err := skipRpc(dAtA[iNdEx:])

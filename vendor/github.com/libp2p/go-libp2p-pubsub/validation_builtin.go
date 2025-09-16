@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"encoding/binary"
+	"log/slog"
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -30,14 +31,16 @@ type PeerMetadataStore interface {
 // interoperability hazard. We expect this issue to be addressed in the not so distant future,
 // but keep this in mind if you are in a mixed environment with (older) rust nodes.
 type BasicSeqnoValidator struct {
-	mx   sync.RWMutex
-	meta PeerMetadataStore
+	mx     sync.RWMutex
+	meta   PeerMetadataStore
+	logger *slog.Logger
 }
 
 // NewBasicSeqnoValidator constructs a BasicSeqnoValidator using the givven PeerMetadataStore.
-func NewBasicSeqnoValidator(meta PeerMetadataStore) ValidatorEx {
+func NewBasicSeqnoValidator(meta PeerMetadataStore, logger *slog.Logger) ValidatorEx {
 	val := &BasicSeqnoValidator{
-		meta: meta,
+		meta:   meta,
+		logger: logger,
 	}
 	return val.validate
 }
@@ -50,7 +53,7 @@ func (v *BasicSeqnoValidator) validate(ctx context.Context, _ peer.ID, m *Messag
 	v.mx.RUnlock()
 
 	if err != nil {
-		log.Warn("error retrieving peer nonce: %s", err)
+		v.logger.Warn("error retrieving peer nonce", "err", err)
 		return ValidationIgnore
 	}
 
@@ -76,7 +79,7 @@ func (v *BasicSeqnoValidator) validate(ctx context.Context, _ peer.ID, m *Messag
 
 	nonceBytes, err = v.meta.Get(ctx, p)
 	if err != nil {
-		log.Warn("error retrieving peer nonce: %s", err)
+		v.logger.Warn("error retrieving peer nonce", "err", err)
 		return ValidationIgnore
 	}
 
@@ -94,7 +97,7 @@ func (v *BasicSeqnoValidator) validate(ctx context.Context, _ peer.ID, m *Messag
 
 	err = v.meta.Put(ctx, p, nonceBytes)
 	if err != nil {
-		log.Warn("error storing peer nonce: %s", err)
+		v.logger.Warn("error storing peer nonce", "err", err)
 	}
 
 	return ValidationAccept

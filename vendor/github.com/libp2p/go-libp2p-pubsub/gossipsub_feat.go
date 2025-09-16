@@ -20,20 +20,24 @@ const (
 	GossipSubFeaturePX
 	// Protocol supports IDONTWANT -- gossipsub-v1.2 compatible
 	GossipSubFeatureIdontwant
+	// Protocol supports the Extensions control message -- gossipsub-v1.3 compatible
+	GossipSubFeatureExtensions
 )
 
 // GossipSubDefaultProtocols is the default gossipsub router protocol list
-var GossipSubDefaultProtocols = []protocol.ID{GossipSubID_v12, GossipSubID_v11, GossipSubID_v10, FloodSubID}
+var GossipSubDefaultProtocols = []protocol.ID{GossipSubID_v13, GossipSubID_v12, GossipSubID_v11, GossipSubID_v10, FloodSubID}
 
 // GossipSubDefaultFeatures is the feature test function for the default gossipsub protocols
 func GossipSubDefaultFeatures(feat GossipSubFeature, proto protocol.ID) bool {
 	switch feat {
 	case GossipSubFeatureMesh:
-		return proto == GossipSubID_v12 || proto == GossipSubID_v11 || proto == GossipSubID_v10
+		return proto == GossipSubID_v13 || proto == GossipSubID_v12 || proto == GossipSubID_v11 || proto == GossipSubID_v10
 	case GossipSubFeaturePX:
-		return proto == GossipSubID_v12 || proto == GossipSubID_v11
+		return proto == GossipSubID_v13 || proto == GossipSubID_v12 || proto == GossipSubID_v11
 	case GossipSubFeatureIdontwant:
-		return proto == GossipSubID_v12
+		return proto == GossipSubID_v13 || proto == GossipSubID_v12
+	case GossipSubFeatureExtensions:
+		return proto == GossipSubID_v13
 	default:
 		return false
 	}

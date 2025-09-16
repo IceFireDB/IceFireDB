@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
@@ -45,6 +46,7 @@ type basicTracer struct {
 	buf    []*pb.TraceEvent
 	lossy  bool
 	closed bool
+	logger *slog.Logger
 }
 
 func (t *basicTracer) Trace(evt *pb.TraceEvent) {
@@ -56,7 +58,7 @@ func (t *basicTracer) Trace(evt *pb.TraceEvent) {
 	}
 
 	if t.lossy && len(t.buf) > TraceBufferSize {
-		log.Debug("trace buffer overflow; dropping trace event")
+		t.logger.Debug("trace buffer overflow; dropping trace event")
 	} else {
 		t.buf = append(t.buf, evt)
 	}
@@ -84,17 +86,17 @@ type JSONTracer struct {
 
 // NewJsonTracer creates a new JSONTracer writing traces to file.
 func NewJSONTracer(file string) (*JSONTracer, error) {
-	return OpenJSONTracer(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	return OpenJSONTracer(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644, slog.Default())
 }
 
 // OpenJSONTracer creates a new JSONTracer, with explicit control of OpenFile flags and permissions.
-func OpenJSONTracer(file string, flags int, perm os.FileMode) (*JSONTracer, error) {
+func OpenJSONTracer(file string, flags int, perm os.FileMode, logger *slog.Logger) (*JSONTracer, error) {
 	f, err := os.OpenFile(file, flags, perm)
 	if err != nil {
 		return nil, err
 	}
 
-	tr := &JSONTracer{w: f, basicTracer: basicTracer{ch: make(chan struct{}, 1)}}
+	tr := &JSONTracer{w: f, basicTracer: basicTracer{ch: make(chan struct{}, 1), logger: logger}}
 	go tr.doWrite()
 
 	return tr, nil
@@ -115,7 +117,7 @@ func (t *JSONTracer) doWrite() {
 		for i, evt := range buf {
 			err := enc.Encode(evt)
 			if err != nil {
-				log.Warnf("error writing event trace: %s", err.Error())
+				t.logger.Warn("error writing event trace", "err", err)
 			}
 			buf[i] = nil
 		}
@@ -136,17 +138,19 @@ type PBTracer struct {
 }
 
 func NewPBTracer(file string) (*PBTracer, error) {
-	return OpenPBTracer(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	return OpenPBTracer(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644, slog.Default())
 }
 
 // OpenPBTracer creates a new PBTracer, with explicit control of OpenFile flags and permissions.
-func OpenPBTracer(file string, flags int, perm os.FileMode) (*PBTracer, error) {
+// OpenPBTracer constructs a PBTracer that writes to the given file,
+// with explicit control of OpenFile flags and permissions
+func OpenPBTracer(file string, flags int, perm os.FileMode, logger *slog.Logger) (*PBTracer, error) {
 	f, err := os.OpenFile(file, flags, perm)
 	if err != nil {
 		return nil, err
 	}
 
-	tr := &PBTracer{w: f, basicTracer: basicTracer{ch: make(chan struct{}, 1)}}
+	tr := &PBTracer{w: f, basicTracer: basicTracer{ch: make(chan struct{}, 1), logger: logger}}
 	go tr.doWrite()
 
 	return tr, nil
@@ -167,7 +171,7 @@ func (t *PBTracer) doWrite() {
 		for i, evt := range buf {
 			err := w.WriteMsg(evt)
 			if err != nil {
-				log.Warnf("error writing event trace: %s", err.Error())
+				t.logger.Warn("error writing event trace", "err", err)
 			}
 			buf[i] = nil
 		}
@@ -192,8 +196,8 @@ type RemoteTracer struct {
 }
 
 // NewRemoteTracer constructs a RemoteTracer, tracing to the peer identified by pi
-func NewRemoteTracer(ctx context.Context, host host.Host, pi peer.AddrInfo) (*RemoteTracer, error) {
-	tr := &RemoteTracer{ctx: ctx, host: host, peer: pi.ID, basicTracer: basicTracer{ch: make(chan struct{}, 1), lossy: true}}
+func NewRemoteTracer(ctx context.Context, host host.Host, pi peer.AddrInfo, logger *slog.Logger) (*RemoteTracer, error) {
+	tr := &RemoteTracer{ctx: ctx, host: host, peer: pi.ID, basicTracer: basicTracer{ch: make(chan struct{}, 1), lossy: true, logger: logger}}
 	host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.PermanentAddrTTL)
 	go tr.doWrite()
 	return tr, nil
@@ -204,7 +208,7 @@ func (t *RemoteTracer) doWrite() {
 
 	s, err := t.openStream()
 	if err != nil {
-		log.Debugf("error opening remote tracer stream: %s", err.Error())
+		t.logger.Debug("error opening remote tracer stream", "err", err)
 		return
 	}
 
@@ -239,13 +243,13 @@ func (t *RemoteTracer) doWrite() {
 
 		err = w.WriteMsg(&batch)
 		if err != nil {
-			log.Debugf("error writing trace event batch: %s", err)
+			t.logger.Debug("error writing trace event batch", "err", err)
 			goto end
 		}
 
 		err = gzipW.Flush()
 		if err != nil {
-			log.Debugf("error flushin gzip stream: %s", err)
+			t.logger.Debug("error flushing gzip stream", "err", err)
 			goto end
 		}
 
@@ -269,7 +273,7 @@ func (t *RemoteTracer) doWrite() {
 			s.Reset()
 			s, err = t.openStream()
 			if err != nil {
-				log.Debugf("error opening remote tracer stream: %s", err.Error())
+				t.logger.Debug("error opening remote tracer stream", "err", err)
 				return
 			}
 
