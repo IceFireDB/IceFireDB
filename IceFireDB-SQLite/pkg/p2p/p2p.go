@@ -101,11 +101,11 @@ func NewP2P(serviceName string, nodeHostIP string, nodeHostPort int) *P2P {
 // The peer discovery is handled by a go-routine that will read from a channel
 // of peer address information until the peer channel closes
 func (p2p *P2P) AdvertiseConnect() {
-	// Advertise the availabilty of the service on this node
+	// Advertise the availability of the service on this node
 	ttl, err := p2p.Discovery.Advertise(p2p.Ctx, p2p.service)
 	// Debug log
 	logrus.Debugln("Advertised the p2p Service.")
-	// Sleep to give time for the advertisment to propogate
+	// Sleep to give time for the advertisment to propagate
 	time.Sleep(time.Second * 5)
 	// Debug log
 	logrus.Debugf("Service Time-to-Live is %s", ttl)
@@ -148,7 +148,7 @@ func (p2p *P2P) AnnounceConnect() {
 	}
 	// Debug log
 	logrus.Debugln("Announced the p2p Service.")
-	// Sleep to give time for the advertisment to propogate
+	// Sleep to give time for the advertisment to propagate
 	time.Sleep(time.Second * 5)
 
 	// Find the other providers for the service CID
@@ -329,7 +329,7 @@ func setupHost(ctx context.Context, nodeHostIP string, nodeHostPort int) (host.H
 func setupKadDHT(ctx context.Context, nodehost host.Host) (*dht.IpfsDHT, error) {
 	// Create DHT server mode option
 	dhtmode := dht.Mode(dht.ModeServer)
-	// Rertieve the list of boostrap peer addresses
+	// Rertieve the list of bootstrap peer addresses
 	bootstrappeers := dht.GetDefaultBootstrapPeerAddrInfos()
 	// Create the DHT bootstrap peers option
 	dhtpeers := dht.BootstrapPeers(bootstrappeers...)
