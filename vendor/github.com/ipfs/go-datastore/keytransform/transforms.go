@@ -29,6 +29,10 @@ type PrefixTransform struct {
 
 // ConvertKey adds the prefix.
 func (p PrefixTransform) ConvertKey(k ds.Key) ds.Key {
+	if p.Prefix.IsAncestorOf(k) {
+		return k
+	}
+
 	return p.Prefix.Child(k)
 }
 
