@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"iter"
 
 	query "github.com/ipfs/go-datastore/query"
 )
@@ -92,6 +93,50 @@ type Read interface {
 	//   for entry := range entries { ... }
 	//
 	Query(ctx context.Context, q query.Query) (query.Results, error)
+}
+
+// QueryIter returns a go iterator that allows ranging over query results.
+// The range yields two values, a result Entry and an error. If an error is
+// returned then iteration stops.
+//
+// Example:
+//
+//	qry := query.Query{
+//		Prefix: keyPrefix,
+//	}
+//	var foundVal []byte
+//	for ent, err := range QueryIter(ctx, dstore, qry) {
+//		if err != nil {
+//			return err
+//		}
+//		if ent.Key == lookingFor {
+//			foundVal = ent.Val
+//			break
+//		}
+//	}
+func QueryIter(ctx context.Context, ds Read, q query.Query) iter.Seq2[query.Entry, error] {
+	return func(yield func(query.Entry, error) bool) {
+		results, err := ds.Query(ctx, q)
+		if err != nil {
+			yield(query.Entry{}, err)
+			return
+		}
+		defer results.Close()
+
+		for result := range results.Next() {
+			if ctx.Err() != nil {
+				yield(query.Entry{}, ctx.Err())
+				return
+			}
+			if result.Error != nil {
+				yield(query.Entry{}, result.Error)
+				return
+			}
+			if !yield(result.Entry, nil) {
+				return
+			}
+		}
+	}
 }
 
 // Batching datastores support deferred, grouped updates to the database.
@@ -206,14 +251,13 @@ var ErrNotFound error = &dsError{error: errors.New("datastore: key not found"), 
 //	}
 func GetBackedHas(ctx context.Context, ds Read, key Key) (bool, error) {
 	_, err := ds.Get(ctx, key)
-	switch err {
-	case nil:
-		return true, nil
-	case ErrNotFound:
-		return false, nil
-	default:
+	if err != nil {
+		if err == ErrNotFound {
+			return false, nil
+		}
 		return false, err
 	}
+	return true, nil
 }
 
 // GetBackedSize provides a default Datastore.GetSize implementation.
@@ -224,10 +268,10 @@ func GetBackedHas(ctx context.Context, ds Read, key Key) (bool, error) {
 //	}
 func GetBackedSize(ctx context.Context, ds Read, key Key) (int, error) {
 	value, err := ds.Get(ctx, key)
-	if err == nil {
-		return len(value), nil
+	if err != nil {
+		return -1, err
 	}
-	return -1, err
+	return len(value), nil
 }
 
 type Batch interface {
