@@ -2,6 +2,7 @@ package keytransform
 
 import (
 	"context"
+	"errors"
 
 	ds "github.com/ipfs/go-datastore"
 	dsq "github.com/ipfs/go-datastore/query"
@@ -31,6 +32,7 @@ type Datastore struct {
 
 var _ ds.Datastore = (*Datastore)(nil)
 var _ ds.Batching = (*Datastore)(nil)
+var _ ds.TxnDatastore = (*Datastore)(nil)
 var _ ds.Shim = (*Datastore)(nil)
 var _ ds.PersistentDatastore = (*Datastore)(nil)
 var _ ds.CheckedDatastore = (*Datastore)(nil)
@@ -130,13 +132,12 @@ orders:
 			continue
 		case dsq.OrderByKey, *dsq.OrderByKey,
 			dsq.OrderByKeyDescending, *dsq.OrderByKeyDescending:
-			// if the key transform preserves order, we can delegate
-			// to the child datastore.
+			// if the key transform preserves order, we can delegate to the
+			// child datastore.
 			if orderPreserving {
-				// When sorting, we compare with the first
-				// Order, then, if equal, we compare with the
-				// second Order, etc. However, keys are _unique_
-				// so we'll never apply any additional orders
+				// When sorting, we compare with the first Order, then, if
+				// equal, we compare with the second Order, etc. However, keys
+				// are _unique_ so we'll never apply any additional orders
 				// after ordering by key.
 				child.Orders = child.Orders[:i+1]
 				break orders
@@ -224,6 +225,23 @@ func (d *Datastore) Batch(ctx context.Context) (ds.Batch, error) {
 	}, nil
 }
 
+func (d *Datastore) NewTransaction(ctx context.Context, readOnly bool) (ds.Txn, error) {
+	tds, ok := d.child.(ds.TxnDatastore)
+	if !ok {
+		return nil, errors.New("keytransform: transaction feature not supported")
+	}
+
+	childTxn, err := tds.NewTransaction(ctx, readOnly)
+	if err != nil {
+		return nil, err
+	}
+
+	return &transformTxn{
+		dst: childTxn,
+		f:   d.ConvertKey,
+	}, nil
+}
+
 type transformBatch struct {
 	dst ds.Batch
 
@@ -242,6 +260,47 @@ func (t *transformBatch) Delete(ctx context.Context, key ds.Key) error {
 
 func (t *transformBatch) Commit(ctx context.Context) error {
 	return t.dst.Commit(ctx)
+}
+
+type transformTxn struct {
+	ds  *Datastore
+	dst ds.Txn
+
+	f KeyMapping
+}
+
+var _ ds.Txn = (*transformTxn)(nil)
+
+func (t *transformTxn) Put(ctx context.Context, key ds.Key, val []byte) error {
+	return t.dst.Put(ctx, t.f(key), val)
+}
+
+func (t *transformTxn) Delete(ctx context.Context, key ds.Key) error {
+	return t.dst.Delete(ctx, t.f(key))
+}
+
+func (t *transformTxn) Commit(ctx context.Context) error {
+	return t.dst.Commit(ctx)
+}
+
+func (t *transformTxn) Get(ctx context.Context, key ds.Key) (value []byte, err error) {
+	return t.dst.Get(ctx, t.f(key))
+}
+
+func (t *transformTxn) Has(ctx context.Context, key ds.Key) (exists bool, err error) {
+	return t.dst.Has(ctx, t.f(key))
+}
+
+func (t *transformTxn) GetSize(ctx context.Context, key ds.Key) (size int, err error) {
+	return t.dst.GetSize(ctx, t.f(key))
+}
+
+func (t *transformTxn) Query(ctx context.Context, q dsq.Query) (dsq.Results, error) {
+	return t.ds.Query(ctx, q)
+}
+
+func (t *transformTxn) Discard(ctx context.Context) {
+	t.dst.Discard(ctx)
 }
 
 func (d *Datastore) Check(ctx context.Context) error {

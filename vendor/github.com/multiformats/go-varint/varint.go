@@ -28,13 +28,23 @@ const (
 // This may return a size greater than MaxUvarintLen63, which would be an
 // illegal value, and would be rejected by readers.
 func UvarintSize(num uint64) int {
-	bits := bits.Len64(num)
-	q, r := bits/7, bits%7
-	size := q
-	if r > 0 || size == 0 {
-		size++
-	}
-	return size
+	// This implementation follows the optimised approach from Google's protobuf library
+	// for better performance through LZCNT instruction usage on modern CPUs.
+
+	// OR with 1 to guarantee num is never 0, avoiding extra instructions for LZCNT.
+	// Because `0` is a special case with undefined behaviour, Go has special casing
+	// for it that we can avoid entirely.
+	// This doesn't change the result since varint(0) and varint(1) both encode to
+	// 1 byte and we only care about byte length.
+	num |= 1
+
+	// Using XOR 63 instead of subtraction for better performance on modern CPUs.
+	// This computes log2(num) for our [1..2^64-1] range.
+	log2value := uint32(bits.LeadingZeros64(num)) ^ 63
+
+	// This computes 1 + (bits-1)/7, using 9/64 approximation of 1/7
+	// Formula: ceil(log2(num)/7) = floor((log2(num)*9 + 73) / 64)
+	return int((log2value*9 + (64 + 9)) / 64)
 }
 
 // ToUvarint converts an unsigned integer to a varint-encoded []byte

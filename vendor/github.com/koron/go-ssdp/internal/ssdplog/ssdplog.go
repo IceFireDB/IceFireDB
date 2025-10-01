@@ -7,7 +7,7 @@ import "log"
 
 var LoggerProvider = func() *log.Logger { return nil }
 
-func Printf(s string, a ...interface{}) {
+func Printf(s string, a ...any) {
 	if p := LoggerProvider; p != nil {
 		if l := p(); l != nil {
 			l.Printf(s, a...)

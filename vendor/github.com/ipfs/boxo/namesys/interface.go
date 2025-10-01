@@ -29,6 +29,9 @@ var (
 
 	// ErrMissingDNSLinkRecord signals that the domain has no DNSLink TXT entries.
 	ErrMissingDNSLinkRecord = fmt.Errorf("%w: DNSLink lookup could not find a TXT record (https://docs.ipfs.tech/concepts/dnslink/)", ErrResolveFailed)
+
+	// ErrInvalidSequence signals that the provided sequence number is invalid.
+	ErrInvalidSequence = errors.New("sequence number must be greater than the current record sequence")
 )
 
 const (
@@ -187,6 +190,12 @@ type PublishOptions struct {
 	// creating a new record to publish. With this options, you can further customize
 	// the way IPNS Records are created.
 	IPNSOptions []ipns.Option
+
+	// Sequence number defines the sequence number stored in an IPNS record.
+	// If provided, it must be greater than the current record's sequence number
+	// to prevent unintentional replay attacks or broken updates that would be
+	// ignored by clients that have an older record with higher sequence.
+	Sequence *uint64
 }
 
 // DefaultPublishOptions returns the default options for publishing an IPNS Record.
@@ -207,10 +216,20 @@ func PublishWithEOL(eol time.Time) PublishOption {
 	}
 }
 
-// PublishWithEOL sets [PublishOptions.TTL].
+// PublishWithTTL sets [PublishOptions.TTL].
 func PublishWithTTL(ttl time.Duration) PublishOption {
 	return func(o *PublishOptions) {
 		o.TTL = ttl
+	}
+}
+
+// PublishWithSequence sets [PublishOptions.Sequence]. The provided sequence
+// number must be greater than the current record's sequence number to prevent
+// unintentional replay attacks or broken updates that would be ignored by clients
+// that have an older record with higher sequence.
+func PublishWithSequence(seq uint64) PublishOption {
+	return func(o *PublishOptions) {
+		o.Sequence = &seq
 	}
 }
 

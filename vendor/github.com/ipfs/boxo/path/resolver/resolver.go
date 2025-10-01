@@ -6,10 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/ipfs/boxo/fetcher"
 	fetcherhelpers "github.com/ipfs/boxo/fetcher/helpers"
 	"github.com/ipfs/boxo/path"
@@ -20,6 +16,9 @@ import (
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 	"github.com/ipld/go-ipld-prime/schema"
 	"github.com/ipld/go-ipld-prime/traversal/selector/builder"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var log = logging.Logger("path/resolver")
@@ -102,7 +101,8 @@ func (r *basicResolver) ResolveToLastNode(ctx context.Context, fpath path.Immuta
 
 	if len(nodes) < 1 {
 		return cid.Cid{}, nil, fmt.Errorf("path %v did not resolve to a node", fpath)
-	} else if len(nodes) < len(remainder) {
+	}
+	if len(nodes) < len(remainder) {
 		return cid.Undef, nil, &ErrNoLink{Name: remainder[len(nodes)-1], Node: lastCid}
 	}
 

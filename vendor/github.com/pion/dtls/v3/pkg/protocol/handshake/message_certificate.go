@@ -15,7 +15,7 @@ type MessageCertificate struct {
 	Certificate [][]byte
 }
 
-// Type returns the Handshake Type
+// Type returns the Handshake Type.
 func (m MessageCertificate) Type() Type {
 	return TypeCertificate
 }
@@ -24,31 +24,36 @@ const (
 	handshakeMessageCertificateLengthFieldSize = 3
 )
 
-// Marshal encodes the Handshake
+// Marshal encodes the Handshake.
 func (m *MessageCertificate) Marshal() ([]byte, error) {
 	out := make([]byte, handshakeMessageCertificateLengthFieldSize)
 
 	for _, r := range m.Certificate {
 		// Certificate Length
+		//nolint:makezero // todo: fix
 		out = append(out, make([]byte, handshakeMessageCertificateLengthFieldSize)...)
+		//nolint:gosec // G115
 		util.PutBigEndianUint24(out[len(out)-handshakeMessageCertificateLengthFieldSize:], uint32(len(r)))
 
 		// Certificate body
-		out = append(out, append([]byte{}, r...)...)
+		out = append(out, append([]byte{}, r...)...) //nolint:makezero // todo: fix
 	}
 
 	// Total Payload Size
-	util.PutBigEndianUint24(out[0:], uint32(len(out[handshakeMessageCertificateLengthFieldSize:])))
+	util.PutBigEndianUint24(out[0:], uint32(len(out[handshakeMessageCertificateLengthFieldSize:]))) //nolint:gosec //G115
+
 	return out, nil
 }
 
-// Unmarshal populates the message from encoded data
+// Unmarshal populates the message from encoded data.
 func (m *MessageCertificate) Unmarshal(data []byte) error {
 	if len(data) < handshakeMessageCertificateLengthFieldSize {
 		return errBufferTooSmall
 	}
 
-	if certificateBodyLen := int(util.BigEndianUint24(data)); certificateBodyLen+handshakeMessageCertificateLengthFieldSize != len(data) {
+	if certificateBodyLen := int(util.BigEndianUint24(
+		data,
+	)); certificateBodyLen+handshakeMessageCertificateLengthFieldSize != len(data) {
 		return errLengthMismatch
 	}
 

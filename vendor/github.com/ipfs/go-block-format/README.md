@@ -5,27 +5,21 @@ go-block-format
 [![](https://img.shields.io/badge/project-IPFS-blue.svg?style=flat-square)](http://ipfs.io/)
 [![](https://img.shields.io/badge/freenode-%23ipfs-blue.svg?style=flat-square)](http://webchat.freenode.net/?channels=%23ipfs)
 [![Coverage Status](https://codecov.io/gh/ipfs/go-block-format/branch/master/graph/badge.svg)](https://codecov.io/gh/ipfs/go-block-format/branch/master)
-[![Travis CI](https://travis-ci.org/ipfs/go-block-format.svg?branch=master)](https://travis-ci.org/ipfs/go-block-format)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/ipfs/go-block-format/go-test.yml?branch=master)](https://github.com/ipfs/go-block-format/actions)
+[![GoDoc](https://pkg.go.dev/badge/github.com/ipfs/go-block-format)](https://pkg.go.dev/github.com/ipfs/go-block-format)
 
 > go-block-format is a set of interfaces that a type needs to implement in order to be a CID addressable block of data.
 
-## Lead Maintainer
-
-[Eric Myhre](https://github.com/warpfork)
-
 ## Table of Contents
 
-- [Install](#install)
-- [Usage](#usage)
-- [API](#api)
+- [Background](#background)
+- [Documentation](#documentation)
 - [Contribute](#contribute)
 - [License](#license)
 
-## Install
+## Documentation
 
-```sh
-make install
-```
+https://pkg.go.dev/github.com/ipfs/go-block-format
 
 ## Contribute
 
@@ -35,4 +29,4 @@ Small note: If editing the Readme, please conform to the [standard-readme](https
 
 ## License
 
-MIT © Juan Batiz-Benet
+MIT

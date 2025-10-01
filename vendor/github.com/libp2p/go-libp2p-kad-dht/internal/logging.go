@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -20,7 +21,7 @@ func multibaseB32Encode(k []byte) string {
 
 func tryFormatLoggableRecordKey(k string) (string, error) {
 	if len(k) == 0 {
-		return "", fmt.Errorf("LoggableRecordKey is empty")
+		return "", errors.New("LoggableRecordKey is empty")
 	}
 	var proto, cstr string
 	if k[0] == '/' {
@@ -73,7 +74,7 @@ func (lk LoggableProviderRecordBytes) String() string {
 
 func tryFormatLoggableProviderKey(k []byte) (string, error) {
 	if len(k) == 0 {
-		return "", fmt.Errorf("LoggableProviderKey is empty")
+		return "", errors.New("LoggableProviderKey is empty")
 	}
 
 	encodedKey := multibaseB32Encode(k)

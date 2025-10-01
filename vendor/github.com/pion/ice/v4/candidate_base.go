@@ -693,8 +693,10 @@ func (c *candidateBase) setExtensions(extensions []CandidateExtension) {
 // UnmarshalCandidate Parses a candidate from a string
 // https://datatracker.ietf.org/doc/html/rfc5245#section-15.1
 func UnmarshalCandidate(raw string) (Candidate, error) { //nolint:cyclop
-	pos := 0
+	// Handle candidates with the "candidate:" prefix as defined in RFC 5245 section 15.1.
+	raw = strings.TrimPrefix(raw, "candidate:")
 
+	pos := 0
 	// foundation ( 1*32ice-char ) But we allow for empty foundation,
 	foundation, pos, err := readCandidateCharToken(raw, pos, 32)
 	if err != nil {

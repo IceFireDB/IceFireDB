@@ -47,6 +47,7 @@ func (p *packetListenerWrapper) Accept() (net.PacketConn, net.Addr, error) {
 	if err != nil {
 		return PacketConnFromConn(c), nil, err
 	}
+
 	return PacketConnFromConn(c), c.RemoteAddr(), nil
 }
 
@@ -73,12 +74,14 @@ type packetConnWrapper struct {
 // ReadFrom reads from the underlying net.Conn and returns its remote address.
 func (p *packetConnWrapper) ReadFrom(b []byte) (int, net.Addr, error) {
 	n, err := p.conn.Read(b)
+
 	return n, p.conn.RemoteAddr(), err
 }
 
 // WriteTo writes to the underlying net.Conn.
 func (p *packetConnWrapper) WriteTo(b []byte, _ net.Addr) (int, error) {
 	n, err := p.conn.Write(b)
+
 	return n, err
 }
 
