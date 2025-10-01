@@ -77,39 +77,78 @@ build-linux-amd64 build-release-linux-amd64:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	GOOS=linux GOARCH=amd64 go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_amd64 $(SRCS)
+	# For DuckDB support, we need to use CGO for cross-compilation
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build  -mod=mod $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_amd64 $(SRCS)
 
 # Build for Linux ARM64
 build-linux-arm64 build-release-linux-arm64:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	GOOS=linux GOARCH=arm64 go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_arm64 $(SRCS)
+	# For DuckDB support, we need to use CGO for cross-compilation
+	# If cross-compilation fails, provide helpful error message
+	@echo "Building for Linux ARM64 (requires cross-compilation toolchain)..."
+	@if CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build  -mod=mod $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_arm64 $(SRCS); then \
+		echo "ARM64 build successful"; \
+	else \
+		echo "Cross-compilation failed. Please install ARM64 cross-compilation toolchain:"; \
+		echo "  Ubuntu/Debian: sudo apt-get install gcc-aarch64-linux-gnu"; \
+		echo "  Or build for current platform using: make localbuild"; \
+		exit 1; \
+	fi
 
 # Build for Linux ARMv5
 build-linux-armv5 build-release-linux-armv5:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	GOOS=linux GOARCH=arm GOARM=5 go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv5 $(SRCS)
+	# For DuckDB support, we need to use CGO for cross-compilation
+	@echo "Building for Linux ARMv5 (requires cross-compilation toolchain)..."
+	@if CGO_ENABLED=1 GOOS=linux GOARCH=arm GOARM=5 go build  -mod=mod $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv5 $(SRCS); then \
+		echo "ARMv5 build successful"; \
+	else \
+		echo "Cross-compilation failed. Please install ARM cross-compilation toolchain:"; \
+		echo "  Ubuntu/Debian: sudo apt-get install gcc-arm-linux-gnueabi"; \
+		echo "  Or build for current platform using: make localbuild"; \
+		exit 1; \
+	fi
 
 # Build for Linux ARMv6
 build-linux-armv6 build-release-linux-armv6:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	GOOS=linux GOARCH=arm GOARM=6 go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv6 $(SRCS)
+	# For DuckDB support, we need to use CGO for cross-compilation
+	@echo "Building for Linux ARMv6 (requires cross-compilation toolchain)..."
+	@if CGO_ENABLED=1 GOOS=linux GOARCH=arm GOARM=6 go build  -mod=mod $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv6 $(SRCS); then \
+		echo "ARMv6 build successful"; \
+	else \
+		echo "Cross-compilation failed. Please install ARM cross-compilation toolchain:"; \
+		echo "  Ubuntu/Debian: sudo apt-get install gcc-arm-linux-gnueabi"; \
+		echo "  Or build for current platform using: make localbuild"; \
+		exit 1; \
+	fi
 
 # Build for Linux ARMv7
 build-linux-armv7 build-release-linux-armv7:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	GOOS=linux GOARCH=arm GOARM=7 go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv7 $(SRCS)
+	# For DuckDB support, we need to use CGO for cross-compilation
+	@echo "Building for Linux ARMv7 (requires cross-compilation toolchain)..."
+	@if CGO_ENABLED=1 GOOS=linux GOARCH=arm GOARM=7 go build  -mod=mod $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv7 $(SRCS); then \
+		echo "ARMv7 build successful"; \
+	else \
+		echo "Cross-compilation failed. Please install ARM cross-compilation toolchain:"; \
+		echo "  Ubuntu/Debian: sudo apt-get install gcc-arm-linux-gnueabihf"; \
+		echo "  Or build for current platform using: make localbuild"; \
+		exit 1; \
+	fi
 
 # Build for local environment
 localbuild:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME) $(SRCS)
+	# For DuckDB support, we need to use CGO
+	CGO_ENABLED=1 go build  -mod=mod $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME) $(SRCS)

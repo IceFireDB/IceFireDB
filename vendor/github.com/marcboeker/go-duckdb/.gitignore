@@ -1,0 +1,7 @@
+.vscode
+.DS_Store
+run.sh
+duckdb/
+.idea
+./duckdb
+duckdb

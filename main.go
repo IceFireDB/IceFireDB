@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"log"
@@ -22,9 +23,12 @@ import (
 
 	_ "github.com/IceFireDB/IceFireDB/driver/badger"
 	"github.com/IceFireDB/IceFireDB/driver/crdt"
+	_ "github.com/IceFireDB/IceFireDB/driver/duckdb"
+	"github.com/IceFireDB/IceFireDB/driver/duckdb"
 	"github.com/IceFireDB/IceFireDB/driver/hybriddb"
 	"github.com/IceFireDB/IceFireDB/driver/ipfs"
 	"github.com/IceFireDB/IceFireDB/driver/ipfs-synckv"
+	_ "github.com/marcboeker/go-duckdb"
 
 	// "github.com/IceFireDB/IceFireDB/driver/orbitdb"
 	"github.com/IceFireDB/IceFireDB/driver/oss"
@@ -87,6 +91,10 @@ func main() {
 			case *ipfs_synckv.DB:
 				db = driver.GetStorageEngine().(*leveldb.DB)
 			}
+		case *sql.DB:
+			// DuckDB driver returns *sql.DB
+			// For snapshot/restore functionality, we need to handle DuckDB specially
+			// Since DuckDB is SQL-based, we'll need to implement snapshot/restore differently
 		default:
 			panic(fmt.Errorf("unsupported storage is caused: %T", v))
 		}
@@ -105,6 +113,10 @@ func main() {
 		}
 		if storageBackend == ipfs_synckv.StorageName {
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*ipfs_synckv.DB).Metrics)
+		}
+		if storageBackend == duckdb.StorageName {
+			// DuckDB driver doesn't currently have metrics
+			// Can add metrics support in the future if needed
 		}
 
 	}
