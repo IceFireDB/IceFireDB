@@ -77,39 +77,39 @@ build-linux-amd64 build-release-linux-amd64:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	GOOS=linux GOARCH=amd64 go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_amd64 $(SRCS)
+	GOOS=linux GOARCH=amd64 go build  -mod=mod $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_amd64 $(SRCS)
 
 # Build for Linux ARM64
 build-linux-arm64 build-release-linux-arm64:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	GOOS=linux GOARCH=arm64 go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_arm64 $(SRCS)
+	GOOS=linux GOARCH=arm64 go build  -mod=mod $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_arm64 $(SRCS)
 
 # Build for Linux ARMv5
 build-linux-armv5 build-release-linux-armv5:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	GOOS=linux GOARCH=arm GOARM=5 go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv5 $(SRCS)
+	GOOS=linux GOARCH=arm GOARM=5 go build  -mod=mod $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv5 $(SRCS)
 
 # Build for Linux ARMv6
 build-linux-armv6 build-release-linux-armv6:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	GOOS=linux GOARCH=arm GOARM=6 go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv6 $(SRCS)
+	GOOS=linux GOARCH=arm GOARM=6 go build  -mod=mod $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv6 $(SRCS)
 
 # Build for Linux ARMv7
 build-linux-armv7 build-release-linux-armv7:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	GOOS=linux GOARCH=arm GOARM=7 go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv7 $(SRCS)
+	GOOS=linux GOARCH=arm GOARM=7 go build  -mod=mod $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME)_linux_armv7 $(SRCS)
 
 # Build for local environment
 localbuild:
 	if [ ! -d "./bin/" ]; then \
 	mkdir bin; \
 	fi
-	go build $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME) $(SRCS)
+	go build  -mod=mod $(CFLAGS) -o ./bin/$(RELEASE_BIN_NAME) $(SRCS)
