@@ -3,7 +3,7 @@ package merkledag
 import (
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	pb "github.com/ipfs/boxo/ipld/merkledag/pb"
@@ -24,14 +24,6 @@ const _ = pb.DoNotUpgradeFileEverItWillChangeYourHashes
 // for now, we use a PBNode intermediate thing.
 // because native go objects are nice.
 
-// pbLinkSlice is a slice of pb.PBLink, similar to LinkSlice but for sorting the
-// PB form
-type pbLinkSlice []*pb.PBLink
-
-func (pbls pbLinkSlice) Len() int           { return len(pbls) }
-func (pbls pbLinkSlice) Swap(a, b int)      { pbls[a], pbls[b] = pbls[b], pbls[a] }
-func (pbls pbLinkSlice) Less(a, b int) bool { return *pbls[a].Name < *pbls[b].Name }
-
 // unmarshal decodes raw data into a *Node instance.
 // The conversion uses an intermediate PBNode.
 func unmarshal(encodedBytes []byte) (*ProtoNode, error) {
@@ -46,17 +38,17 @@ func unmarshal(encodedBytes []byte) (*ProtoNode, error) {
 func fromImmutableNode(encoded *immutableProtoNode) *ProtoNode {
 	n := new(ProtoNode)
 	n.encoded = encoded
-	if n.encoded.PBNode.Data.Exists() {
-		n.data = n.encoded.PBNode.Data.Must().Bytes()
+	if n.encoded.Data.Exists() {
+		n.data = n.encoded.Data.Must().Bytes()
 	}
-	numLinks := n.encoded.PBNode.Links.Length()
+	numLinks := n.encoded.Links.Length()
 	// links may not be sorted after deserialization, but we don't change
 	// them until we mutate this node since we're representing the current,
 	// as-serialized state
 	n.links = make([]*format.Link, numLinks)
 	linkAllocs := make([]format.Link, numLinks)
 	for i := int64(0); i < numLinks; i++ {
-		next := n.encoded.PBNode.Links.Lookup(i)
+		next := n.encoded.Links.Lookup(i)
 		name := ""
 		if next.FieldName().Exists() {
 			name = next.FieldName().Must().String()
@@ -89,10 +81,8 @@ func (n *ProtoNode) marshalImmutable() (*immutableProtoNode, error) {
 					qp.ListEntry(la, qp.Map(3, func(ma ipld.MapAssembler) {
 						qp.MapEntry(ma, "Hash", qp.Link(cidlink.Link{Cid: link.Cid}))
 						qp.MapEntry(ma, "Name", qp.String(link.Name))
-						sz := int64(link.Size)
-						if sz < 0 { // overflow, >MaxInt64 is almost certainly an error
-							sz = 0
-						}
+						// overflow, >MaxInt64 is almost certainly an error
+						sz := max(int64(link.Size), 0)
 						qp.MapEntry(ma, "Tsize", qp.Int(sz))
 					}))
 				}
@@ -148,7 +138,9 @@ func (n *ProtoNode) GetPBNode() *pb.PBNode {
 	// Ensure links are sorted prior to encode, regardless of `linksDirty`. They
 	// may not have come sorted if we deserialized a badly encoded form that
 	// didn't have links already sorted.
-	sort.Stable(pbLinkSlice(pbn.Links))
+	slices.SortStableFunc(pbn.Links, func(a, b *pb.PBLink) int {
+		return strings.Compare(*a.Name, *b.Name)
+	})
 
 	if len(n.data) > 0 {
 		pbn.Data = n.data
@@ -163,7 +155,7 @@ func (n *ProtoNode) EncodeProtobuf(force bool) ([]byte, error) {
 		if n.linksDirty {
 			// there was a mutation involving links, make sure we sort before we build
 			// and cache a `Node` form that captures the current state
-			sort.Stable(LinkSlice(n.links))
+			n.sortLinks()
 			n.linksDirty = false
 		}
 		n.cached = cid.Undef

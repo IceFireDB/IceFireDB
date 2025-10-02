@@ -106,9 +106,12 @@ type DagTemplateData struct {
 
 type ErrorTemplateData struct {
 	GlobalData
-	StatusCode int
-	StatusText string
-	Error      string
+	StatusCode           int
+	StatusText           string
+	Error                string
+	DiagnosticServiceURL string
+	RootCID              string
+	FailedCID            string
 }
 
 type DirectoryTemplateData struct {

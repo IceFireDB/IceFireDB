@@ -38,7 +38,6 @@ func GetDAG(ctx context.Context, ds NodeGetter, root Node) []*NodePromise {
 // GetNodes returns an array of 'FutureNode' promises, with each corresponding
 // to the key with the same index as the passed in keys
 func GetNodes(ctx context.Context, ds NodeGetter, keys []cid.Cid) []*NodePromise {
-
 	// Early out if no work to do
 	if len(keys) == 0 {
 		return nil
@@ -101,11 +100,7 @@ func Copy(ctx context.Context, from, to DAGService, root cid.Cid) error {
 			return err
 		}
 	}
-	err = to.Add(ctx, node)
-	if err != nil {
-		return err
-	}
-	return nil
+	return to.Add(ctx, node)
 }
 
 // Remove duplicates from a list of keys
@@ -113,6 +108,9 @@ func dedupeKeys(cids []cid.Cid) []cid.Cid {
 	set := cid.NewSet()
 	for _, c := range cids {
 		set.Add(c)
+	}
+	if set.Len() == len(cids) {
+		return cids
 	}
 	return set.Keys()
 }

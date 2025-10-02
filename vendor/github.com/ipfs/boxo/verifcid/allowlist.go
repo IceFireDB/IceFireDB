@@ -11,6 +11,12 @@ var DefaultAllowlist defaultAllowlist
 type Allowlist interface {
 	// IsAllowed checks for multihash allowance by the code.
 	IsAllowed(code uint64) bool
+
+	// MinDigestSize returns the minimum digest size for a given multihash code.
+	MinDigestSize(code uint64) int
+
+	// MaxDigestSize returns the maximum digest size for a given multihash code.
+	MaxDigestSize(code uint64) int
 }
 
 // NewAllowlist constructs new [Allowlist] from the given map set.
@@ -41,6 +47,24 @@ func (al allowlist) IsAllowed(code uint64) bool {
 	return false
 }
 
+func (al allowlist) MinDigestSize(code uint64) int {
+	// If we have an override, delegate to it
+	if al.override != nil {
+		return al.override.MinDigestSize(code)
+	}
+	// Otherwise use default behavior
+	return DefaultAllowlist.MinDigestSize(code)
+}
+
+func (al allowlist) MaxDigestSize(code uint64) int {
+	// If we have an override, delegate to it
+	if al.override != nil {
+		return al.override.MaxDigestSize(code)
+	}
+	// Otherwise use default behavior
+	return DefaultAllowlist.MaxDigestSize(code)
+}
+
 type defaultAllowlist struct{}
 
 func (defaultAllowlist) IsAllowed(code uint64) bool {
@@ -65,5 +89,27 @@ func (defaultAllowlist) IsAllowed(code uint64) bool {
 		}
 
 		return false
+	}
+}
+
+func (defaultAllowlist) MinDigestSize(code uint64) int {
+	switch code {
+	case mh.IDENTITY:
+		// Identity hashes are exempt from minimum size requirements
+		// as they embed data directly
+		return 0
+	default:
+		return DefaultMinDigestSize
+	}
+}
+
+func (defaultAllowlist) MaxDigestSize(code uint64) int {
+	switch code {
+	case mh.IDENTITY:
+		// Identity CIDs embed data directly, limit to prevent abuse
+		return DefaultMaxIdentityDigestSize
+	default:
+		// Maximum size for cryptographic hash digests
+		return DefaultMaxDigestSize
 	}
 }

@@ -20,9 +20,8 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
-	"github.com/jbenet/goprocess"
 
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 )
 
 var log = logging.Logger("flatfs")
@@ -48,7 +47,7 @@ var (
 	// calculating the DiskUsage upon a start when no
 	// DiskUsageFile is present.
 	// If this period did not suffice to read the size of the datastore,
-	// the remaining sizes will be stimated.
+	// the remaining sizes will be estimated.
 	DiskUsageCalcTimeout = 5 * time.Minute
 	// RetryDelay is a timeout for a backoff on retrying operations
 	// that fail due to transient errors like too many file descriptors open.
@@ -109,16 +108,12 @@ var (
 	ErrInvalidKey            = errors.New("key not supported by flatfs")
 )
 
-func init() {
-	rand.Seed(time.Now().UTC().UnixNano())
-}
-
 // Datastore implements the go-datastore Interface.
 // Note this datastore cannot guarantee order of concurrent
 // write operations to the same key. See the explanation in
 // Put().
 type Datastore struct {
-	// atmoic operations should always be used with diskUsage.
+	// atomic operations should always be used with diskUsage.
 	// Must be first in struct to ensure correct alignment
 	// (see https://golang.org/pkg/sync/atomic/#pkg-note-BUG)
 	diskUsage int64
@@ -129,7 +124,7 @@ type Datastore struct {
 	shardStr string
 	getDir   ShardFunc
 
-	// sychronize all writes and directory changes for added safety
+	// synchronize all writes and directory changes for added safety
 	sync bool
 
 	// these values should only be used during internalization or
@@ -167,6 +162,8 @@ type op struct {
 	v    []byte        // value
 }
 
+// opMap is a synchronisation structure where a single op can be stored
+// for each key.
 type opMap struct {
 	ops sync.Map
 }
@@ -179,7 +176,11 @@ type opResult struct {
 	name  string
 }
 
-// Returns nil if there's nothing to do.
+// Begins starts the processing of an op:
+// - if no other op for the same key exist, register it and return immediately
+// - if another op exist for the same key, wait until it's done:
+//   - if that previous op succeeded, consider that ours shouldn't execute and return nil
+//   - if that previous op failed, start ours
 func (m *opMap) Begin(name string) *opResult {
 	for {
 		myOp := &opResult{opMap: m, name: name}
@@ -305,6 +306,8 @@ func (fs *Datastore) ShardStr() string {
 	return fs.shardStr
 }
 
+// encode returns the directory and file names for a given key according to
+// the sharding function.
 func (fs *Datastore) encode(key datastore.Key) (dir, file string) {
 	noslash := key.String()[1:]
 	dir = filepath.Join(fs.path, fs.getDir(noslash))
@@ -312,6 +315,8 @@ func (fs *Datastore) encode(key datastore.Key) (dir, file string) {
 	return dir, file
 }
 
+// decode returns the datastore.Key corresponding to a file name, according
+// to the sharding function.
 func (fs *Datastore) decode(file string) (key datastore.Key, ok bool) {
 	if !strings.HasSuffix(file, extension) {
 		// We expect random files like "put-". Log when we encounter
@@ -325,8 +330,11 @@ func (fs *Datastore) decode(file string) (key datastore.Key, ok bool) {
 	return datastore.NewKey(name), true
 }
 
+// makeDir is identical to makeDirNoSync but also enforce the sync
+// if required by the config.
 func (fs *Datastore) makeDir(dir string) error {
-	if err := fs.makeDirNoSync(dir); err != nil {
+	created, err := fs.makeDirNoSync(dir)
+	if err != nil {
 		return err
 	}
 
@@ -334,7 +342,7 @@ func (fs *Datastore) makeDir(dir string) error {
 	// it, the creation of the prefix dir itself might not be
 	// durable yet. Sync the root dir after a successful mkdir of
 	// a prefix dir, just to be paranoid.
-	if fs.sync {
+	if fs.sync && created {
 		if err := syncDir(fs.path); err != nil {
 			return err
 		}
@@ -342,19 +350,19 @@ func (fs *Datastore) makeDir(dir string) error {
 	return nil
 }
 
-func (fs *Datastore) makeDirNoSync(dir string) error {
+// makeDirNoSync create a directory on disk and report if it was created or
+// already existed.
+func (fs *Datastore) makeDirNoSync(dir string) (created bool, err error) {
 	if err := os.Mkdir(dir, 0755); err != nil {
-		// EEXIST is safe to ignore here, that just means the prefix
-		// directory already existed.
-		if !os.IsExist(err) {
-			return err
+		if os.IsExist(err) {
+			return false, nil
 		}
-		return nil
+		return false, err
 	}
 
 	// Track DiskUsage of this NEW folder
 	fs.updateDiskUsage(dir, true)
-	return nil
+	return true, nil
 }
 
 // This function always runs under an opLock. Therefore, only one thread is
@@ -363,7 +371,7 @@ func (fs *Datastore) renameAndUpdateDiskUsage(tmpPath, path string) error {
 	fi, err := os.Stat(path)
 
 	// Destination exists, we need to discount it from diskUsage
-	if fs != nil && err == nil {
+	if fi != nil && err == nil {
 		atomic.AddInt64(&fs.diskUsage, -fi.Size())
 	} else if !os.IsNotExist(err) {
 		return err
@@ -371,7 +379,7 @@ func (fs *Datastore) renameAndUpdateDiskUsage(tmpPath, path string) error {
 
 	// Rename and add new file's diskUsage. If the rename fails,
 	// it will either a) Re-add the size of an existing file, which
-	// was sustracted before b) Add 0 if there is no existing file.
+	// was subtracted before b) Add 0 if there is no existing file.
 	for i := 0; i < RetryAttempts; i++ {
 		err = rename(tmpPath, path)
 		// if there's no error, or the source file doesn't exist, abort.
@@ -573,9 +581,11 @@ func (fs *Datastore) putMany(data map[datastore.Key][]byte) error {
 		return nil
 	}
 
+	// Start by writing all the data in temp files so that we can be sure that
+	// all the data is on disk before renaming to the final places.
 	for key, value := range data {
 		dir, path := fs.encode(key)
-		if err := fs.makeDirNoSync(dir); err != nil {
+		if _, err := fs.makeDirNoSync(dir); err != nil {
 			return err
 		}
 		dirsToSync[dir] = struct{}{}
@@ -764,25 +774,22 @@ func (fs *Datastore) Query(ctx context.Context, q query.Query) (query.Results, e
 
 	// Replicates the logic in ResultsWithChan but actually respects calls
 	// to `Close`.
-	b := query.NewResultBuilder(q)
-	b.Process.Go(func(p goprocess.Process) {
-		err := fs.walkTopLevel(fs.path, b)
-		if err == nil {
-			return
-		}
-		select {
-		case b.Output <- query.Result{Error: errors.New("walk failed: " + err.Error())}:
-		case <-p.Closing():
+	results := query.ResultsWithContext(q, func(qctx context.Context, output chan<- query.Result) {
+		err := fs.walkTopLevel(qctx, q, fs.path, output)
+		if err != nil {
+			select {
+			case output <- query.Result{Error: errors.New("walk failed: " + err.Error())}:
+			case <-qctx.Done():
+			}
 		}
 	})
-	go b.Process.CloseAfterChildren() //nolint
 
 	// We don't apply _any_ of the query logic ourselves so we'll leave it
 	// all up to the naive query engine.
-	return query.NaiveQueryApply(q, b.Results()), nil
+	return query.NaiveQueryApply(q, results), nil
 }
 
-func (fs *Datastore) walkTopLevel(path string, result *query.ResultBuilder) error {
+func (fs *Datastore) walkTopLevel(ctx context.Context, q query.Query, path string, output chan<- query.Result) error {
 	dir, err := os.Open(path)
 	if err != nil {
 		return err
@@ -801,15 +808,15 @@ func (fs *Datastore) walkTopLevel(path string, result *query.ResultBuilder) erro
 			continue
 		}
 
-		err = fs.walk(filepath.Join(path, dir), result)
+		err = fs.walk(ctx, q, filepath.Join(path, dir), output)
 		if err != nil {
 			return err
 		}
 
 		// Are we closing?
 		select {
-		case <-result.Process.Closing():
-			return nil
+		case <-ctx.Done():
+			return ctx.Err()
 		default:
 		}
 	}
@@ -847,11 +854,10 @@ func folderSize(path string, deadline time.Time) (int64, initAccuracy, error) {
 	}
 
 	// randomize file order
-	// https://stackoverflow.com/a/42776696
-	for i := len(files) - 1; i > 0; i-- {
-		j := rand.Intn(i + 1)
+	r := rand.New(rand.NewSource(time.Now().UTC().UnixNano()))
+	r.Shuffle(len(files), func(i, j int) {
 		files[i], files[j] = files[j], files[i]
-	}
+	})
 
 	accuracy := exactA
 	for {
@@ -971,6 +977,7 @@ func (fs *Datastore) updateDiskUsage(path string, add bool) {
 	}
 }
 
+// checkpointDiskUsage triggers a disk usage checkpoint write.
 func (fs *Datastore) checkpointDiskUsage() {
 	select {
 	case fs.checkpointCh <- struct{}{}:
@@ -980,6 +987,8 @@ func (fs *Datastore) checkpointDiskUsage() {
 	}
 }
 
+// checkpointLoop periodically or following checkpoint event, write the current
+// disk usage on disk.
 func (fs *Datastore) checkpointLoop() {
 	defer close(fs.done)
 
@@ -1023,6 +1032,7 @@ func (fs *Datastore) checkpointLoop() {
 	}
 }
 
+// writeDiskUsageFile write the given checkpoint disk usage in a file.
 func (fs *Datastore) writeDiskUsageFile(du int64, doSync bool) {
 	tmp, err := fs.tempFile()
 	if err != nil {
@@ -1123,7 +1133,7 @@ func (fs *Datastore) tempFileOnce() (*os.File, error) {
 }
 
 // only call this on directories.
-func (fs *Datastore) walk(path string, qrb *query.ResultBuilder) error {
+func (fs *Datastore) walk(ctx context.Context, q query.Query, path string, output chan<- query.Result) error {
 	dir, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -1152,7 +1162,7 @@ func (fs *Datastore) walk(path string, qrb *query.ResultBuilder) error {
 
 		var result query.Result
 		result.Key = key.String()
-		if !qrb.Query.KeysOnly {
+		if !q.KeysOnly {
 			value, err := readFile(filepath.Join(path, fn))
 			if err != nil {
 				result.Error = err
@@ -1162,7 +1172,7 @@ func (fs *Datastore) walk(path string, qrb *query.ResultBuilder) error {
 				result.Value = value
 				result.Size = len(value)
 			}
-		} else if qrb.Query.ReturnsSizes {
+		} else if q.ReturnsSizes {
 			var stat os.FileInfo
 			stat, err := os.Stat(filepath.Join(path, fn))
 			if err != nil {
@@ -1173,9 +1183,9 @@ func (fs *Datastore) walk(path string, qrb *query.ResultBuilder) error {
 		}
 
 		select {
-		case qrb.Output <- result:
-		case <-qrb.Process.Closing():
-			return nil
+		case output <- result:
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
 	return nil

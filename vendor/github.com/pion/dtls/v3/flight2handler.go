@@ -13,7 +13,13 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol/recordlayer"
 )
 
-func flight2Parse(ctx context.Context, c flightConn, state *State, cache *handshakeCache, cfg *handshakeConfig) (flightVal, *alert.Alert, error) {
+func flight2Parse(
+	ctx context.Context,
+	c flightConn,
+	state *State,
+	cache *handshakeCache,
+	cfg *handshakeConfig,
+) (flightVal, *alert.Alert, error) {
 	seq, msgs, ok := cache.fullPullMap(state.handshakeRecvSequence, state.cipherSuite,
 		handshakeCachePullRule{handshake.TypeClientHello, cfg.initialEpoch, true, false},
 	)
@@ -41,11 +47,18 @@ func flight2Parse(ctx context.Context, c flightConn, state *State, cache *handsh
 	if !bytes.Equal(state.cookie, clientHello.Cookie) {
 		return 0, &alert.Alert{Level: alert.Fatal, Description: alert.AccessDenied}, errCookieMismatch
 	}
+
 	return flight4, nil, nil
 }
 
-func flight2Generate(_ flightConn, state *State, _ *handshakeCache, _ *handshakeConfig) ([]*packet, *alert.Alert, error) {
+func flight2Generate(
+	_ flightConn,
+	state *State,
+	_ *handshakeCache,
+	_ *handshakeConfig,
+) ([]*packet, *alert.Alert, error) {
 	state.handshakeSendSequence = 0
+
 	return []*packet{
 		{
 			record: &recordlayer.RecordLayer{

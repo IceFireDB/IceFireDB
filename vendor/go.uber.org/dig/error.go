@@ -186,7 +186,7 @@ func (e errInvalidInput) Error() string { return fmt.Sprint(e) }
 func (e errInvalidInput) Unwrap() error { return e.Cause }
 
 func (e errInvalidInput) writeMessage(w io.Writer, _ string) {
-	fmt.Fprintf(w, e.Message)
+	fmt.Fprint(w, e.Message)
 }
 
 func (e errInvalidInput) Format(w fmt.State, c rune) {
@@ -406,7 +406,7 @@ var _ digError = errMissingTypes(nil)
 func newErrMissingTypes(c containerStore, k key) errMissingTypes {
 	// Possible types we will look for in the container. We will always look
 	// for pointers to the requested type and some extras on a per-Kind basis.
-	suggestions := []reflect.Type{reflect.PtrTo(k.t)}
+	suggestions := []reflect.Type{reflect.PointerTo(k.t)}
 
 	if k.t.Kind() == reflect.Ptr {
 		// The user requested a pointer but maybe we have a value.
@@ -415,7 +415,7 @@ func newErrMissingTypes(c containerStore, k key) errMissingTypes {
 
 	if k.t.Kind() == reflect.Slice {
 		// Maybe the user meant a slice of pointers while we have the slice of elements
-		suggestions = append(suggestions, reflect.SliceOf(reflect.PtrTo(k.t.Elem())))
+		suggestions = append(suggestions, reflect.SliceOf(reflect.PointerTo(k.t.Elem())))
 
 		// Maybe the user meant a slice of elements while we have the slice of pointers
 		sliceElement := k.t.Elem()
@@ -426,7 +426,7 @@ func newErrMissingTypes(c containerStore, k key) errMissingTypes {
 
 	if k.t.Kind() == reflect.Array {
 		// Maybe the user meant an array of pointers while we have the array of elements
-		suggestions = append(suggestions, reflect.ArrayOf(k.t.Len(), reflect.PtrTo(k.t.Elem())))
+		suggestions = append(suggestions, reflect.ArrayOf(k.t.Len(), reflect.PointerTo(k.t.Elem())))
 
 		// Maybe the user meant an array of elements while we have the array of pointers
 		arrayElement := k.t.Elem()

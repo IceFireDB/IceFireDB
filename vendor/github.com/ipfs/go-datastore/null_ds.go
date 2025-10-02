@@ -25,7 +25,7 @@ func NewNullDatastore() *NullDatastore {
 }
 
 // Put implements Datastore.Put
-func (d *NullDatastore) Put(ctx context.Context, key Key, value []byte) (err error) {
+func (d *NullDatastore) Put(ctx context.Context, key Key, value []byte) error {
 	return nil
 }
 
@@ -35,22 +35,22 @@ func (d *NullDatastore) Sync(ctx context.Context, prefix Key) error {
 }
 
 // Get implements Datastore.Get
-func (d *NullDatastore) Get(ctx context.Context, key Key) (value []byte, err error) {
+func (d *NullDatastore) Get(ctx context.Context, key Key) ([]byte, error) {
 	return nil, ErrNotFound
 }
 
 // Has implements Datastore.Has
-func (d *NullDatastore) Has(ctx context.Context, key Key) (exists bool, err error) {
+func (d *NullDatastore) Has(ctx context.Context, key Key) (bool, error) {
 	return false, nil
 }
 
 // Has implements Datastore.GetSize
-func (d *NullDatastore) GetSize(ctx context.Context, key Key) (size int, err error) {
+func (d *NullDatastore) GetSize(ctx context.Context, key Key) (int, error) {
 	return -1, ErrNotFound
 }
 
 // Delete implements Datastore.Delete
-func (d *NullDatastore) Delete(ctx context.Context, key Key) (err error) {
+func (d *NullDatastore) Delete(ctx context.Context, key Key) error {
 	return nil
 }
 
@@ -89,15 +89,15 @@ func (d *NullDatastore) NewTransaction(ctx context.Context, readOnly bool) (Txn,
 
 type nullTxn struct{}
 
-func (t *nullTxn) Get(ctx context.Context, key Key) (value []byte, err error) {
+func (t *nullTxn) Get(ctx context.Context, key Key) ([]byte, error) {
 	return nil, nil
 }
 
-func (t *nullTxn) Has(ctx context.Context, key Key) (exists bool, err error) {
+func (t *nullTxn) Has(ctx context.Context, key Key) (bool, error) {
 	return false, nil
 }
 
-func (t *nullTxn) GetSize(ctx context.Context, key Key) (size int, err error) {
+func (t *nullTxn) GetSize(ctx context.Context, key Key) (int, error) {
 	return 0, nil
 }
 
