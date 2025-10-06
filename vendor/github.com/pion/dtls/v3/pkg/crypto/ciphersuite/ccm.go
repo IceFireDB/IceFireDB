@@ -14,24 +14,24 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol/recordlayer"
 )
 
-// CCMTagLen is the length of Authentication Tag
+// CCMTagLen is the length of Authentication Tag.
 type CCMTagLen int
 
-// CCM Enums
+// CCM Enums.
 const (
 	CCMTagLength8  CCMTagLen = 8
 	CCMTagLength   CCMTagLen = 16
 	ccmNonceLength           = 12
 )
 
-// CCM Provides an API to Encrypt/Decrypt DTLS 1.2 Packets
+// CCM Provides an API to Encrypt/Decrypt DTLS 1.2 Packets.
 type CCM struct {
 	localCCM, remoteCCM         ccm.CCM
 	localWriteIV, remoteWriteIV []byte
 	tagLen                      CCMTagLen
 }
 
-// NewCCM creates a DTLS GCM Cipher
+// NewCCM creates a DTLS GCM Cipher.
 func NewCCM(tagLen CCMTagLen, localKey, localWriteIV, remoteKey, remoteWriteIV []byte) (*CCM, error) {
 	localBlock, err := aes.NewCipher(localKey)
 	if err != nil {
@@ -60,7 +60,7 @@ func NewCCM(tagLen CCMTagLen, localKey, localWriteIV, remoteKey, remoteWriteIV [
 	}, nil
 }
 
-// Encrypt encrypt a DTLS RecordLayer message
+// Encrypt encrypt a DTLS RecordLayer message.
 func (c *CCM) Encrypt(pkt *recordlayer.RecordLayer, raw []byte) ([]byte, error) {
 	payload := raw[pkt.Header.Size():]
 	raw = raw[:pkt.Header.Size()]
@@ -82,36 +82,38 @@ func (c *CCM) Encrypt(pkt *recordlayer.RecordLayer, raw []byte) ([]byte, error) 
 	raw = append(raw, encryptedPayload...)
 
 	// Update recordLayer size to include explicit nonce
-	binary.BigEndian.PutUint16(raw[pkt.Header.Size()-2:], uint16(len(raw)-pkt.Header.Size()))
+	binary.BigEndian.PutUint16(raw[pkt.Header.Size()-2:], uint16(len(raw)-pkt.Header.Size())) //nolint:gosec //G115
+
 	return raw, nil
 }
 
-// Decrypt decrypts a DTLS RecordLayer message
-func (c *CCM) Decrypt(h recordlayer.Header, in []byte) ([]byte, error) {
-	if err := h.Unmarshal(in); err != nil {
+// Decrypt decrypts a DTLS RecordLayer message.
+func (c *CCM) Decrypt(header recordlayer.Header, in []byte) ([]byte, error) {
+	if err := header.Unmarshal(in); err != nil {
 		return nil, err
 	}
 	switch {
-	case h.ContentType == protocol.ContentTypeChangeCipherSpec:
+	case header.ContentType == protocol.ContentTypeChangeCipherSpec:
 		// Nothing to encrypt with ChangeCipherSpec
 		return in, nil
-	case len(in) <= (8 + h.Size()):
+	case len(in) <= (8 + header.Size()):
 		return nil, errNotEnoughRoomForNonce
 	}
 
-	nonce := append(append([]byte{}, c.remoteWriteIV[:4]...), in[h.Size():h.Size()+8]...)
-	out := in[h.Size()+8:]
+	nonce := append(append([]byte{}, c.remoteWriteIV[:4]...), in[header.Size():header.Size()+8]...)
+	out := in[header.Size()+8:]
 
 	var additionalData []byte
-	if h.ContentType == protocol.ContentTypeConnectionID {
-		additionalData = generateAEADAdditionalDataCID(&h, len(out)-int(c.tagLen))
+	if header.ContentType == protocol.ContentTypeConnectionID {
+		additionalData = generateAEADAdditionalDataCID(&header, len(out)-int(c.tagLen))
 	} else {
-		additionalData = generateAEADAdditionalData(&h, len(out)-int(c.tagLen))
+		additionalData = generateAEADAdditionalData(&header, len(out)-int(c.tagLen))
 	}
 	var err error
 	out, err = c.remoteCCM.Open(out[:0], nonce, out, additionalData)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", errDecryptPacket, err) //nolint:errorlint
 	}
-	return append(in[:h.Size()], out...), nil
+
+	return append(in[:header.Size()], out...), nil
 }

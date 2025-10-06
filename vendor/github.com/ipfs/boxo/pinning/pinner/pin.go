@@ -108,9 +108,28 @@ type Pinner interface {
 	// old one
 	Update(ctx context.Context, from, to cid.Cid, unpin bool) error
 
-	// Check if a set of keys are pinned, more efficient than
-	// calling IsPinned for each key
+	// CheckIfPinned checks if the given cids are pinned, returning their pin types.
+	// This is more efficient than calling IsPinned for each key.
+	// Note: The returned Pinned structs do not include pin names, which makes this
+	// method fast as it avoids loading pin metadata from the datastore.
 	CheckIfPinned(ctx context.Context, cids ...cid.Cid) ([]Pinned, error)
+
+	// CheckIfPinnedWithType checks if the given cids are pinned with a specific pin type.
+	// This is more efficient than CheckIfPinned when you only need to check specific pin types.
+	//
+	// The mode parameter specifies which pin type(s) to check:
+	// - Recursive: Only checks the recursive pin index
+	// - Direct: Only checks the direct pin index
+	// - Indirect: Only checks for indirect pins (requires graph traversal)
+	// - Any: Checks all pin types (equivalent to CheckIfPinned)
+	//
+	// The includeNames parameter controls whether pin names are loaded:
+	// - false: Returns pin types only (fast, uses only indexes)
+	// - true: Also loads pin names from datastore (slower, requires additional reads)
+	//
+	// This method is particularly useful for filtered pin listings (e.g., ipfs pin ls --type=recursive)
+	// as it avoids checking unnecessary indexes and graph traversals.
+	CheckIfPinnedWithType(ctx context.Context, mode Mode, includeNames bool, cids ...cid.Cid) ([]Pinned, error)
 
 	// PinWithMode is for manually editing the pin structure. Use with
 	// care! If used improperly, garbage collection may not be

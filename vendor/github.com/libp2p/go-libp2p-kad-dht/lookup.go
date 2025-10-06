@@ -2,11 +2,12 @@ package dht
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/libp2p/go-libp2p-kad-dht/internal"
-	"github.com/libp2p/go-libp2p-kad-dht/metrics"
+	"github.com/libp2p/go-libp2p-kad-dht/internal/metrics"
+	"github.com/libp2p/go-libp2p-kad-dht/netsize"
 	"github.com/libp2p/go-libp2p-kad-dht/qpeerset"
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -14,22 +15,21 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// GetClosestPeers is a Kademlia 'node lookup' operation. Returns a channel of
+// GetClosestPeers is a Kademlia 'node lookup' operation. Returns a slice of
 // the K closest peers to the given key.
 //
-// If the context is canceled, this function will return the context error along
-// with the closest K peers it has found so far.
+// If the context is canceled, this function will return the context error
+// along with the closest K peers it has found so far.
 func (dht *IpfsDHT) GetClosestPeers(ctx context.Context, key string) ([]peer.ID, error) {
 	ctx, span := internal.StartSpan(ctx, "IpfsDHT.GetClosestPeers", trace.WithAttributes(internal.KeyAsAttribute("Key", key)))
 	defer span.End()
 
 	if key == "" {
-		return nil, fmt.Errorf("can't lookup empty key")
+		return nil, errors.New("can't lookup empty key")
 	}
 
-	//TODO: I can break the interface! return []peer.ID
+	// TODO: I can break the interface! return []peer.ID
 	lookupRes, err := dht.runLookupWithFollowup(ctx, key, dht.pmGetClosestPeers(key), func(*qpeerset.QueryPeerset) bool { return false })
-
 	if err != nil {
 		return nil, err
 	}
@@ -40,14 +40,19 @@ func (dht *IpfsDHT) GetClosestPeers(ctx context.Context, key string) ([]peer.ID,
 
 	// tracking lookup results for network size estimator
 	if err = dht.nsEstimator.Track(key, lookupRes.closest); err != nil {
-		logger.Warnf("network size estimator track peers: %s", err)
+		if err != netsize.ErrWrongNumOfPeers || dht.routingTable.Size() > dht.bucketSize {
+			// Don't warn if we have a wrong number of peers and the routing table is
+			// small because the network may simply not have enough peers.
+			logger.Warnf("network size estimator track peers: %s", err)
+		}
 	}
 
 	if ns, err := dht.nsEstimator.NetworkSize(); err == nil {
-		metrics.NetworkSize.M(int64(ns))
+		metrics.RecordNetworkSize(dht.ctx, int64(ns))
 	}
 
-	// refresh the cpl for this key as the query was successful
+	// Reset the refresh timer for this key's bucket since we've just
+	// successfully interacted with the closest peers to key
 	dht.routingTable.ResetCplRefreshedAtForID(kb.ConvertKey(key), time.Now())
 
 	return lookupRes.peers, nil

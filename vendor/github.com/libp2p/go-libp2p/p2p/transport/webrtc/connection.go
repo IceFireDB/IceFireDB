@@ -132,6 +132,12 @@ func (c *connection) Close() error {
 	return nil
 }
 
+// CloseWithError closes the connection ignoring the error code. As there's no way to signal
+// the remote peer on closing the underlying peerconnection, we ignore the error code.
+func (c *connection) CloseWithError(_ network.ConnErrorCode) error {
+	return c.Close()
+}
+
 // closeWithError is used to Close the connection when the underlying DTLS connection fails
 func (c *connection) closeWithError(err error) {
 	c.closeOnce.Do(func() {
@@ -182,7 +188,7 @@ func (c *connection) OpenStream(ctx context.Context) (network.MuxedStream, error
 		dc.Close()
 		return nil, fmt.Errorf("detach channel failed for stream(%d): %w", streamID, err)
 	}
-	str := newStream(dc, rwc, func() { c.removeStream(streamID) })
+	str := newStream(dc, rwc, maxSendMessageSize, func() { c.removeStream(streamID) })
 	if err := c.addStream(str); err != nil {
 		str.Reset()
 		return nil, fmt.Errorf("failed to add stream(%d) to connection: %w", streamID, err)
@@ -195,7 +201,7 @@ func (c *connection) AcceptStream() (network.MuxedStream, error) {
 	case <-c.ctx.Done():
 		return nil, c.closeErr
 	case dc := <-c.acceptQueue:
-		str := newStream(dc.channel, dc.stream, func() { c.removeStream(*dc.channel.ID()) })
+		str := newStream(dc.channel, dc.stream, maxSendMessageSize, func() { c.removeStream(*dc.channel.ID()) })
 		if err := c.addStream(str); err != nil {
 			str.Reset()
 			return nil, err

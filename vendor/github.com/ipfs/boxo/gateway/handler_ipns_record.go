@@ -93,5 +93,8 @@ func (i *handler) serveIpnsRecord(ctx context.Context, w http.ResponseWriter, r 
 		return true
 	}
 
+	log.Debugw("failed to write IPNS record response",
+		"path", rq.contentPath,
+		"error", err)
 	return false
 }

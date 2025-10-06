@@ -8,10 +8,12 @@ type autoNATSettings struct {
 	serverRPM                            int
 	serverPerPeerRPM                     int
 	serverDialDataRPM                    int
+	maxConcurrentRequestsPerPeer         int
 	dataRequestPolicy                    dataRequestPolicyFunc
 	now                                  func() time.Time
 	amplificatonAttackPreventionDialWait time.Duration
 	metricsTracer                        MetricsTracer
+	throttlePeerDuration                 time.Duration
 }
 
 func defaultSettings() *autoNATSettings {
@@ -20,19 +22,22 @@ func defaultSettings() *autoNATSettings {
 		serverRPM:                            60, // 1 every second
 		serverPerPeerRPM:                     12, // 1 every 5 seconds
 		serverDialDataRPM:                    12, // 1 every 5 seconds
+		maxConcurrentRequestsPerPeer:         2,
 		dataRequestPolicy:                    amplificationAttackPrevention,
 		amplificatonAttackPreventionDialWait: 3 * time.Second,
 		now:                                  time.Now,
+		throttlePeerDuration:                 defaultThrottlePeerDuration,
 	}
 }
 
 type AutoNATOption func(s *autoNATSettings) error
 
-func WithServerRateLimit(rpm, perPeerRPM, dialDataRPM int) AutoNATOption {
+func WithServerRateLimit(rpm, perPeerRPM, dialDataRPM int, maxConcurrentRequestsPerPeer int) AutoNATOption {
 	return func(s *autoNATSettings) error {
 		s.serverRPM = rpm
 		s.serverPerPeerRPM = perPeerRPM
 		s.serverDialDataRPM = dialDataRPM
+		s.maxConcurrentRequestsPerPeer = maxConcurrentRequestsPerPeer
 		return nil
 	}
 }
@@ -59,6 +64,13 @@ func allowPrivateAddrs(s *autoNATSettings) error {
 func withAmplificationAttackPreventionDialWait(d time.Duration) AutoNATOption {
 	return func(s *autoNATSettings) error {
 		s.amplificatonAttackPreventionDialWait = d
+		return nil
+	}
+}
+
+func withThrottlePeerDuration(d time.Duration) AutoNATOption {
+	return func(s *autoNATSettings) error {
+		s.throttlePeerDuration = d
 		return nil
 	}
 }

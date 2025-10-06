@@ -14,6 +14,7 @@ package namesys
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -32,7 +33,6 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/multierr"
 )
 
 // namesys is a multi-protocol [NameSystem] that implements generic IPFS naming.
@@ -244,8 +244,7 @@ func (ns *namesys) resolveOnceAsync(ctx context.Context, p path.Path, options Re
 
 				p, err := joinPaths(res.Path, p)
 				if err != nil {
-					// res.Err may already be defined, so just combine them
-					res.Err = multierr.Combine(err, res.Err)
+					res.Err = errors.Join(err, res.Err)
 				}
 
 				emitOnceResult(ctx, out, AsyncResult{Path: p, TTL: res.TTL, LastMod: res.LastMod, Err: res.Err})

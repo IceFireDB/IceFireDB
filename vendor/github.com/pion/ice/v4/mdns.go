@@ -47,6 +47,7 @@ func createMulticastDNS(
 	mDNSMode MulticastDNSMode,
 	mDNSName string,
 	log logging.LeveledLogger,
+	loggerFactory logging.LoggerFactory,
 ) (*mdns.Conn, MulticastDNSMode, error) {
 	if mDNSMode == MulticastDNSModeDisabled {
 		return nil, mDNSMode, nil
@@ -124,6 +125,7 @@ func createMulticastDNS(
 		conn, err := mdns.Server(pktConnV4, pktConnV6, &mdns.Config{
 			Interfaces:      ifcs,
 			IncludeLoopback: includeLoopback,
+			LoggerFactory:   loggerFactory,
 		})
 
 		return conn, mDNSMode, err
@@ -132,6 +134,7 @@ func createMulticastDNS(
 			Interfaces:      ifcs,
 			IncludeLoopback: includeLoopback,
 			LocalNames:      []string{mDNSName},
+			LoggerFactory:   loggerFactory,
 		})
 
 		return conn, mDNSMode, err

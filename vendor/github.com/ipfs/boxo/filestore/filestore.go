@@ -13,11 +13,13 @@ import (
 
 	blockstore "github.com/ipfs/boxo/blockstore"
 	posinfo "github.com/ipfs/boxo/filestore/posinfo"
+	"github.com/ipfs/boxo/provider"
 	blocks "github.com/ipfs/go-block-format"
 	cid "github.com/ipfs/go-cid"
 	dsq "github.com/ipfs/go-datastore/query"
 	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/multiformats/go-multihash"
 )
 
 var logger = logging.Logger("filestore")
@@ -31,8 +33,9 @@ var (
 // to store regular blocks and a special Blockstore called
 // FileManager to store blocks which data exists in an external file.
 type Filestore struct {
-	fm *FileManager
-	bs blockstore.Blockstore
+	fm       *FileManager
+	bs       blockstore.Blockstore
+	provider provider.MultihashProvider
 }
 
 // FileManager returns the FileManager in Filestore.
@@ -45,9 +48,12 @@ func (f *Filestore) MainBlockstore() blockstore.Blockstore {
 	return f.bs
 }
 
-// NewFilestore creates one using the given Blockstore and FileManager.
-func NewFilestore(bs blockstore.Blockstore, fm *FileManager) *Filestore {
-	return &Filestore{fm, bs}
+// NewFilestore creates one using the given Blockstore and FileManager. An
+// optional MultihashProvider can be used to provide blocks written to the
+// FileManager (blocks written to the normal blockstore will be provided by it
+// if it has been initialized with the blockstore.Provider option).
+func NewFilestore(bs blockstore.Blockstore, fm *FileManager, prov provider.MultihashProvider) *Filestore {
+	return &Filestore{fm, bs, prov}
 }
 
 // AllKeysChan returns a channel from which to read the keys stored in
@@ -193,7 +199,17 @@ func (f *Filestore) Put(ctx context.Context, b blocks.Block) error {
 
 	switch b := b.(type) {
 	case *posinfo.FilestoreNode:
-		return f.fm.Put(ctx, b)
+		err = f.fm.Put(ctx, b)
+		if err != nil {
+			return err
+		}
+		if f.provider != nil {
+			logger.Debugf("filestore: provide %s", b.Cid())
+			if err := f.provider.StartProviding(false, b.Cid().Hash()); err != nil {
+				logger.Warnf("filestore: error while providing %s: %s", b.Cid(), err)
+			}
+		}
+		return nil
 	default:
 		return f.bs.Put(ctx, b)
 	}
@@ -235,13 +251,19 @@ func (f *Filestore) PutMany(ctx context.Context, bs []blocks.Block) error {
 		if err != nil {
 			return err
 		}
+
+		if f.provider != nil {
+			var hashes []multihash.Multihash
+			for _, n := range fstores {
+				hashes = append(hashes, n.Node.Cid().Hash())
+			}
+			logger.Debugf("filestore: provide %d hashes", len(hashes))
+			if err := f.provider.StartProviding(false, hashes...); err != nil {
+				logger.Warnf("filestore: error while providing hashes: %s", err)
+			}
+		}
 	}
 	return nil
-}
-
-// HashOnRead calls blockstore.HashOnRead.
-func (f *Filestore) HashOnRead(enabled bool) {
-	f.bs.HashOnRead(enabled)
 }
 
 var _ blockstore.Blockstore = (*Filestore)(nil)

@@ -52,10 +52,15 @@ func InstallShieldCab(raw []byte, _ uint32) bool {
 }
 
 // Zstd matches a Zstandard archive file.
+// https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md
 func Zstd(raw []byte, limit uint32) bool {
-	return len(raw) >= 4 &&
-		(0x22 <= raw[0] && raw[0] <= 0x28 || raw[0] == 0x1E) && // Different Zstandard versions.
-		bytes.HasPrefix(raw[1:], []byte{0xB5, 0x2F, 0xFD})
+	if len(raw) < 4 {
+		return false
+	}
+	sig := binary.LittleEndian.Uint32(raw)
+	// Check for Zstandard frames and skippable frames.
+	return (sig >= 0xFD2FB522 && sig <= 0xFD2FB528) ||
+		(sig >= 0x184D2A50 && sig <= 0x184D2A5F)
 }
 
 // CRX matches a Chrome extension file: a zip archive prepended by a package header.
@@ -132,7 +137,7 @@ func tarParseOctal(b []byte) int64 {
 		if b == 0 {
 			break
 		}
-		if !(b >= '0' && b <= '7') {
+		if b < '0' || b > '7' {
 			return -1
 		}
 		ret = (ret << 3) | int64(b-'0')

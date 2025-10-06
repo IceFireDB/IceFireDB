@@ -8,12 +8,12 @@ import (
 	"sync"
 
 	"github.com/Jorropo/jsync"
-	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	record "github.com/libp2p/go-libp2p-record"
 	ci "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"go.uber.org/multierr"
 )
 
 // Parallel operates on the slice of routers in parallel.
@@ -156,7 +156,7 @@ func (r Parallel) put(do func(routing.Routing) error) error {
 	case 1:
 		return errs[0]
 	default:
-		return &multierror.Error{Errors: errs}
+		return multierr.Combine(errs...)
 	}
 }
 
@@ -273,7 +273,7 @@ func (r Parallel) get(ctx context.Context, do func(routing.Routing) (interface{}
 	case 1:
 		return nil, errs[0]
 	default:
-		return nil, &multierror.Error{Errors: errs}
+		return nil, multierr.Combine(errs...)
 	}
 }
 
@@ -579,26 +579,26 @@ func fewProviders(ctx context.Context, out chan<- peer.AddrInfo, in []<-chan pee
 
 // Bootstrap signals all the sub-routers to bootstrap.
 func (r Parallel) Bootstrap(ctx context.Context) error {
-	var me multierror.Error
+	var errs error
 	for _, b := range r.Routers {
 		if err := b.Bootstrap(ctx); err != nil {
-			me.Errors = append(me.Errors, err)
+			errs = multierr.Append(errs, err)
 		}
 	}
-	return me.ErrorOrNil()
+	return errs
 }
 
 // Close closes all sub-routers that implement the io.Closer interface.
 func (r Parallel) Close() error {
-	var me multierror.Error
+	var errs error
 	for _, router := range r.Routers {
 		if closer, ok := router.(io.Closer); ok {
 			if err := closer.Close(); err != nil {
-				me.Errors = append(me.Errors, err)
+				errs = multierr.Append(errs, err)
 			}
 		}
 	}
-	return me.ErrorOrNil()
+	return errs
 }
 
 var _ routing.Routing = Parallel{}

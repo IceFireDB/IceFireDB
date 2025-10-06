@@ -20,6 +20,7 @@ import (
 	uio "github.com/ipfs/boxo/ipld/unixfs/io"
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/boxo/path/resolver"
+	"github.com/ipfs/boxo/retrieval"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	format "github.com/ipfs/go-ipld-format"
@@ -27,8 +28,12 @@ import (
 	"github.com/ipfs/go-unixfsnode/data"
 	"github.com/ipld/go-car/v2"
 	"github.com/ipld/go-car/v2/storage"
-	dagpb "github.com/ipld/go-codec-dagpb"
+	dagpb "github.com/ipld/go-codec-dagpb" // Ensure basic codecs are registered.
 	"github.com/ipld/go-ipld-prime"
+	_ "github.com/ipld/go-ipld-prime/codec/cbor"    // Ensure basic codecs are registered.
+	_ "github.com/ipld/go-ipld-prime/codec/dagcbor" // Ensure basic codecs are registered.
+	_ "github.com/ipld/go-ipld-prime/codec/dagjson" // Ensure basic codecs are registered.
+	_ "github.com/ipld/go-ipld-prime/codec/json"    // Ensure basic codecs are registered.
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
@@ -37,12 +42,6 @@ import (
 	"github.com/ipld/go-ipld-prime/traversal/selector"
 	selectorparse "github.com/ipld/go-ipld-prime/traversal/selector/parse"
 	mc "github.com/multiformats/go-multicodec"
-
-	// Ensure basic codecs are registered.
-	_ "github.com/ipld/go-ipld-prime/codec/cbor"
-	_ "github.com/ipld/go-ipld-prime/codec/dagcbor"
-	_ "github.com/ipld/go-ipld-prime/codec/dagjson"
-	_ "github.com/ipld/go-ipld-prime/codec/json"
 )
 
 // BlocksBackend is an [IPFSBackend] implementation based on a [blockservice.BlockService].
@@ -114,17 +113,52 @@ func NewRemoteBlocksBackend(gatewayURL []string, httpClient *http.Client, opts .
 }
 
 func (bb *BlocksBackend) Get(ctx context.Context, path path.ImmutablePath, ranges ...ByteRange) (ContentPathMetadata, *GetResponse, error) {
-	md, nd, err := bb.getNode(ctx, path)
-	if err != nil {
-		return md, nil, err
-	}
-
 	// Only a single range is supported in responses to HTTP Range Requests.
 	// When more than one is passed in the Range header, this library will
 	// return a response for the first one and ignores remaining ones.
 	var ra *ByteRange
 	if len(ranges) > 0 {
 		ra = &ranges[0]
+	}
+
+	// For range requests on UnixFS files, we can optimize by only fetching
+	// the root block first to determine if it's a file, then create a
+	// UnixfsFile that will lazily fetch only the blocks needed for the range
+	if ra != nil {
+		// Get just the root block first
+		roots, lastSeg, remainder, err := bb.getPathRoots(ctx, path)
+		if err != nil {
+			return ContentPathMetadata{}, nil, err
+		}
+
+		md := ContentPathMetadata{
+			PathSegmentRoots:     roots,
+			LastSegment:          lastSeg,
+			LastSegmentRemainder: remainder,
+		}
+
+		lastRoot := lastSeg.RootCid()
+
+		// Fetch only the root block to check if it's a UnixFS file
+		rootBlock, err := bb.blockService.GetBlock(ctx, lastRoot)
+		if err != nil {
+			// Wrap error with retrieval diagnostics if available
+			return md, nil, retrieval.WrapWithState(ctx, err)
+		}
+
+		// Try to optimize for dag-pb blocks that might be UnixFS files
+		if rootCodec := lastRoot.Prefix().GetCodec(); rootCodec == uint64(mc.DagPb) {
+			if unixfsFileResponse := loadUnixFSFileWithLazyBlocks(ctx, path, rootBlock, &md, ra, bb.dagService); unixfsFileResponse != nil {
+				return md, unixfsFileResponse, nil
+			}
+		}
+		// Fall back to regular path for non-files or if optimization fails
+	}
+
+	// Regular path for non-range requests or when optimization doesn't apply
+	md, nd, err := bb.getNode(ctx, path)
+	if err != nil {
+		return md, nil, err
 	}
 
 	rootCodec := nd.Cid().Prefix().GetCodec()
@@ -141,7 +175,7 @@ func (bb *BlocksBackend) Get(ctx context.Context, path path.ImmutablePath, range
 		}
 
 		if rootCodec == uint64(mc.Raw) {
-			if err := seekToRangeStart(f, ra); err != nil {
+			if err := seekToRangeStart(f, ra, fileSize); err != nil {
 				return ContentPathMetadata{}, nil, err
 			}
 		}
@@ -182,7 +216,7 @@ func (bb *BlocksBackend) Get(ctx context.Context, path path.ImmutablePath, range
 			return ContentPathMetadata{}, nil, err
 		}
 
-		if err := seekToRangeStart(file, ra); err != nil {
+		if err := seekToRangeStart(file, ra, fileSize); err != nil {
 			return ContentPathMetadata{}, nil, err
 		}
 
@@ -194,6 +228,70 @@ func (bb *BlocksBackend) Get(ctx context.Context, path path.ImmutablePath, range
 	}
 
 	return ContentPathMetadata{}, nil, fmt.Errorf("data was not a valid file or directory: %w", ErrInternalServerError) // TODO: should there be a gateway invalid content type to abstract over the various IPLD error types?
+}
+
+// loadUnixFSFileWithLazyBlocks attempts to load a UnixFS file in a way that only
+// fetches the blocks necessary for the requested byte range.
+//
+// This optimization is only possible for dag-pb files. It decodes the root block,
+// creates a UnixFS file reader, and seeks to the range start. This avoids fetching
+// unnecessary blocks when serving range requests for large files.
+//
+// Returns nil if the content is not a UnixFS file or if any step fails.
+func loadUnixFSFileWithLazyBlocks(ctx context.Context, path path.ImmutablePath, rootBlock blocks.Block, md *ContentPathMetadata, ra *ByteRange, dagService format.DAGService) *GetResponse {
+	// Try to decode as protobuf
+	nd, err := merkledag.DecodeProtobuf(rootBlock.RawData())
+	if err != nil {
+		log.Debugw("failed to decode protobuf for range request optimization",
+			"path", path,
+			"error", err)
+		return nil
+	}
+
+	// Try to create a UnixFS file - this will only fetch blocks as needed
+	f, err := ufile.NewUnixfsFile(ctx, dagService, nd)
+	if err != nil {
+		log.Debugw("failed to create UnixFS file for range request optimization",
+			"path", path,
+			"error", err)
+		return nil
+	}
+
+	// Check if it's actually a file
+	file, ok := f.(files.File)
+	if !ok {
+		// Not a file, can't optimize
+		return nil
+	}
+
+	// Get file size for range calculations
+	fileSize, err := f.Size()
+	if err != nil {
+		log.Debugw("failed to get file size for range request optimization",
+			"path", path,
+			"error", err)
+		return nil
+	}
+
+	// Set modification time if available
+	if mtime := f.ModTime(); !mtime.IsZero() {
+		md.ModTime = mtime
+	}
+
+	// Seek to the start of the requested range
+	if err := seekToRangeStart(file, ra, fileSize); err != nil {
+		log.Debugw("failed to seek to range start",
+			"path", path,
+			"error", err)
+		return nil
+	}
+
+	// Handle symlinks specially
+	if s, ok := f.(*files.Symlink); ok {
+		return NewGetResponseFromSymlink(s, fileSize)
+	}
+
+	return NewGetResponseFromReader(file, fileSize)
 }
 
 func (bb *BlocksBackend) GetAll(ctx context.Context, path path.ImmutablePath) (ContentPathMetadata, files.Node, error) {
@@ -211,12 +309,26 @@ func (bb *BlocksBackend) GetAll(ctx context.Context, path path.ImmutablePath) (C
 }
 
 func (bb *BlocksBackend) GetBlock(ctx context.Context, path path.ImmutablePath) (ContentPathMetadata, files.File, error) {
-	md, nd, err := bb.getNode(ctx, path)
+	roots, lastSeg, remainder, err := bb.getPathRoots(ctx, path)
 	if err != nil {
-		return md, nil, err
+		return ContentPathMetadata{}, nil, err
 	}
 
-	return md, files.NewBytesFile(nd.RawData()), nil
+	md := ContentPathMetadata{
+		PathSegmentRoots:     roots,
+		LastSegment:          lastSeg,
+		LastSegmentRemainder: remainder,
+	}
+
+	lastRoot := lastSeg.RootCid()
+
+	b, err := bb.blockService.GetBlock(ctx, lastRoot)
+	if err != nil {
+		// Wrap error with retrieval diagnostics if available
+		return md, nil, retrieval.WrapWithState(ctx, err)
+	}
+
+	return md, files.NewBytesFile(b.RawData()), nil
 }
 
 func (bb *BlocksBackend) Head(ctx context.Context, path path.ImmutablePath) (ContentPathMetadata, *HeadResponse, error) {
@@ -491,10 +603,7 @@ func walkGatewaySimpleSelector(ctx context.Context, lastCid cid.Cid, terminalBlk
 				if err != nil {
 					return err
 				}
-				from = fileLength + entityRange.From
-				if from < 0 {
-					from = 0
-				}
+				from = max(fileLength+entityRange.From, 0)
 				foundFileLength = true
 			}
 
@@ -514,7 +623,6 @@ func walkGatewaySimpleSelector(ctx context.Context, lastCid cid.Cid, terminalBlk
 					if err != nil {
 						return err
 					}
-					foundFileLength = true
 				}
 				to = fileLength + *entityRange.To
 			}
@@ -552,13 +660,21 @@ func (bb *BlocksBackend) getNode(ctx context.Context, path path.ImmutablePath) (
 
 	nd, err := bb.dagService.Get(ctx, lastRoot)
 	if err != nil {
-		return ContentPathMetadata{}, nil, err
+		// Wrap error with retrieval diagnostics if available
+		return ContentPathMetadata{}, nil, retrieval.WrapWithState(ctx, err)
 	}
 
 	return md, nd, err
 }
 
 func (bb *BlocksBackend) getPathRoots(ctx context.Context, contentPath path.ImmutablePath) ([]cid.Cid, path.ImmutablePath, []string, error) {
+	// Update retrieval progress, if tracked in the existing context
+	if retrievalState := retrieval.StateFromContext(ctx); retrievalState != nil {
+		retrievalState.SetPhase(retrieval.PhasePathResolution)
+		// Set the root CID (first CID in the path)
+		retrievalState.SetRootCID(contentPath.RootCid())
+	}
+
 	/*
 		These are logical roots where each CID represent one path segment
 		and resolves to either a directory or the root block of a file.
@@ -603,7 +719,8 @@ func (bb *BlocksBackend) getPathRoots(ctx context.Context, contentPath path.Immu
 			if isErrNotFound(err) {
 				return nil, path.ImmutablePath{}, nil, &resolver.ErrNoLink{Name: root, Node: lastPath.RootCid()}
 			}
-			return nil, path.ImmutablePath{}, nil, err
+			// Wrap error with retrieval diagnostics if available
+			return nil, path.ImmutablePath{}, nil, retrieval.WrapWithState(ctx, err)
 		}
 		lastPath = resolvedSubPath
 		remainder = remainderSubPath
@@ -611,6 +728,14 @@ func (bb *BlocksBackend) getPathRoots(ctx context.Context, contentPath path.Immu
 	}
 
 	pathRoots = pathRoots[:len(pathRoots)-1]
+
+	// Set the terminal CID after successful path resolution
+	if retrievalState := retrieval.StateFromContext(ctx); retrievalState != nil {
+		if rootCid := lastPath.RootCid(); rootCid.Defined() {
+			retrievalState.SetTerminalCID(rootCid)
+		}
+	}
+
 	return pathRoots, lastPath, remainder, nil
 }
 
@@ -663,7 +788,8 @@ func (bb *BlocksBackend) resolvePath(ctx context.Context, p path.Path) (path.Imm
 
 	node, remainder, err := bb.resolver.ResolveToLastNode(ctx, imPath)
 	if err != nil {
-		return path.ImmutablePath{}, nil, err
+		// Wrap error with retrieval diagnostics if available
+		return path.ImmutablePath{}, nil, retrieval.WrapWithState(ctx, err)
 	}
 
 	p, err = path.Join(path.FromCid(node), remainder...)

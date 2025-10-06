@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"reflect"
+	"sort"
 	"sync"
 
 	cid "github.com/ipfs/go-cid"
@@ -405,6 +407,40 @@ func ReadStringWithMax(r io.Reader, maxLength uint64) (string, error) {
 	return string(buf), nil
 }
 
+// ReadFullStringIntoBuf will read a string off the given stream, consuming the
+// entire cbor item if the string on the stream is longer than the buffer,
+// the string is discarded and 'false' is returned
+// Note: Will only read data into the buffer if the data fits into the buffer,
+// otherwise the bytes are discarded entirely
+func ReadFullStringIntoBuf(cr *CborReader, buf []byte, maxLength uint64) (int, bool, error) {
+	maj, l, err := cr.ReadHeader()
+	if err != nil {
+		return 0, false, err
+	}
+
+	if maj != MajTextString {
+		return 0, false, fmt.Errorf("got tag %d while reading string value (l = %d)", maj, l)
+	}
+
+	if l > maxLength {
+		return 0, false, fmt.Errorf("string in input was too long")
+	}
+
+	if l > uint64(len(buf)) {
+		if err := discard(cr, int(l)); err != nil {
+			return 0, false, nil
+		}
+		return 0, false, nil
+	}
+
+	n, err := io.ReadFull(cr, buf[:l])
+	if err != nil {
+		return n, false, err
+	}
+
+	return int(l), true, nil
+}
+
 // Deprecated: use ReadString
 func ReadStringBuf(r io.Reader, _ []byte) (string, error) {
 	return ReadString(r)
@@ -486,4 +522,44 @@ func WriteCidBuf(buf []byte, w io.Writer, c cid.Cid) error {
 	}
 
 	return nil
+}
+
+// sort type example objects on name of type
+func sortTypeNames(obs []any) []any {
+	temp := make([]tnAny, len(obs))
+	for i, ob := range obs {
+		v := reflect.ValueOf(ob)
+		if v.Kind() == reflect.Pointer {
+			v = v.Elem()
+		}
+		temp[i] = tnAny{v.Type().Name(), ob}
+	}
+	sortref := tnAnySorter(temp)
+	sort.Sort(&sortref)
+	out := make([]any, len(obs))
+	for i, rec := range temp {
+		out[i] = rec.ob
+	}
+	return out
+}
+
+// type-name and any
+type tnAny struct {
+	name string
+	ob   any
+}
+
+type tnAnySorter []tnAny
+
+// sort.Interface
+func (tas *tnAnySorter) Len() int {
+	return len(*tas)
+}
+func (tas *tnAnySorter) Less(i, j int) bool {
+	return (*tas)[i].name < (*tas)[j].name
+}
+func (tas *tnAnySorter) Swap(i, j int) {
+	t := (*tas)[i]
+	(*tas)[i] = (*tas)[j]
+	(*tas)[j] = t
 }

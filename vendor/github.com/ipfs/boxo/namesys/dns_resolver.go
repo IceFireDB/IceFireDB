@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"net"
 	gopath "path"
+	"slices"
 	"strings"
 	"time"
 
 	path "github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
 	dns "github.com/miekg/dns"
-	"github.com/samber/lo"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -132,9 +132,9 @@ func workDomain(ctx context.Context, r *DNSResolver, name string, res chan Async
 	}
 
 	// Filter only the IPFS and IPNS paths.
-	paths = lo.Filter(paths, func(item path.Path, index int) bool {
-		return item.Namespace() == path.IPFSNamespace ||
-			item.Namespace() == path.IPNSNamespace
+	paths = slices.DeleteFunc(paths, func(item path.Path) bool {
+		ns := item.Namespace()
+		return ns != path.IPFSNamespace && ns != path.IPNSNamespace
 	})
 
 	switch len(paths) {
