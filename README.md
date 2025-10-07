@@ -22,9 +22,6 @@
   - [NoSQL Command support](#nosql-command-support)
 - [System Design](#system-design)
 - [Quick Start](#quick-start)
-- [Performance](#performance)
-- [Project direction](#project-direction)
-- [Thanks support](#thanks-support)
 
 
 
@@ -42,7 +39,7 @@ The core of IceFireDB architecture is geographically distributed event source an
      alt="icefiredb-bridge">
 </p>
 
-IceFireDB is a database built for web3 and web2. The core mission of the project is to help applications quickly achieve decentralization and data immutability. At present, the storage layer supports various storage methods such as disk, OSS, and IPFS. The protocol layer currently supports SQL and RESP protocols, and will support GraphQL protocols in the future.A blockchain fusion layer based on immutable transparent logs and Ethereum is under construction to support integration with higher-level decentralized computing platforms and applications as well as identity, financial assets, intellectual property and sidechain protocols. IceFireDB strives to fill the gap of the decentralized stack, making the data ecology of web3 applications more complete, and making it easier for web2 applications to achieve decentralization and data immutability.
+IceFireDB is a database built for web3 and web2. The core mission of the project is to help applications quickly achieve decentralization and data immutability. At present, the storage layer supports various storage methods such as disk, OSS, and IPFS. The protocol layer currently supports SQL and RESP protocols.IceFireDB strives to fill the gap of the decentralized stack, making the data ecology of web3 applications more complete, and making it easier for web2 applications to achieve decentralization and data immutability.
 
 
 <p align="center">
@@ -154,43 +151,9 @@ It supports distributed raft disk Redis database mode in web2 mode, and also sup
 [https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/quick_start/](https://www.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/quick_start/)
 
 
-# Performance 
-
-**leveldb driver**
-
-```shell
-corerman@ubuntu:~/DATA/ICODE/GoLang/IceFireDB$ redis-benchmark  -h 127.0.0.1 -p 11001 -n 10000000 -t set,get -c 512 -P 512 -q
-
-SET: 253232.12 requests per second
-GET: 2130875.50 requests per second
-```
-
 # Project direction
 
 IceFireDB originated from the distributed NoSQL database in the web2 scenario. We will continue to support the web2 distributed NoSQL database, while investing more energy in the direction of web3 and web2 decentralized databases. We are very grateful to our community partners for their continued interest, the community has been our driving force.
-
-# Thanks support
-
- **I stood on the shoulders of giants and did only simple things. Thank you for your attention.**
-
-* https://github.com/tidwall/uhaha
-* https://github.com/syndtr/goleveldb
-* https://github.com/dgraph-io/ristretto
-* https://github.com/ledisdb/ledisdb
-* https://github.com/dgraph-io/badger
-* https://github.com/ipfs/ipfs
-* https://github.com/libp2p
-
-
-<table>
-  <tr>
-    <td align="center"><a href="https://protocol.ai/"><img src="https://user-images.githubusercontent.com/34047788/188373221-4819fd05-ef2f-4e53-b784-dcfffe9c018c.png" width="100px;" alt=""/><br /><sub><b>Protocol Labs</b></sub></a></td>
-    <td align="center"><a href="https://filecoin.io/"><img src="https://user-images.githubusercontent.com/34047788/188373584-e245e0bb-8a3c-4773-a741-17e4023bde65.png" width="100px;" alt=""/><br /><sub><b>Filecoin</b></sub></a></td>
-  <td align="center"><a href="https://fvm.filecoin.io/"><img src="https://user-images.githubusercontent.com/34047788/220075045-48286b37-b708-4ecf-94f5-064c55e79fa3.png" width="110px;" alt="FVM"/><br /><sub><b>FVM</b></sub></a></td>
-  <td align="center"><a href="https://libp2p.io/"><img src="https://github.com/IceFireDB/.github/assets/34047788/36e39958-76ad-4b3a-96e1-1614e87ac1a3" width="100px;" alt="libp2p"/><br /><sub><b>libp2p</b></sub></a></td>  
-</tr>
-</table>
-
 
 **License**
 
