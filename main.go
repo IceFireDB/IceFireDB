@@ -64,12 +64,14 @@ func main() {
 		var err error
 		le, err = ledis.Open(ldsCfg)
 		if err != nil {
-			panic(err)
+			log.Printf("failed to open ledis database: %v", err)
+			return
 		}
 
 		ldb, err = le.Select(0)
 		if err != nil {
-			panic(err)
+			log.Printf("failed to select ledis database: %v", err)
+			return
 		}
 
 		// Obtain the leveldb object and handle it carefully
@@ -88,7 +90,8 @@ func main() {
 				db = driver.GetStorageEngine().(*leveldb.DB)
 			}
 		default:
-			panic(fmt.Errorf("unsupported storage is caused: %T", v))
+			log.Printf("unsupported storage engine: %T", v)
+			return
 		}
 		if storageBackend == hybriddb.StorageName {
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*hybriddb.DB).Metrics)

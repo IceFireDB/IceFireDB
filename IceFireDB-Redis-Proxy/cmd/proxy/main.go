@@ -64,12 +64,13 @@ func main() {
 	app.Action = start
 	err := app.Run(os.Args)
 	if err != nil {
-		panic(err)
+		logrus.Errorf("failed to run application: %v", err)
+		os.Exit(1)
 	}
 }
 
 func start(c *cli.Context) error {
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	wg := sync.WaitGroup{}
 	errSignal := make(chan error)

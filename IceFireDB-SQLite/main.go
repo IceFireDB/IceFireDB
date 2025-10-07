@@ -49,7 +49,7 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-		ctx, cancel := context.WithCancel(context.TODO())
+		ctx, cancel := context.WithCancel(context.Background())
 		stop := make(chan struct{})
 
 		go func() {

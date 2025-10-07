@@ -53,12 +53,12 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 
 	// Initialize the DB struct
 	db := &DB{
-		ctx:  context.TODO(),
+		ctx:  context.Background(),
 		path: path,
 	}
 
 	var err error
-	ctx := context.TODO()
+	ctx := context.Background()
 	// Create the IPFS node
 	node, api, err := iflog.CreateNode(ctx, db.path)
 	if err != nil {
