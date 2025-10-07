@@ -47,7 +47,7 @@ func main() {
 		return nil
 	}
 	app.Action = func(c *cli.Context) error {
-		ctx, cancel := context.WithCancel(context.TODO())
+		ctx, cancel := context.WithCancel(context.Background())
 		go exitSignal(cancel)
 		if err := mysql.Run(ctx); err != nil {
 			return err
@@ -55,7 +55,8 @@ func main() {
 		return nil
 	}
 	if err := app.Run(os.Args); err != nil {
-		panic(fmt.Sprintf("app run error: %v", err))
+		logrus.Errorf("failed to run application: %v", err)
+		os.Exit(1)
 	}
 }
 

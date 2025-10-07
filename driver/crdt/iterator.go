@@ -3,7 +3,7 @@ package crdt
 import (
 	"fmt"
 	"github.com/ipfs/go-datastore/query"
-	"log"
+	"github.com/sirupsen/logrus"
 )
 
 type Iterator struct {
@@ -55,7 +55,7 @@ func (it *Iterator) Last() {
 	}
 	result, err := it.db.db.Query(it.db.ctx, q)
 	if err != nil {
-		log.Println(err)
+		logrus.Errorf("failed to query database: %v", err)
 		return
 	}
 	it.results = result
@@ -76,7 +76,7 @@ func (it *Iterator) Seek(key []byte) {
 
 	result, err := it.db.db.Query(it.db.ctx, q)
 	if err != nil {
-		log.Println(err)
+		logrus.Errorf("failed to query database: %v", err)
 		return
 	}
 	it.results = result

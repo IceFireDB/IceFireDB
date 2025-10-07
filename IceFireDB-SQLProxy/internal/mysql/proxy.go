@@ -76,7 +76,7 @@ func (m *mysqlProxy) onConn(c net.Conn) {
 	// Default to admin connection for direct connections
 	clientConn, err := m.popAdminConn()
 	if err != nil {
-		logrus.Errorf("get remote conn err:", err)
+		logrus.Errorf("get remote conn err: %v", err)
 		return
 	}
 	defer func() {

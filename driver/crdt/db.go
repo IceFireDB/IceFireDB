@@ -56,7 +56,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	}
 
 	db := new(DB)
-	db.ctx = context.TODO()
+	db.ctx = context.Background()
 	db.path = path
 	var err error
 	kvcfg := kv.Config{
@@ -68,7 +68,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 		Logger:              logrus.New(),
 	}
 
-	db.db, err = kv.NewCRDTKeyValueDB(context.TODO(), kvcfg)
+	db.db, err = kv.NewCRDTKeyValueDB(context.Background(), kvcfg)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (db *DB) Put(key, value []byte) error {
 	}
 	err := db.db.Put(db.ctx, k, value)
 	if err != nil {
-		log.Println("err", err, key, k, value, string(value))
+		logrus.Errorf("failed to put key-value pair: key=%s, value=%s, error=%v", string(key), string(value), err)
 	}
 	return err
 }

@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/IceFireDB/IceFireDB/IceFireDB-Redis-Proxy/proxy"
 
@@ -71,9 +72,10 @@ func newProxy2Server() *ProxyTest {
 
 	p, err := proxy.New()
 	if err != nil {
-		panic(err)
+		log.Printf("failed to create proxy: %v", err)
+		return nil
 	}
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(context.Background())
 	errSignal := make(chan error)
 	go func() {
 		p.Run(ctx, errSignal)

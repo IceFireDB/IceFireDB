@@ -33,12 +33,12 @@ func GoWithRecover(handler func(), recoverHandler func(r interface{})) {
 		defer func() {
 			if r := recover(); r != nil {
 
-				log.Println("%s goroutine panic: %v\n%s\n", time.Now().Format(time.DateTime), r, string(debug.Stack()))
+				log.Printf("%s goroutine panic: %v\n%s\n", time.Now().Format(time.DateTime), r, string(debug.Stack()))
 				if recoverHandler != nil {
 					go func() {
 						defer func() {
 							if p := recover(); p != nil {
-								log.Println("recover goroutine panic:%v\n%s\n", p, string(debug.Stack()))
+								log.Printf("recover goroutine panic:%v\n%s\n", p, string(debug.Stack()))
 							}
 						}()
 						recoverHandler(r)
