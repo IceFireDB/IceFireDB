@@ -239,7 +239,7 @@ IceFireDB is released under the Apache License 2.0:
 
 <div align="center">
 
-**Built with ❤️ by the IceFireDB Community**
+**Built with ❤️ by the IceFireLabs**
 
 [📚 Documentation](https://docs.icefiredb.xyz/icefiredb_docs/) • 
 [🐛 Report Issues](https://github.com/IceFireDB/IceFireDB/issues) • 
