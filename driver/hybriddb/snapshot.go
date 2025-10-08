@@ -11,7 +11,14 @@ type Snapshot struct {
 }
 
 func (s *Snapshot) Get(key []byte) ([]byte, error) {
-	return s.snp.Get(key, s.db.iteratorOpts)
+	v, err := s.snp.Get(key, s.db.iteratorOpts)
+	if err != nil {
+		if err == leveldb.ErrNotFound {
+			return nil, nil // Not found
+		}
+		return nil, err // Other LevelDB error
+	}
+	return v, nil
 }
 
 func (s *Snapshot) NewIterator() driver.IIterator {
