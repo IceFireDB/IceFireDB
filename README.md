@@ -68,13 +68,13 @@ IceFireDB is an advanced decentralized database infrastructure that bridges trad
 ## 🏗️ Architecture
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/b706f093-7d71-4253-94b7-0ecb55bfbcef" width="600" alt="IceFireDB Architecture">
+  <img src="./imgs/367561373-b706f093-7d71-4253-94b7-0ecb55bfbcef.png" width="600" alt="IceFireDB Architecture">
 </div>
 
 ### Decentralized Database Engine
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/cce03ccd-b6e9-427e-a492-51637db04991" width="500" alt="IceFireDB Bridge Architecture">
+  <img src="imgs/cce03ccd-b6e9-427e-a492-51637db04991.png" width="500" alt="IceFireDB Bridge Architecture">
 </div>
 
 IceFireDB is designed as a bridge between Web2 and Web3 worlds, enabling:
@@ -84,14 +84,14 @@ IceFireDB is designed as a bridge between Web2 and Web3 worlds, enabling:
 - **Protocol Flexibility**: Supports both SQL and NoSQL interfaces
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/9e35731b-fea1-4e11-88a1-089323a7f2aa" width="500" alt="Project Purpose">
+  <img src="imgs/9e35731b-fea1-4e11-88a1-089323a7f2aa.png" width="500" alt="Project Purpose">
 </div>
 
 
 ## 📚 Documentation
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/f127e510-db14-489b-aec4-479688c20e6c" width="600" alt="IceFireDB Detailed Architecture">
+  <img src="imgs/f127e510-db14-489b-aec4-479688c20e6c.png" width="600" alt="IceFireDB Detailed Architecture">
 </div>
 
 ### 📖 Comprehensive Documentation
