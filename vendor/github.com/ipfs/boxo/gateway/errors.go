@@ -12,6 +12,7 @@ import (
 	"github.com/ipfs/boxo/gateway/assets"
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/boxo/path/resolver"
+	"github.com/ipfs/boxo/retrieval"
 	"github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
 	"github.com/ipld/go-ipld-prime/datamodel"
@@ -24,6 +25,16 @@ var (
 	ErrBadGateway          = NewErrorStatusCodeFromStatus(http.StatusBadGateway)
 	ErrServiceUnavailable  = NewErrorStatusCodeFromStatus(http.StatusServiceUnavailable)
 	ErrTooManyRequests     = NewErrorStatusCodeFromStatus(http.StatusTooManyRequests)
+
+	// Errors for user input validation (prevent user input in logs)
+	errUnsupportedFormat        = errors.New("unsupported response format requested")
+	errConversionNotSupported   = errors.New("converting to requested format is not supported")
+	errInvalidURIQueryParameter = errors.New("failed to parse uri query parameter")
+	errInvalidURIScheme         = errors.New("uri query parameter scheme must be ipfs or ipns")
+	errUnsupportedCarScope      = errors.New("unsupported application/vnd.ipld.car scope parameter")
+	errUnsupportedCarOrder      = errors.New("unsupported application/vnd.ipld.car order parameter")
+	errUnsupportedCarDups       = errors.New("unsupported application/vnd.ipld.car dups parameter")
+	errIndexNotReadable         = errors.New("index.html could not be read: not a file")
 )
 
 // ErrorRetryAfter wraps any error with "retry after" hint. When an error of this type
@@ -166,6 +177,56 @@ func (epr ErrPartialResponse) Error() string {
 	return "received a partial CAR response from the backend"
 }
 
+// writeErrorResponse writes an error response with the given status code and message.
+// It returns HTML or plain text based on the Accept header and DisableHTMLErrors config.
+func writeErrorResponse(w http.ResponseWriter, r *http.Request, c *Config, statusCode int, message string) {
+	// Check if HTML response is appropriate
+	acceptsHTML := false
+	if c != nil && !c.DisableHTMLErrors {
+		acceptsHTML = strings.Contains(r.Header.Get("Accept"), "text/html")
+	}
+
+	if acceptsHTML {
+		// Extract CIDs from RetrievalState for diagnostic purposes (504 errors)
+		var rootCID, failedCID string
+		if statusCode == http.StatusGatewayTimeout && c != nil && c.DiagnosticServiceURL != "" {
+			if retrievalState := retrieval.StateFromContext(r.Context()); retrievalState != nil {
+				// Get root CID (first CID in the path)
+				if root := retrievalState.GetRootCID(); root.Defined() {
+					rootCID = root.String()
+				}
+				// Get terminal CID (CID that failed to retrieve)
+				if terminal := retrievalState.GetTerminalCID(); terminal.Defined() {
+					failedCID = terminal.String()
+				} else {
+					// If no terminal CID, use root CID as the failed CID
+					failedCID = rootCID
+				}
+			}
+		}
+
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(statusCode)
+		err := assets.ErrorTemplate.Execute(w, assets.ErrorTemplateData{
+			GlobalData: assets.GlobalData{
+				Menu: c.Menu,
+			},
+			StatusCode:           statusCode,
+			StatusText:           http.StatusText(statusCode),
+			Error:                message,
+			DiagnosticServiceURL: c.DiagnosticServiceURL,
+			RootCID:              rootCID,
+			FailedCID:            failedCID,
+		})
+		if err != nil {
+			fmt.Fprintf(w, "error during body generation: %v", err)
+		}
+	} else {
+		// plain text response
+		http.Error(w, message, statusCode)
+	}
+}
+
 func webError(w http.ResponseWriter, r *http.Request, c *Config, err error, defaultCode int) {
 	code := defaultCode
 
@@ -200,24 +261,13 @@ func webError(w http.ResponseWriter, r *http.Request, c *Config, err error, defa
 		code = gwErr.StatusCode
 	}
 
-	acceptsHTML := !c.DisableHTMLErrors && strings.Contains(r.Header.Get("Accept"), "text/html")
-	if acceptsHTML {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(code)
-		err = assets.ErrorTemplate.Execute(w, assets.ErrorTemplateData{
-			GlobalData: assets.GlobalData{
-				Menu: c.Menu,
-			},
-			StatusCode: code,
-			StatusText: http.StatusText(code),
-			Error:      err.Error(),
-		})
-		if err != nil {
-			_, _ = w.Write([]byte(fmt.Sprintf("error during body generation: %v", err)))
-		}
-	} else {
-		http.Error(w, err.Error(), code)
-	}
+	log.Debugw("serving error response",
+		"path", r.URL.Path,
+		"method", r.Method,
+		"error", err,
+		"code", code)
+
+	writeErrorResponse(w, r, c, code, err.Error())
 }
 
 // isErrNotFound returns true for IPLD errors that should return 4xx errors (e.g. the path doesn't exist, the data is

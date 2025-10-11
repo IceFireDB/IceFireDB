@@ -4,19 +4,17 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	pstore "github.com/libp2p/go-libp2p/p2p/host/peerstore"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 
-	"github.com/gogo/protobuf/proto"
-	u "github.com/ipfs/boxo/util"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-kad-dht/internal"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 	recpb "github.com/libp2p/go-libp2p-record/pb"
 	"github.com/multiformats/go-base32"
+	"google.golang.org/protobuf/proto"
 )
 
 // dhthandler specifies the signature of functions that handle DHT messages.
@@ -68,12 +66,11 @@ func (dht *IpfsDHT) handleGetValue(ctx context.Context, p peer.ID, pmes *pb.Mess
 	resp.Record = rec
 
 	// Find closest peer on given cluster to desired key and reply with that info
-	closer := dht.betterPeersToQuery(pmes, p, dht.bucketSize)
-	if len(closer) > 0 {
-		// TODO: pstore.PeerInfos should move to core (=> peerstore.AddrInfos).
-		closerinfos := pstore.PeerInfos(dht.peerstore, closer)
-		for _, pi := range closerinfos {
-			logger.Debugf("handleGetValue returning closer peer: '%s'", pi.ID)
+	closestPeers := dht.closestPeersToQuery(pmes, p, dht.bucketSize)
+	if len(closestPeers) > 0 {
+		closestInfos := peerstore.AddrInfos(dht.peerstore, closestPeers)
+		for _, pi := range closestInfos {
+			logger.Debugf("handleGetValue returning closest peer: '%s'", pi.ID)
 			if len(pi.Addrs) < 1 {
 				logger.Warnw("no addresses on peer being sent",
 					"local", dht.self,
@@ -83,7 +80,7 @@ func (dht *IpfsDHT) handleGetValue(ctx context.Context, p peer.ID, pmes *pb.Mess
 			}
 		}
 
-		resp.CloserPeers = pb.PeerInfosToPBPeers(dht.host.Network(), closerinfos)
+		resp.CloserPeers = pb.PeerInfosToPBPeers(dht.host.Network(), closestInfos)
 	}
 
 	return resp, nil
@@ -115,7 +112,7 @@ func (dht *IpfsDHT) checkLocalDatastore(ctx context.Context, k []byte) (*recpb.R
 	}
 
 	var recordIsBad bool
-	recvtime, err := u.ParseRFC3339(rec.GetTimeReceived())
+	recvtime, err := internal.ParseRFC3339(rec.GetTimeReceived())
 	if err != nil {
 		logger.Info("either no receive time set on record, or it was invalid: ", err)
 		recordIsBad = true
@@ -206,7 +203,7 @@ func (dht *IpfsDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Mess
 	}
 
 	// record the time we receive every record
-	rec.TimeReceived = u.FormatRFC3339(time.Now())
+	rec.TimeReceived = internal.FormatRFC3339(time.Now())
 
 	data, err := proto.Marshal(rec)
 	if err != nil {
@@ -254,42 +251,26 @@ func (dht *IpfsDHT) handlePing(_ context.Context, p peer.ID, pmes *pb.Message) (
 
 func (dht *IpfsDHT) handleFindPeer(ctx context.Context, from peer.ID, pmes *pb.Message) (_ *pb.Message, _err error) {
 	resp := pb.NewMessage(pmes.GetType(), nil, pmes.GetClusterLevel())
-	var closest []peer.ID
 
 	if len(pmes.GetKey()) == 0 {
-		return nil, fmt.Errorf("handleFindPeer with empty key")
+		return nil, errors.New("handleFindPeer with empty key")
 	}
 
-	// if looking for self... special case where we send it on CloserPeers.
 	targetPid := peer.ID(pmes.GetKey())
-	closest = dht.betterPeersToQuery(pmes, from, dht.bucketSize)
+	closest := dht.closestPeersToQuery(pmes, from, dht.bucketSize)
 
-	// Never tell a peer about itself.
-	if targetPid != from {
-		// Add the target peer to the set of closest peers if
-		// not already present in our routing table.
-		//
-		// Later, when we lookup known addresses for all peers
-		// in this set, we'll prune this peer if we don't
-		// _actually_ know where it is.
-		found := false
-		for _, p := range closest {
-			if targetPid == p {
-				found = true
-				break
-			}
-		}
-		if !found {
-			closest = append(closest, targetPid)
-		}
+	// Prepend targetPid to the front of the list if not already present.
+	// targetPid is always the closest key to itself.
+	//
+	// Per IPFS Kademlia DHT spec: FIND_PEER has a special exception where the
+	// target peer MUST be included in the response (if present in peerstore),
+	// even if it is self, the requester, or not a DHT server. This allows peers
+	// to discover multiaddresses for any peer, not just DHT servers.
+	if len(closest) == 0 || closest[0] != targetPid {
+		closest = append([]peer.ID{targetPid}, closest...)
 	}
 
-	if closest == nil {
-		return resp, nil
-	}
-
-	// TODO: pstore.PeerInfos should move to core (=> peerstore.AddrInfos).
-	closestinfos := pstore.PeerInfos(dht.peerstore, closest)
+	closestinfos := peerstore.AddrInfos(dht.peerstore, closest)
 	// possibly an over-allocation but this array is temporary anyways.
 	withAddresses := make([]peer.AddrInfo, 0, len(closestinfos))
 	for _, pi := range closestinfos {
@@ -305,9 +286,9 @@ func (dht *IpfsDHT) handleFindPeer(ctx context.Context, from peer.ID, pmes *pb.M
 func (dht *IpfsDHT) handleGetProviders(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, _err error) {
 	key := pmes.GetKey()
 	if len(key) > 80 {
-		return nil, fmt.Errorf("handleGetProviders key size too large")
+		return nil, errors.New("handleGetProviders key size too large")
 	} else if len(key) == 0 {
-		return nil, fmt.Errorf("handleGetProviders key is empty")
+		return nil, errors.New("handleGetProviders key is empty")
 	}
 
 	resp := pb.NewMessage(pmes.GetType(), pmes.GetKey(), pmes.GetClusterLevel())
@@ -328,11 +309,10 @@ func (dht *IpfsDHT) handleGetProviders(ctx context.Context, p peer.ID, pmes *pb.
 
 	resp.ProviderPeers = pb.PeerInfosToPBPeers(dht.host.Network(), filtered)
 
-	// Also send closer peers.
-	closer := dht.betterPeersToQuery(pmes, p, dht.bucketSize)
-	if closer != nil {
-		// TODO: pstore.PeerInfos should move to core (=> peerstore.AddrInfos).
-		infos := pstore.PeerInfos(dht.peerstore, closer)
+	// Also send closest dht servers we know about.
+	closestPeers := dht.closestPeersToQuery(pmes, p, dht.bucketSize)
+	if closestPeers != nil {
+		infos := peerstore.AddrInfos(dht.peerstore, closestPeers)
 		resp.CloserPeers = pb.PeerInfosToPBPeers(dht.host.Network(), infos)
 	}
 
@@ -342,15 +322,16 @@ func (dht *IpfsDHT) handleGetProviders(ctx context.Context, p peer.ID, pmes *pb.
 func (dht *IpfsDHT) handleAddProvider(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, _err error) {
 	key := pmes.GetKey()
 	if len(key) > 80 {
-		return nil, fmt.Errorf("handleAddProvider key size too large")
+		return nil, errors.New("handleAddProvider key size too large")
 	} else if len(key) == 0 {
-		return nil, fmt.Errorf("handleAddProvider key is empty")
+		return nil, errors.New("handleAddProvider key is empty")
 	}
 
 	logger.Debugw("adding provider", "from", p, "key", internal.LoggableProviderRecordBytes(key))
 
 	// add provider should use the address given in the message
 	pinfos := pb.PBPeersToPeerInfos(pmes.GetProviderPeers())
+	success := false
 	for _, pi := range pinfos {
 		if pi.ID != p {
 			// we should ignore this provider record! not from originator.
@@ -364,10 +345,15 @@ func (dht *IpfsDHT) handleAddProvider(ctx context.Context, p peer.ID, pmes *pb.M
 			continue
 		}
 
-		// We run the addrs filter after checking for the length,
-		// this allows transient nodes with varying /p2p-circuit addresses to still have their anouncement go through.
+		// We run the addrs filter after checking for the length, this allows
+		// transient nodes with varying /p2p-circuit addresses to still have their
+		// announcement go through.
 		addrs := dht.filterAddrs(pi.Addrs)
 		dht.providerStore.AddProvider(ctx, key, peer.AddrInfo{ID: pi.ID, Addrs: addrs})
+		success = true
+	}
+	if !success {
+		return nil, errors.New("handleAddProvider no valid provider")
 	}
 
 	return nil, nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -22,7 +23,7 @@ const (
 	// If we go over the max, we'll adjust the delay down to a random value
 	// between 90-100% of the max backoff.
 	maxBackoffJitter = 10 // %
-	connmgrTag       = "ipfs-peering"
+	ConnmgrTag       = "ipfs-peering"
 	// This needs to be sufficient to prevent two sides from simultaneously
 	// dialing.
 	initialDelay = 5 * time.Second
@@ -68,8 +69,7 @@ type peerHandler struct {
 // setAddrs sets the addresses for this peer.
 func (ph *peerHandler) setAddrs(addrs []multiaddr.Multiaddr) {
 	// Not strictly necessary, but it helps to not trust the calling code.
-	addrCopy := make([]multiaddr.Multiaddr, len(addrs))
-	copy(addrCopy, addrs)
+	addrCopy := slices.Clone(addrs)
 
 	ph.mu.Lock()
 	defer ph.mu.Unlock()
@@ -236,7 +236,7 @@ func (ps *PeeringService) AddPeer(info peer.AddrInfo) {
 		handler.setAddrs(info.Addrs)
 	} else {
 		logger.Infow("peer added", "peer", info.ID, "addrs", info.Addrs)
-		ps.host.ConnManager().Protect(info.ID, connmgrTag)
+		ps.host.ConnManager().Protect(info.ID, ConnmgrTag)
 
 		handler = &peerHandler{
 			host:      ps.host,
@@ -265,9 +265,10 @@ func (ps *PeeringService) ListPeers() []peer.AddrInfo {
 
 	out := make([]peer.AddrInfo, 0, len(ps.peers))
 	for id, addrs := range ps.peers {
-		ai := peer.AddrInfo{ID: id}
-		ai.Addrs = append(ai.Addrs, addrs.addrs...)
-		out = append(out, ai)
+		out = append(out, peer.AddrInfo{
+			ID:    id,
+			Addrs: slices.Clone(addrs.addrs),
+		})
 	}
 	return out
 }
@@ -281,7 +282,7 @@ func (ps *PeeringService) RemovePeer(id peer.ID) {
 
 	if handler, ok := ps.peers[id]; ok {
 		logger.Infow("peer removed", "peer", id)
-		ps.host.ConnManager().Unprotect(id, connmgrTag)
+		ps.host.ConnManager().Unprotect(id, ConnmgrTag)
 
 		handler.stop()
 		delete(ps.peers, id)

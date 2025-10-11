@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
-	"github.com/ipfs/boxo/files"
 	"github.com/ipfs/boxo/gateway/assets"
 	"github.com/ipfs/boxo/path"
 	cid "github.com/ipfs/go-cid"
@@ -47,11 +46,17 @@ func (i *handler) serveDirectory(ctx context.Context, w http.ResponseWriter, r *
 			suffix := "/"
 			// preserve query parameters
 			if r.URL.RawQuery != "" {
-				suffix = suffix + "?" + r.URL.RawQuery
+				suffix = suffix + "?" + url.PathEscape(r.URL.RawQuery)
+			}
+			// Re-escape path instead of reusing RawPath to avod mix of lawer
+			// and upper hex that may come from RawPath.
+			if strings.ContainsRune(requestURI.RawPath, '%') {
+				requestURI.RawPath = ""
 			}
 			// /ipfs/cid/foo?bar must be redirected to /ipfs/cid/foo/?bar
-			redirectURL := originalURLPath + suffix
+			redirectURL := requestURI.EscapedPath() + suffix
 			rq.logger.Debugw("directory location moved permanently", "status", http.StatusMovedPermanently)
+
 			http.Redirect(w, r, redirectURL, http.StatusMovedPermanently)
 			return true
 		}
@@ -86,7 +91,7 @@ func (i *handler) serveDirectory(ctx context.Context, w http.ResponseWriter, r *
 		if err == nil {
 			defer idxHeadResp.Close()
 			if !idxHeadResp.isFile {
-				i.webError(w, r, fmt.Errorf("%q could not be read: %w", imIndexPath, files.ErrNotReader), http.StatusUnprocessableEntity)
+				i.webError(w, r, errIndexNotReadable, http.StatusUnprocessableEntity)
 				return false
 			}
 			returnRangeStartsAtZero = true
@@ -99,7 +104,7 @@ func (i *handler) serveDirectory(ctx context.Context, w http.ResponseWriter, r *
 		if err == nil {
 			defer idxGetResp.Close()
 			if idxGetResp.bytes == nil {
-				i.webError(w, r, fmt.Errorf("%q could not be read: %w", imIndexPath, files.ErrNotReader), http.StatusUnprocessableEntity)
+				i.webError(w, r, errIndexNotReadable, http.StatusUnprocessableEntity)
 				return false
 			}
 			if len(ranges) > 0 {
@@ -215,7 +220,7 @@ func (i *handler) serveDirectory(ctx context.Context, w http.ResponseWriter, r *
 	rq.logger.Debugw("request processed", "tplDataDNSLink", globalData.DNSLink, "tplDataSize", size, "tplDataBackLink", backLink, "tplDataHash", hash)
 
 	if err := assets.DirectoryTemplate.Execute(w, tplData); err != nil {
-		_, _ = w.Write([]byte(fmt.Sprintf("error during body generation: %v", err)))
+		_, _ = fmt.Fprintf(w, "error during body generation: %v", err)
 		return false
 	}
 

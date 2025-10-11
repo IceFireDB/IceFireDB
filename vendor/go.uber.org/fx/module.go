@@ -195,6 +195,13 @@ func (m *module) provide(p provide) {
 	opts := []dig.ProvideOption{
 		dig.FillProvideInfo(&info),
 		dig.Export(!p.Private),
+		dig.WithProviderBeforeCallback(func(bci dig.BeforeCallbackInfo) {
+			m.log.LogEvent(&fxevent.BeforeRun{
+				Name:       funcName,
+				Kind:       "provide",
+				ModuleName: m.name,
+			})
+		}),
 		dig.WithProviderCallback(func(ci dig.CallbackInfo) {
 			m.log.LogEvent(&fxevent.Run{
 				Name:       funcName,
@@ -229,6 +236,13 @@ func (m *module) supply(p provide) {
 	typeName := p.SupplyType.String()
 	opts := []dig.ProvideOption{
 		dig.Export(!p.Private),
+		dig.WithProviderBeforeCallback(func(bci dig.BeforeCallbackInfo) {
+			m.log.LogEvent(&fxevent.BeforeRun{
+				Name:       fmt.Sprintf("stub(%v)", typeName),
+				Kind:       "supply",
+				ModuleName: m.name,
+			})
+		}),
 		dig.WithProviderCallback(func(ci dig.CallbackInfo) {
 			m.log.LogEvent(&fxevent.Run{
 				Name:       fmt.Sprintf("stub(%v)", typeName),
@@ -253,11 +267,11 @@ func (m *module) supply(p provide) {
 }
 
 // Constructs custom loggers for all modules in the tree
-func (m *module) constructAllCustomLoggers() {
+func (m *module) installAllEventLoggers() {
 	if m.logConstructor != nil {
 		if buffer, ok := m.log.(*logBuffer); ok {
 			// default to parent's logger if custom logger constructor fails
-			if err := m.constructCustomLogger(buffer); err != nil {
+			if err := m.installEventLogger(buffer); err != nil {
 				m.app.err = multierr.Append(m.app.err, err)
 				m.log = m.fallbackLogger
 				buffer.Connect(m.log)
@@ -269,12 +283,11 @@ func (m *module) constructAllCustomLoggers() {
 	}
 
 	for _, mod := range m.modules {
-		mod.constructAllCustomLoggers()
+		mod.installAllEventLoggers()
 	}
 }
 
-// Mirroring the behavior of app.constructCustomLogger
-func (m *module) constructCustomLogger(buffer *logBuffer) (err error) {
+func (m *module) installEventLogger(buffer *logBuffer) (err error) {
 	p := m.logConstructor
 	fname := fxreflect.FuncName(p.Target)
 	defer func() {
@@ -297,15 +310,15 @@ func (m *module) constructCustomLogger(buffer *logBuffer) (err error) {
 	})
 }
 
-func (m *module) executeInvokes() error {
+func (m *module) invokeAll() error {
 	for _, m := range m.modules {
-		if err := m.executeInvokes(); err != nil {
+		if err := m.invokeAll(); err != nil {
 			return err
 		}
 	}
 
 	for _, invoke := range m.invokes {
-		if err := m.executeInvoke(invoke); err != nil {
+		if err := m.invoke(invoke); err != nil {
 			return err
 		}
 	}
@@ -313,7 +326,7 @@ func (m *module) executeInvokes() error {
 	return nil
 }
 
-func (m *module) executeInvoke(i invoke) (err error) {
+func (m *module) invoke(i invoke) (err error) {
 	fnName := fxreflect.FuncName(i.Target)
 	m.log.LogEvent(&fxevent.Invoking{
 		FunctionName: fnName,
@@ -353,6 +366,13 @@ func (m *module) decorate(d decorator) (err error) {
 	var info dig.DecorateInfo
 	opts := []dig.DecorateOption{
 		dig.FillDecorateInfo(&info),
+		dig.WithDecoratorBeforeCallback(func(bci dig.BeforeCallbackInfo) {
+			m.log.LogEvent(&fxevent.BeforeRun{
+				Name:       funcName,
+				Kind:       "decorate",
+				ModuleName: m.name,
+			})
+		}),
 		dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
 			m.log.LogEvent(&fxevent.Run{
 				Name:       funcName,
@@ -385,6 +405,13 @@ func (m *module) decorate(d decorator) (err error) {
 func (m *module) replace(d decorator) error {
 	typeName := d.ReplaceType.String()
 	opts := []dig.DecorateOption{
+		dig.WithDecoratorBeforeCallback(func(bci dig.BeforeCallbackInfo) {
+			m.log.LogEvent(&fxevent.BeforeRun{
+				Name:       fmt.Sprintf("stub(%v)", typeName),
+				Kind:       "replace",
+				ModuleName: m.name,
+			})
+		}),
 		dig.WithDecoratorCallback(func(ci dig.CallbackInfo) {
 			m.log.LogEvent(&fxevent.Run{
 				Name:       fmt.Sprintf("stub(%v)", typeName),

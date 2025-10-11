@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -21,6 +22,13 @@ import (
 func (i *handler) serveFile(ctx context.Context, w http.ResponseWriter, r *http.Request, resolvedPath path.ImmutablePath, rq *requestData, fileSize int64, fileBytes io.ReadCloser, isSymlink bool, returnRangeStartsAtZero bool, fileContentType string) bool {
 	_, span := spanTrace(ctx, "Handler.ServeFile", trace.WithAttributes(attribute.String("path", resolvedPath.String())))
 	defer span.End()
+
+	// Check if range request exceeds file size limit
+	if i.config.MaxRangeRequestFileSize > 0 && r.Header.Get("Range") != "" && fileSize > i.config.MaxRangeRequestFileSize {
+		err := fmt.Errorf("range requests not supported for files larger than %d bytes: switch to verifiable block requests (application/vnd.ipld.raw)", i.config.MaxRangeRequestFileSize)
+		i.webError(w, r, err, http.StatusNotImplemented)
+		return false
+	}
 
 	// Set Cache-Control and read optional Last-Modified time
 	modtime := addCacheControlHeaders(w, r, rq.contentPath, rq.ttl, rq.lastMod, resolvedPath.RootCid(), "")

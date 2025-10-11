@@ -2,30 +2,34 @@ package internal
 
 import (
 	"context"
+	"slices"
 	"sync"
-
-	"github.com/samber/lo"
 )
 
-// DoBatch processes a slice of items with concurrency no higher than maxConcurrency by splitting it into batches no larger than maxBatchSize.
-// If an error is returned for any batch, the process is short-circuited and the error is immediately returned.
+// DoBatch processes a slice of items with concurrency no higher than
+// maxConcurrency by splitting it into batches no larger than maxBatchSize. If
+// an error is returned for any batch, the process is short-circuited and the
+// error is immediately returned.
 func DoBatch[A any](ctx context.Context, maxBatchSize, maxConcurrency int, items []A, f func(context.Context, []A) error) error {
 	if len(items) == 0 {
 		return nil
 	}
-	batches := lo.Chunk(items, maxBatchSize)
+	batches := slices.Collect(slices.Chunk(items, maxBatchSize))
 	workerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	batchChan := make(chan []A)
 	errChan := make(chan error)
 	wg := sync.WaitGroup{}
-	for i := 0; i < maxConcurrency && i < len(batches); i++ {
+	for range min(maxConcurrency, len(batches)) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for {
 				select {
-				case batch := <-batchChan:
+				case batch, ok := <-batchChan:
+					if !ok {
+						return
+					}
 					err := f(workerCtx, batch)
 					if err != nil {
 						select {
@@ -43,8 +47,11 @@ func DoBatch[A any](ctx context.Context, maxBatchSize, maxConcurrency int, items
 
 	// work sender
 	go func() {
-		defer close(errChan)
-		defer wg.Wait()
+		defer func() {
+			close(batchChan)
+			wg.Wait()
+			close(errChan)
+		}()
 		for _, batch := range batches {
 			select {
 			case batchChan <- batch:
@@ -52,7 +59,6 @@ func DoBatch[A any](ctx context.Context, maxBatchSize, maxConcurrency int, items
 				return
 			}
 		}
-		cancel()
 	}()
 
 	// receive any errors
@@ -62,8 +68,8 @@ func DoBatch[A any](ctx context.Context, maxBatchSize, maxConcurrency int, items
 			// we finished without any errors, congratulations
 			return nil
 		}
-		// short circuit on the first error we get
-		// canceling the worker ctx and thus all workers,
+		// short circuit on the first error we get canceling the worker ctx and
+		// thus all workers,
 		return err
 	case <-ctx.Done():
 		return ctx.Err()

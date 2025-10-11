@@ -13,33 +13,32 @@ import (
 
 const sessionCloseErrorCode quic.StreamErrorCode = 0x170d7b68
 
-type SendStream interface {
-	io.Writer
-	io.Closer
-
+type quicSendStream interface {
+	io.WriteCloser
 	StreamID() quic.StreamID
-	CancelWrite(StreamErrorCode)
-
+	CancelWrite(quic.StreamErrorCode)
 	SetWriteDeadline(time.Time) error
 }
 
-type ReceiveStream interface {
+var (
+	_ quicSendStream = &quic.SendStream{}
+	_ quicSendStream = &quic.Stream{}
+)
+
+type quicReceiveStream interface {
 	io.Reader
-
 	StreamID() quic.StreamID
-	CancelRead(StreamErrorCode)
-
+	CancelRead(quic.StreamErrorCode)
 	SetReadDeadline(time.Time) error
 }
 
-type Stream interface {
-	SendStream
-	ReceiveStream
-	SetDeadline(time.Time) error
-}
+var (
+	_ quicReceiveStream = &quic.ReceiveStream{}
+	_ quicReceiveStream = &quic.Stream{}
+)
 
-type sendStream struct {
-	str quic.SendStream
+type SendStream struct {
+	str quicSendStream
 	// WebTransport stream header.
 	// Set by the constructor, set to nil once sent out.
 	// Might be initialized to nil if this sendStream is part of an incoming bidirectional stream.
@@ -50,13 +49,15 @@ type sendStream struct {
 	once sync.Once
 }
 
-var _ SendStream = &sendStream{}
-
-func newSendStream(str quic.SendStream, hdr []byte, onClose func()) *sendStream {
-	return &sendStream{str: str, streamHdr: hdr, onClose: onClose}
+func newSendStream(str quicSendStream, hdr []byte, onClose func()) *SendStream {
+	return &SendStream{
+		str:       str,
+		streamHdr: hdr,
+		onClose:   onClose,
+	}
 }
 
-func (s *sendStream) maybeSendStreamHeader() (err error) {
+func (s *SendStream) maybeSendStreamHeader() (err error) {
 	s.once.Do(func() {
 		if _, e := s.str.Write(s.streamHdr); e != nil {
 			err = e
@@ -67,7 +68,7 @@ func (s *sendStream) maybeSendStreamHeader() (err error) {
 	return
 }
 
-func (s *sendStream) Write(b []byte) (int, error) {
+func (s *SendStream) Write(b []byte) (int, error) {
 	if err := s.maybeSendStreamHeader(); err != nil {
 		return 0, err
 	}
@@ -78,16 +79,16 @@ func (s *sendStream) Write(b []byte) (int, error) {
 	return n, maybeConvertStreamError(err)
 }
 
-func (s *sendStream) CancelWrite(e StreamErrorCode) {
+func (s *SendStream) CancelWrite(e StreamErrorCode) {
 	s.str.CancelWrite(webtransportCodeToHTTPCode(e))
 	s.onClose()
 }
 
-func (s *sendStream) closeWithSession() {
+func (s *SendStream) closeWithSession() {
 	s.str.CancelWrite(sessionCloseErrorCode)
 }
 
-func (s *sendStream) Close() error {
+func (s *SendStream) Close() error {
 	if err := s.maybeSendStreamHeader(); err != nil {
 		return err
 	}
@@ -95,26 +96,27 @@ func (s *sendStream) Close() error {
 	return maybeConvertStreamError(s.str.Close())
 }
 
-func (s *sendStream) SetWriteDeadline(t time.Time) error {
+func (s *SendStream) SetWriteDeadline(t time.Time) error {
 	return maybeConvertStreamError(s.str.SetWriteDeadline(t))
 }
 
-func (s *sendStream) StreamID() quic.StreamID {
+func (s *SendStream) StreamID() quic.StreamID {
 	return s.str.StreamID()
 }
 
-type receiveStream struct {
-	str     quic.ReceiveStream
+type ReceiveStream struct {
+	str     quicReceiveStream
 	onClose func()
 }
 
-var _ ReceiveStream = &receiveStream{}
-
-func newReceiveStream(str quic.ReceiveStream, onClose func()) *receiveStream {
-	return &receiveStream{str: str, onClose: onClose}
+func newReceiveStream(str quicReceiveStream, onClose func()) *ReceiveStream {
+	return &ReceiveStream{
+		str:     str,
+		onClose: onClose,
+	}
 }
 
-func (s *receiveStream) Read(b []byte) (int, error) {
+func (s *ReceiveStream) Read(b []byte) (int, error) {
 	n, err := s.str.Read(b)
 	if err != nil && !isTimeoutError(err) {
 		s.onClose()
@@ -122,42 +124,64 @@ func (s *receiveStream) Read(b []byte) (int, error) {
 	return n, maybeConvertStreamError(err)
 }
 
-func (s *receiveStream) CancelRead(e StreamErrorCode) {
+func (s *ReceiveStream) CancelRead(e StreamErrorCode) {
 	s.str.CancelRead(webtransportCodeToHTTPCode(e))
 	s.onClose()
 }
 
-func (s *receiveStream) closeWithSession() {
+func (s *ReceiveStream) closeWithSession() {
 	s.str.CancelRead(sessionCloseErrorCode)
 }
 
-func (s *receiveStream) SetReadDeadline(t time.Time) error {
+func (s *ReceiveStream) SetReadDeadline(t time.Time) error {
 	return maybeConvertStreamError(s.str.SetReadDeadline(t))
 }
 
-func (s *receiveStream) StreamID() quic.StreamID {
+func (s *ReceiveStream) StreamID() quic.StreamID {
 	return s.str.StreamID()
 }
 
-type stream struct {
-	*sendStream
-	*receiveStream
+type Stream struct {
+	sendStr *SendStream
+	recvStr *ReceiveStream
 
 	mx                             sync.Mutex
 	sendSideClosed, recvSideClosed bool
 	onClose                        func()
 }
 
-var _ Stream = &stream{}
-
-func newStream(str quic.Stream, hdr []byte, onClose func()) *stream {
-	s := &stream{onClose: onClose}
-	s.sendStream = newSendStream(str, hdr, func() { s.registerClose(true) })
-	s.receiveStream = newReceiveStream(str, func() { s.registerClose(false) })
+func newStream(str *quic.Stream, hdr []byte, onClose func()) *Stream {
+	s := &Stream{onClose: onClose}
+	s.sendStr = newSendStream(str, hdr, func() { s.registerClose(true) })
+	s.recvStr = newReceiveStream(str, func() { s.registerClose(false) })
 	return s
 }
 
-func (s *stream) registerClose(isSendSide bool) {
+func (s *Stream) StreamID() quic.StreamID {
+	return s.recvStr.StreamID()
+}
+
+func (s *Stream) Write(b []byte) (int, error) {
+	return s.sendStr.Write(b)
+}
+
+func (s *Stream) Read(b []byte) (int, error) {
+	return s.recvStr.Read(b)
+}
+
+func (s *Stream) CancelWrite(e StreamErrorCode) {
+	s.sendStr.CancelWrite(e)
+}
+
+func (s *Stream) CancelRead(e StreamErrorCode) {
+	s.recvStr.CancelRead(e)
+}
+
+func (s *Stream) Close() error {
+	return s.sendStr.Close()
+}
+
+func (s *Stream) registerClose(isSendSide bool) {
 	s.mx.Lock()
 	if isSendSide {
 		s.sendSideClosed = true
@@ -172,22 +196,23 @@ func (s *stream) registerClose(isSendSide bool) {
 	}
 }
 
-func (s *stream) closeWithSession() {
-	s.sendStream.closeWithSession()
-	s.receiveStream.closeWithSession()
+func (s *Stream) closeWithSession() {
+	s.sendStr.closeWithSession()
+	s.recvStr.closeWithSession()
 }
 
-func (s *stream) SetDeadline(t time.Time) error {
-	err1 := s.sendStream.SetWriteDeadline(t)
-	err2 := s.receiveStream.SetReadDeadline(t)
-	if err1 != nil {
-		return err1
-	}
-	return err2
+func (s *Stream) SetWriteDeadline(t time.Time) error {
+	return s.sendStr.SetWriteDeadline(t)
 }
 
-func (s *stream) StreamID() quic.StreamID {
-	return s.receiveStream.StreamID()
+func (s *Stream) SetReadDeadline(t time.Time) error {
+	return s.recvStr.SetReadDeadline(t)
+}
+
+func (s *Stream) SetDeadline(t time.Time) error {
+	err1 := s.SetWriteDeadline(t)
+	err2 := s.SetReadDeadline(t)
+	return errors.Join(err1, err2)
 }
 
 func maybeConvertStreamError(err error) error {

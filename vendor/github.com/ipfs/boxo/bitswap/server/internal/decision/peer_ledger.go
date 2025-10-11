@@ -3,12 +3,11 @@ package decision
 import (
 	wl "github.com/ipfs/boxo/bitswap/client/wantlist"
 	pb "github.com/ipfs/boxo/bitswap/message/pb"
-
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-type DefaultPeerLedger struct {
+type peerLedger struct {
 	// these two maps are inversions of each other
 	peers map[peer.ID]map[cid.Cid]entry
 	cids  map[cid.Cid]map[peer.ID]entry
@@ -16,8 +15,18 @@ type DefaultPeerLedger struct {
 	maxEntriesPerPeer int
 }
 
-func NewDefaultPeerLedger(maxEntriesPerPeer uint) *DefaultPeerLedger {
-	return &DefaultPeerLedger{
+type peerEntry struct {
+	Peer peer.ID
+	entry
+}
+
+type entry struct {
+	Priority int32
+	WantType pb.Message_Wantlist_WantType
+}
+
+func newPeerLedger(maxEntriesPerPeer uint) *peerLedger {
+	return &peerLedger{
 		peers: make(map[peer.ID]map[cid.Cid]entry),
 		cids:  make(map[cid.Cid]map[peer.ID]entry),
 
@@ -28,7 +37,7 @@ func NewDefaultPeerLedger(maxEntriesPerPeer uint) *DefaultPeerLedger {
 // Wants adds an entry to the peer ledger. If adding the entry would make the
 // peer ledger exceed the maxEntriesPerPeer limit, then the entry is not added
 // and false is returned.
-func (l *DefaultPeerLedger) Wants(p peer.ID, e wl.Entry) bool {
+func (l *peerLedger) Wants(p peer.ID, e wl.Entry) bool {
 	cids, ok := l.peers[p]
 	if !ok {
 		cids = make(map[cid.Cid]entry)
@@ -50,7 +59,7 @@ func (l *DefaultPeerLedger) Wants(p peer.ID, e wl.Entry) bool {
 	return true
 }
 
-func (l *DefaultPeerLedger) CancelWant(p peer.ID, k cid.Cid) bool {
+func (l *peerLedger) CancelWant(p peer.ID, k cid.Cid) bool {
 	wants, ok := l.peers[p]
 	if !ok {
 		return false
@@ -65,7 +74,7 @@ func (l *DefaultPeerLedger) CancelWant(p peer.ID, k cid.Cid) bool {
 	return had
 }
 
-func (l *DefaultPeerLedger) CancelWantWithType(p peer.ID, k cid.Cid, typ pb.Message_Wantlist_WantType) {
+func (l *peerLedger) CancelWantWithType(p peer.ID, k cid.Cid, typ pb.Message_Wantlist_WantType) {
 	wants, ok := l.peers[p]
 	if !ok {
 		return
@@ -86,7 +95,7 @@ func (l *DefaultPeerLedger) CancelWantWithType(p peer.ID, k cid.Cid, typ pb.Mess
 	l.removePeerFromCid(p, k)
 }
 
-func (l *DefaultPeerLedger) removePeerFromCid(p peer.ID, k cid.Cid) {
+func (l *peerLedger) removePeerFromCid(p peer.ID, k cid.Cid) {
 	m, ok := l.cids[k]
 	if !ok {
 		return
@@ -97,28 +106,22 @@ func (l *DefaultPeerLedger) removePeerFromCid(p peer.ID, k cid.Cid) {
 	}
 }
 
-type entry struct {
-	Priority int32
-	WantType pb.Message_Wantlist_WantType
-}
-
-func (l *DefaultPeerLedger) Peers(k cid.Cid) []PeerEntry {
+func (l *peerLedger) Peers(k cid.Cid) []peerEntry {
 	m, ok := l.cids[k]
 	if !ok {
 		return nil
 	}
-	peers := make([]PeerEntry, 0, len(m))
+	peers := make([]peerEntry, 0, len(m))
 	for p, e := range m {
-		peers = append(peers, PeerEntry{
-			Peer:     p,
-			Priority: e.Priority,
-			WantType: e.WantType,
+		peers = append(peers, peerEntry{
+			Peer:  p,
+			entry: e,
 		})
 	}
 	return peers
 }
 
-func (l *DefaultPeerLedger) CollectPeerIDs() []peer.ID {
+func (l *peerLedger) CollectPeerIDs() []peer.ID {
 	peers := make([]peer.ID, 0, len(l.peers))
 	for p := range l.peers {
 		peers = append(peers, p)
@@ -126,11 +129,11 @@ func (l *DefaultPeerLedger) CollectPeerIDs() []peer.ID {
 	return peers
 }
 
-func (l *DefaultPeerLedger) WantlistSizeForPeer(p peer.ID) int {
+func (l *peerLedger) WantlistSizeForPeer(p peer.ID) int {
 	return len(l.peers[p])
 }
 
-func (l *DefaultPeerLedger) WantlistForPeer(p peer.ID) []wl.Entry {
+func (l *peerLedger) WantlistForPeer(p peer.ID) []wl.Entry {
 	cids, ok := l.peers[p]
 	if !ok {
 		return nil
@@ -150,7 +153,7 @@ func (l *DefaultPeerLedger) WantlistForPeer(p peer.ID) []wl.Entry {
 // ClearPeerWantlist does not take an effort to fully erase it from memory.
 // This is intended when the peer is still connected and the map capacity could
 // be reused. If the memory should be freed use PeerDisconnected instead.
-func (l *DefaultPeerLedger) ClearPeerWantlist(p peer.ID) {
+func (l *peerLedger) ClearPeerWantlist(p peer.ID) {
 	cids, ok := l.peers[p]
 	if !ok {
 		return
@@ -161,7 +164,12 @@ func (l *DefaultPeerLedger) ClearPeerWantlist(p peer.ID) {
 	}
 }
 
-func (l *DefaultPeerLedger) PeerDisconnected(p peer.ID) {
+func (l *peerLedger) PeerDisconnected(p peer.ID) {
 	l.ClearPeerWantlist(p)
 	delete(l.peers, p)
+}
+
+func (l *peerLedger) HasPeer(p peer.ID) bool {
+	_, ok := l.peers[p]
+	return ok
 }

@@ -1,9 +1,10 @@
-comment: false
 coverage:
+  ignore:
+    - interop/
   status:
-    patch:
+    project:
       default:
         informational: true
-    project:
+    patch:
       default:
         informational: true

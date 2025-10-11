@@ -9,7 +9,7 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol/recordlayer"
 )
 
-// 2 megabytes
+// 2 megabytes.
 const fragmentBufferMaxSize = 2000000
 
 type fragment struct {
@@ -29,7 +29,7 @@ func newFragmentBuffer() *fragmentBuffer {
 	return &fragmentBuffer{cache: map[uint16][]*fragment{}}
 }
 
-// current total size of buffer
+// current total size of buffer.
 func (f *fragmentBuffer) size() int {
 	size := 0
 	for i := range f.cache {
@@ -37,12 +37,13 @@ func (f *fragmentBuffer) size() int {
 			size += len(f.cache[i][j].data)
 		}
 	}
+
 	return size
 }
 
 // Attempts to push a DTLS packet to the fragmentBuffer
 // when it returns true it means the fragmentBuffer has inserted and the buffer shouldn't be handled
-// when an error returns it is fatal, and the DTLS connection should be stopped
+// when an error returns it is fatal, and the DTLS connection should be stopped.
 func (f *fragmentBuffer) push(buf []byte) (isHandshake, isRetransmit bool, err error) {
 	if f.size()+len(buf) >= fragmentBufferMaxSize {
 		return false, false, errFragmentBufferOverflow
@@ -64,7 +65,8 @@ func (f *fragmentBuffer) push(buf []byte) (isHandshake, isRetransmit bool, err e
 		}
 
 		// Fragment is a retransmission. We have already assembled it before successfully
-		isRetransmit = frag.handshakeHeader.FragmentOffset == 0 && frag.handshakeHeader.MessageSequence < f.currentMessageSequenceNumber
+		isRetransmit = frag.handshakeHeader.FragmentOffset == 0 &&
+			frag.handshakeHeader.MessageSequence < f.currentMessageSequenceNumber
 
 		if _, ok := f.cache[frag.handshakeHeader.MessageSequence]; !ok {
 			f.cache[frag.handshakeHeader.MessageSequence] = []*fragment{}
@@ -107,9 +109,11 @@ func (f *fragmentBuffer) pop() (content []byte, epoch uint16) {
 				}
 
 				rawMessage = append(f.data, rawMessage...)
+
 				return true
 			}
 		}
+
 		return false
 	}
 
@@ -131,5 +135,6 @@ func (f *fragmentBuffer) pop() (content []byte, epoch uint16) {
 
 	delete(f.cache, f.currentMessageSequenceNumber)
 	f.currentMessageSequenceNumber++
+
 	return append(rawHeader, rawMessage...), messageEpoch
 }

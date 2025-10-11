@@ -99,6 +99,9 @@ const (
 	// Multibase is a draft code tagged "multiformat".
 	Multibase Code = 0x33 // multibase
 
+	// Varsig is a draft code tagged "multiformat" and described by: Variable signature (varsig) multiformat.
+	Varsig Code = 0x34 // varsig
+
 	// Dns is a permanent code tagged "multiaddr".
 	Dns Code = 0x35 // dns
 
@@ -147,6 +150,9 @@ const (
 	// TorrentFile is a draft code tagged "ipld" and described by: Torrent file (bencoded).
 	TorrentFile Code = 0x7c // torrent-file
 
+	// Blake3Hashseq is a draft code tagged "ipld" and described by: BLAKE3 hash sequence - per Iroh collections spec.
+	Blake3Hashseq Code = 0x80 // blake3-hashseq
+
 	// LeofcoinBlock is a draft code tagged "ipld" and described by: Leofcoin Block.
 	LeofcoinBlock Code = 0x81 // leofcoin-block
 
@@ -164,6 +170,9 @@ const (
 
 	// DagCose is a draft code tagged "ipld" and described by: MerkleDAG COSE.
 	DagCose Code = 0x86 // dag-cose
+
+	// Lbry is a draft code tagged "namespace" and described by: LBRY Address.
+	Lbry Code = 0x8c // lbry
 
 	// EthBlock is a permanent code tagged "ipld" and described by: Ethereum Header (RLP).
 	EthBlock Code = 0x90 // eth-block
@@ -195,8 +204,8 @@ const (
 	// EthReceiptLogTrie is a draft code tagged "ipld" and described by: Ethereum Transaction Receipt Log Trie (Eth-Trie).
 	EthReceiptLogTrie Code = 0x99 // eth-receipt-log-trie
 
-	// EthRecieptLog is a draft code tagged "ipld" and described by: Ethereum Transaction Receipt Log (RLP).
-	EthRecieptLog Code = 0x9a // eth-reciept-log
+	// EthReceiptLog is a draft code tagged "ipld" and described by: Ethereum Transaction Receipt Log (RLP).
+	EthReceiptLog Code = 0x9a // eth-receipt-log
 
 	// Aes128 is a draft code tagged "key" and described by: 128-bit AES symmetric key.
 	Aes128 Code = 0xa0 // aes-128
@@ -228,10 +237,10 @@ const (
 	// ZcashTx is a permanent code tagged "ipld" and described by: Zcash Tx.
 	ZcashTx Code = 0xc1 // zcash-tx
 
-	// Caip50 is a draft code tagged "multiformat" and described by: CAIP-50 multi-chain account id.
+	// Caip50 is a draft code tagged "multiformat" and described by: CAIP-50 multi-chain account ID.
 	Caip50 Code = 0xca // caip-50
 
-	// Streamid is a draft code tagged "namespace" and described by: Ceramic Stream Id.
+	// Streamid is a draft code tagged "namespace" and described by: Ceramic Stream ID.
 	Streamid Code = 0xce // streamid
 
 	// StellarBlock is a draft code tagged "ipld" and described by: Stellar Block.
@@ -375,6 +384,9 @@ const (
 	// Noise is a draft code tagged "multiaddr".
 	Noise Code = 0x01c6 // noise
 
+	// Shs is a draft code tagged "multiaddr" and described by: Secure Scuttlebutt - Secret Handshake Stream.
+	Shs Code = 0x01c8 // shs
+
 	// Quic is a permanent code tagged "multiaddr".
 	Quic Code = 0x01cc // quic
 
@@ -398,6 +410,9 @@ const (
 
 	// Http is a draft code tagged "multiaddr".
 	Http Code = 0x01e0 // http
+
+	// HttpPath is a draft code tagged "multiaddr" and described by: Percent-encoded path to an HTTP resource.
+	HttpPath Code = 0x01e1 // http-path
 
 	// Swhid1Snp is a draft code tagged "ipld" and described by: SoftWare Heritage persistent IDentifier version 1 snapshot.
 	Swhid1Snp Code = 0x01f0 // swhid-1-snp
@@ -438,8 +453,14 @@ const (
 	// TransportIpfsGatewayHttp is a draft code tagged "transport" and described by: HTTP IPFS Gateway trustless datatransfer.
 	TransportIpfsGatewayHttp Code = 0x0920 // transport-ipfs-gateway-http
 
+	// TransportFilecoinPieceHttp is a draft code tagged "transport" and described by: HTTP piece retrieval from Filecoin storage provider; https://github.com/filecoin-project/FIPs/blob/master/FRCs/frc-0066.md.
+	TransportFilecoinPieceHttp Code = 0x0930 // transport-filecoin-piece-http
+
 	// Multidid is a draft code tagged "multiformat" and described by: Compact encoding for Decentralized Identifers.
 	Multidid Code = 0x0d1d // multidid
+
+	// Fr32Sha256Trunc254Padbintree is a draft code tagged "multihash" and described by: A balanced binary tree hash used in Filecoin Piece Commitments as described in FRC-0069.
+	Fr32Sha256Trunc254Padbintree Code = 0x1011 // fr32-sha256-trunc254-padbintree
 
 	// Sha2_256Trunc254Padded is a permanent code tagged "multihash" and described by: SHA2-256 with the two most significant bits from the last byte zeroed (as via a mask with 0b00111111) - used for proving trees as in Filecoin.
 	Sha2_256Trunc254Padded Code = 0x1012 // sha2-256-trunc254-padded
@@ -492,6 +513,36 @@ const (
 	// Sm2Pub is a draft code tagged "key" and described by: SM2 public key (compressed).
 	Sm2Pub Code = 0x1206 // sm2-pub
 
+	// Vlad is a draft code tagged "vlad" and described by: Verifiable Long-lived ADdress.
+	Vlad Code = 0x1207 // vlad
+
+	// ProvenanceLog is a draft code tagged "serialization" and described by: Verifiable and permissioned append-only log.
+	ProvenanceLog Code = 0x1208 // provenance-log
+
+	// ProvenanceLogEntry is a draft code tagged "serialization" and described by: Verifiable and permissioned append-only log entry.
+	ProvenanceLogEntry Code = 0x1209 // provenance-log-entry
+
+	// ProvenanceLogScript is a draft code tagged "serialization" and described by: Verifiable and permissioned append-only log script.
+	ProvenanceLogScript Code = 0x120a // provenance-log-script
+
+	// Mlkem512Pub is a draft code tagged "key" and described by: ML-KEM 512 public key; as specified by FIPS 203.
+	Mlkem512Pub Code = 0x120b // mlkem-512-pub
+
+	// Mlkem768Pub is a draft code tagged "key" and described by: ML-KEM 768 public key; as specified by FIPS 203.
+	Mlkem768Pub Code = 0x120c // mlkem-768-pub
+
+	// Mlkem1024Pub is a draft code tagged "key" and described by: ML-KEM 1024 public key; as specified by FIPS 203.
+	Mlkem1024Pub Code = 0x120d // mlkem-1024-pub
+
+	// Multisig is a draft code tagged "multiformat" and described by: Digital signature multiformat.
+	Multisig Code = 0x1239 // multisig
+
+	// Multikey is a draft code tagged "multiformat" and described by: Encryption key multiformat.
+	Multikey Code = 0x123a // multikey
+
+	// Nonce is a draft code tagged "nonce" and described by: Nonce random value.
+	Nonce Code = 0x123b // nonce
+
 	// Ed25519Priv is a draft code tagged "key" and described by: Ed25519 private key.
 	Ed25519Priv Code = 0x1300 // ed25519-priv
 
@@ -516,6 +567,75 @@ const (
 	// P521Priv is a draft code tagged "key" and described by: P-521 private key.
 	P521Priv Code = 0x1308 // p521-priv
 
+	// Bls12_381G1Priv is a draft code tagged "key" and described by: BLS12-381 G1 private key.
+	Bls12_381G1Priv Code = 0x1309 // bls12_381-g1-priv
+
+	// Bls12_381G2Priv is a draft code tagged "key" and described by: BLS12-381 G2 private key.
+	Bls12_381G2Priv Code = 0x130a // bls12_381-g2-priv
+
+	// Bls12_381G1g2Priv is a draft code tagged "key" and described by: BLS12-381 G1 and G2 private key.
+	Bls12_381G1g2Priv Code = 0x130b // bls12_381-g1g2-priv
+
+	// Bls12_381G1PubShare is a draft code tagged "key" and described by: BLS12-381 G1 public key share.
+	Bls12_381G1PubShare Code = 0x130c // bls12_381-g1-pub-share
+
+	// Bls12_381G2PubShare is a draft code tagged "key" and described by: BLS12-381 G2 public key share.
+	Bls12_381G2PubShare Code = 0x130d // bls12_381-g2-pub-share
+
+	// Bls12_381G1PrivShare is a draft code tagged "key" and described by: BLS12-381 G1 private key share.
+	Bls12_381G1PrivShare Code = 0x130e // bls12_381-g1-priv-share
+
+	// Bls12_381G2PrivShare is a draft code tagged "key" and described by: BLS12-381 G2 private key share.
+	Bls12_381G2PrivShare Code = 0x130f // bls12_381-g2-priv-share
+
+	// Sm2Priv is a draft code tagged "key" and described by: SM2 private key.
+	Sm2Priv Code = 0x1310 // sm2-priv
+
+	// LamportSha3_512Pub is a draft code tagged "key" and described by: Lamport public key based on SHA3-512.
+	LamportSha3_512Pub Code = 0x1a14 // lamport-sha3-512-pub
+
+	// LamportSha3_384Pub is a draft code tagged "key" and described by: Lamport public key based on SHA3-384.
+	LamportSha3_384Pub Code = 0x1a15 // lamport-sha3-384-pub
+
+	// LamportSha3_256Pub is a draft code tagged "key" and described by: Lamport public key based on SHA3-256.
+	LamportSha3_256Pub Code = 0x1a16 // lamport-sha3-256-pub
+
+	// LamportSha3_512Priv is a draft code tagged "key" and described by: Lamport private key based on SHA3-512.
+	LamportSha3_512Priv Code = 0x1a24 // lamport-sha3-512-priv
+
+	// LamportSha3_384Priv is a draft code tagged "key" and described by: Lamport private key based on SHA3-384.
+	LamportSha3_384Priv Code = 0x1a25 // lamport-sha3-384-priv
+
+	// LamportSha3_256Priv is a draft code tagged "key" and described by: Lamport private key based on SHA3-256.
+	LamportSha3_256Priv Code = 0x1a26 // lamport-sha3-256-priv
+
+	// LamportSha3_512PrivShare is a draft code tagged "key" and described by: Lamport private key share based on SHA3-512 and split with Shamir gf256.
+	LamportSha3_512PrivShare Code = 0x1a34 // lamport-sha3-512-priv-share
+
+	// LamportSha3_384PrivShare is a draft code tagged "key" and described by: Lamport private key share based on SHA3-384 and split with Shamir gf256.
+	LamportSha3_384PrivShare Code = 0x1a35 // lamport-sha3-384-priv-share
+
+	// LamportSha3_256PrivShare is a draft code tagged "key" and described by: Lamport private key share based on SHA3-256 and split with Shamir gf256.
+	LamportSha3_256PrivShare Code = 0x1a36 // lamport-sha3-256-priv-share
+
+	// LamportSha3_512Sig is a draft code tagged "multisig" and described by: Lamport signature based on SHA3-512.
+	LamportSha3_512Sig Code = 0x1a44 // lamport-sha3-512-sig
+
+	// LamportSha3_384Sig is a draft code tagged "multisig" and described by: Lamport signature based on SHA3-384.
+	LamportSha3_384Sig Code = 0x1a45 // lamport-sha3-384-sig
+
+	// LamportSha3_256Sig is a draft code tagged "multisig" and described by: Lamport signature based on SHA3-256.
+	LamportSha3_256Sig Code = 0x1a46 // lamport-sha3-256-sig
+
+	// LamportSha3_512SigShare is a draft code tagged "multisig" and described by: Lamport signature share based on SHA3-512 and split with Shamir gf256.
+	LamportSha3_512SigShare Code = 0x1a54 // lamport-sha3-512-sig-share
+
+	// LamportSha3_384SigShare is a draft code tagged "multisig" and described by: Lamport signature share based on SHA3-384 and split with Shamir gf256.
+	LamportSha3_384SigShare Code = 0x1a55 // lamport-sha3-384-sig-share
+
+	// LamportSha3_256SigShare is a draft code tagged "multisig" and described by: Lamport signature share based on SHA3-256 and split with Shamir gf256.
+	LamportSha3_256SigShare Code = 0x1a56 // lamport-sha3-256-sig-share
+
 	// Kangarootwelve is a draft code tagged "multihash" and described by: KangarooTwelve is an extendable-output hash function based on Keccak-p.
 	Kangarootwelve Code = 0x1d01 // kangarootwelve
 
@@ -527,6 +647,12 @@ const (
 
 	// Sm3_256 is a draft code tagged "multihash".
 	Sm3_256 Code = 0x534d // sm3-256
+
+	// Sha256a is a draft code tagged "hash" and described by: The sum of multiple sha2-256 hashes; as specified by Ceramic CIP-124..
+	Sha256a Code = 0x7012 // sha256a
+
+	// Chacha20Poly1305 is a draft code tagged "multikey" and described by: ChaCha20_Poly1305 encryption scheme.
+	Chacha20Poly1305 Code = 0xa000 // chacha20-poly1305
 
 	// Blake2b8 is a draft code tagged "multihash" and described by: Blake2b consists of 64 output lengths that give different hashes.
 	Blake2b8 Code = 0xb201 // blake2b-8
@@ -1506,8 +1632,8 @@ const (
 	// PoseidonBls12_381A2Fc1Sc is a draft code tagged "multihash" and described by: Poseidon using BLS12-381 and arity of 2 with Filecoin parameters - high-security variant.
 	PoseidonBls12_381A2Fc1Sc Code = 0xb402 // poseidon-bls12_381-a2-fc1-sc
 
-	// Urdca2015Canon is a draft code tagged "ipld" and described by: The result of canonicalizing an input according to URDCA-2015 and then expressing its hash value as a multihash value..
-	Urdca2015Canon Code = 0xb403 // urdca-2015-canon
+	// Rdfc1 is a draft code tagged "ipld" and described by: The result of canonicalizing an input according to RDFC-1.0 and then expressing its hash value as a multihash value..
+	Rdfc1 Code = 0xb403 // rdfc-1
 
 	// Ssz is a draft code tagged "serialization" and described by: SimpleSerialize (SSZ) serialization.
 	Ssz Code = 0xb501 // ssz
@@ -1515,8 +1641,14 @@ const (
 	// SszSha2_256Bmt is a draft code tagged "multihash" and described by: SSZ Merkle tree root using SHA2-256 as the hashing function and SSZ serialization for the block binary.
 	SszSha2_256Bmt Code = 0xb502 // ssz-sha2-256-bmt
 
+	// Sha2_256Chunked is a draft code tagged "multihash" and described by: Hash of concatenated SHA2-256 digests of 8*2^n MiB source chunks; n = ceil(log2(source_size/(10^4 * 8MiB))).
+	Sha2_256Chunked Code = 0xb510 // sha2-256-chunked
+
 	// JsonJcs is a draft code tagged "ipld" and described by: The result of canonicalizing an input according to JCS - JSON Canonicalisation Scheme (RFC 8785).
 	JsonJcs Code = 0xb601 // json-jcs
+
+	// BittorrentPiecesRoot is a draft code tagged "multihash" and described by: BitTorrent v2 pieces root hash..
+	BittorrentPiecesRoot Code = 0xb702 // bittorrent-pieces-root
 
 	// Iscc is a draft code tagged "softhash" and described by: ISCC (International Standard Content Code) - similarity preserving hash.
 	Iscc Code = 0xcc01 // iscc
@@ -1524,17 +1656,20 @@ const (
 	// ZeroxcertImprint256 is a draft code tagged "zeroxcert" and described by: 0xcert Asset Imprint (root hash).
 	ZeroxcertImprint256 Code = 0xce11 // zeroxcert-imprint-256
 
-	// Varsig is a draft code tagged "varsig" and described by: Namespace for all not yet standard signature algorithms.
-	Varsig Code = 0xd000 // varsig
+	// NonstandardSig is a deprecated code tagged "varsig" and described by: Namespace for all not yet standard signature algorithms.
+	NonstandardSig Code = 0xd000 // nonstandard-sig
 
-	// Es256k is a draft code tagged "varsig" and described by: ES256K Siganture Algorithm (secp256k1).
+	// BcryptPbkdf is a draft code tagged "multihash" and described by: Bcrypt-PBKDF key derivation function.
+	BcryptPbkdf Code = 0xd00d // bcrypt-pbkdf
+
+	// Es256k is a draft code tagged "varsig" and described by: ES256K Signature Algorithm (secp256k1).
 	Es256k Code = 0xd0e7 // es256k
 
-	// Bls12381G1Sig is a draft code tagged "varsig" and described by: G1 signature for BLS-12381-G2.
-	Bls12381G1Sig Code = 0xd0ea // bls-12381-g1-sig
+	// Bls12_381G1Sig is a draft code tagged "varsig" and described by: G1 signature for BLS12-381.
+	Bls12_381G1Sig Code = 0xd0ea // bls12_381-g1-sig
 
-	// Bls12381G2Sig is a draft code tagged "varsig" and described by: G2 signature for BLS-12381-G1.
-	Bls12381G2Sig Code = 0xd0eb // bls-12381-g2-sig
+	// Bls12_381G2Sig is a draft code tagged "varsig" and described by: G2 signature for BLS12-381.
+	Bls12_381G2Sig Code = 0xd0eb // bls12_381-g2-sig
 
 	// Eddsa is a draft code tagged "varsig" and described by: Edwards-Curve Digital Signature Algorithm.
 	Eddsa Code = 0xd0ed // eddsa
@@ -1545,11 +1680,29 @@ const (
 	// Jwk_jcsPub is a draft code tagged "key" and described by: JSON object containing only the required members of a JWK (RFC 7518 and RFC 7517) representing the public key. Serialisation based on JCS (RFC 8785).
 	Jwk_jcsPub Code = 0xeb51 // jwk_jcs-pub
 
+	// Ed2k is a draft code tagged "multihash" and described by: eDonkey2000 hash..
+	Ed2k Code = 0xed20 // ed2k
+
 	// FilCommitmentUnsealed is a permanent code tagged "filecoin" and described by: Filecoin piece or sector data commitment merkle node/root (CommP & CommD).
 	FilCommitmentUnsealed Code = 0xf101 // fil-commitment-unsealed
 
 	// FilCommitmentSealed is a permanent code tagged "filecoin" and described by: Filecoin sector data commitment merkle node/root - sealed and replicated (CommR).
 	FilCommitmentSealed Code = 0xf102 // fil-commitment-sealed
+
+	// ShelterContractManifest is a draft code tagged "shelter" and described by: Shelter protocol contract manifest.
+	ShelterContractManifest Code = 0x511e00 // shelter-contract-manifest
+
+	// ShelterContractText is a draft code tagged "shelter" and described by: Shelter protocol contract text.
+	ShelterContractText Code = 0x511e01 // shelter-contract-text
+
+	// ShelterContractData is a draft code tagged "shelter" and described by: Shelter protocol contract data (contract chain).
+	ShelterContractData Code = 0x511e02 // shelter-contract-data
+
+	// ShelterFileManifest is a draft code tagged "shelter" and described by: Shelter protocol file manifest.
+	ShelterFileManifest Code = 0x511e03 // shelter-file-manifest
+
+	// ShelterFileChunk is a draft code tagged "shelter" and described by: Shelter protocol file chunk.
+	ShelterFileChunk Code = 0x511e04 // shelter-file-chunk
 
 	// Plaintextv2 is a draft code tagged "multiaddr".
 	Plaintextv2 Code = 0x706c61 // plaintextv2
@@ -1587,14 +1740,53 @@ const (
 	// Es256 is a draft code tagged "varsig" and described by: ES256 Signature Algorithm.
 	Es256 Code = 0xd01200 // es256
 
-	// Es284 is a draft code tagged "varsig" and described by: ES384 Signature Algorithm.
-	Es284 Code = 0xd01201 // es284
+	// Es384 is a draft code tagged "varsig" and described by: ES384 Signature Algorithm.
+	Es384 Code = 0xd01201 // es384
 
 	// Es512 is a draft code tagged "varsig" and described by: ES512 Signature Algorithm.
 	Es512 Code = 0xd01202 // es512
 
 	// Rs256 is a draft code tagged "varsig" and described by: RS256 Signature Algorithm.
 	Rs256 Code = 0xd01205 // rs256
+
+	// Es256kMsig is a draft code tagged "multisig" and described by: ES256K (secp256k1) Signature as Multisig.
+	Es256kMsig Code = 0xd01300 // es256k-msig
+
+	// Bls12_381G1Msig is a draft code tagged "multisig" and described by: G1 signature for BLS-12381-G2 as Multisig.
+	Bls12_381G1Msig Code = 0xd01301 // bls12_381-g1-msig
+
+	// Bls12_381G2Msig is a draft code tagged "multisig" and described by: G2 signature for BLS-12381-G1 as Multisig.
+	Bls12_381G2Msig Code = 0xd01302 // bls12_381-g2-msig
+
+	// EddsaMsig is a draft code tagged "multisig" and described by: Edwards-Curve Digital Signature as Multisig.
+	EddsaMsig Code = 0xd01303 // eddsa-msig
+
+	// Bls12_381G1ShareMsig is a draft code tagged "multisig" and described by: G1 threshold signature share for BLS-12381-G2 as Multisig.
+	Bls12_381G1ShareMsig Code = 0xd01304 // bls12_381-g1-share-msig
+
+	// Bls12_381G2ShareMsig is a draft code tagged "multisig" and described by: G2 threshold signature share for BLS-12381-G1 as Multisig.
+	Bls12_381G2ShareMsig Code = 0xd01305 // bls12_381-g2-share-msig
+
+	// LamportMsig is a draft code tagged "multisig" and described by: Lamport signature as Multisig.
+	LamportMsig Code = 0xd01306 // lamport-msig
+
+	// LamportShareMsig is a draft code tagged "multisig" and described by: Lamport threshold signature share as Multisig.
+	LamportShareMsig Code = 0xd01307 // lamport-share-msig
+
+	// Es256Msig is a draft code tagged "multisig" and described by: ECDSA P-256 Signature as Multisig.
+	Es256Msig Code = 0xd01308 // es256-msig
+
+	// Es384Msig is a draft code tagged "multisig" and described by: ECDSA P-384 Signature as Multisig.
+	Es384Msig Code = 0xd01309 // es384-msig
+
+	// Es521Msig is a draft code tagged "multisig" and described by: ECDSA P-521 Signature as Multisig.
+	Es521Msig Code = 0xd0130a // es521-msig
+
+	// Rs256Msig is a draft code tagged "multisig" and described by: RS256 Signature as Multisig.
+	Rs256Msig Code = 0xd0130b // rs256-msig
+
+	// Scion is a draft code tagged "multiaddr" and described by: SCION Internet architecture.
+	Scion Code = 0xd02000 // scion
 )
 
 var knownCodes = []Code{
@@ -1630,6 +1822,7 @@ var knownCodes = []Code{
 	Multihash,
 	Multiaddr,
 	Multibase,
+	Varsig,
 	Dns,
 	Dns4,
 	Dns6,
@@ -1646,12 +1839,14 @@ var knownCodes = []Code{
 	GitRaw,
 	TorrentInfo,
 	TorrentFile,
+	Blake3Hashseq,
 	LeofcoinBlock,
 	LeofcoinTx,
 	LeofcoinPr,
 	Sctp,
 	DagJose,
 	DagCose,
+	Lbry,
 	EthBlock,
 	EthBlockList,
 	EthTxTrie,
@@ -1662,7 +1857,7 @@ var knownCodes = []Code{
 	EthAccountSnapshot,
 	EthStorageTrie,
 	EthReceiptLogTrie,
-	EthRecieptLog,
+	EthReceiptLog,
 	Aes128,
 	Aes192,
 	Aes256,
@@ -1722,6 +1917,7 @@ var knownCodes = []Code{
 	Tls,
 	Sni,
 	Noise,
+	Shs,
 	Quic,
 	QuicV1,
 	Webtransport,
@@ -1730,6 +1926,7 @@ var knownCodes = []Code{
 	Wss,
 	P2pWebsocketStar,
 	Http,
+	HttpPath,
 	Swhid1Snp,
 	Json,
 	Messagepack,
@@ -1743,7 +1940,9 @@ var knownCodes = []Code{
 	TransportBitswap,
 	TransportGraphsyncFilecoinv1,
 	TransportIpfsGatewayHttp,
+	TransportFilecoinPieceHttp,
 	Multidid,
+	Fr32Sha256Trunc254Padbintree,
 	Sha2_256Trunc254Padded,
 	Sha2_224,
 	Sha2_512_224,
@@ -1761,6 +1960,16 @@ var knownCodes = []Code{
 	X448Pub,
 	RsaPub,
 	Sm2Pub,
+	Vlad,
+	ProvenanceLog,
+	ProvenanceLogEntry,
+	ProvenanceLogScript,
+	Mlkem512Pub,
+	Mlkem768Pub,
+	Mlkem1024Pub,
+	Multisig,
+	Multikey,
+	Nonce,
 	Ed25519Priv,
 	Secp256k1Priv,
 	X25519Priv,
@@ -1769,10 +1978,35 @@ var knownCodes = []Code{
 	P256Priv,
 	P384Priv,
 	P521Priv,
+	Bls12_381G1Priv,
+	Bls12_381G2Priv,
+	Bls12_381G1g2Priv,
+	Bls12_381G1PubShare,
+	Bls12_381G2PubShare,
+	Bls12_381G1PrivShare,
+	Bls12_381G2PrivShare,
+	Sm2Priv,
+	LamportSha3_512Pub,
+	LamportSha3_384Pub,
+	LamportSha3_256Pub,
+	LamportSha3_512Priv,
+	LamportSha3_384Priv,
+	LamportSha3_256Priv,
+	LamportSha3_512PrivShare,
+	LamportSha3_384PrivShare,
+	LamportSha3_256PrivShare,
+	LamportSha3_512Sig,
+	LamportSha3_384Sig,
+	LamportSha3_256Sig,
+	LamportSha3_512SigShare,
+	LamportSha3_384SigShare,
+	LamportSha3_256SigShare,
 	Kangarootwelve,
 	AesGcm256,
 	Silverpine,
 	Sm3_256,
+	Sha256a,
+	Chacha20Poly1305,
 	Blake2b8,
 	Blake2b16,
 	Blake2b24,
@@ -2099,21 +2333,30 @@ var knownCodes = []Code{
 	Xxh3_128,
 	PoseidonBls12_381A2Fc1,
 	PoseidonBls12_381A2Fc1Sc,
-	Urdca2015Canon,
+	Rdfc1,
 	Ssz,
 	SszSha2_256Bmt,
+	Sha2_256Chunked,
 	JsonJcs,
+	BittorrentPiecesRoot,
 	Iscc,
 	ZeroxcertImprint256,
-	Varsig,
+	NonstandardSig,
+	BcryptPbkdf,
 	Es256k,
-	Bls12381G1Sig,
-	Bls12381G2Sig,
+	Bls12_381G1Sig,
+	Bls12_381G2Sig,
 	Eddsa,
 	Eip191,
 	Jwk_jcsPub,
+	Ed2k,
 	FilCommitmentUnsealed,
 	FilCommitmentSealed,
+	ShelterContractManifest,
+	ShelterContractText,
+	ShelterContractData,
+	ShelterFileManifest,
+	ShelterFileChunk,
 	Plaintextv2,
 	HolochainAdrV0,
 	HolochainAdrV1,
@@ -2126,9 +2369,22 @@ var knownCodes = []Code{
 	SubspaceNs,
 	KumandraNs,
 	Es256,
-	Es284,
+	Es384,
 	Es512,
 	Rs256,
+	Es256kMsig,
+	Bls12_381G1Msig,
+	Bls12_381G2Msig,
+	EddsaMsig,
+	Bls12_381G1ShareMsig,
+	Bls12_381G2ShareMsig,
+	LamportMsig,
+	LamportShareMsig,
+	Es256Msig,
+	Es384Msig,
+	Es521Msig,
+	Rs256Msig,
+	Scion,
 }
 
 func (c Code) Tag() string {
@@ -2150,6 +2406,7 @@ func (c Code) Tag() string {
 		Crc32,
 		Crc64Ecma,
 		Murmur3X64_128,
+		Sha256a,
 		Xxh32,
 		Xxh64,
 		Xxh3_64,
@@ -2172,6 +2429,7 @@ func (c Code) Tag() string {
 		GitRaw,
 		TorrentInfo,
 		TorrentFile,
+		Blake3Hashseq,
 		LeofcoinBlock,
 		LeofcoinTx,
 		LeofcoinPr,
@@ -2187,7 +2445,7 @@ func (c Code) Tag() string {
 		EthAccountSnapshot,
 		EthStorageTrie,
 		EthReceiptLogTrie,
-		EthRecieptLog,
+		EthReceiptLog,
 		BitcoinBlock,
 		BitcoinTx,
 		BitcoinWitnessCommitment,
@@ -2205,7 +2463,7 @@ func (c Code) Tag() string {
 		DagJson,
 		Swhid1Snp,
 		Json,
-		Urdca2015Canon,
+		Rdfc1,
 		JsonJcs:
 		return "ipld"
 
@@ -2228,6 +2486,9 @@ func (c Code) Tag() string {
 		X448Pub,
 		RsaPub,
 		Sm2Pub,
+		Mlkem512Pub,
+		Mlkem768Pub,
+		Mlkem1024Pub,
 		Ed25519Priv,
 		Secp256k1Priv,
 		X25519Priv,
@@ -2236,6 +2497,23 @@ func (c Code) Tag() string {
 		P256Priv,
 		P384Priv,
 		P521Priv,
+		Bls12_381G1Priv,
+		Bls12_381G2Priv,
+		Bls12_381G1g2Priv,
+		Bls12_381G1PubShare,
+		Bls12_381G2PubShare,
+		Bls12_381G1PrivShare,
+		Bls12_381G2PrivShare,
+		Sm2Priv,
+		LamportSha3_512Pub,
+		LamportSha3_384Pub,
+		LamportSha3_256Pub,
+		LamportSha3_512Priv,
+		LamportSha3_384Priv,
+		LamportSha3_256Priv,
+		LamportSha3_512PrivShare,
+		LamportSha3_384PrivShare,
+		LamportSha3_256PrivShare,
 		Jwk_jcsPub:
 		return "key"
 
@@ -2275,6 +2553,7 @@ func (c Code) Tag() string {
 		Tls,
 		Sni,
 		Noise,
+		Shs,
 		Quic,
 		QuicV1,
 		Webtransport,
@@ -2283,16 +2562,21 @@ func (c Code) Tag() string {
 		Wss,
 		P2pWebsocketStar,
 		Http,
+		HttpPath,
 		Silverpine,
-		Plaintextv2:
+		Plaintextv2,
+		Scion:
 		return "multiaddr"
 
 	case Multicodec,
 		Multihash,
 		Multiaddr,
 		Multibase,
+		Varsig,
 		Caip50,
-		Multidid:
+		Multidid,
+		Multisig,
+		Multikey:
 		return "multiformat"
 
 	case Identity,
@@ -2314,6 +2598,7 @@ func (c Code) Tag() string {
 		DblSha2_256,
 		Md4,
 		Md5,
+		Fr32Sha256Trunc254Padbintree,
 		Sha2_256Trunc254Padded,
 		Sha2_224,
 		Sha2_512_224,
@@ -2647,10 +2932,38 @@ func (c Code) Tag() string {
 		Skein1024_1024,
 		PoseidonBls12_381A2Fc1,
 		PoseidonBls12_381A2Fc1Sc,
-		SszSha2_256Bmt:
+		SszSha2_256Bmt,
+		Sha2_256Chunked,
+		BittorrentPiecesRoot,
+		BcryptPbkdf,
+		Ed2k:
 		return "multihash"
 
+	case Chacha20Poly1305:
+		return "multikey"
+
+	case LamportSha3_512Sig,
+		LamportSha3_384Sig,
+		LamportSha3_256Sig,
+		LamportSha3_512SigShare,
+		LamportSha3_384SigShare,
+		LamportSha3_256SigShare,
+		Es256kMsig,
+		Bls12_381G1Msig,
+		Bls12_381G2Msig,
+		EddsaMsig,
+		Bls12_381G1ShareMsig,
+		Bls12_381G2ShareMsig,
+		LamportMsig,
+		LamportShareMsig,
+		Es256Msig,
+		Es384Msig,
+		Es521Msig,
+		Rs256Msig:
+		return "multisig"
+
 	case Path,
+		Lbry,
 		Streamid,
 		Ipld,
 		Ipfs,
@@ -2664,6 +2977,9 @@ func (c Code) Tag() string {
 		KumandraNs:
 		return "namespace"
 
+	case Nonce:
+		return "nonce"
+
 	case Protobuf,
 		Rlp,
 		Bencode,
@@ -2672,28 +2988,42 @@ func (c Code) Tag() string {
 		IpnsRecord,
 		CarIndexSorted,
 		CarMultihashIndexSorted,
+		ProvenanceLog,
+		ProvenanceLogEntry,
+		ProvenanceLogScript,
 		Ssz:
 		return "serialization"
+
+	case ShelterContractManifest,
+		ShelterContractText,
+		ShelterContractData,
+		ShelterFileManifest,
+		ShelterFileChunk:
+		return "shelter"
 
 	case Iscc:
 		return "softhash"
 
 	case TransportBitswap,
 		TransportGraphsyncFilecoinv1,
-		TransportIpfsGatewayHttp:
+		TransportIpfsGatewayHttp,
+		TransportFilecoinPieceHttp:
 		return "transport"
 
-	case Varsig,
+	case NonstandardSig,
 		Es256k,
-		Bls12381G1Sig,
-		Bls12381G2Sig,
+		Bls12_381G1Sig,
+		Bls12_381G2Sig,
 		Eddsa,
 		Eip191,
 		Es256,
-		Es284,
+		Es384,
 		Es512,
 		Rs256:
 		return "varsig"
+
+	case Vlad:
+		return "vlad"
 
 	case ZeroxcertImprint256:
 		return "zeroxcert"
