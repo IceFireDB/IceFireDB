@@ -12,7 +12,7 @@ import (
 
 	dag "github.com/ipfs/boxo/ipld/merkledag"
 	ft "github.com/ipfs/boxo/ipld/unixfs"
-
+	"github.com/ipfs/boxo/provider"
 	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 )
@@ -64,6 +64,11 @@ const (
 	TDir
 )
 
+const (
+	repubQuick = 300 * time.Millisecond
+	repubLong  = 3 * time.Second
+)
+
 // FSNode abstracts the `Directory` and `File` structures, it represents
 // any child node in the MFS (i.e., all the nodes besides the `Root`). It
 // is the counterpart of the `parent` interface which represents any
@@ -94,18 +99,14 @@ type Root struct {
 	dir *Directory
 
 	repub *Republisher
+	prov  provider.MultihashProvider
 }
 
 // NewRoot creates a new Root and starts up a republisher routine for it.
-func NewRoot(parent context.Context, ds ipld.DAGService, node *dag.ProtoNode, pf PubFunc) (*Root, error) {
+func NewRoot(ctx context.Context, ds ipld.DAGService, node *dag.ProtoNode, pf PubFunc, prov provider.MultihashProvider) (*Root, error) {
 	var repub *Republisher
 	if pf != nil {
-		repub = NewRepublisher(parent, pf, time.Millisecond*300, time.Second*3)
-
-		// No need to take the lock here since we just created
-		// the `Republisher` and no one has access to it yet.
-
-		go repub.Run(node.Cid())
+		repub = NewRepublisher(pf, repubQuick, repubLong, node.Cid())
 	}
 
 	root := &Root{
@@ -121,7 +122,7 @@ func NewRoot(parent context.Context, ds ipld.DAGService, node *dag.ProtoNode, pf
 
 	switch fsn.Type() {
 	case ft.TDirectory, ft.THAMTShard:
-		newDir, err := NewDirectory(parent, node.String(), node, root, ds)
+		newDir, err := NewDirectory(ctx, node.String(), node, root, ds, prov)
 		if err != nil {
 			return nil, err
 		}
@@ -134,6 +135,33 @@ func NewRoot(parent context.Context, ds ipld.DAGService, node *dag.ProtoNode, pf
 	default:
 		return nil, fmt.Errorf("unrecognized unixfs type: %s", fsn.Type())
 	}
+	return root, nil
+}
+
+// NewEmptyRoot creates an empty Root directory with the given directory
+// options. A republisher is created if PubFunc is not nil.
+func NewEmptyRoot(ctx context.Context, ds ipld.DAGService, pf PubFunc, prov provider.MultihashProvider, opts MkdirOpts) (*Root, error) {
+	root := new(Root)
+
+	dir, err := NewEmptyDirectory(ctx, "", root, ds, prov, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Rather than "dir.GetNode()" because it is cheaper and we have no
+	// risks.
+	nd, err := dir.unixfsDir.GetNode()
+	if err != nil {
+		return nil, err
+	}
+
+	var repub *Republisher
+	if pf != nil {
+		repub = NewRepublisher(pf, repubQuick, repubLong, nd.Cid())
+	}
+
+	root.repub = repub
+	root.dir = dir
 	return root, nil
 }
 
@@ -170,19 +198,7 @@ func (kr *Root) Flush() error {
 func (kr *Root) FlushMemFree(ctx context.Context) error {
 	dir := kr.GetDirectory()
 
-	if err := dir.Flush(); err != nil {
-		return err
-	}
-
-	dir.lock.Lock()
-	defer dir.lock.Unlock()
-
-	for name := range dir.entriesCache {
-		delete(dir.entriesCache, name)
-	}
-	// TODO: Can't we just create new maps?
-
-	return nil
+	return dir.Flush()
 }
 
 // updateChildEntry implements the `parent` interface, and signals
@@ -197,8 +213,16 @@ func (kr *Root) updateChildEntry(c child) error {
 	if err != nil {
 		return err
 	}
+
 	// TODO: Why are we not using the inner directory lock nor
 	// applying the same procedure as `Directory.updateChildEntry`?
+
+	if kr.prov != nil {
+		log.Debugf("mfs: provide: %s", c.Node.Cid())
+		if err := kr.prov.StartProviding(false, c.Node.Cid().Hash()); err != nil {
+			log.Warnf("mfs: error while providing %s: %s", c.Node.Cid(), err)
+		}
+	}
 
 	if kr.repub != nil {
 		kr.repub.Update(c.Node.Cid())

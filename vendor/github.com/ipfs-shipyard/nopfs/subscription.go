@@ -99,7 +99,7 @@ func (s *HTTPSubscriber) downloadAndAppend() error {
 	rangeHeader := fmt.Sprintf("bytes=%d-", localFileSize)
 	req.Header.Set("Range", rangeHeader)
 
-	logger.Debug("%s: requesting bytes from %d: %s", s.localFile, localFileSize, req.URL)
+	logger.Debugf("%s: requesting bytes from %d: %s", s.localFile, localFileSize, req.URL)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

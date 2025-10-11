@@ -6,7 +6,6 @@ import (
 	"github.com/ipfs/boxo/bitswap/client"
 	"github.com/ipfs/boxo/bitswap/server"
 	"github.com/ipfs/boxo/bitswap/tracer"
-	delay "github.com/ipfs/go-ipfs-delay"
 )
 
 type option func(*Bitswap)
@@ -33,7 +32,7 @@ func MaxQueuedWantlistEntriesPerPeer(count uint) Option {
 	return Option{server.MaxQueuedWantlistEntriesPerPeer(count)}
 }
 
-// MaxCidSize only affects the server.
+// MaxCidSize limits the size of incoming CIDs in requests (server only).
 // If it is 0 no limit is applied.
 func MaxCidSize(n uint) Option {
 	return Option{server.MaxCidSize(n)}
@@ -41,10 +40,6 @@ func MaxCidSize(n uint) Option {
 
 func TaskWorkerCount(count int) Option {
 	return Option{server.TaskWorkerCount(count)}
-}
-
-func ProvideEnabled(enabled bool) Option {
-	return Option{server.ProvideEnabled(enabled)}
 }
 
 func SetSendDontHaves(send bool) Option {
@@ -57,10 +52,6 @@ func WithPeerBlockRequestFilter(pbrf server.PeerBlockRequestFilter) Option {
 
 func WithScoreLedger(scoreLedger server.ScoreLedger) Option {
 	return Option{server.WithScoreLedger(scoreLedger)}
-}
-
-func WithPeerLedger(peerLedger server.PeerLedger) Option {
-	return Option{server.WithPeerLedger(peerLedger)}
 }
 
 func WithTargetMessageSize(tms int) Option {
@@ -82,7 +73,7 @@ func ProviderSearchDelay(newProvSearchDelay time.Duration) Option {
 	return Option{client.ProviderSearchDelay(newProvSearchDelay)}
 }
 
-func RebroadcastDelay(newRebroadcastDelay delay.D) Option {
+func RebroadcastDelay(newRebroadcastDelay time.Duration) Option {
 	return Option{client.RebroadcastDelay(newRebroadcastDelay)}
 }
 
@@ -105,4 +96,20 @@ func WithTracer(tap tracer.Tracer) Option {
 			bs.tracer = tap
 		}),
 	}
+}
+
+func WithServerEnabled(enabled bool) Option {
+	return Option{
+		option(func(bs *Bitswap) {
+			bs.serverEnabled = enabled
+		}),
+	}
+}
+
+func WithClientOption(opt client.Option) Option {
+	return Option{opt}
+}
+
+func WithServerOption(opt server.Option) Option {
+	return Option{opt}
 }

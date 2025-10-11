@@ -22,7 +22,7 @@ func GetPeeker(r io.Reader) BytePeeker {
 type peeker struct {
 	reader    io.Reader
 	peekState int
-	lastByte  byte
+	lastByte  [1]byte
 }
 
 const (
@@ -42,7 +42,7 @@ func (p *peeker) Read(buf []byte) (n int, err error) {
 	}
 
 	if p.peekState == peekUnread {
-		buf[0] = p.lastByte
+		buf[0] = p.lastByte[0]
 		n, err = p.reader.Read(buf[1:])
 		n += 1
 	} else {
@@ -50,7 +50,7 @@ func (p *peeker) Read(buf []byte) (n int, err error) {
 	}
 	if n > 0 {
 		p.peekState = peekSet
-		p.lastByte = buf[n-1]
+		p.lastByte[0] = buf[n-1]
 	}
 	return n, err
 }
@@ -58,15 +58,13 @@ func (p *peeker) Read(buf []byte) (n int, err error) {
 func (p *peeker) ReadByte() (byte, error) {
 	if p.peekState == peekUnread {
 		p.peekState = peekSet
-		return p.lastByte, nil
+		return p.lastByte[0], nil
 	}
-	var buf [1]byte
-	_, err := io.ReadFull(p.reader, buf[:])
+	_, err := io.ReadFull(p.reader, p.lastByte[:])
 	if err != nil {
 		return 0, err
 	}
-	b := buf[0]
-	p.lastByte = b
+	b := p.lastByte[0]
 	p.peekState = peekSet
 	return b, nil
 }

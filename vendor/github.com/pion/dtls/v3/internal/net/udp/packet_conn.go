@@ -34,13 +34,13 @@ const (
 	defaultListenBacklog = 128 // same as Linux default
 )
 
-// Typed errors
+// Typed errors.
 var (
 	ErrClosedListener      = errors.New("udp: listener closed")
 	ErrListenQueueExceeded = errors.New("udp: listen queue exceeded")
 )
 
-// listener augments a connection-oriented Listener over a UDP PacketConn
+// listener augments a connection-oriented Listener over a UDP PacketConn.
 type listener struct {
 	pConn *net.UDPConn
 
@@ -68,10 +68,12 @@ func (l *listener) Accept() (net.PacketConn, net.Addr, error) {
 	select {
 	case c := <-l.acceptCh:
 		l.connWG.Add(1)
+
 		return c, c.raddr, nil
 
 	case <-l.readDoneCh:
 		err, _ := l.errRead.Load().(error)
+
 		return nil, nil, err
 
 	case <-l.doneCh:
@@ -168,7 +170,7 @@ func (lc *ListenConfig) Listen(network string, laddr *net.UDPAddr) (dtlsnet.Pack
 		return nil, err
 	}
 
-	l := &listener{
+	packetListener := &listener{
 		pConn:          conn,
 		acceptCh:       make(chan *PacketConn, lc.Backlog),
 		conns:          make(map[string]*PacketConn),
@@ -179,20 +181,20 @@ func (lc *ListenConfig) Listen(network string, laddr *net.UDPAddr) (dtlsnet.Pack
 		readDoneCh:     make(chan struct{}),
 	}
 
-	l.accepting.Store(true)
-	l.connWG.Add(1)
-	l.readWG.Add(2) // wait readLoop and Close execution routine
+	packetListener.accepting.Store(true)
+	packetListener.connWG.Add(1)
+	packetListener.readWG.Add(2) // wait readLoop and Close execution routine
 
-	go l.readLoop()
+	go packetListener.readLoop()
 	go func() {
-		l.connWG.Wait()
-		if err := l.pConn.Close(); err != nil {
-			l.errClose.Store(err)
+		packetListener.connWG.Wait()
+		if err := packetListener.pConn.Close(); err != nil {
+			packetListener.errClose.Store(err)
 		}
-		l.readWG.Done()
+		packetListener.readWG.Done()
 	}()
 
-	return l, nil
+	return packetListener, nil
 }
 
 // Listen creates a new listener using default ListenConfig.
@@ -212,6 +214,7 @@ func (l *listener) readLoop() {
 		n, raddr, err := l.pConn.ReadFrom(buf)
 		if err != nil {
 			l.errRead.Store(err)
+
 			return
 		}
 		conn, ok, err := l.getConn(raddr, buf[:n])
@@ -225,7 +228,7 @@ func (l *listener) readLoop() {
 }
 
 // getConn gets an existing connection or creates a new one.
-func (l *listener) getConn(raddr net.Addr, buf []byte) (*PacketConn, bool, error) {
+func (l *listener) getConn(raddr net.Addr, buf []byte) (*PacketConn, bool, error) { //nolint:cyclop
 	l.connLock.Lock()
 	defer l.connLock.Unlock()
 	// If we have a custom resolver, use it.
@@ -257,6 +260,7 @@ func (l *listener) getConn(raddr net.Addr, buf []byte) (*PacketConn, bool, error
 			return nil, false, ErrListenQueueExceeded
 		}
 	}
+
 	return conn, true, nil
 }
 
@@ -292,19 +296,19 @@ func (l *listener) newPacketConn(raddr net.Addr) *PacketConn {
 
 // ReadFrom reads a single packet payload and its associated remote address from
 // the underlying buffer.
-func (c *PacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
-	return c.buffer.ReadFrom(p)
+func (c *PacketConn) ReadFrom(buff []byte) (int, net.Addr, error) {
+	return c.buffer.ReadFrom(buff)
 }
 
-// WriteTo writes len(p) bytes from p to the specified address.
-func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+// WriteTo writes len(payload) bytes from payload to the specified address.
+func (c *PacketConn) WriteTo(payload []byte, addr net.Addr) (n int, err error) {
 	// If we have a connection identifier, check to see if the outgoing packet
 	// sets it.
 	if c.listener.connIdentifier != nil {
 		id := c.id.Load()
 		// Only update establish identifier if we haven't already done so.
 		if id == nil {
-			candidate, ok := c.listener.connIdentifier(p)
+			candidate, ok := c.listener.connIdentifier(payload)
 			// If we have an identifier, add entry to connection map.
 			if ok {
 				c.listener.connLock.Lock()
@@ -340,10 +344,11 @@ func (c *PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 		return 0, context.DeadlineExceeded
 	default:
 	}
-	return c.listener.pConn.WriteTo(p, addr)
+
+	return c.listener.pConn.WriteTo(payload, addr)
 }
 
-// Close closes the conn and releases any Read calls
+// Close closes the conn and releases any Read calls.
 func (c *PacketConn) Close() error {
 	var err error
 	c.doneOnce.Do(func() {
@@ -390,6 +395,7 @@ func (c *PacketConn) LocalAddr() net.Addr {
 // SetDeadline implements net.PacketConn.SetDeadline.
 func (c *PacketConn) SetDeadline(t time.Time) error {
 	c.writeDeadline.Set(t)
+
 	return c.SetReadDeadline(t)
 }
 

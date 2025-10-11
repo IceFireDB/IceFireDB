@@ -27,12 +27,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sync"
 
+	"github.com/gammazero/deque"
+	dag "github.com/ipfs/boxo/ipld/merkledag"
 	format "github.com/ipfs/boxo/ipld/unixfs"
 	"github.com/ipfs/boxo/ipld/unixfs/internal"
-
-	dag "github.com/ipfs/boxo/ipld/merkledag"
 	bitfield "github.com/ipfs/go-bitfield"
 	cid "github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
@@ -563,7 +564,7 @@ func parallelShardWalk(ctx context.Context, root *Shard, dserv ipld.DAGService, 
 	}
 
 	send := feed
-	var todoQueue []*listCidsAndShards
+	var todoQueue deque.Deque[*listCidsAndShards]
 	var inProgress int
 
 	next := &listCidsAndShards{
@@ -575,9 +576,8 @@ dispatcherLoop:
 		select {
 		case send <- next:
 			inProgress++
-			if len(todoQueue) > 0 {
-				next = todoQueue[0]
-				todoQueue = todoQueue[1:]
+			if todoQueue.Len() > 0 {
+				next = todoQueue.PopFront()
 			} else {
 				next = nil
 				send = nil
@@ -592,7 +592,7 @@ dispatcherLoop:
 				next = nextNodes
 				send = feed
 			} else {
-				todoQueue = append(todoQueue, nextNodes)
+				todoQueue.PushBack(nextNodes)
 			}
 		case <-errGrpCtx.Done():
 			break dispatcherLoop
@@ -780,7 +780,7 @@ const maximumHamtWidth = 1 << 10 // FIXME: Spec this and decide of a correct val
 
 func newChilder(ds ipld.DAGService, size int) (*childer, error) {
 	if size > maximumHamtWidth {
-		return nil, fmt.Errorf("hamt witdh (%d) exceed maximum allowed (%d)", size, maximumHamtWidth)
+		return nil, fmt.Errorf("hamt width (%d) exceed maximum allowed (%d)", size, maximumHamtWidth)
 	}
 	bf, err := bitfield.NewBitfield(size)
 	if err != nil {
@@ -797,8 +797,7 @@ func (s *childer) makeChilder(data []byte, links []*ipld.Link) *childer {
 	s.children = make([]*Shard, len(links))
 	s.bitfield.SetBytes(data)
 	if len(links) > 0 {
-		s.links = make([]*ipld.Link, len(links))
-		copy(s.links, links)
+		s.links = slices.Clone(links)
 	}
 
 	return s
@@ -830,10 +829,12 @@ func (s *childer) insert(key string, lnk *ipld.Link, idx int) error {
 		return err
 	}
 
-	s.children = append(s.children[:i], append([]*Shard{sd}, s.children[i:]...)...)
-	s.links = append(s.links[:i], append([]*ipld.Link{nil}, s.links[i:]...)...)
+	s.children = slices.Insert(s.children, i, sd)
+
 	// Add a `nil` placeholder in `links` so the rest of the entries keep the same
 	// index as `children`.
+	s.links = slices.Insert(s.links, i, nil)
+
 	s.bitfield.SetBit(idx)
 
 	return nil
@@ -856,11 +857,8 @@ func (s *childer) rm(childIndex int) error {
 		return err
 	}
 
-	copy(s.children[i:], s.children[i+1:])
-	s.children = s.children[:len(s.children)-1]
-
-	copy(s.links[i:], s.links[i+1:])
-	s.links = s.links[:len(s.links)-1]
+	s.children = slices.Delete(s.children, i, i+1)
+	s.links = slices.Delete(s.links, i, i+1)
 
 	s.bitfield.UnsetBit(childIndex)
 

@@ -2,7 +2,7 @@ package query
 
 import (
 	"bytes"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -70,8 +70,8 @@ func (OrderByKeyDescending) String() string {
 
 // Less returns true if a comes before b with the requested orderings.
 func Less(orders []Order, a, b Entry) bool {
-	for _, cmp := range orders {
-		switch cmp.Compare(a, b) {
+	for _, order := range orders {
+		switch order.Compare(a, b) {
 		case 0:
 		case -1:
 			return true
@@ -86,9 +86,23 @@ func Less(orders []Order, a, b Entry) bool {
 	return a.Key < b.Key
 }
 
+// Compare compares two Entry values according to the given orders. Returns -1
+// if Entry a comes before b with the requested ordering, 1 if a comes after b,
+// and 0 if a and b are the same.
+func Compare(orders []Order, a, b Entry) int {
+	for _, order := range orders {
+		n := order.Compare(a, b)
+		if n != 0 {
+			return n
+		}
+	}
+	// Gives stable sort.
+	return strings.Compare(a.Key, b.Key)
+}
+
 // Sort sorts the given entries using the given orders.
 func Sort(orders []Order, entries []Entry) {
-	sort.Slice(entries, func(i int, j int) bool {
-		return Less(orders, entries[i], entries[j])
+	slices.SortFunc(entries, func(a, b Entry) int {
+		return Compare(orders, a, b)
 	})
 }

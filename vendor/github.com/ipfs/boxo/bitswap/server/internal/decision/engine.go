@@ -25,7 +25,6 @@ import (
 	"github.com/ipfs/go-peertaskqueue"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	"github.com/ipfs/go-peertaskqueue/peertracker"
-	process "github.com/jbenet/goprocess"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mh "github.com/multiformats/go-multihash"
 )
@@ -121,44 +120,6 @@ type ScoreLedger interface {
 	Stop()
 }
 
-type PeerEntry struct {
-	Peer     peer.ID
-	Priority int32
-	WantType pb.Message_Wantlist_WantType
-}
-
-// PeerLedger is an external ledger dealing with peers and their want lists.
-type PeerLedger interface {
-	// Wants informs the ledger that [peer.ID] wants [wl.Entry].
-	// If peer ledger exceed internal limit, then the entry is not added
-	// and false is returned.
-	Wants(p peer.ID, e wl.Entry) bool
-
-	// CancelWant returns true if the [cid.Cid] was removed from the wantlist of [peer.ID].
-	CancelWant(p peer.ID, k cid.Cid) bool
-
-	// CancelWantWithType will not cancel WantBlock if we sent a HAVE message.
-	CancelWantWithType(p peer.ID, k cid.Cid, typ pb.Message_Wantlist_WantType)
-
-	// Peers returns all peers that want [cid.Cid].
-	Peers(k cid.Cid) []PeerEntry
-
-	// CollectPeerIDs returns all peers that the ledger has an active session with.
-	CollectPeerIDs() []peer.ID
-
-	// WantlistSizeForPeer returns the size of the wantlist for [peer.ID].
-	WantlistSizeForPeer(p peer.ID) int
-
-	// WantlistForPeer returns the wantlist for [peer.ID].
-	WantlistForPeer(p peer.ID) []wl.Entry
-
-	// ClearPeerWantlist clears the wantlist for [peer.ID].
-	ClearPeerWantlist(p peer.ID)
-
-	// PeerDisconnected informs the ledger that [peer.ID] is no longer connected.
-	PeerDisconnected(p peer.ID)
-}
-
 // Engine manages sending requested blocks to peers.
 type Engine struct {
 	// peerRequestQueue is a priority queue of requests received from peers.
@@ -186,7 +147,7 @@ type Engine struct {
 	lock sync.RWMutex // protects the fields immediately below
 
 	// peerLedger saves which peers are waiting for a Cid
-	peerLedger PeerLedger
+	peerLedger *peerLedger
 
 	// an external ledger dealing with peer scores
 	scoreLedger ScoreLedger
@@ -195,6 +156,9 @@ type Engine struct {
 
 	taskWorkerLock  sync.Mutex
 	taskWorkerCount int
+	waitWorkers     sync.WaitGroup
+	cancel          context.CancelFunc
+	closeOnce       sync.Once
 
 	targetMessageSize int
 
@@ -246,7 +210,7 @@ type TaskInfo struct {
 type TaskComparator func(ta, tb *TaskInfo) bool
 
 // PeerBlockRequestFilter is used to accept / deny requests for a CID coming from a PeerID
-// It should return true if the request should be fullfilled.
+// It should return true if the request should be fulfilled.
 type PeerBlockRequestFilter func(p peer.ID, c cid.Cid) bool
 
 type Option func(*Engine)
@@ -272,13 +236,6 @@ func WithTargetMessageSize(size int) Option {
 func WithScoreLedger(scoreledger ScoreLedger) Option {
 	return func(e *Engine) {
 		e.scoreLedger = scoreledger
-	}
-}
-
-// WithPeerLedger sets a custom [PeerLedger] to be used with this [Engine].
-func WithPeerLedger(peerLedger PeerLedger) Option {
-	return func(e *Engine) {
-		e.peerLedger = peerLedger
 	}
 }
 
@@ -325,8 +282,11 @@ func WithMaxQueuedWantlistEntriesPerPeer(count uint) Option {
 	}
 }
 
-// WithMaxQueuedWantlistEntriesPerPeer limits how much individual entries each peer is allowed to send.
-// If a peer send us more than this we will truncate newest entries.
+// WithMaxCidSize limits the size of incoming CIDs that we are willing to accept.
+// We will ignore requests for CIDs whose total encoded size exceeds this limit.
+// This protects against malicious peers sending CIDs with pathologically large
+// varint encodings that could exhaust memory.
+// It defaults to [defaults.MaximumAllowedCid]
 func WithMaxCidSize(n uint) Option {
 	return func(e *Engine) {
 		e.maxCidSize = n
@@ -382,6 +342,8 @@ func NewEngine(
 	self peer.ID,
 	opts ...Option,
 ) *Engine {
+	ctx, cancel := context.WithCancel(ctx)
+
 	e := &Engine{
 		scoreLedger:                     NewDefaultScoreLedger(),
 		bstoreWorkerCount:               defaults.BitswapEngineBlockstoreWorkerCount,
@@ -401,16 +363,14 @@ func NewEngine(
 		tagUseful:                       fmt.Sprintf(tagFormat, "useful", uuid.New().String()),
 		maxQueuedWantlistEntriesPerPeer: defaults.MaxQueuedWantlistEntiresPerPeer,
 		maxCidSize:                      defaults.MaximumAllowedCid,
+		cancel:                          cancel,
 	}
 
 	for _, opt := range opts {
 		opt(e)
 	}
 
-	// If peerLedger was not set by option, then create a default instance.
-	if e.peerLedger == nil {
-		e.peerLedger = NewDefaultPeerLedger(e.maxQueuedWantlistEntriesPerPeer)
-	}
+	e.peerLedger = newPeerLedger(e.maxQueuedWantlistEntriesPerPeer)
 
 	e.bsm = newBlockstoreManager(bs, e.bstoreWorkerCount, bmetrics.PendingBlocksGauge(ctx), bmetrics.ActiveBlocksGauge(ctx))
 
@@ -437,6 +397,8 @@ func NewEngine(
 		log.Infow("Replace WantHave with WantBlock is enabled", "maxSize", e.wantHaveReplaceSize)
 	}
 
+	e.startWorkers(ctx)
+
 	return e
 }
 
@@ -462,7 +424,7 @@ func (e *Engine) SetSendDontHaves(send bool) {
 // Starts the score ledger. Before start the function checks and,
 // if it is unset, initializes the scoreLedger with the default
 // implementation.
-func (e *Engine) startScoreLedger(px process.Process) {
+func (e *Engine) startScoreLedger() {
 	e.scoreLedger.Start(func(p peer.ID, score int) {
 		if score == 0 {
 			e.peerTagger.UntagPeer(p, e.tagUseful)
@@ -470,33 +432,32 @@ func (e *Engine) startScoreLedger(px process.Process) {
 			e.peerTagger.TagPeer(p, e.tagUseful, score)
 		}
 	})
-	px.Go(func(ppx process.Process) {
-		<-ppx.Closing()
-		e.scoreLedger.Stop()
-	})
 }
 
-func (e *Engine) startBlockstoreManager(px process.Process) {
+// startWorkers starts workers to handle requests from other nodes for the data
+// on this node.
+func (e *Engine) startWorkers(ctx context.Context) {
 	e.bsm.start()
-	px.Go(func(ppx process.Process) {
-		<-ppx.Closing()
-		e.bsm.stop()
-	})
-}
-
-// Start up workers to handle requests from other nodes for the data on this node
-func (e *Engine) StartWorkers(ctx context.Context, px process.Process) {
-	e.startBlockstoreManager(px)
-	e.startScoreLedger(px)
+	e.startScoreLedger()
 
 	e.taskWorkerLock.Lock()
 	defer e.taskWorkerLock.Unlock()
 
+	e.waitWorkers.Add(e.taskWorkerCount)
 	for i := 0; i < e.taskWorkerCount; i++ {
-		px.Go(func(_ process.Process) {
-			e.taskWorker(ctx)
-		})
+		go e.taskWorker(ctx)
 	}
+}
+
+// Close shuts down the decision engine and returns after all workers have
+// finished. Safe to call multiple times/concurrently.
+func (e *Engine) Close() {
+	e.closeOnce.Do(func() {
+		e.cancel()
+		e.bsm.stop()
+		e.scoreLedger.Stop()
+	})
+	e.waitWorkers.Wait()
 }
 
 func (e *Engine) onPeerAdded(p peer.ID) {
@@ -524,6 +485,7 @@ func (e *Engine) LedgerForPeer(p peer.ID) *Receipt {
 // and adds them to an envelope that is passed off to the bitswap workers,
 // which send the message to the network.
 func (e *Engine) taskWorker(ctx context.Context) {
+	defer e.waitWorkers.Done()
 	defer e.taskWorkerExit()
 	for {
 		oneTimeUse := make(chan *Envelope, 1) // buffer to prevent blocking
@@ -664,6 +626,12 @@ func (e *Engine) Peers() []peer.ID {
 	return e.peerLedger.CollectPeerIDs()
 }
 
+func (e *Engine) HasPeer(p peer.ID) bool {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.peerLedger.HasPeer(p)
+}
+
 // MessageReceived is called when a message is received from a remote peer.
 // For each item in the wantlist, add a want-have or want-block entry to the
 // request queue (this is later popped off by the workerTasks). Returns true
@@ -676,7 +644,7 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 
 	wants, cancels, denials, err := e.splitWantsCancelsDenials(p, m)
 	if err != nil {
-		// This is a truely broken client, let's kill the connection.
+		// This is a truly broken client, let's kill the connection.
 		log.Warnw(err.Error(), "local", e.self, "remote", p)
 		return true
 	}
@@ -815,22 +783,15 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 }
 
 func (e *Engine) filterOverflow(p peer.ID, wants, overflow []bsmsg.Entry) ([]bsmsg.Entry, []bsmsg.Entry) {
-	if len(wants) == 0 {
-		return wants, overflow
-	}
-
-	filteredWants := wants[:0] // shift inplace
-	for _, entry := range wants {
-		if !e.peerLedger.Wants(p, entry.Entry) {
-			// Cannot add entry because it would exceed size limit.
-			overflow = append(overflow, entry)
-			continue
+	wants = slices.DeleteFunc(wants, func(entry bsmsg.Entry) bool {
+		if e.peerLedger.Wants(p, entry.Entry) {
+			return false
 		}
-		filteredWants = append(filteredWants, entry)
-	}
-	// Clear truncated entries - early GC.
-	clear(wants[len(filteredWants):])
-	return filteredWants, overflow
+		// Cannot add entry because it would exceed size limit.
+		overflow = append(overflow, entry)
+		return true
+	})
+	return wants, overflow
 }
 
 // handleOverflow processes incoming wants that could not be addded to the peer
@@ -909,7 +870,7 @@ func (e *Engine) handleOverflow(ctx context.Context, p peer.ID, overflow, wants 
 	return wants
 }
 
-// Split the want-havek entries from the cancel and deny entries.
+// Split the want, cancel, and deny entries.
 func (e *Engine) splitWantsCancelsDenials(p peer.ID, m bsmsg.BitSwapMessage) ([]bsmsg.Entry, []bsmsg.Entry, []bsmsg.Entry, error) {
 	entries := m.Wantlist() // creates copy; safe to modify
 	if len(entries) == 0 {

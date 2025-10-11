@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
@@ -141,6 +142,25 @@ func (br *BlockReader) Next() (blocks.Block, error) {
 	return blocks.NewBlockWithCid(data, c)
 }
 
+// NextReader returns a CID, io.Reader and length of what should be the next block
+// the CID itself is not verified, and the reader is limited to the size of the block
+// The user of this function HAS TO consume all of the bytes in the returned reader before using any other function
+// on the BlockReader.
+// The returned length might be larger than MaxAllowedSectionSize, it is up to the user to check before loading the data into memory.
+func (br *BlockReader) NextReader() (cid.Cid, io.Reader, uint64, error) {
+	// we pass Math.MaxInt64 as io.LimitReader doesn't support uint64
+	// and we want unlimited size, as it is for the user of the function to read blocks of data without OOMing
+	c, length, err := util.ReadNodeHeader(br.r, br.opts.ZeroLengthSectionAsEOF, math.MaxInt64)
+	if err != nil {
+		return cid.Undef, nil, 0, err
+	}
+	limitReader := io.LimitReader(br.r, int64(length))
+
+	ss := uint64(c.ByteLen()) + length
+	br.offset += uint64(varint.UvarintSize(ss)) + ss
+	return c, limitReader, length, nil
+}
+
 // BlockMetadata contains metadata about a block's section in a CAR file/stream.
 //
 // There are two offsets for the block section which will be the same if the
@@ -171,26 +191,14 @@ type BlockMetadata struct {
 // If the underlying reader used by the BlockReader is actually a ReadSeeker, this method will attempt to
 // seek over the underlying data rather than reading it into memory.
 func (br *BlockReader) SkipNext() (*BlockMetadata, error) {
-	sectionSize, err := util.LdReadSize(br.r, br.opts.ZeroLengthSectionAsEOF, br.opts.MaxAllowedSectionSize)
+	c, blockSize, err := util.ReadNodeHeader(br.r, br.opts.ZeroLengthSectionAsEOF, br.opts.MaxAllowedSectionSize)
 	if err != nil {
 		return nil, err
 	}
-	if sectionSize == 0 {
-		_, _, err := cid.CidFromBytes([]byte{}) // generate zero-byte CID error
-		if err == nil {
-			panic("expected zero-byte CID error")
-		}
-		return nil, err
-	}
-
+	cidSize := uint64(c.ByteLen())
+	sectionSize := blockSize + cidSize
 	lenSize := uint64(varint.UvarintSize(sectionSize))
 
-	cidSize, c, err := cid.CidFromReader(io.LimitReader(br.r, int64(sectionSize)))
-	if err != nil {
-		return nil, err
-	}
-
-	blockSize := sectionSize - uint64(cidSize)
 	blockOffset := br.offset
 
 	// move our reader forward; either by seeking or slurping

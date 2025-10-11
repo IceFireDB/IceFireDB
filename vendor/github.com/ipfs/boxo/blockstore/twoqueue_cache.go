@@ -355,10 +355,6 @@ func (b *tqcache) PutMany(ctx context.Context, bs []blocks.Block) error {
 	return nil
 }
 
-func (b *tqcache) HashOnRead(enabled bool) {
-	b.blockstore.HashOnRead(enabled)
-}
-
 func (b *tqcache) cacheHave(key string, have bool) {
 	b.cache.Add(key, cacheHave(have))
 }

@@ -10,11 +10,11 @@ import (
 	"mime"
 	"net/http"
 	gourl "net/url"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/benbjohnson/clock"
+	"github.com/filecoin-project/go-clock"
 	ipns "github.com/ipfs/boxo/ipns"
 	"github.com/ipfs/boxo/routing/http/contentrouter"
 	"github.com/ipfs/boxo/routing/http/filters"
@@ -27,6 +27,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -36,6 +37,27 @@ var (
 
 	DefaultProtocolFilter = []string{"unknown", "transport-bitswap"} // IPIP-484
 )
+
+// normalizeBaseURL removes duplicate /routing/v1 paths from the base URL
+// to prevent URLs like /routing/v1/routing/v1/providers when baseURL ends with /routing/v1
+func normalizeBaseURL(baseURL string) (string, error) {
+	// Remove trailing slashes first
+	baseURL = strings.TrimRight(baseURL, "/")
+
+	// Remove /routing/v1 suffix if present
+	baseURL = strings.TrimSuffix(baseURL, "/routing/v1")
+
+	// After deduplication, check if there's any path remaining
+	u, err := gourl.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+	if u.Path != "" && u.Path != "/" {
+		return "", errors.New("only /routing/v1 URLs are supported")
+	}
+
+	return baseURL, nil
+}
 
 const (
 	mediaTypeJSON       = "application/json"
@@ -55,6 +77,7 @@ type Client struct {
 
 	// Called immediately after signing a provide request. It is used
 	// for testing, e.g., testing the server with a mangled signature.
+	//nolint:staticcheck
 	//lint:ignore SA1019 // ignore staticcheck
 	afterSignCallback func(req *types.WriteBitswapRecord)
 
@@ -107,7 +130,7 @@ func WithDisabledLocalFiltering(val bool) Option {
 // The protocols are ordered alphabetically for cache key (url) consistency
 func WithProtocolFilter(protocolFilter []string) Option {
 	return func(c *Client) error {
-		sort.Strings(protocolFilter)
+		slices.Sort(protocolFilter)
 		c.protocolFilter = protocolFilter
 		return nil
 	}
@@ -118,7 +141,7 @@ func WithProtocolFilter(protocolFilter []string) Option {
 // The addresses are ordered alphabetically for cache key (url) consistency
 func WithAddrFilter(addrFilter []string) Option {
 	return func(c *Client) error {
-		sort.Strings(addrFilter)
+		slices.Sort(addrFilter)
 		c.addrFilter = addrFilter
 		return nil
 	}
@@ -176,8 +199,13 @@ func WithStreamResultsRequired() Option {
 // New creates a content routing API client.
 // The Provider and identity parameters are option. If they are nil, the [client.ProvideBitswap] method will not function.
 func New(baseURL string, opts ...Option) (*Client, error) {
+	normalizedURL, err := normalizeBaseURL(baseURL)
+	if err != nil {
+		return nil, err
+	}
+
 	client := &Client{
-		baseURL:        baseURL,
+		baseURL:        normalizedURL,
 		httpClient:     newDefaultHTTPClient(defaultUserAgent),
 		clock:          clock.New(),
 		accepts:        strings.Join([]string{mediaTypeNDJSON, mediaTypeJSON}, ","),
@@ -207,8 +235,11 @@ type measuringIter[T any] struct {
 }
 
 func (c *measuringIter[T]) Next() bool {
-	c.m.length++
-	return c.Iter.Next()
+	hasNext := c.Iter.Next()
+	if hasNext {
+		c.m.length++
+	}
+	return hasNext
 }
 
 func (c *measuringIter[T]) Val() T {
@@ -252,7 +283,10 @@ func (c *Client) FindProviders(ctx context.Context, key cid.Cid) (providers iter
 	}
 
 	m.statusCode = resp.StatusCode
+	// Per IPIP-0513: Handle 404 as empty results for backward compatibility
+	// New servers return 200 with empty results, old servers return 404
 	if resp.StatusCode == http.StatusNotFound {
+		io.Copy(io.Discard, resp.Body) // Drain body for connection reuse
 		resp.Body.Close()
 		m.record(ctx)
 		return iter.FromSlice[iter.Result[types.Record]](nil), nil
@@ -353,8 +387,10 @@ func (c *Client) ProvideBitswap(ctx context.Context, keys []cid.Cid, ttl time.Du
 
 // ProvideAsync makes a provide request to a delegated router
 //
+//nolint:staticcheck
 //lint:ignore SA1019 // ignore staticcheck
 func (c *Client) provideSignedBitswapRecord(ctx context.Context, bswp *types.WriteBitswapRecord) (time.Duration, error) {
+	//nolint:staticcheck
 	//lint:ignore SA1019 // ignore staticcheck
 	req := jsontypes.WriteProvidersRequest{Providers: []types.Record{bswp}}
 
@@ -433,7 +469,10 @@ func (c *Client) FindPeers(ctx context.Context, pid peer.ID) (peers iter.ResultI
 	}
 
 	m.statusCode = resp.StatusCode
+	// Per IPIP-0513: Handle 404 as empty results for backward compatibility
+	// New servers return 200 with empty results, old servers return 404
 	if resp.StatusCode == http.StatusNotFound {
+		io.Copy(io.Discard, resp.Body) // Drain body for connection reuse
 		resp.Body.Close()
 		m.record(ctx)
 		return iter.FromSlice[iter.Result[*types.PeerRecord]](nil), nil
@@ -489,7 +528,20 @@ func (c *Client) FindPeers(ctx context.Context, pid peer.ID) (peers iter.ResultI
 // GetIPNS tries to retrieve the [ipns.Record] for the given [ipns.Name]. The record is
 // validated against the given name. If validation fails, an error is returned, but no
 // record.
-func (c *Client) GetIPNS(ctx context.Context, name ipns.Name) (*ipns.Record, error) {
+func (c *Client) GetIPNS(ctx context.Context, name ipns.Name) (record *ipns.Record, err error) {
+	m := newMeasurement("GetIPNS")
+	start := time.Now()
+	defer func() {
+		m.latency = time.Since(start)
+		m.err = err
+		if record != nil {
+			m.length = 1
+		} else {
+			m.length = 0
+		}
+		m.record(ctx)
+	}()
+
 	url := c.baseURL + "/routing/v1/ipns/" + name.String()
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -498,14 +550,33 @@ func (c *Client) GetIPNS(ctx context.Context, name ipns.Name) (*ipns.Record, err
 	}
 	httpReq.Header.Set("Accept", mediaTypeIPNSRecord)
 
+	m.host = httpReq.Host
+
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("making HTTP req to get IPNS record: %w", err)
 	}
 	defer resp.Body.Close()
 
+	m.statusCode = resp.StatusCode
+
+	// Per IPIP-0513: Handle 404 as "no record found" for backward compatibility
+	// New servers return 200 with text/plain for no record, old servers return 404
+	if resp.StatusCode == http.StatusNotFound {
+		io.Copy(io.Discard, resp.Body) // Drain body for connection reuse
+		return nil, routing.ErrNotFound
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, httpError(resp.StatusCode, resp.Body)
+	}
+
+	// Per IPIP-0513: Only Content-Type: application/vnd.ipfs.ipns-record indicates a valid record
+	// Any other content type (e.g., text/plain) means no record found
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, mediaTypeIPNSRecord) {
+		io.Copy(io.Discard, resp.Body) // Drain body for connection reuse
+		return nil, routing.ErrNotFound
 	}
 
 	// Limit the reader to the maximum record size.
@@ -514,7 +585,7 @@ func (c *Client) GetIPNS(ctx context.Context, name ipns.Name) (*ipns.Record, err
 		return nil, fmt.Errorf("making HTTP req to get IPNS record: %w", err)
 	}
 
-	record, err := ipns.UnmarshalRecord(rawRecord)
+	record, err = ipns.UnmarshalRecord(rawRecord)
 	if err != nil {
 		return nil, fmt.Errorf("IPNS record from remote endpoint is not valid: %w", err)
 	}
@@ -528,7 +599,16 @@ func (c *Client) GetIPNS(ctx context.Context, name ipns.Name) (*ipns.Record, err
 }
 
 // PutIPNS attempts at putting the given [ipns.Record] for the given [ipns.Name].
-func (c *Client) PutIPNS(ctx context.Context, name ipns.Name, record *ipns.Record) error {
+func (c *Client) PutIPNS(ctx context.Context, name ipns.Name, record *ipns.Record) (err error) {
+	m := newMeasurement("PutIPNS")
+	start := time.Now()
+	defer func() {
+		m.latency = time.Since(start)
+		m.err = err
+		// Don't set m.length for PutIPNS - not meaningful
+		m.record(ctx)
+	}()
+
 	url := c.baseURL + "/routing/v1/ipns/" + name.String()
 
 	rawRecord, err := ipns.MarshalRecord(record)
@@ -542,11 +622,15 @@ func (c *Client) PutIPNS(ctx context.Context, name ipns.Name, record *ipns.Recor
 	}
 	httpReq.Header.Set("Content-Type", mediaTypeIPNSRecord)
 
+	m.host = httpReq.Host
+
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("making HTTP req to get IPNS record: %w", err)
 	}
 	defer resp.Body.Close()
+
+	m.statusCode = resp.StatusCode
 
 	if resp.StatusCode != http.StatusOK {
 		return httpError(resp.StatusCode, resp.Body)

@@ -23,6 +23,7 @@ func (pds *peerDistanceSorter) Len() int { return len(pds.peers) }
 func (pds *peerDistanceSorter) Swap(a, b int) {
 	pds.peers[a], pds.peers[b] = pds.peers[b], pds.peers[a]
 }
+
 func (pds *peerDistanceSorter) Less(a, b int) bool {
 	return pds.peers[a].distance.less(pds.peers[b].distance)
 }
@@ -31,7 +32,7 @@ func (pds *peerDistanceSorter) Less(a, b int) bool {
 func (pds *peerDistanceSorter) appendPeer(p peer.ID, pDhtId ID) {
 	pds.peers = append(pds.peers, peerDistance{
 		p:        p,
-		distance: xor(pds.target, pDhtId),
+		distance: Xor(pds.target, pDhtId),
 	})
 }
 

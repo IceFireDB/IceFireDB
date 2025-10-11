@@ -21,6 +21,9 @@ func WriteTupleEncodersToFile(fname, pkg string, types ...interface{}) error {
 // The MarshalCBOR and UnmarshalCBOR implementations will marshal/unmarshal each type's fields as a
 // fixed-length CBOR array of field values.
 func (g Gen) WriteTupleEncodersToFile(fname, pkg string, types ...interface{}) error {
+	if g.SortTypeNames {
+		types = sortTypeNames(types)
+	}
 	buf := new(bytes.Buffer)
 
 	typeInfos := make([]*GenTypeInfo, len(types))
@@ -74,6 +77,9 @@ func WriteMapEncodersToFile(fname, pkg string, types ...interface{}) error {
 // The MarshalCBOR and UnmarshalCBOR implementations will marshal/unmarshal each type's fields as a
 // map of field names to field values.
 func (g Gen) WriteMapEncodersToFile(fname, pkg string, types ...interface{}) error {
+	if g.SortTypeNames {
+		types = sortTypeNames(types)
+	}
 	buf := new(bytes.Buffer)
 
 	typeInfos := make([]*GenTypeInfo, len(types))
@@ -89,9 +95,9 @@ func (g Gen) WriteMapEncodersToFile(fname, pkg string, types ...interface{}) err
 		return xerrors.Errorf("failed to write header: %w", err)
 	}
 
-	for _, t := range typeInfos {
+	for i, t := range typeInfos {
 		if err := g.GenMapEncodersForType(t, buf); err != nil {
-			return xerrors.Errorf("failed to generate encoders: %w", err)
+			return xerrors.Errorf("%T (%s) failed to generate encoders: %w", types[i], t.Name, err)
 		}
 	}
 

@@ -1,24 +1,33 @@
+// Package provider provides interfaces and tooling for (Re)providers.
+//
+// This includes methods to provide streams of CIDs (i.e. from pinned
+// merkledags, from blockstores, from single dags etc.). These methods can be
+// used for other purposes, but are usually fed to the Reprovider to announce
+// CIDs.
 package provider
 
 import (
 	"context"
 
-	blocks "github.com/ipfs/boxo/blockstore"
-	"github.com/ipfs/boxo/fetcher"
-	fetcherhelpers "github.com/ipfs/boxo/fetcher/helpers"
-	pin "github.com/ipfs/boxo/pinning/pinner"
+	"github.com/gammazero/chanqueue"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-cidutil"
-	logging "github.com/ipfs/go-log/v2"
-	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	mh "github.com/multiformats/go-multihash"
 )
-
-var logR = logging.Logger("reprovider.simple")
 
 // Provider announces blocks to the network
 type Provider interface {
 	// Provide takes a cid and makes an attempt to announce it to the network
-	Provide(cid.Cid) error
+	Provide(context.Context, cid.Cid, bool) error
+}
+
+// MultihashProvider is the interface implementing StartProviding.
+type MultihashProvider interface {
+	// StartProviding announces blocks to the network, batching multiple keys for efficiency.
+	// The force parameter, when true, forces re-providing even if the keys were recently provided.
+	// When false, the implementation may skip keys that were recently announced based on internal
+	// rate limiting or caching strategies.
+	StartProviding(force bool, keys ...mh.Multihash) error
 }
 
 // Reprovider reannounces blocks to the network
@@ -30,8 +39,12 @@ type Reprovider interface {
 // System defines the interface for interacting with the value
 // provider system
 type System interface {
+	// Clear removes all entries from the provide queue. Returns the number of
+	// CIDs removed from the queue.
+	Clear() int
 	Close() error
 	Stat() (ReproviderStats, error)
+	SetKeyProvider(kp KeyChanFunc)
 	Provider
 	Reprovider
 }
@@ -39,94 +52,24 @@ type System interface {
 // KeyChanFunc is function streaming CIDs to pass to content routing
 type KeyChanFunc func(context.Context) (<-chan cid.Cid, error)
 
-// NewBlockstoreProvider returns key provider using bstore.AllKeysChan
-func NewBlockstoreProvider(bstore blocks.Blockstore) KeyChanFunc {
+// NewBufferedProvider returns a KeyChanFunc supplying keys from a given
+// KeyChanFunction, but buffering keys in memory if we can read them faster
+// they are consumed.  This allows the underlying KeyChanFunc to finish
+// listing pins as soon as possible releasing any resources, locks, at the
+// expense of memory usage.
+func NewBufferedProvider(pinsF KeyChanFunc) KeyChanFunc {
 	return func(ctx context.Context) (<-chan cid.Cid, error) {
-		return bstore.AllKeysChan(ctx)
-	}
-}
-
-// NewPinnedProvider returns provider supplying pinned keys
-func NewPinnedProvider(onlyRoots bool, pinning pin.Pinner, fetchConfig fetcher.Factory) KeyChanFunc {
-	return func(ctx context.Context) (<-chan cid.Cid, error) {
-		set, err := pinSet(ctx, pinning, fetchConfig, onlyRoots)
+		pins, err := pinsF(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		outCh := make(chan cid.Cid)
-		go func() {
-			defer close(outCh)
-			for c := range set.New {
-				select {
-				case <-ctx.Done():
-					return
-				case outCh <- c:
-				}
-			}
-		}()
-
-		return outCh, nil
+		queue := chanqueue.New(chanqueue.WithInputRdOnly[cid.Cid](pins))
+		return queue.Out(), nil
 	}
 }
 
-func pinSet(ctx context.Context, pinning pin.Pinner, fetchConfig fetcher.Factory, onlyRoots bool) (*cidutil.StreamingSet, error) {
-	set := cidutil.NewStreamingSet()
-	recursivePins := cidutil.NewSet()
-
-	go func() {
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-		defer close(set.New)
-
-		// 1. Recursive keys
-		for sc := range pinning.RecursiveKeys(ctx, false) {
-			if sc.Err != nil {
-				logR.Errorf("reprovide recursive pins: %s", sc.Err)
-				return
-			}
-			if !onlyRoots {
-				// Save some bytes.
-				_ = recursivePins.Visit(sc.Pin.Key)
-			}
-			_ = set.Visitor(ctx)(sc.Pin.Key)
-		}
-
-		// 2. Direct pins
-		for sc := range pinning.DirectKeys(ctx, false) {
-			if sc.Err != nil {
-				logR.Errorf("reprovide direct pins: %s", sc.Err)
-				return
-			}
-			_ = set.Visitor(ctx)(sc.Pin.Key)
-		}
-
-		if onlyRoots {
-			return
-		}
-
-		// 3. Go through recursive pins to fetch remaining blocks if we want more
-		// than just roots.
-		session := fetchConfig.NewSession(ctx)
-		err := recursivePins.ForEach(func(c cid.Cid) error {
-			return fetcherhelpers.BlockAll(ctx, session, cidlink.Link{Cid: c}, func(res fetcher.FetchResult) error {
-				clink, ok := res.LastBlockLink.(cidlink.Link)
-				if ok {
-					_ = set.Visitor(ctx)(clink.Cid)
-				}
-				return nil
-			})
-		})
-		if err != nil {
-			logR.Errorf("reprovide indirect pins: %s", err)
-			return
-		}
-	}()
-
-	return set, nil
-}
-
-func NewPrioritizedProvider(priorityCids KeyChanFunc, otherCids KeyChanFunc) KeyChanFunc {
+func NewPrioritizedProvider(streams ...KeyChanFunc) KeyChanFunc {
 	return func(ctx context.Context) (<-chan cid.Cid, error) {
 		outCh := make(chan cid.Cid)
 
@@ -165,15 +108,12 @@ func NewPrioritizedProvider(priorityCids KeyChanFunc, otherCids KeyChanFunc) Key
 				}
 			}
 
-			err := handleStream(priorityCids, true)
-			if err != nil {
-				log.Warnf("error in prioritized strategy while handling priority CIDs: %w", err)
-				return
-			}
-
-			err = handleStream(otherCids, false)
-			if err != nil {
-				log.Warnf("error in prioritized strategy while handling other CIDs: %w", err)
+			last := len(streams) - 1
+			for i, stream := range streams {
+				if err := handleStream(stream, i < last); err != nil {
+					log.Warnf("error in prioritized strategy while handling CID stream %d: %w", i, err)
+					return
+				}
 			}
 		}()
 

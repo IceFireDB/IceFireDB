@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2014 The btcsuite developers
-// Copyright (c) 2015-2020 The Decred developers
+// Copyright (c) 2015-2024 The Decred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -181,7 +181,7 @@ func NonceRFC6979(privKey []byte, hash []byte, extra []byte, version []byte, ext
 	// with potential additional data as described by section 3.6 of the RFC.
 	hasher := newHMACSHA256(k)
 	hasher.Write(oneInitializer)
-	hasher.Write(singleZero[:])
+	hasher.Write(singleZero)
 	hasher.Write(key)
 	k = hasher.Sum()
 
@@ -200,8 +200,8 @@ func NonceRFC6979(privKey []byte, hash []byte, extra []byte, version []byte, ext
 	// with potential additional data as described by section 3.6 of the RFC.
 	hasher.Reset()
 	hasher.Write(v)
-	hasher.Write(singleOne[:])
-	hasher.Write(key[:])
+	hasher.Write(singleOne)
+	hasher.Write(key)
 	k = hasher.Sum()
 
 	// Step G.
@@ -252,7 +252,7 @@ func NonceRFC6979(privKey []byte, hash []byte, extra []byte, version []byte, ext
 		// K = HMAC_K(V || 0x00)
 		hasher.Reset()
 		hasher.Write(v)
-		hasher.Write(singleZero[:])
+		hasher.Write(singleZero)
 		k = hasher.Sum()
 
 		// V = HMAC_K(V)

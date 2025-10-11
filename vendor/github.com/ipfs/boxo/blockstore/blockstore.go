@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	dshelp "github.com/ipfs/boxo/datastore/dshelp"
+	"github.com/ipfs/boxo/provider"
 	blocks "github.com/ipfs/go-block-format"
 	cid "github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
@@ -16,6 +17,7 @@ import (
 	dsq "github.com/ipfs/go-datastore/query"
 	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/multiformats/go-multihash"
 )
 
 var logger = logging.Logger("blockstore")
@@ -58,10 +60,6 @@ type Blockstore interface {
 	// When underlying blockstore is operating on Multihash and codec information
 	// is not preserved, returned CIDs will use Raw (0x55) codec.
 	AllKeysChan(ctx context.Context) (<-chan cid.Cid, error)
-
-	// HashOnRead specifies if every read block should be
-	// rehashed to make sure it matches its CID.
-	HashOnRead(enabled bool)
 }
 
 // Viewer can be implemented by blockstores that offer zero-copy access to
@@ -83,13 +81,13 @@ type Viewer interface {
 // garbage-collection operations.
 type GCLocker interface {
 	// GCLock locks the blockstore for garbage collection. No operations
-	// that expect to finish with a pin should ocurr simultaneously.
+	// that expect to finish with a pin should occur simultaneously.
 	// Reading during GC is safe, and requires no lock.
 	GCLock(context.Context) Unlocker
 
 	// PinLock locks the blockstore for sequences of puts expected to finish
 	// with a pin (before GC). Multiple put->pin sequences can write through
-	// at the same time, but no GC should happen simulatenously.
+	// at the same time, but no GC should happen simultaneously.
 	// Reading during Pinning is safe, and requires no lock.
 	PinLock(context.Context) Unlocker
 
@@ -122,11 +120,11 @@ type Option struct {
 }
 
 // WriteThrough skips checking if the blockstore already has a block before
-// writing it.
-func WriteThrough() Option {
+// writing it, when enabled.
+func WriteThrough(enabled bool) Option {
 	return Option{
 		func(bs *blockstore) {
-			bs.writeThrough = true
+			bs.writeThrough = enabled
 		},
 	}
 }
@@ -137,6 +135,16 @@ func NoPrefix() Option {
 	return Option{
 		func(bs *blockstore) {
 			bs.noPrefix = true
+		},
+	}
+}
+
+// Provider allows performing a StartProvide operation for every block written.
+func Provider(provider provider.MultihashProvider) Option {
+	return Option{
+		func(bs *blockstore) {
+			logger.Debug("providing-blockstore configured")
+			bs.provider = provider
 		},
 	}
 }
@@ -170,13 +178,9 @@ func NewBlockstoreNoPrefix(d ds.Batching) Blockstore {
 type blockstore struct {
 	datastore ds.Batching
 
-	rehash       atomic.Bool
 	writeThrough bool
 	noPrefix     bool
-}
-
-func (bs *blockstore) HashOnRead(enabled bool) {
-	bs.rehash.Store(enabled)
+	provider     provider.MultihashProvider
 }
 
 func (bs *blockstore) Get(ctx context.Context, k cid.Cid) (blocks.Block, error) {
@@ -191,18 +195,6 @@ func (bs *blockstore) Get(ctx context.Context, k cid.Cid) (blocks.Block, error) 
 	if err != nil {
 		return nil, err
 	}
-	if bs.rehash.Load() {
-		rbcid, err := k.Prefix().Sum(bdata)
-		if err != nil {
-			return nil, err
-		}
-
-		if !rbcid.Equals(k) {
-			return nil, ErrHashMismatch
-		}
-
-		return blocks.NewBlockWithCid(bdata, rbcid)
-	}
 	return blocks.NewBlockWithCid(bdata, k)
 }
 
@@ -216,7 +208,17 @@ func (bs *blockstore) Put(ctx context.Context, block blocks.Block) error {
 			return nil // already stored.
 		}
 	}
-	return bs.datastore.Put(ctx, k, block.RawData())
+	if err := bs.datastore.Put(ctx, k, block.RawData()); err != nil {
+		return err
+	}
+
+	if bs.provider != nil {
+		logger.Debugf("blockstore: provide %s", block.Cid())
+		if err := bs.provider.StartProviding(false, block.Cid().Hash()); err != nil {
+			logger.Warnf("blockstore: error while providing %s: %s", block.Cid(), err)
+		}
+	}
+	return nil
 }
 
 func (bs *blockstore) PutMany(ctx context.Context, blocks []blocks.Block) error {
@@ -244,7 +246,21 @@ func (bs *blockstore) PutMany(ctx context.Context, blocks []blocks.Block) error 
 			return err
 		}
 	}
-	return t.Commit(ctx)
+	if err := t.Commit(ctx); err != nil {
+		return err
+	}
+
+	if bs.provider != nil {
+		var hashes []multihash.Multihash
+		for _, block := range blocks {
+			hashes = append(hashes, block.Cid().Hash())
+		}
+		logger.Debugf("blockstore: provide %d hashes", len(hashes))
+		if err := bs.provider.StartProviding(false, hashes...); err != nil {
+			logger.Warnf("blockstore: error while providing blocks: %s", err)
+		}
+	}
+	return nil
 }
 
 func (bs *blockstore) Has(ctx context.Context, k cid.Cid) (bool, error) {

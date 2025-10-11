@@ -2,24 +2,22 @@ package bitswap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ipfs/boxo/bitswap/client"
-	"github.com/ipfs/boxo/bitswap/internal/defaults"
 	"github.com/ipfs/boxo/bitswap/message"
 	"github.com/ipfs/boxo/bitswap/network"
 	"github.com/ipfs/boxo/bitswap/server"
 	"github.com/ipfs/boxo/bitswap/tracer"
-	"github.com/ipfs/go-metrics-interface"
-
 	blockstore "github.com/ipfs/boxo/blockstore"
 	exchange "github.com/ipfs/boxo/exchange"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipfs/go-metrics-interface"
 	"github.com/libp2p/go-libp2p/core/peer"
-
-	"go.uber.org/multierr"
+	"github.com/libp2p/go-libp2p/core/routing"
 )
 
 var log = logging.Logger("bitswap")
@@ -45,22 +43,23 @@ type bitswap interface {
 }
 
 var (
-	_                  exchange.SessionExchange = (*Bitswap)(nil)
-	_                  bitswap                  = (*Bitswap)(nil)
-	HasBlockBufferSize                          = defaults.HasBlockBufferSize
+	_ exchange.SessionExchange = (*Bitswap)(nil)
+	_ bitswap                  = (*Bitswap)(nil)
 )
 
 type Bitswap struct {
 	*client.Client
 	*server.Server
 
-	tracer tracer.Tracer
-	net    network.BitSwapNetwork
+	tracer        tracer.Tracer
+	net           network.BitSwapNetwork
+	serverEnabled bool
 }
 
-func New(ctx context.Context, net network.BitSwapNetwork, bstore blockstore.Blockstore, options ...Option) *Bitswap {
+func New(ctx context.Context, net network.BitSwapNetwork, providerFinder routing.ContentDiscovery, bstore blockstore.Blockstore, options ...Option) *Bitswap {
 	bs := &Bitswap{
-		net: net,
+		net:           net,
+		serverEnabled: true,
 	}
 
 	var serverOptions []server.Option
@@ -85,24 +84,25 @@ func New(ctx context.Context, net network.BitSwapNetwork, bstore blockstore.Bloc
 		serverOptions = append(serverOptions, server.WithTracer(tracer))
 	}
 
-	if HasBlockBufferSize != defaults.HasBlockBufferSize {
-		serverOptions = append(serverOptions, server.HasBlockBufferSize(HasBlockBufferSize))
-	}
-
 	ctx = metrics.CtxSubScope(ctx, "bitswap")
-
-	bs.Server = server.New(ctx, net, bstore, serverOptions...)
-	bs.Client = client.New(ctx, net, bstore, append(clientOptions, client.WithBlockReceivedNotifier(bs.Server))...)
+	if bs.serverEnabled {
+		bs.Server = server.New(ctx, net, bstore, serverOptions...)
+		clientOptions = append(clientOptions, client.WithBlockReceivedNotifier(bs.Server))
+	}
+	bs.Client = client.New(ctx, net, providerFinder, bstore, clientOptions...)
 	net.Start(bs) // use the polyfill receiver to log received errors and trace messages only once
 
 	return bs
 }
 
 func (bs *Bitswap) NotifyNewBlocks(ctx context.Context, blks ...blocks.Block) error {
-	return multierr.Combine(
-		bs.Client.NotifyNewBlocks(ctx, blks...),
-		bs.Server.NotifyNewBlocks(ctx, blks...),
-	)
+	if bs.Server != nil {
+		return errors.Join(
+			bs.Client.NotifyNewBlocks(ctx, blks...),
+			bs.Server.NotifyNewBlocks(ctx, blks...),
+		)
+	}
+	return bs.Client.NotifyNewBlocks(ctx, blks...)
 }
 
 type Stat struct {
@@ -115,7 +115,6 @@ type Stat struct {
 	MessagesReceived uint64
 	BlocksSent       uint64
 	DataSent         uint64
-	ProvideBufLen    int
 }
 
 func (bs *Bitswap) Stat() (*Stat, error) {
@@ -123,48 +122,63 @@ func (bs *Bitswap) Stat() (*Stat, error) {
 	if err != nil {
 		return nil, err
 	}
-	ss, err := bs.Server.Stat()
-	if err != nil {
-		return nil, err
-	}
 
-	return &Stat{
+	// Initialize stat with client stats
+	stat := &Stat{
 		Wantlist:         cs.Wantlist,
 		BlocksReceived:   cs.BlocksReceived,
 		DataReceived:     cs.DataReceived,
 		DupBlksReceived:  cs.DupBlksReceived,
 		DupDataReceived:  cs.DupDataReceived,
 		MessagesReceived: cs.MessagesReceived,
-		Peers:            ss.Peers,
-		BlocksSent:       ss.BlocksSent,
-		DataSent:         ss.DataSent,
-		ProvideBufLen:    ss.ProvideBufLen,
-	}, nil
+		// Server stats will be added conditionally
+	}
+
+	// Stats only available if server is enabled
+	if bs.Server != nil {
+		ss, err := bs.Server.Stat()
+		if err != nil {
+			return stat, fmt.Errorf("failed to get server stats: %w", err)
+		}
+		stat.Peers = ss.Peers
+		stat.BlocksSent = ss.BlocksSent
+		stat.DataSent = ss.DataSent
+	}
+
+	return stat, nil
 }
 
 func (bs *Bitswap) Close() error {
 	bs.net.Stop()
-	return multierr.Combine(
-		bs.Client.Close(),
-		bs.Server.Close(),
-	)
+	bs.Client.Close()
+	if bs.Server != nil {
+		bs.Server.Close()
+	}
+	return nil
 }
 
 func (bs *Bitswap) WantlistForPeer(p peer.ID) []cid.Cid {
 	if p == bs.net.Self() {
 		return bs.Client.GetWantlist()
 	}
-	return bs.Server.WantlistForPeer(p)
+	if bs.Server != nil {
+		return bs.Server.WantlistForPeer(p)
+	}
+	return nil
 }
 
 func (bs *Bitswap) PeerConnected(p peer.ID) {
 	bs.Client.PeerConnected(p)
-	bs.Server.PeerConnected(p)
+	if bs.Server != nil {
+		bs.Server.PeerConnected(p)
+	}
 }
 
 func (bs *Bitswap) PeerDisconnected(p peer.ID) {
 	bs.Client.PeerDisconnected(p)
-	bs.Server.PeerDisconnected(p)
+	if bs.Server != nil {
+		bs.Server.PeerDisconnected(p)
+	}
 }
 
 func (bs *Bitswap) ReceiveError(err error) {
@@ -179,5 +193,7 @@ func (bs *Bitswap) ReceiveMessage(ctx context.Context, p peer.ID, incoming messa
 	}
 
 	bs.Client.ReceiveMessage(ctx, p, incoming)
-	bs.Server.ReceiveMessage(ctx, p, incoming)
+	if bs.Server != nil {
+		bs.Server.ReceiveMessage(ctx, p, incoming)
+	}
 }

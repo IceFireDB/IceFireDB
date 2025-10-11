@@ -30,7 +30,7 @@ func parseNewConnectionIDFrame(b []byte, _ protocol.Version) (*NewConnectionIDFr
 	}
 	b = b[l:]
 	if ret > seq {
-		//nolint:stylecheck
+		//nolint:staticcheck // SA1021: Retire Prior To is the name of the field
 		return nil, 0, fmt.Errorf("Retire Prior To value (%d) larger than Sequence Number (%d)", ret, seq)
 	}
 	if len(b) == 0 {
@@ -61,7 +61,7 @@ func parseNewConnectionIDFrame(b []byte, _ protocol.Version) (*NewConnectionIDFr
 }
 
 func (f *NewConnectionIDFrame) Append(b []byte, _ protocol.Version) ([]byte, error) {
-	b = append(b, newConnectionIDFrameType)
+	b = append(b, byte(FrameTypeNewConnectionID))
 	b = quicvarint.Append(b, f.SequenceNumber)
 	b = quicvarint.Append(b, f.RetirePriorTo)
 	connIDLen := f.ConnectionID.Len()

@@ -3,6 +3,7 @@ package util
 import (
 	"errors"
 	"io"
+	"math"
 
 	internalio "github.com/ipld/go-car/v2/internal/io"
 
@@ -31,6 +32,32 @@ func ReadNode(r io.Reader, zeroLenAsEOF bool, maxReadBytes uint64) (cid.Cid, []b
 	}
 
 	return c, data[n:], nil
+}
+
+// ReadNodeHeader returns the specified CID of the node and the length of data to be read.
+func ReadNodeHeader(r io.Reader, zeroLenAsEOF bool, maxReadBytes uint64) (cid.Cid, uint64, error) {
+	maxReadBytes = min(maxReadBytes, math.MaxInt64) // io.LimitReader doesn't support uint64
+
+	size, err := LdReadSize(r, zeroLenAsEOF, maxReadBytes)
+	if err != nil {
+		return cid.Cid{}, 0, err
+	}
+
+	if size == 0 {
+		_, _, err := cid.CidFromBytes([]byte{}) // generate zero-byte CID error
+		if err == nil {
+			panic("expected zero-byte CID error")
+		}
+		return cid.Undef, 0, err
+	}
+
+	limitReader := io.LimitReader(r, int64(size)) // safe due to the `min` above
+	n, c, err := cid.CidFromReader(limitReader)
+	if err != nil {
+		return cid.Cid{}, 0, err
+	}
+
+	return c, size - uint64(n), nil
 }
 
 func LdWrite(w io.Writer, d ...[]byte) error {

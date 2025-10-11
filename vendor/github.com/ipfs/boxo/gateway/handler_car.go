@@ -14,10 +14,8 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/ipfs/boxo/path"
 	"github.com/ipfs/go-cid"
-
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/multierr"
 )
 
 const (
@@ -92,7 +90,7 @@ func (i *handler) serveCAR(ctx context.Context, w http.ResponseWriter, r *http.R
 
 	_, copyErr := io.Copy(w, carFile)
 	carErr := carFile.Close()
-	streamErr := multierr.Combine(carErr, copyErr)
+	streamErr := errors.Join(carErr, copyErr)
 	if streamErr != nil {
 		// Update fail metric
 		i.carStreamFailMetric.WithLabelValues(rq.contentPath.Namespace()).Observe(time.Since(rq.begin).Seconds())
@@ -138,8 +136,7 @@ func buildCarParams(r *http.Request, contentTypeParams map[string]string) (CarPa
 		case DagScopeEntity, DagScopeAll, DagScopeBlock:
 			params.Scope = s
 		default:
-			err := fmt.Errorf("unsupported application/vnd.ipld.car dag-scope URL parameter: %q", scopeStr)
-			return CarParams{}, err
+			return CarParams{}, errUnsupportedCarScope
 		}
 	} else {
 		params.Scope = DagScopeAll
@@ -176,7 +173,7 @@ func buildCarParams(r *http.Request, contentTypeParams map[string]string) (CarPa
 		case DagOrderUnknown, DagOrderDFS:
 			params.Order = order
 		default:
-			return CarParams{}, fmt.Errorf("unsupported application/vnd.ipld.car content type order parameter: %q", order)
+			return CarParams{}, errUnsupportedCarOrder
 		}
 	} else {
 		// when order is not specified, we use DFS as the implicit default

@@ -10,25 +10,25 @@ import (
 )
 
 const (
-	// RTO.Initial in msec
+	// RTO.Initial in msec.
 	rtoInitial float64 = 1.0 * 1000
 
-	// RTO.Min in msec
+	// RTO.Min in msec.
 	rtoMin float64 = 1.0 * 1000
 
-	// RTO.Max in msec
+	// RTO.Max in msec.
 	defaultRTOMax float64 = 60.0 * 1000
 
-	// RTO.Alpha
+	// RTO.Alpha.
 	rtoAlpha float64 = 0.125
 
-	// RTO.Beta
+	// RTO.Beta.
 	rtoBeta float64 = 0.25
 
-	// Max.Init.Retransmits:
+	// Max.Init.Retransmits.
 	maxInitRetrans uint = 8
 
-	// Path.Max.Retrans
+	// Path.Max.Retrans.
 	pathMaxRetrans uint = 5
 
 	noMaxRetrans uint = 0
@@ -54,6 +54,7 @@ func newRTOManager(rtoMax float64) *rtoManager {
 	if mgr.rtoMax == 0 {
 		mgr.rtoMax = defaultRTOMax
 	}
+
 	return &mgr
 }
 
@@ -76,6 +77,7 @@ func (m *rtoManager) setNewRTT(rtt float64) float64 {
 		m.srtt = (1-rtoAlpha)*m.srtt + rtoAlpha*rtt
 	}
 	m.rto = math.Min(math.Max(m.srtt+4*m.rttvar, rtoMin), m.rtoMax)
+
 	return m.srtt
 }
 
@@ -101,7 +103,7 @@ func (m *rtoManager) reset() {
 	m.rto = rtoInitial
 }
 
-// set RTO value for testing
+// set RTO value for testing.
 func (m *rtoManager) setRTO(rto float64, noUpdate bool) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -126,7 +128,7 @@ const (
 	rtxTimerClosed
 )
 
-// rtxTimer provides the retnransmission timer conforms with RFC 4960 Sec 6.3.1
+// rtxTimer provides the retnransmission timer conforms with RFC 4960 Sec 6.3.1.
 type rtxTimer struct {
 	timer      *time.Timer
 	observer   rtxTimerObserver
@@ -157,11 +159,13 @@ func newRTXTimer(id int, observer rtxTimerObserver, maxRetrans uint,
 	}
 	timer.timer = time.AfterFunc(math.MaxInt64, timer.timeout)
 	timer.timer.Stop()
+
 	return &timer
 }
 
 func (t *rtxTimer) calculateNextTimeout() time.Duration {
 	timeout := calculateNextTimeout(t.rto, t.nRtos, t.rtoMax)
+
 	return time.Duration(timeout) * time.Millisecond
 }
 
@@ -199,6 +203,7 @@ func (t *rtxTimer) start(rto float64) bool {
 	t.state = rtxTimerStarted
 	t.pending++
 	t.timer.Reset(t.calculateNextTimeout())
+
 	return true
 }
 
@@ -216,7 +221,7 @@ func (t *rtxTimer) stop() {
 }
 
 // closes the timer. this is similar to stop() but subsequent start() call
-// will fail (the timer is no longer usable)
+// will fail (the timer is no longer usable).
 func (t *rtxTimer) close() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -228,7 +233,7 @@ func (t *rtxTimer) close() {
 }
 
 // isRunning tests if the timer is running.
-// Debug purpose only
+// Debug purpose only.
 func (t *rtxTimer) isRunning() bool {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -244,7 +249,9 @@ func calculateNextTimeout(rto float64, nRtos uint, rtoMax float64) float64 {
 	//        to this doubling operation.
 	if nRtos < 31 {
 		m := 1 << nRtos
+
 		return math.Min(rto*float64(m), rtoMax)
 	}
+
 	return rtoMax
 }

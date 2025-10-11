@@ -56,7 +56,7 @@ var _ io.Closer = (*Client)(nil)
 // SkipResolve returns true since we always defer to the inner transport for
 // the actual connection. By skipping resolution here, we let the inner
 // transport decide how to resolve the multiaddr
-func (c *Client) SkipResolve(ctx context.Context, maddr ma.Multiaddr) bool {
+func (c *Client) SkipResolve(_ context.Context, _ ma.Multiaddr) bool {
 	return true
 }
 
@@ -101,7 +101,7 @@ func (c *Client) Listen(addr ma.Multiaddr) (transport.Listener, error) {
 		return nil, err
 	}
 
-	return c.upgrader.UpgradeListener(c, c.Listener()), nil
+	return c.upgrader.UpgradeGatedMaListener(c, c.upgrader.GateMaListener(c.Listener())), nil
 }
 
 func (c *Client) Protocols() []int {

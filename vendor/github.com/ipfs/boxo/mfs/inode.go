@@ -1,6 +1,7 @@
 package mfs
 
 import (
+	"github.com/ipfs/boxo/provider"
 	ipld "github.com/ipfs/go-ipld-format"
 )
 
@@ -18,4 +19,7 @@ type inode struct {
 	// dagService used to store modifications made to the contents
 	// of the file or directory the `inode` belongs to.
 	dagService ipld.DAGService
+
+	// provider used to announce CIDs
+	prov provider.MultihashProvider
 }

@@ -32,12 +32,12 @@ type conn struct {
 	session   *webtransport.Session
 
 	scope network.ConnManagementScope
-	qconn quic.Connection
+	qconn *quic.Conn
 }
 
 var _ tpt.CapableConn = &conn{}
 
-func newConn(tr *transport, sess *webtransport.Session, sconn *connSecurityMultiaddrs, scope network.ConnManagementScope, qconn quic.Connection) *conn {
+func newConn(tr *transport, sess *webtransport.Session, sconn *connSecurityMultiaddrs, scope network.ConnManagementScope, qconn *quic.Conn) *conn {
 	return &conn{
 		connSecurityMultiaddrs: sconn,
 		transport:              tr,
@@ -72,10 +72,14 @@ func (c *conn) allowWindowIncrease(size uint64) bool {
 // garbage collection to properly work in this package.
 func (c *conn) Close() error {
 	defer c.scope.Done()
-	c.transport.removeConn(c.session)
+	c.transport.removeConn(c.qconn)
 	err := c.session.CloseWithError(0, "")
 	_ = c.qconn.CloseWithError(1, "")
 	return err
+}
+
+func (c *conn) CloseWithError(_ network.ConnErrorCode) error {
+	return c.Close()
 }
 
 func (c *conn) IsClosed() bool           { return c.session.Context().Err() != nil }
