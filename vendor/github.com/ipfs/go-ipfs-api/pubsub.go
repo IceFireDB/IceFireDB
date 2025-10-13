@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	mbase "github.com/multiformats/go-multibase"
 )
 
@@ -58,12 +58,12 @@ func (s *PubSubSubscription) Next() (*Message, error) {
 		return nil, err
 	}
 	topics := make([]string, len(r.TopicIDs))
-	for _, mbtopic := range r.TopicIDs {
+	for i, mbtopic := range r.TopicIDs {
 		_, topic, err := mbase.Decode(mbtopic)
 		if err != nil {
 			return nil, err
 		}
-		topics = append(topics, string(topic))
+		topics[i] = string(topic)
 	}
 	return &Message{
 		From:     from,

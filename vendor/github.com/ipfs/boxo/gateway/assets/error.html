@@ -32,24 +32,44 @@
       {{ else if eq .StatusCode 500 }}
         <p>This gateway was unable to return the requested data due to an internal error. Please check the error below for more information.</p>
       {{ else if eq .StatusCode 502 }}
-        <p>The gateway backed was unable to fullfil your request due to an error.</p>
+        <p>The gateway backend was unable to fulfill your request due to an error.</p>
       {{ else if eq .StatusCode 504 }}
-        <p>The gateway backend was unable to fullfil your request due to a timeout.</p>
+        <p>This gateway is taking too long to fetch content from content providers. Please check the error below for more information.</p>
+
+        {{ if and .RootCID .FailedCID (ne .RootCID .FailedCID) }}
+          <p><strong>Note:</strong> The timeout occurred while fetching a sub-resource (CID: <code>{{ .FailedCID }}</code>) of the root content (CID: <code>{{ .RootCID }}</code>).</p>
+        {{ end }}
+
       {{ else if eq .StatusCode 506 }}
-        <p>The gateway backend was unable to fullfil your request at this time. Try again later.</p>
+        <p>The gateway backend was unable to fulfill your request at this time. Try again later.</p>
       {{ end }}
 
       <pre class="terminal wrap">{{ .Error }}</pre>
-         
+
       <p>How you can proceed:</p>
       <ul>
-        <li>Check the <a href="https://discuss.ipfs.tech/c/help/13" rel="noopener noreferrer">Discussion Forums</a> for similar errors.</li>
-        <li>Try diagnosing your request with the <a href="https://docs.ipfs.tech/reference/diagnostic-tools/" rel="noopener noreferrer">diagnostic tools</a>.</li>
-        <li>Self-host and run an <a href="https://docs.ipfs.tech/concepts/ipfs-implementations/" rel="noopener noreferrer">IPFS client</a> that verifies your data.</li>
+        <li>Check the <a href="https://discuss.ipfs.tech/c/help/13" target="_blank" rel="noopener noreferrer">Discussion Forums</a> for similar errors.</li>
+        <li>Try diagnosing your request with the <a href="https://docs.ipfs.tech/reference/diagnostic-tools/" target="_blank" rel="noopener noreferrer">diagnostic tools</a>.</li>
+        <li>Self-host and run an <a href="https://docs.ipfs.tech/concepts/ipfs-implementations/" target="_blank" rel="noopener noreferrer">IPFS client</a> that verifies your data.</li>
         {{ if or (eq .StatusCode 400) (eq .StatusCode 404) }}
-          <li>Inspect the <a href="https://cid.ipfs.tech/" rel="noopener noreferrer">CID</a> or <a href="https://explore.ipld.io/" rel="noopener noreferrer">DAG</a>.</li>
+          <li>Inspect the <a href="https://cid.ipfs.tech/" target="_blank" rel="noopener noreferrer">CID</a> or <a href="https://explore.ipld.io/" target="_blank" rel="noopener noreferrer">DAG</a>.</li>
         {{ end }}
       </ul>
+
+      <div class="buttons">
+        <button onclick="document.querySelector('#main .container').innerHTML = '<p>Retrying, please wait...</p>'; window.location.reload(true)"
+                class="button retry-button">
+          Retry
+        </button>
+        {{ if and (eq .StatusCode 504) .FailedCID .DiagnosticServiceURL }}
+          <a href="{{ .DiagnosticServiceURL }}?cid={{ .FailedCID }}"
+             target="_blank"
+             rel="noopener noreferrer"
+             class="button diagnose-button">
+            Check CID retrievability
+          </a>
+        {{ end }}
+      </div>
     </section>
   </main>
 </body>

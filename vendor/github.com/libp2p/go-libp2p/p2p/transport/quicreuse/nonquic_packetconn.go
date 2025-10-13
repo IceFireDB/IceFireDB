@@ -10,7 +10,7 @@ import (
 // non-QUIC packets on a quic.Transport. This lets us reuse this UDP port for
 // other transports like WebRTC.
 type nonQUICPacketConn struct {
-	owningTransport refCountedQuicTransport
+	owningTransport RefCountedQUICTransport
 	tr              QUICTransport
 	ctx             context.Context
 	ctxCancel       context.CancelFunc
@@ -59,7 +59,7 @@ func (n *nonQUICPacketConn) SetReadDeadline(t time.Time) error {
 }
 
 // SetWriteDeadline implements net.PacketConn.
-func (n *nonQUICPacketConn) SetWriteDeadline(t time.Time) error {
+func (n *nonQUICPacketConn) SetWriteDeadline(_ time.Time) error {
 	// Unused. quic-go doesn't support deadlines for writes.
 	return nil
 }

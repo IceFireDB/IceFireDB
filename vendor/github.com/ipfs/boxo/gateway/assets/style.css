@@ -36,11 +36,6 @@ a:hover {
 	text-decoration: underline;
 }
 
-a:active,
-a:visited {
-	color: #00b0e9;
-}
-
 .flex {
 	display: flex;
 }
@@ -64,6 +59,19 @@ a:visited {
 .ipfs-hash {
 	color: #7f8491;
 	font-family: var(--monospace);
+}
+
+.copy-button {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.15em;
+  transition: background-color 0.3s ease;
+}
+
+.copy-button:active {
+  opacity: 0.25;
 }
 
 #header {
@@ -222,7 +230,7 @@ section > .grid.dag > div:nth-of-type(2n+1) {
 .terminal {
 	background: var(--steel-gray);
 	color: white;
-	padding: .7em;
+	padding: 0.625em 1.25em;
 	border-radius: var(--radius);
 	word-wrap: break-word;
 	white-space: break-spaces;
@@ -259,4 +267,42 @@ section > .grid.dag > div:nth-of-type(2n+1) {
 	.dn-mobile {
 		display: none;
 	}
+}
+
+.buttons {
+	margin: 1.5em 0;
+	display: flex;
+	gap: 0.75em;
+	flex-wrap: wrap;
+}
+
+.button {
+	display: inline-block;
+	padding: 0.625em 1.25em;
+	font-size: 1em;
+	cursor: pointer;
+	border-radius: var(--radius);
+	text-decoration: none;
+	border: none;
+	font-family: inherit;
+}
+
+.retry-button {
+	background-color: #3B8C90;
+	color: var(--near-white);
+}
+
+.retry-button:hover {
+	background-color: var(--navy);
+}
+
+.diagnose-button {
+	background-color: var(--steel-gray);
+	color: var(--near-white);
+}
+
+.diagnose-button:hover {
+	background-color: var(--navy);
+	color: var(--near-white);
+	text-decoration: none;
 }

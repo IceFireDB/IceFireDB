@@ -65,7 +65,8 @@ func NewCCM(b cipher.Block, tagsize, noncesize int) (CCM, error) {
 	if lensize < 2 || lensize > 8 {
 		return nil, errInvalidNonceSize
 	}
-	c := &ccm{b: b, M: uint8(tagsize), L: uint8(lensize)}
+	c := &ccm{b: b, M: uint8(tagsize), L: uint8(lensize)} //nolint:gosec // G114
+
 	return c, nil
 }
 
@@ -75,13 +76,14 @@ func (c *ccm) MaxLength() int { return maxlen(c.L, c.Overhead()) }
 
 func maxlen(l uint8, tagsize int) int {
 	mLen := (uint64(1) << (8 * l)) - 1
-	if m64 := uint64(math.MaxInt64) - uint64(tagsize); l > 8 || mLen > m64 {
+	if m64 := uint64(math.MaxInt64) - uint64(tagsize); l > 8 || mLen > m64 { //nolint:gosec // G114
 		mLen = m64 // The maximum lentgh on a 64bit arch
 	}
-	if mLen != uint64(int(mLen)) {
+	if mLen != uint64(int(mLen)) { //nolint:gosec // G114
 		return math.MaxInt32 - tagsize // We have only 32bit int's
 	}
-	return int(mLen)
+
+	return int(mLen) //nolint:gosec // G114
 }
 
 // MaxNonceLength returns the maximum nonce length for a given plaintext length.
@@ -90,10 +92,11 @@ func maxlen(l uint8, tagsize int) int {
 func MaxNonceLength(pdatalen int) int {
 	const tagsize = 16
 	for L := 2; L <= 8; L++ {
-		if maxlen(uint8(L), tagsize) >= pdatalen {
+		if maxlen(uint8(L), tagsize) >= pdatalen { //nolint:gosec // G115
 			return 15 - L
 		}
 	}
+
 	return 0
 }
 
@@ -137,20 +140,20 @@ func (c *ccm) tag(nonce, plaintext, adata []byte) ([]byte, error) {
 	c.b.Encrypt(mac[:], mac[:])
 
 	var block [ccmBlockSize]byte
-	if n := uint64(len(adata)); n > 0 {
+	if adataLength := uint64(len(adata)); adataLength > 0 { //nolint:nestif
 		// First adata block includes adata length
 		i := 2
-		if n <= 0xfeff {
-			binary.BigEndian.PutUint16(block[:i], uint16(n))
+		if adataLength <= 0xfeff {
+			binary.BigEndian.PutUint16(block[:i], uint16(adataLength))
 		} else {
 			block[0] = 0xfe
 			block[1] = 0xff
-			if n < uint64(1<<32) {
+			if adataLength < uint64(1<<32) {
 				i = 2 + 4
-				binary.BigEndian.PutUint32(block[2:i], uint32(n))
+				binary.BigEndian.PutUint32(block[2:i], uint32(adataLength)) //nolint:gosec // G115
 			} else {
 				i = 2 + 8
-				binary.BigEndian.PutUint64(block[2:i], n)
+				binary.BigEndian.PutUint64(block[2:i], adataLength)
 			}
 		}
 		i = copy(block[i:], adata)
@@ -170,6 +173,7 @@ func (c *ccm) tag(nonce, plaintext, adata []byte) ([]byte, error) {
 // second slice that aliases into it and contains only the extra bytes. If the
 // original slice has sufficient capacity then no allocation is performed.
 // From crypto/cipher/gcm.go
+// .
 func sliceForAppend(in []byte, n int) (head, tail []byte) {
 	if total := len(in) + n; cap(in) >= total {
 		head = in[:total]
@@ -178,6 +182,7 @@ func sliceForAppend(in []byte, n int) (head, tail []byte) {
 		copy(head, in)
 	}
 	tail = head[len(in):]
+
 	return
 }
 
@@ -207,6 +212,7 @@ func (c *ccm) Seal(dst, nonce, plaintext, adata []byte) []byte {
 	ret, out := sliceForAppend(dst, len(plaintext)+int(c.M))
 	stream.XORKeyStream(out, plaintext)
 	copy(out[len(plaintext):], tag)
+
 	return ret
 }
 
@@ -250,5 +256,6 @@ func (c *ccm) Open(dst, nonce, ciphertext, adata []byte) ([]byte, error) {
 	if subtle.ConstantTimeCompare(tag, expectedTag) != 1 {
 		return nil, errOpen
 	}
+
 	return append(dst, plaintext...), nil
 }

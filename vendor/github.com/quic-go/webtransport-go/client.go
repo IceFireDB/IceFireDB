@@ -34,7 +34,7 @@ type Dialer struct {
 
 	// DialAddr is the function used to dial the underlying QUIC connection.
 	// If unset, quic.DialAddrEarly will be used.
-	DialAddr func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (quic.EarlyConnection, error)
+	DialAddr func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error)
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -102,7 +102,7 @@ func (d *Dialer) Dial(ctx context.Context, urlStr string, reqHdr http.Header) (*
 	}
 	tr := &http3.Transport{
 		EnableDatagrams: true,
-		StreamHijacker: func(ft http3.FrameType, connTracingID quic.ConnectionTracingID, str quic.Stream, e error) (hijacked bool, err error) {
+		StreamHijacker: func(ft http3.FrameType, connTracingID quic.ConnectionTracingID, str *quic.Stream, e error) (hijacked bool, err error) {
 			if isWebTransportError(e) {
 				return true, nil
 			}
@@ -119,7 +119,7 @@ func (d *Dialer) Dial(ctx context.Context, urlStr string, reqHdr http.Header) (*
 			d.conns.AddStream(connTracingID, str, sessionID(id))
 			return true, nil
 		},
-		UniStreamHijacker: func(st http3.StreamType, connTracingID quic.ConnectionTracingID, str quic.ReceiveStream, err error) (hijacked bool) {
+		UniStreamHijacker: func(st http3.StreamType, connTracingID quic.ConnectionTracingID, str *quic.ReceiveStream, err error) (hijacked bool) {
 			if st != webTransportUniStreamType && !isWebTransportError(err) {
 				return false
 			}
@@ -164,7 +164,7 @@ func (d *Dialer) Dial(ctx context.Context, urlStr string, reqHdr http.Header) (*
 	if rsp.StatusCode < 200 || rsp.StatusCode >= 300 {
 		return rsp, nil, fmt.Errorf("received status %d", rsp.StatusCode)
 	}
-	return rsp, d.conns.AddSession(conn, sessionID(requestStr.StreamID()), requestStr), nil
+	return rsp, d.conns.AddSession(conn.Conn(), sessionID(requestStr.StreamID()), requestStr), nil
 }
 
 func (d *Dialer) Close() error {

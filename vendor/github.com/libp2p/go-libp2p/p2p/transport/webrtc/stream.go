@@ -15,22 +15,9 @@ import (
 )
 
 const (
-	// maxMessageSize is the maximum message size of the Protobuf message we send / receive.
-	maxMessageSize = 16384
-	// maxSendBuffer is the maximum data we enqueue on the underlying data channel for writes.
-	// The underlying SCTP layer has an unbounded buffer for writes. We limit the amount enqueued
-	// per stream is limited to avoid a single stream monopolizing the entire connection.
-	maxSendBuffer = 2 * maxMessageSize
-	// sendBufferLowThreshold is the threshold below which we write more data on the underlying
-	// data channel. We want a notification as soon as we can write 1 full sized message.
-	sendBufferLowThreshold = maxSendBuffer - maxMessageSize
-	// maxTotalControlMessagesSize is the maximum total size of all control messages we will
-	// write on this stream.
-	// 4 control messages of size 10 bytes + 10 bytes buffer. This number doesn't need to be
-	// exact. In the worst case, we enqueue these many bytes more in the webrtc peer connection
-	// send queue.
-	maxTotalControlMessagesSize = 50
-
+	// maxSendMessageSize is the maximum message size of the Protobuf message we send / receive.
+	// NOTE: Change `varintOverhead` if you change this.
+	maxSendMessageSize = 16384
 	// Proto overhead assumption is 5 bytes
 	protoOverhead = 5
 	// Varint overhead is assumed to be 2 bytes. This is safe since
@@ -40,9 +27,20 @@ const (
 	// is less than or equal to 2 ^ 14, the varint will not be more than
 	// 2 bytes in length.
 	varintOverhead = 2
+
+	// maxTotalControlMessagesSize is the maximum total size of all control messages we will
+	// write on this stream.
+	// 4 control messages of size 10 bytes + 10 bytes buffer. This number doesn't need to be
+	// exact. In the worst case, we enqueue these many bytes more in the webrtc peer connection
+	// send queue.
+	maxTotalControlMessagesSize = 50
+
 	// maxFINACKWait is the maximum amount of time a stream will wait to read
 	// FIN_ACK before closing the data channel
 	maxFINACKWait = 10 * time.Second
+
+	// maxReceiveMessageSize is the maximum message size of the Protobuf message we receive.
+	maxReceiveMessageSize = 256<<10 + 1<<10 // 1kB buffer
 )
 
 type receiveState uint8
@@ -69,8 +67,9 @@ type stream struct {
 
 	// readerMx ensures that only a single goroutine reads from the reader. Read is not threadsafe
 	// But we may need to read from reader for control messages from a different goroutine.
-	readerMx sync.Mutex
-	reader   pbio.Reader
+	readerMx  sync.Mutex
+	reader    pbio.Reader
+	readError error
 
 	// this buffer is limited up to a single message. Reason we need it
 	// is because a reader might read a message midway, and so we need a
@@ -78,10 +77,12 @@ type stream struct {
 	nextMessage  *pb.Message
 	receiveState receiveState
 
-	writer            pbio.Writer // concurrent writes prevented by mx
-	writeStateChanged chan struct{}
-	sendState         sendState
-	writeDeadline     time.Time
+	writer             pbio.Writer // concurrent writes prevented by mx
+	writeStateChanged  chan struct{}
+	sendState          sendState
+	writeDeadline      time.Time
+	writeError         error
+	maxSendMessageSize int
 
 	controlMessageReaderOnce sync.Once
 	// controlMessageReaderEndTime is the end time for reading FIN_ACK from the control
@@ -103,20 +104,21 @@ var _ network.MuxedStream = &stream{}
 func newStream(
 	channel *webrtc.DataChannel,
 	rwc datachannel.ReadWriteCloser,
+	maxSendMessageSize int,
 	onDone func(),
 ) *stream {
 	s := &stream{
-		reader:            pbio.NewDelimitedReader(rwc, maxMessageSize),
-		writer:            pbio.NewDelimitedWriter(rwc),
-		writeStateChanged: make(chan struct{}, 1),
-		id:                *channel.ID(),
-		dataChannel:       rwc.(*datachannel.DataChannel),
-		onDone:            onDone,
+		reader:             pbio.NewDelimitedReader(rwc, maxReceiveMessageSize),
+		writer:             pbio.NewDelimitedWriter(rwc),
+		writeStateChanged:  make(chan struct{}, 1),
+		id:                 *channel.ID(),
+		dataChannel:        rwc.(*datachannel.DataChannel),
+		onDone:             onDone,
+		maxSendMessageSize: maxSendMessageSize,
 	}
-	s.dataChannel.SetBufferedAmountLowThreshold(sendBufferLowThreshold)
+	s.dataChannel.SetBufferedAmountLowThreshold(uint64(s.sendBufferLowThreshold()))
 	s.dataChannel.OnBufferedAmountLow(func() {
 		s.notifyWriteStateChanged()
-
 	})
 	return s
 }
@@ -146,6 +148,10 @@ func (s *stream) Close() error {
 }
 
 func (s *stream) Reset() error {
+	return s.ResetWithError(0)
+}
+
+func (s *stream) ResetWithError(errCode network.StreamErrorCode) error {
 	s.mx.Lock()
 	isClosed := s.closeForShutdownErr != nil
 	s.mx.Unlock()
@@ -154,8 +160,8 @@ func (s *stream) Reset() error {
 	}
 
 	defer s.cleanup()
-	cancelWriteErr := s.cancelWrite()
-	closeReadErr := s.CloseRead()
+	cancelWriteErr := s.cancelWrite(errCode)
+	closeReadErr := s.closeRead(errCode, false)
 	s.setDataChannelReadDeadline(time.Now().Add(-1 * time.Hour))
 	return errors.Join(closeReadErr, cancelWriteErr)
 }
@@ -175,19 +181,20 @@ func (s *stream) SetDeadline(t time.Time) error {
 	return s.SetWriteDeadline(t)
 }
 
-// processIncomingFlag process the flag on an incoming message
+// processIncomingFlag processes the flag(FIN/RST/etc) on msg.
 // It needs to be called while the mutex is locked.
-func (s *stream) processIncomingFlag(flag *pb.Message_Flag) {
-	if flag == nil {
+func (s *stream) processIncomingFlag(msg *pb.Message) {
+	if msg.Flag == nil {
 		return
 	}
 
-	switch *flag {
+	switch msg.GetFlag() {
 	case pb.Message_STOP_SENDING:
 		// We must process STOP_SENDING after sending a FIN(sendStateDataSent). Remote peer
 		// may not send a FIN_ACK once it has sent a STOP_SENDING
 		if s.sendState == sendStateSending || s.sendState == sendStateDataSent {
 			s.sendState = sendStateReset
+			s.writeError = &network.StreamError{Remote: true, ErrorCode: network.StreamErrorCode(msg.GetErrorCode())}
 		}
 		s.notifyWriteStateChanged()
 	case pb.Message_FIN_ACK:
@@ -206,6 +213,11 @@ func (s *stream) processIncomingFlag(flag *pb.Message_Flag) {
 	case pb.Message_RESET:
 		if s.receiveState == receiveStateReceiving {
 			s.receiveState = receiveStateReset
+			s.readError = &network.StreamError{Remote: true, ErrorCode: network.StreamErrorCode(msg.GetErrorCode())}
+		}
+		if s.sendState == sendStateSending || s.sendState == sendStateDataSent {
+			s.sendState = sendStateReset
+			s.writeError = &network.StreamError{Remote: true, ErrorCode: network.StreamErrorCode(msg.GetErrorCode())}
 		}
 		s.spawnControlMessageReader()
 	}
@@ -235,7 +247,7 @@ func (s *stream) spawnControlMessageReader() {
 			s.readerMx.Unlock()
 
 			if s.nextMessage != nil {
-				s.processIncomingFlag(s.nextMessage.Flag)
+				s.processIncomingFlag(s.nextMessage)
 				s.nextMessage = nil
 			}
 			var msg pb.Message
@@ -266,7 +278,7 @@ func (s *stream) spawnControlMessageReader() {
 					}
 					return
 				}
-				s.processIncomingFlag(msg.Flag)
+				s.processIncomingFlag(&msg)
 			}
 		}()
 	})

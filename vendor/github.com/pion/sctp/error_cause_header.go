@@ -8,7 +8,7 @@ import (
 	"errors"
 )
 
-// errorCauseHeader represents the shared header that is shared by all error causes
+// errorCauseHeader represents the shared header that is shared by all error causes.
 type errorCauseHeader struct {
 	code errorCauseCode
 	len  uint16
@@ -19,11 +19,11 @@ const (
 	errorCauseHeaderLength = 4
 )
 
-// ErrInvalidSCTPChunk is returned when an SCTP chunk is invalid
+// ErrInvalidSCTPChunk is returned when an SCTP chunk is invalid.
 var ErrInvalidSCTPChunk = errors.New("invalid SCTP chunk")
 
 func (e *errorCauseHeader) marshal() ([]byte, error) {
-	e.len = uint16(len(e.raw)) + uint16(errorCauseHeaderLength)
+	e.len = uint16(len(e.raw)) + uint16(errorCauseHeaderLength) //nolint:gosec // G115
 	raw := make([]byte, e.len)
 	binary.BigEndian.PutUint16(raw[0:], uint16(e.code))
 	binary.BigEndian.PutUint16(raw[2:], e.len)
@@ -40,6 +40,7 @@ func (e *errorCauseHeader) unmarshal(raw []byte) error {
 	}
 	valueLength := e.len - errorCauseHeaderLength
 	e.raw = raw[errorCauseHeaderLength : errorCauseHeaderLength+valueLength]
+
 	return nil
 }
 
@@ -51,7 +52,7 @@ func (e *errorCauseHeader) errorCauseCode() errorCauseCode {
 	return e.code
 }
 
-// String makes errorCauseHeader printable
+// String makes errorCauseHeader printable.
 func (e errorCauseHeader) String() string {
 	return e.code.String()
 }

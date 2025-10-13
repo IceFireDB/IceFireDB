@@ -13,7 +13,13 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol/recordlayer"
 )
 
-func flight6Parse(_ context.Context, _ flightConn, state *State, cache *handshakeCache, cfg *handshakeConfig) (flightVal, *alert.Alert, error) {
+func flight6Parse(
+	_ context.Context,
+	_ flightConn,
+	state *State,
+	cache *handshakeCache,
+	cfg *handshakeConfig,
+) (flightVal, *alert.Alert, error) {
 	_, msgs, ok := cache.fullPullMap(state.handshakeRecvSequence-1, state.cipherSuite,
 		handshakeCachePullRule{handshake.TypeFinished, cfg.initialEpoch + 1, true, false},
 	)
@@ -30,7 +36,12 @@ func flight6Parse(_ context.Context, _ flightConn, state *State, cache *handshak
 	return flight6, nil, nil
 }
 
-func flight6Generate(_ flightConn, state *State, cache *handshakeCache, cfg *handshakeConfig) ([]*packet, *alert.Alert, error) {
+func flight6Generate(
+	_ flightConn,
+	state *State,
+	cache *handshakeCache,
+	cfg *handshakeConfig,
+) ([]*packet, *alert.Alert, error) {
 	var pkts []*packet
 
 	pkts = append(pkts,
@@ -82,5 +93,6 @@ func flight6Generate(_ flightConn, state *State, cache *handshakeCache, cfg *han
 			resetLocalSequenceNumber: true,
 		},
 	)
+
 	return pkts, nil, nil
 }

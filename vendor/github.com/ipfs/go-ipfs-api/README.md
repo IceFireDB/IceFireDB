@@ -14,7 +14,7 @@
 ## Install
 
 ```sh
-go get -u github.com/ipfs/go-ipfs-api
+go install github.com/ipfs/go-ipfs-api@latest
 ```
 
 This will download the source into `$GOPATH/src/github.com/ipfs/go-ipfs-api`.

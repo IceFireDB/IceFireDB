@@ -10,17 +10,17 @@ package protocol
 // https://tools.ietf.org/html/rfc5246#section-7.1
 type ChangeCipherSpec struct{}
 
-// ContentType returns the ContentType of this content
+// ContentType returns the ContentType of this content.
 func (c ChangeCipherSpec) ContentType() ContentType {
 	return ContentTypeChangeCipherSpec
 }
 
-// Marshal encodes the ChangeCipherSpec to binary
+// Marshal encodes the ChangeCipherSpec to binary.
 func (c *ChangeCipherSpec) Marshal() ([]byte, error) {
 	return []byte{0x01}, nil
 }
 
-// Unmarshal populates the ChangeCipherSpec from binary
+// Unmarshal populates the ChangeCipherSpec from binary.
 func (c *ChangeCipherSpec) Unmarshal(data []byte) error {
 	if len(data) == 1 && data[0] == 0x01 {
 		return nil

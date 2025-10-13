@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	files "github.com/ipfs/go-ipfs-files"
+	files "github.com/ipfs/boxo/files"
 )
 
 type FilesOpt func(*RequestBuilder) error
@@ -41,6 +41,7 @@ type filesMkdir struct{}
 type filesRead struct{}
 type filesWrite struct{}
 type filesStat struct{}
+type filesCp struct{}
 
 var (
 	FilesLs    filesLs
@@ -49,6 +50,7 @@ var (
 	FilesRead  filesRead
 	FilesWrite filesWrite
 	FilesStat  filesStat
+	FilesCp    filesCp
 )
 
 // Stat use long listing format
@@ -203,6 +205,14 @@ func (filesWrite) Hash(hash string) FilesOpt {
 	}
 }
 
+// Parents make parent directories as needed
+func (filesCp) Parents(parents bool) FilesOpt {
+	return func(rb *RequestBuilder) error {
+		rb.Option("parents", parents)
+		return nil
+	}
+}
+
 // FilesChcid change the cid version or hash function of the root node of a given path
 func (s *Shell) FilesChcid(ctx context.Context, path string, options ...FilesOpt) error {
 	if len(path) == 0 {
@@ -220,8 +230,14 @@ func (s *Shell) FilesChcid(ctx context.Context, path string, options ...FilesOpt
 }
 
 // FilesCp copy any IPFS files and directories into MFS (or copy within MFS)
-func (s *Shell) FilesCp(ctx context.Context, src string, dest string) error {
-	return s.Request("files/cp", src, dest).Exec(ctx, nil)
+func (s *Shell) FilesCp(ctx context.Context, src string, dest string, options ...FilesOpt) error {
+	rb := s.Request("files/cp", src, dest)
+	for _, opt := range options {
+		if err := opt(rb); err != nil {
+			return err
+		}
+	}
+	return rb.Exec(ctx, nil)
 }
 
 // FilesFlush flush a given path's data to disk
@@ -322,7 +338,10 @@ func (s *Shell) FilesStat(ctx context.Context, path string, options ...FilesOpt)
 func (s *Shell) FilesWrite(ctx context.Context, path string, data io.Reader, options ...FilesOpt) error {
 	fr := files.NewReaderFile(data)
 	slf := files.NewSliceDirectory([]files.DirEntry{files.FileEntry("", fr)})
-	fileReader := files.NewMultiFileReader(slf, true)
+	fileReader, err := s.newMultiFileReader(slf)
+	if err != nil {
+		return err
+	}
 
 	rb := s.Request("files/write", path)
 	for _, opt := range options {
