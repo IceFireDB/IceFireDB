@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/ipfs/boxo/bitswap"
-	"github.com/ipfs/boxo/bitswap/network"
+	"github.com/ipfs/boxo/bitswap/client"
+	"github.com/ipfs/boxo/bitswap/network/bsnet"
 	"github.com/ipfs/boxo/blockservice"
 	blockstore "github.com/ipfs/boxo/blockstore"
 	chunker "github.com/ipfs/boxo/chunker"
@@ -37,7 +38,8 @@ import (
 var logger = logging.Logger("ipfslite")
 
 var (
-	defaultReprovideInterval = 12 * time.Hour
+	defaultReprovideInterval              = 12 * time.Hour
+	defaultBitswapBroadcastMaxRandomPeers = 64
 )
 
 // Config wraps configuration options for the Peer.
@@ -50,11 +52,20 @@ type Config struct {
 	// when the given blockstore or datastore already has caching, or when
 	// caching is not needed.
 	UncachedBlockstore bool
+	// Controls the maximum number of random peers that this peer will
+	// broadcast its list of wanted blocks. Defaults to 64. It is possible
+	// to disable broadcasts to random peers by setting it to -1.
+	BitswapBroadcastMaxRandomPeers int
 }
 
 func (cfg *Config) setDefaults() {
 	if cfg.ReprovideInterval == 0 {
 		cfg.ReprovideInterval = defaultReprovideInterval
+	}
+	if bbmrp := cfg.BitswapBroadcastMaxRandomPeers; bbmrp == 0 {
+		cfg.BitswapBroadcastMaxRandomPeers = defaultBitswapBroadcastMaxRandomPeers
+	} else if bbmrp < 0 {
+		cfg.BitswapBroadcastMaxRandomPeers = 0
 	}
 }
 
@@ -114,12 +125,12 @@ func New(
 	}
 	err = p.setupDAGService()
 	if err != nil {
-		p.bserv.Close()
+		_ = p.bserv.Close()
 		return nil, err
 	}
 	err = p.setupReprovider()
 	if err != nil {
-		p.bserv.Close()
+		_ = p.bserv.Close()
 		return nil, err
 	}
 
@@ -131,7 +142,9 @@ func New(
 func (p *Peer) setupBlockstore(bs blockstore.Blockstore) error {
 	var err error
 	if bs == nil {
-		bs = blockstore.NewBlockstore(p.store)
+		bs = blockstore.NewBlockstore(p.store,
+			blockstore.WriteThrough(true),
+		)
 	}
 
 	// Support Identity multihashes.
@@ -153,8 +166,21 @@ func (p *Peer) setupBlockService() error {
 		return nil
 	}
 
-	bswapnet := network.NewFromIpfsHost(p.host, p.dht)
-	bswap := bitswap.New(p.ctx, bswapnet, p.bstore)
+	bswapnet := bsnet.NewFromIpfsHost(p.host)
+	bswap := bitswap.New(p.ctx, bswapnet, nil, p.bstore,
+		bitswap.ProviderSearchDelay(1000*time.Millisecond), // See https://github.com/ipfs/go-ipfs/issues/8807 for rationale
+		bitswap.EngineBlockstoreWorkerCount(128),
+		bitswap.TaskWorkerCount(24),
+		bitswap.EngineTaskWorkerCount(24),
+		bitswap.MaxOutstandingBytesPerPeer(1<<20),
+		bitswap.WithWantHaveReplaceSize(1024),
+		bitswap.WithClientOption(client.BroadcastControlEnable(true)),
+		bitswap.WithClientOption(client.BroadcastControlMaxPeers(-1)),
+		bitswap.WithClientOption(client.BroadcastControlLocalPeers(false)),
+		bitswap.WithClientOption(client.BroadcastControlPeeredPeers(false)),
+		bitswap.WithClientOption(client.BroadcastControlMaxRandomPeers(p.cfg.BitswapBroadcastMaxRandomPeers)),
+		bitswap.WithClientOption(client.BroadcastControlSendToPendingPeers(false)),
+	)
 	p.bserv = blockservice.New(p.bstore, bswap)
 	p.exch = bswap
 	return nil
@@ -175,7 +201,7 @@ func (p *Peer) setupReprovider() error {
 		provider.DatastorePrefix(datastore.NewKey("repro")),
 		provider.Online(p.dht),
 		provider.ReproviderInterval(p.cfg.ReprovideInterval),
-		provider.KeyProvider(provider.NewBlockstoreProvider(p.bstore)))
+		provider.KeyProvider(p.bstore.AllKeysChan))
 	if err != nil {
 		return err
 	}
@@ -186,8 +212,8 @@ func (p *Peer) setupReprovider() error {
 
 func (p *Peer) autoclose() {
 	<-p.ctx.Done()
-	p.reprovider.Close()
-	p.bserv.Close()
+	_ = p.reprovider.Close()
+	_ = p.bserv.Close()
 }
 
 // Bootstrap is an optional helper to connect to the given peers and bootstrap
@@ -253,6 +279,7 @@ type AddParams struct {
 	Shard     bool
 	NoCopy    bool
 	HashFun   string
+	MaxLinks  int
 }
 
 // AddFile chunks and adds content to the DAGService from a reader. The content
@@ -264,6 +291,10 @@ func (p *Peer) AddFile(ctx context.Context, r io.Reader, params *AddParams) (ipl
 	}
 	if params.HashFun == "" {
 		params.HashFun = "sha2-256"
+	}
+
+	if params.MaxLinks == 0 {
+		params.MaxLinks = helpers.DefaultLinksPerBlock
 	}
 
 	prefix, err := merkledag.PrefixForCidVersion(1)
@@ -281,7 +312,7 @@ func (p *Peer) AddFile(ctx context.Context, r io.Reader, params *AddParams) (ipl
 	dbp := helpers.DagBuilderParams{
 		Dagserv:    p,
 		RawLeaves:  params.RawLeaves,
-		Maxlinks:   helpers.DefaultLinksPerBlock,
+		Maxlinks:   params.MaxLinks,
 		NoCopy:     params.NoCopy,
 		CidBuilder: &prefix,
 	}

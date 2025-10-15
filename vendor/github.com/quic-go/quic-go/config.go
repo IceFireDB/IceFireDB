@@ -8,7 +8,7 @@ import (
 	"github.com/quic-go/quic-go/quicvarint"
 )
 
-// Clone clones a Config
+// Clone clones a Config.
 func (c *Config) Clone() *Config {
 	copy := *c
 	return &copy
@@ -106,23 +106,24 @@ func populateConfig(config *Config) *Config {
 	}
 
 	return &Config{
-		GetConfigForClient:             config.GetConfigForClient,
-		Versions:                       versions,
-		HandshakeIdleTimeout:           handshakeIdleTimeout,
-		MaxIdleTimeout:                 idleTimeout,
-		KeepAlivePeriod:                config.KeepAlivePeriod,
-		InitialStreamReceiveWindow:     initialStreamReceiveWindow,
-		MaxStreamReceiveWindow:         maxStreamReceiveWindow,
-		InitialConnectionReceiveWindow: initialConnectionReceiveWindow,
-		MaxConnectionReceiveWindow:     maxConnectionReceiveWindow,
-		AllowConnectionWindowIncrease:  config.AllowConnectionWindowIncrease,
-		MaxIncomingStreams:             maxIncomingStreams,
-		MaxIncomingUniStreams:          maxIncomingUniStreams,
-		TokenStore:                     config.TokenStore,
-		EnableDatagrams:                config.EnableDatagrams,
-		InitialPacketSize:              initialPacketSize,
-		DisablePathMTUDiscovery:        config.DisablePathMTUDiscovery,
-		Allow0RTT:                      config.Allow0RTT,
-		Tracer:                         config.Tracer,
+		GetConfigForClient:               config.GetConfigForClient,
+		Versions:                         versions,
+		HandshakeIdleTimeout:             handshakeIdleTimeout,
+		MaxIdleTimeout:                   idleTimeout,
+		KeepAlivePeriod:                  config.KeepAlivePeriod,
+		InitialStreamReceiveWindow:       initialStreamReceiveWindow,
+		MaxStreamReceiveWindow:           maxStreamReceiveWindow,
+		InitialConnectionReceiveWindow:   initialConnectionReceiveWindow,
+		MaxConnectionReceiveWindow:       maxConnectionReceiveWindow,
+		AllowConnectionWindowIncrease:    config.AllowConnectionWindowIncrease,
+		MaxIncomingStreams:               maxIncomingStreams,
+		MaxIncomingUniStreams:            maxIncomingUniStreams,
+		TokenStore:                       config.TokenStore,
+		EnableDatagrams:                  config.EnableDatagrams,
+		InitialPacketSize:                initialPacketSize,
+		DisablePathMTUDiscovery:          config.DisablePathMTUDiscovery,
+		EnableStreamResetPartialDelivery: config.EnableStreamResetPartialDelivery,
+		Allow0RTT:                        config.Allow0RTT,
+		Tracer:                           config.Tracer,
 	}
 }

@@ -758,6 +758,7 @@ func (a *Agent) gatherCandidatesRelay(ctx context.Context, urls []*stun.URI) {
 				conn, connectErr := dtls.Client(&fakenet.PacketConn{Conn: udpConn}, udpConn.RemoteAddr(), &dtls.Config{
 					ServerName:         url.Host,
 					InsecureSkipVerify: a.insecureSkipVerify, //nolint:gosec
+					LoggerFactory:      a.loggerFactory,
 				})
 				if connectErr != nil {
 					a.log.Warnf("Failed to create DTLS client: %v", turnServerAddr, connectErr)

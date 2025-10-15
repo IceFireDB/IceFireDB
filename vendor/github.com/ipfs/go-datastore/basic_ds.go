@@ -27,7 +27,7 @@ func NewMapDatastore() (d *MapDatastore) {
 }
 
 // Put implements Datastore.Put
-func (d *MapDatastore) Put(ctx context.Context, key Key, value []byte) (err error) {
+func (d *MapDatastore) Put(ctx context.Context, key Key, value []byte) error {
 	d.values[key] = value
 	return nil
 }
@@ -38,7 +38,7 @@ func (d *MapDatastore) Sync(ctx context.Context, prefix Key) error {
 }
 
 // Get implements Datastore.Get
-func (d *MapDatastore) Get(ctx context.Context, key Key) (value []byte, err error) {
+func (d *MapDatastore) Get(ctx context.Context, key Key) ([]byte, error) {
 	val, found := d.values[key]
 	if !found {
 		return nil, ErrNotFound
@@ -47,13 +47,13 @@ func (d *MapDatastore) Get(ctx context.Context, key Key) (value []byte, err erro
 }
 
 // Has implements Datastore.Has
-func (d *MapDatastore) Has(ctx context.Context, key Key) (exists bool, err error) {
+func (d *MapDatastore) Has(ctx context.Context, key Key) (bool, error) {
 	_, found := d.values[key]
 	return found, nil
 }
 
 // GetSize implements Datastore.GetSize
-func (d *MapDatastore) GetSize(ctx context.Context, key Key) (size int, err error) {
+func (d *MapDatastore) GetSize(ctx context.Context, key Key) (int, error) {
 	if v, found := d.values[key]; found {
 		return len(v), nil
 	}
@@ -61,7 +61,7 @@ func (d *MapDatastore) GetSize(ctx context.Context, key Key) (size int, err erro
 }
 
 // Delete implements Datastore.Delete
-func (d *MapDatastore) Delete(ctx context.Context, key Key) (err error) {
+func (d *MapDatastore) Delete(ctx context.Context, key Key) error {
 	delete(d.values, key)
 	return nil
 }
@@ -124,7 +124,7 @@ func (d *LogDatastore) Children() []Datastore {
 }
 
 // Put implements Datastore.Put
-func (d *LogDatastore) Put(ctx context.Context, key Key, value []byte) (err error) {
+func (d *LogDatastore) Put(ctx context.Context, key Key, value []byte) error {
 	log.Printf("%s: Put %s\n", d.Name, key)
 	// log.Printf("%s: Put %s ```%s```", d.Name, key, value)
 	return d.child.Put(ctx, key, value)
@@ -137,25 +137,25 @@ func (d *LogDatastore) Sync(ctx context.Context, prefix Key) error {
 }
 
 // Get implements Datastore.Get
-func (d *LogDatastore) Get(ctx context.Context, key Key) (value []byte, err error) {
+func (d *LogDatastore) Get(ctx context.Context, key Key) ([]byte, error) {
 	log.Printf("%s: Get %s\n", d.Name, key)
 	return d.child.Get(ctx, key)
 }
 
 // Has implements Datastore.Has
-func (d *LogDatastore) Has(ctx context.Context, key Key) (exists bool, err error) {
+func (d *LogDatastore) Has(ctx context.Context, key Key) (bool, error) {
 	log.Printf("%s: Has %s\n", d.Name, key)
 	return d.child.Has(ctx, key)
 }
 
 // GetSize implements Datastore.GetSize
-func (d *LogDatastore) GetSize(ctx context.Context, key Key) (size int, err error) {
+func (d *LogDatastore) GetSize(ctx context.Context, key Key) (int, error) {
 	log.Printf("%s: GetSize %s\n", d.Name, key)
 	return d.child.GetSize(ctx, key)
 }
 
 // Delete implements Datastore.Delete
-func (d *LogDatastore) Delete(ctx context.Context, key Key) (err error) {
+func (d *LogDatastore) Delete(ctx context.Context, key Key) error {
 	log.Printf("%s: Delete %s\n", d.Name, key)
 	return d.child.Delete(ctx, key)
 }
@@ -203,20 +203,20 @@ func (d *LogDatastore) Batch(ctx context.Context) (Batch, error) {
 }
 
 // Put implements Batch.Put
-func (d *LogBatch) Put(ctx context.Context, key Key, value []byte) (err error) {
+func (d *LogBatch) Put(ctx context.Context, key Key, value []byte) error {
 	log.Printf("%s: BatchPut %s\n", d.Name, key)
 	// log.Printf("%s: Put %s ```%s```", d.Name, key, value)
 	return d.child.Put(ctx, key, value)
 }
 
 // Delete implements Batch.Delete
-func (d *LogBatch) Delete(ctx context.Context, key Key) (err error) {
+func (d *LogBatch) Delete(ctx context.Context, key Key) error {
 	log.Printf("%s: BatchDelete %s\n", d.Name, key)
 	return d.child.Delete(ctx, key)
 }
 
 // Commit implements Batch.Commit
-func (d *LogBatch) Commit(ctx context.Context) (err error) {
+func (d *LogBatch) Commit(ctx context.Context) error {
 	log.Printf("%s: BatchCommit\n", d.Name)
 	return d.child.Commit(ctx)
 }

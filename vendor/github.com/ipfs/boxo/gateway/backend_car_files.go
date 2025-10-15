@@ -119,8 +119,10 @@ func (b *backpressuredFile) Seek(offset int64, whence int) (int64, error) {
 	return b.f.Seek(offset, whence)
 }
 
-var _ files.File = (*backpressuredFile)(nil)
-var _ awaitCloser = (*backpressuredFile)(nil)
+var (
+	_ files.File  = (*backpressuredFile)(nil)
+	_ awaitCloser = (*backpressuredFile)(nil)
+)
 
 type singleUseDirectory struct {
 	dirIter files.DirIterator
@@ -145,7 +147,7 @@ func (b *singleUseDirectory) ModTime() time.Time {
 }
 
 func (b *singleUseDirectory) Size() (int64, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
@@ -153,8 +155,10 @@ func (b *singleUseDirectory) Entries() files.DirIterator {
 	return b.dirIter
 }
 
-var _ files.Directory = (*singleUseDirectory)(nil)
-var _ awaitCloser = (*singleUseDirectory)(nil)
+var (
+	_ files.Directory = (*singleUseDirectory)(nil)
+	_ awaitCloser     = (*singleUseDirectory)(nil)
+)
 
 type backpressuredFlatDirIter struct {
 	linksItr *dagpb.PBLinks__Itr

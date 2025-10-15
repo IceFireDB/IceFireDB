@@ -8,7 +8,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	dshelp "github.com/ipfs/boxo/datastore/dshelp"
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
@@ -16,6 +15,7 @@ import (
 	pb "github.com/libp2p/go-libp2p-record/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"google.golang.org/protobuf/proto"
 )
 
 // ErrOffline is returned when trying to perform operations that

@@ -12,7 +12,7 @@ func FromReaderJSON[T any](r io.Reader) *JSONIter[T] {
 }
 
 // JSONIter iterates over whitespace-delimited JSON values of a byte stream.
-// This closes the reader if it is a closer, to faciliate easy reading of HTTP responses.
+// This closes the reader if it is a closer, to facilitate easy reading of HTTP responses.
 type JSONIter[T any] struct {
 	Decoder *json.Decoder
 	Reader  io.Reader

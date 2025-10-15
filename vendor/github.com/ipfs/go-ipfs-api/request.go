@@ -6,13 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 
-	files "github.com/ipfs/go-ipfs-files"
+	files "github.com/ipfs/boxo/files"
 )
 
 type Request struct {
@@ -70,7 +69,7 @@ type Response struct {
 func (r *Response) Close() error {
 	if r.Output != nil {
 		// always drain output (response body)
-		_, err1 := io.Copy(ioutil.Discard, r.Output)
+		_, err1 := io.Copy(io.Discard, r.Output)
 		err2 := r.Output.Close()
 		if err1 != nil {
 			return err1
@@ -147,7 +146,7 @@ func (r *Request) Send(c *http.Client) (*Response, error) {
 		case resp.StatusCode == http.StatusNotFound:
 			e.Message = "command not found"
 		case contentType == "text/plain":
-			out, err := ioutil.ReadAll(resp.Body)
+			out, err := io.ReadAll(resp.Body)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "ipfs-shell: warning! response (%d) read error: %s\n", resp.StatusCode, err)
 			}
@@ -158,7 +157,7 @@ func (r *Request) Send(c *http.Client) (*Response, error) {
 			}
 		default:
 			fmt.Fprintf(os.Stderr, "ipfs-shell: warning! unhandled response (%d) encoding: %s", resp.StatusCode, contentType)
-			out, err := ioutil.ReadAll(resp.Body)
+			out, err := io.ReadAll(resp.Body)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "ipfs-shell: response (%d) read error: %s\n", resp.StatusCode, err)
 			}
@@ -168,7 +167,7 @@ func (r *Request) Send(c *http.Client) (*Response, error) {
 		nresp.Output = nil
 
 		// drain body and close
-		io.Copy(ioutil.Discard, resp.Body)
+		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 	}
 

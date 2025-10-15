@@ -8,22 +8,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	gohttp "net/http"
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
-	files "github.com/ipfs/go-ipfs-files"
+	"github.com/blang/semver/v4"
+	files "github.com/ipfs/boxo/files"
+	tar "github.com/ipfs/boxo/tar"
 	homedir "github.com/mitchellh/go-homedir"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	mbase "github.com/multiformats/go-multibase"
-	tar "github.com/whyrusleeping/tar-utils"
 
-	p2pmetrics "github.com/libp2p/go-libp2p-core/metrics"
+	p2pmetrics "github.com/libp2p/go-libp2p/core/metrics"
 )
 
 const (
@@ -36,6 +37,9 @@ const (
 type Shell struct {
 	url     string
 	httpcli gohttp.Client
+
+	versionMu sync.Mutex
+	version   *semver.Version
 }
 
 func NewLocalShell() *Shell {
@@ -55,7 +59,7 @@ func NewLocalShell() *Shell {
 		return nil
 	}
 
-	api, err := ioutil.ReadFile(apiFile)
+	api, err := os.ReadFile(apiFile)
 	if err != nil {
 		return nil
 	}
@@ -122,6 +126,40 @@ func NewShellWithClient(url string, client *gohttp.Client) *Shell {
 	return &sh
 }
 
+// encodedAbsolutePathVersion is the version from which the absolute path header in
+// multipart requests is %-encoded. Before this version, its sent raw.
+var encodedAbsolutePathVersion = semver.MustParse("0.23.0-dev")
+
+func (s *Shell) loadRemoteVersion() (*semver.Version, error) {
+	s.versionMu.Lock()
+	defer s.versionMu.Unlock()
+
+	if s.version == nil {
+		version, _, err := s.Version()
+		if err != nil {
+			return nil, err
+		}
+
+		remoteVersion, err := semver.New(version)
+		if err != nil {
+			return nil, err
+		}
+
+		s.version = remoteVersion
+	}
+
+	return s.version, nil
+}
+
+func (s *Shell) newMultiFileReader(dir files.Directory) (*files.MultiFileReader, error) {
+	version, err := s.loadRemoteVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	return files.NewMultiFileReader(dir, true, version.LT(encodedAbsolutePathVersion)), nil
+}
+
 func (s *Shell) SetTimeout(d time.Duration) {
 	s.httpcli.Timeout = d
 }
@@ -145,7 +183,8 @@ type IdOutput struct {
 // ID gets information about a given peer.  Arguments:
 //
 // peer: peer.ID of the node to look up.  If no peer is specified,
-//   return information about the local peer.
+//
+//	return information about the local peer.
 func (s *Shell) ID(peer ...string) (*IdOutput, error) {
 	if len(peer) > 1 {
 		return nil, fmt.Errorf("too many peer arguments")
@@ -368,7 +407,10 @@ func (s *Shell) PatchData(root string, set bool, data interface{}) (string, erro
 
 	fr := files.NewReaderFile(read)
 	slf := files.NewSliceDirectory([]files.DirEntry{files.FileEntry("", fr)})
-	fileReader := files.NewMultiFileReader(slf, true)
+	fileReader, err := s.newMultiFileReader(slf)
+	if err != nil {
+		return "", err
+	}
 
 	var out object
 	return out.Hash, s.Request("object/patch/"+cmd, root).
@@ -460,7 +502,7 @@ func (s *Shell) BlockGet(path string) ([]byte, error) {
 		return nil, resp.Error
 	}
 
-	return ioutil.ReadAll(resp.Output)
+	return io.ReadAll(resp.Output)
 }
 
 func (s *Shell) BlockPut(block []byte, format, mhtype string, mhlen int) (string, error) {
@@ -470,7 +512,10 @@ func (s *Shell) BlockPut(block []byte, format, mhtype string, mhlen int) (string
 
 	fr := files.NewBytesFile(block)
 	slf := files.NewSliceDirectory([]files.DirEntry{files.FileEntry("", fr)})
-	fileReader := files.NewMultiFileReader(slf, true)
+	fileReader, err := s.newMultiFileReader(slf)
+	if err != nil {
+		return "", err
+	}
 
 	return out.Key, s.Request("block/put").
 		Option("mhtype", mhtype).
@@ -507,7 +552,10 @@ func (s *Shell) ObjectPut(obj *IpfsObject) (string, error) {
 
 	fr := files.NewReaderFile(&data)
 	slf := files.NewSliceDirectory([]files.DirEntry{files.FileEntry("", fr)})
-	fileReader := files.NewMultiFileReader(slf, true)
+	fileReader, err := s.newMultiFileReader(slf)
+	if err != nil {
+		return "", err
+	}
 
 	var out object
 	return out.Hash, s.Request("object/put").
@@ -530,10 +578,13 @@ func (s *Shell) PubSubSubscribe(topic string) (*PubSubSubscription, error) {
 }
 
 func (s *Shell) PubSubPublish(topic, data string) (err error) {
-
 	fr := files.NewReaderFile(bytes.NewReader([]byte(data)))
 	slf := files.NewSliceDirectory([]files.DirEntry{files.FileEntry("", fr)})
-	fileReader := files.NewMultiFileReader(slf, true)
+
+	fileReader, err := s.newMultiFileReader(slf)
+	if err != nil {
+		return err
+	}
 
 	encoder, _ := mbase.EncoderByName("base64url")
 	resp, err := s.Request("pubsub/pub", encoder.Encode([]byte(topic))).
@@ -610,4 +661,27 @@ func (s *Shell) SwarmConnect(ctx context.Context, addr ...string) error {
 		Arguments(addr...).
 		Exec(ctx, &conn)
 	return err
+}
+
+type PeeringLsOutput struct {
+	Peers []PeerInfo
+}
+
+// SwarmPeeringLs lists peers registered in the peering subsystem
+func (s *Shell) SwarmPeeringLs(ctx context.Context) (*PeeringLsOutput, error) {
+	var output *PeeringLsOutput
+	err := s.Request("swarm/peering/ls").Arguments().Exec(ctx, &output)
+	return output, err
+}
+
+type PeerStatus struct {
+	ID     string
+	Status string
+}
+
+// SwarmPeeringAdd adds a peer into the peering subsysytem.
+func (s *Shell) SwarmPeeringAdd(ctx context.Context, addr string) (*PeerStatus, error) {
+	var output *PeerStatus
+	err := s.Request("swarm/peering/add").Arguments(addr).Exec(ctx, &output)
+	return output, err
 }

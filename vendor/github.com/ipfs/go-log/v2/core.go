@@ -1,10 +1,10 @@
 package log
 
 import (
+	"errors"
 	"reflect"
 	"sync"
 
-	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -51,21 +51,28 @@ func (l *lockedMultiCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *za
 func (l *lockedMultiCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	var err error
+	var errs []error
 	for i := range l.cores {
-		err = multierr.Append(err, l.cores[i].Write(ent, fields))
+		err := l.cores[i].Write(ent, fields)
+		if err != nil {
+			errs = append(errs, err)
+		}
+
 	}
-	return err
+	return errors.Join(errs...)
 }
 
 func (l *lockedMultiCore) Sync() error {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	var err error
+	var errs []error
 	for i := range l.cores {
-		err = multierr.Append(err, l.cores[i].Sync())
+		err := l.cores[i].Sync()
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return err
+	return errors.Join(errs...)
 }
 
 func (l *lockedMultiCore) AddCore(core zapcore.Core) {

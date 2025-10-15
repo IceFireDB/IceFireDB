@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	files "github.com/ipfs/go-ipfs-files"
+	files "github.com/ipfs/boxo/files"
 )
 
 type object struct {
@@ -61,10 +61,15 @@ func CidVersion(version int) AddOpts {
 	}
 }
 
+// Add adds a file to ipfs pinning it with the given options
 func (s *Shell) Add(r io.Reader, options ...AddOpts) (string, error) {
 	fr := files.NewReaderFile(r)
 	slf := files.NewSliceDirectory([]files.DirEntry{files.FileEntry("", fr)})
-	fileReader := files.NewMultiFileReader(slf, true)
+
+	fileReader, err := s.newMultiFileReader(slf)
+	if err != nil {
+		return "", err
+	}
 
 	var out object
 	rb := s.Request("add")
@@ -89,14 +94,18 @@ func (s *Shell) AddWithOpts(r io.Reader, pin bool, rawLeaves bool) (string, erro
 func (s *Shell) AddLink(target string) (string, error) {
 	link := files.NewLinkFile(target, nil)
 	slf := files.NewSliceDirectory([]files.DirEntry{files.FileEntry("", link)})
-	reader := files.NewMultiFileReader(slf, true)
+
+	reader, err := s.newMultiFileReader(slf)
+	if err != nil {
+		return "", err
+	}
 
 	var out object
 	return out.Hash, s.Request("add").Body(reader).Exec(context.Background(), &out)
 }
 
 // AddDir adds a directory recursively with all of the files under it
-func (s *Shell) AddDir(dir string) (string, error) {
+func (s *Shell) AddDir(dir string, options ...AddOpts) (string, error) {
 	stat, err := os.Lstat(dir)
 	if err != nil {
 		return "", err
@@ -107,16 +116,24 @@ func (s *Shell) AddDir(dir string) (string, error) {
 		return "", err
 	}
 	slf := files.NewSliceDirectory([]files.DirEntry{files.FileEntry(filepath.Base(dir), sf)})
-	reader := files.NewMultiFileReader(slf, true)
 
-	resp, err := s.Request("add").
-		Option("recursive", true).
-		Body(reader).
-		Send(context.Background())
+	reader, err := s.newMultiFileReader(slf)
 	if err != nil {
 		return "", err
 	}
 
+	rb := s.Request("add").Option("recursive", true)
+	for _, option := range options {
+		option(rb)
+	}
+
+	// Here we cannot use .Exec because "add" streams responses back for each file
+	// within the directory, and we only care about the last one, which is the directory
+	// itself.
+	resp, err := rb.Body(reader).Send(context.Background())
+	if err != nil {
+		return "", err
+	}
 	defer resp.Close()
 
 	if resp.Error != nil {

@@ -16,7 +16,7 @@ import ( //nolint:gci
 // https://www.iana.org/assignments/tls-parameters/tls-parameters.xhtml#tls-parameters-18
 type Algorithm uint16
 
-// Supported hash algorithms
+// Supported hash algorithms.
 const (
 	None    Algorithm = 0 // Blacklisted
 	MD5     Algorithm = 1 // Blacklisted
@@ -28,7 +28,7 @@ const (
 	Ed25519 Algorithm = 8
 )
 
-// String makes hashAlgorithm printable
+// String makes hashAlgorithm printable.
 func (a Algorithm) String() string {
 	switch a {
 	case None:
@@ -52,28 +52,34 @@ func (a Algorithm) String() string {
 	}
 }
 
-// Digest performs a digest on the passed value
+// Digest performs a digest on the passed value.
 func (a Algorithm) Digest(b []byte) []byte {
 	switch a {
 	case None:
 		return nil
 	case MD5:
 		hash := md5.Sum(b) // #nosec
+
 		return hash[:]
 	case SHA1:
 		hash := sha1.Sum(b) // #nosec
+
 		return hash[:]
 	case SHA224:
 		hash := sha256.Sum224(b)
+
 		return hash[:]
 	case SHA256:
 		hash := sha256.Sum256(b)
+
 		return hash[:]
 	case SHA384:
 		hash := sha512.Sum384(b)
+
 		return hash[:]
 	case SHA512:
 		hash := sha512.Sum512(b)
+
 		return hash[:]
 	default:
 		return nil
@@ -81,6 +87,7 @@ func (a Algorithm) Digest(b []byte) []byte {
 }
 
 // Insecure returns if the given HashAlgorithm is considered secure in DTLS 1.2
+// .
 func (a Algorithm) Insecure() bool {
 	switch a {
 	case None, MD5, SHA1:
@@ -90,7 +97,7 @@ func (a Algorithm) Insecure() bool {
 	}
 }
 
-// CryptoHash returns the crypto.Hash implementation for the given HashAlgorithm
+// CryptoHash returns the crypto.Hash implementation for the given HashAlgorithm.
 func (a Algorithm) CryptoHash() crypto.Hash {
 	switch a {
 	case None:
@@ -114,7 +121,7 @@ func (a Algorithm) CryptoHash() crypto.Hash {
 	}
 }
 
-// Algorithms returns all the supported Hash Algorithms
+// Algorithms returns all the supported Hash Algorithms.
 func Algorithms() map[Algorithm]struct{} {
 	return map[Algorithm]struct{}{
 		None:    {},

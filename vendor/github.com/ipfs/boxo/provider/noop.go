@@ -15,11 +15,15 @@ func NewNoopProvider() System {
 	return &noopProvider{}
 }
 
+func (op *noopProvider) Clear() int {
+	return 0
+}
+
 func (op *noopProvider) Close() error {
 	return nil
 }
 
-func (op *noopProvider) Provide(cid.Cid) error {
+func (op *noopProvider) Provide(context.Context, cid.Cid, bool) error {
 	return nil
 }
 
@@ -29,4 +33,7 @@ func (op *noopProvider) Reprovide(context.Context) error {
 
 func (op *noopProvider) Stat() (ReproviderStats, error) {
 	return ReproviderStats{}, nil
+}
+
+func (op *noopProvider) SetKeyProvider(KeyChanFunc) {
 }

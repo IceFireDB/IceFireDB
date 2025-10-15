@@ -117,7 +117,7 @@ func (s Store) Repair(path string, cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-	return db.(*DB).db.Repair()
+	return db.(*DB).db.Repair(context.Background())
 }
 
 type DB struct {

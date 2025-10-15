@@ -22,11 +22,12 @@ func nameToHash() map[string]crypto.Hash {
 	}
 }
 
-// HashFromString allows looking up a hash algorithm by it's string representation
+// HashFromString allows looking up a hash algorithm by it's string representation.
 func HashFromString(s string) (crypto.Hash, error) {
 	if h, ok := nameToHash()[strings.ToLower(s)]; ok {
 		return h, nil
 	}
+
 	return 0, errInvalidHashAlgorithm
 }
 
@@ -37,5 +38,6 @@ func StringFromHash(hash crypto.Hash) (string, error) {
 			return s, nil
 		}
 	}
+
 	return "", errInvalidHashAlgorithm
 }

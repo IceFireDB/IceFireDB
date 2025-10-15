@@ -37,13 +37,14 @@ type ProvideOption interface {
 }
 
 type provideOptions struct {
-	Name     string
-	Group    string
-	Info     *ProvideInfo
-	As       []interface{}
-	Location *digreflect.Func
-	Exported bool
-	Callback Callback
+	Name           string
+	Group          string
+	Info           *ProvideInfo
+	As             []interface{}
+	Location       *digreflect.Func
+	Exported       bool
+	Callback       Callback
+	BeforeCallback BeforeCallback
 }
 
 func (o *provideOptions) Validate() error {
@@ -449,14 +450,17 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 	// we start making changes to it as we may need to
 	// undo them upon encountering errors.
 	allScopes := s.appendSubscopes(nil)
-	for _, s := range allScopes {
-		s := s
-		s.gh.Snapshot()
-		defer func() {
-			if err != nil {
-				s.gh.Rollback()
+
+	defer func(allSc []*Scope) {
+		if err != nil {
+			for _, sc := range allSc {
+				sc.gh.Rollback()
 			}
-		}()
+		}
+	}(allScopes)
+
+	for _, sc := range allScopes {
+		sc.gh.Snapshot()
 	}
 
 	n, err := newConstructorNode(
@@ -464,11 +468,12 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 		s,
 		origScope,
 		constructorOptions{
-			ResultName:  opts.Name,
-			ResultGroup: opts.Group,
-			ResultAs:    opts.As,
-			Location:    opts.Location,
-			Callback:    opts.Callback,
+			ResultName:     opts.Name,
+			ResultGroup:    opts.Group,
+			ResultAs:       opts.As,
+			Location:       opts.Location,
+			Callback:       opts.Callback,
+			BeforeCallback: opts.BeforeCallback,
 		},
 	)
 	if err != nil {

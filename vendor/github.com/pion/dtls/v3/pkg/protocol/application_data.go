@@ -12,18 +12,19 @@ type ApplicationData struct {
 	Data []byte
 }
 
-// ContentType returns the ContentType of this content
+// ContentType returns the ContentType of this content.
 func (a ApplicationData) ContentType() ContentType {
 	return ContentTypeApplicationData
 }
 
-// Marshal encodes the ApplicationData to binary
+// Marshal encodes the ApplicationData to binary.
 func (a *ApplicationData) Marshal() ([]byte, error) {
 	return append([]byte{}, a.Data...), nil
 }
 
-// Unmarshal populates the ApplicationData from binary
+// Unmarshal populates the ApplicationData from binary.
 func (a *ApplicationData) Unmarshal(data []byte) error {
 	a.Data = append([]byte{}, data...)
+
 	return nil
 }
