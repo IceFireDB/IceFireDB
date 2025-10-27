@@ -130,7 +130,7 @@ func TestSnapshot_Iterator(t *testing.T) {
 	for iter.First(); iter.Valid(); iter.Next() {
 		key := string(iter.Key())
 		value := string(iter.Value())
-		
+
 		expectedValue, exists := testData[key]
 		assert.True(t, exists, "Snapshot iterator should only see original keys")
 		assert.Equal(t, expectedValue, value)
@@ -189,7 +189,7 @@ func TestSnapshot_Close(t *testing.T) {
 				t.Fatalf("Snapshot operations panicked after close: %v", r)
 			}
 		}()
-		
+
 		_, _ = snapshot.Get([]byte("test"))
 		_ = snapshot.NewIterator()
 	}()
@@ -234,11 +234,11 @@ func TestSnapshot_Concurrent(t *testing.T) {
 		value, err := snapshot.Get([]byte("initial"))
 		require.NoError(t, err)
 		assert.Equal(t, []byte("value"), value, "Snapshot %d should see original value", i)
-		
+
 		value, err = snapshot.Get([]byte("new"))
 		require.NoError(t, err)
 		assert.Nil(t, value, "Snapshot %d should not see new key", i)
-		
+
 		snapshot.Close()
 	}
 }

@@ -1,4 +1,5 @@
 package hybriddb
+
 import (
 	"fmt"
 	"io/fs"
@@ -22,7 +23,7 @@ const (
 	defaultHotCacheNumCounters = 1e7  // unit:byte 10m
 	defaultFilterBits          = 10
 	defaultCacheTTL            = 5 * time.Minute
-	maxKeySize                 = 1024 * 1024 // 1MB max key size
+	maxKeySize                 = 1024 * 1024      // 1MB max key size
 	maxValueSize               = 64 * 1024 * 1024 // 64MB max value size
 )
 
@@ -37,11 +38,11 @@ type cacheItem struct {
 }
 
 type Config struct {
-	HotCacheSize    int64
-	CacheTTL        time.Duration
-	MaxKeySize      int64
-	MaxValueSize    int64
-	EnableMetrics   bool
+	HotCacheSize      int64
+	CacheTTL          time.Duration
+	MaxKeySize        int64
+	MaxValueSize      int64
+	EnableMetrics     bool
 	EnableCompression bool
 }
 
@@ -128,25 +129,25 @@ type DB struct {
 	cache *ristretto.Cache[[]byte, *cacheItem] // Hot tier storage
 
 	filter filter.Filter
-	
+
 	// Performance and security enhancements
-	mu           sync.RWMutex
-	stats        *Stats
-	closed       bool
-	config       Config
+	mu     sync.RWMutex
+	stats  *Stats
+	closed bool
+	config Config
 }
 
 // Stats holds performance and operational statistics
 type Stats struct {
-	CacheHits        int64
-	CacheMisses      int64
-	ReadOps          int64
-	WriteOps         int64
-	DeleteOps        int64
-	BytesRead        int64
-	BytesWritten     int64
-	Errors           int64
-	StartTime        time.Time
+	CacheHits    int64
+	CacheMisses  int64
+	ReadOps      int64
+	WriteOps     int64
+	DeleteOps    int64
+	BytesRead    int64
+	BytesWritten int64
+	Errors       int64
+	StartTime    time.Time
 }
 
 func (s *DB) GetStorageEngine() interface{} {
@@ -158,15 +159,15 @@ func (db *DB) validateKeyValue(key, value []byte) error {
 	if len(key) == 0 {
 		return fmt.Errorf("key cannot be empty")
 	}
-	
+
 	if int64(len(key)) > db.config.MaxKeySize {
 		return fmt.Errorf("key size %d exceeds maximum allowed %d", len(key), db.config.MaxKeySize)
 	}
-	
+
 	if int64(len(value)) > db.config.MaxValueSize {
 		return fmt.Errorf("value size %d exceeds maximum allowed %d", len(value), db.config.MaxValueSize)
 	}
-	
+
 	return nil
 }
 
@@ -210,11 +211,11 @@ func newOptions(cfg *config.LevelDBConfig) *opt.Options {
 func (db *DB) Close() error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-	
+
 	if db.closed {
 		return fmt.Errorf("database already closed")
 	}
-	
+
 	// Close the cache and wait for all OnEvict writes to complete.
 	db.cache.Close()
 	db.closed = true
@@ -224,11 +225,11 @@ func (db *DB) Close() error {
 func (db *DB) Put(key, value []byte) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-	
+
 	if db.closed {
 		return fmt.Errorf("database is closed")
 	}
-	
+
 	if err := db.validateKeyValue(key, value); err != nil {
 		db.stats.Errors++
 		return err
@@ -239,10 +240,10 @@ func (db *DB) Put(key, value []byte) error {
 		db.stats.Errors++
 		return err
 	}
-	
+
 	db.stats.WriteOps++
 	db.stats.BytesWritten += int64(len(key) + len(value))
-	
+
 	// Then update the cache to ensure consistency
 	item := &cacheItem{
 		key:      key,
@@ -257,18 +258,18 @@ func (db *DB) Put(key, value []byte) error {
 func (db *DB) Get(key []byte) ([]byte, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
-	
+
 	if db.closed {
 		return nil, fmt.Errorf("database is closed")
 	}
-	
+
 	if len(key) == 0 {
 		db.stats.Errors++
 		return nil, fmt.Errorf("key cannot be empty")
 	}
 
 	db.stats.ReadOps++
-	
+
 	// 1. Check hot tier
 	if item, ok := db.cache.Get(key); ok {
 		if !item.isExpired() {
@@ -311,11 +312,11 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 func (db *DB) Delete(key []byte) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-	
+
 	if db.closed {
 		return fmt.Errorf("database is closed")
 	}
-	
+
 	if len(key) == 0 {
 		db.stats.Errors++
 		return fmt.Errorf("key cannot be empty")
@@ -326,9 +327,9 @@ func (db *DB) Delete(key []byte) error {
 		db.stats.Errors++
 		return err
 	}
-	
+
 	db.stats.DeleteOps++
-	
+
 	// Then remove from cache to ensure consistency
 	db.cache.Del(key)
 	return nil
@@ -339,7 +340,7 @@ func (db *DB) SyncPut(key, value []byte) error {
 	if err := db.db.Put(key, value, db.syncOpts); err != nil {
 		return err
 	}
-	
+
 	// Then update the cache to ensure consistency
 	item := &cacheItem{key: key, value: value}
 	db.cache.Set(key, item, int64(len(value)))
@@ -351,7 +352,7 @@ func (db *DB) SyncDelete(key []byte) error {
 	if err := db.db.Delete(key, db.syncOpts); err != nil {
 		return err
 	}
-	
+
 	// Then remove from cache to ensure consistency
 	db.cache.Del(key)
 	return nil
@@ -395,11 +396,11 @@ func (db *DB) Compact() error {
 func (db *DB) GetStats() *Stats {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
-	
+
 	if db.stats == nil {
 		return &Stats{}
 	}
-	
+
 	// Return a copy to avoid race conditions
 	stats := *db.stats
 	return &stats
@@ -407,9 +408,9 @@ func (db *DB) GetStats() *Stats {
 
 func (db *DB) Metrics() (tit string, metrics []map[string]interface{}) {
 	tit = "hybriddb cache"
-	
+
 	stats := db.GetStats()
-	
+
 	// Add cache metrics if available
 	var cacheMetrics []map[string]interface{}
 	if db.cache != nil && db.cache.Metrics != nil {
@@ -430,7 +431,7 @@ func (db *DB) Metrics() (tit string, metrics []map[string]interface{}) {
 			{"sets_rejected": m.SetsRejected()},
 		}
 	}
-	
+
 	// Add operational statistics
 	operationalMetrics := []map[string]interface{}{
 		{"cache_hits": stats.CacheHits},
@@ -445,7 +446,7 @@ func (db *DB) Metrics() (tit string, metrics []map[string]interface{}) {
 		{"uptime": time.Since(stats.StartTime).String()},
 		{"closed": db.closed},
 	}
-	
+
 	// Combine all metrics
 	metrics = append(operationalMetrics, cacheMetrics...)
 	return
