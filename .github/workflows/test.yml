@@ -33,7 +33,7 @@ jobs:
       - name: Start MinIO
         run: docker run -p 9000:9000 -p 9001:9001 -e "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE" -e "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" -d quay.io/minio/minio server /data --console-address ":9001"
       - name: Test
-        run: go test -v -tags="alltest osstest"
+        run: go test -v -count=1 -tags="alltest osstest"
 
   ipfstest:
     strategy:
@@ -65,7 +65,7 @@ jobs:
           export ipfs_data=/root/ipfs_data 
           docker run -d --name ipfs_host -v $ipfs_staging:/export -v $ipfs_data:/data/ipfs -p 4001:4001 -p 8080:8080 -p 5001:5001 ipfs/go-ipfs:latest
       - name: Test
-        run: go test -v -tags alltest
+        run: go test -v -count=1 -tags alltest
 
 
   ipfssynckvtest:
@@ -98,7 +98,7 @@ jobs:
           export ipfs_data=/root/ipfs_data 
           docker run -d --name ipfs_host -v $ipfs_staging:/export -v $ipfs_data:/data/ipfs -p 4001:4001 -p 8080:8080 -p 5001:5001 ipfs/go-ipfs:latest
       - name: Test
-        run: go test -v -tags alltest
+        run: go test -v -count=1 -tags alltest
 
 
   goleveldbtest:
@@ -124,7 +124,7 @@ jobs:
       - name: Install dependencies
         run: go mod tidy && go mod vendor
       - name: Test
-        run: go test -v -tags alltest
+        run: go test -v -count=1 -tags alltest
 
   crdtdbtest:
     strategy:
@@ -149,7 +149,7 @@ jobs:
       - name: Install dependencies
         run: go mod tidy && go mod vendor
       - name: Test
-        run: go test -v -tags alltest
+        run: go test -v -count=1 -tags alltest
 
   ipfslogdbtest:
     strategy:
@@ -174,7 +174,7 @@ jobs:
       - name: Install dependencies
         run: go mod tidy && go mod vendor
       - name: Test
-        run: go test -v -tags alltest
+        run: go test -v -count=1 -tags alltest
 
   badgerdbtest:
     strategy:
@@ -199,7 +199,7 @@ jobs:
       - name: Install dependencies
         run: go mod tidy && go mod vendor
       - name: Test
-        run: go test -v -tags alltest
+        run: go test -v -count=1 -tags alltest
 
   hybriddbtest:
     strategy:
@@ -224,7 +224,7 @@ jobs:
       - name: Install dependencies
         run: go mod tidy && go mod vendor
       - name: Test
-        run: go test -v -tags alltest
+        run: go test -v -count=1 -tags alltest
 
   hybriddb-unit-test:
     strategy:
@@ -242,4 +242,4 @@ jobs:
       - name: Install dependencies
         run: go mod tidy && go mod vendor
       - name: Run hybriddb unit tests
-        run: go test -v ./driver/hybriddb/...
+        run: go test -v -count=1 ./driver/hybriddb/...
