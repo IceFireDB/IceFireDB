@@ -11,7 +11,7 @@ type Snapshot struct {
 }
 
 func (s *Snapshot) Get(key []byte) ([]byte, error) {
-	v, err := s.snp.Get(key, s.db.iteratorOpts)
+	v, err := s.snp.Get(key, nil)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
 			return nil, nil // Not found
