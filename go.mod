@@ -34,7 +34,7 @@ require (
 	github.com/alicebob/miniredis/v2 v2.35.0
 	github.com/chasex/redis-go-cluster v1.0.0
 	github.com/gomodule/redigo v2.0.0+incompatible
-	github.com/ipfs/go-cid v0.5.0
+	github.com/ipfs/go-cid v0.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/libp2p/go-libp2p v0.43.0
 	github.com/libp2p/go-libp2p-kad-dht v0.35.0
