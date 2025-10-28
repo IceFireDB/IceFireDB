@@ -23,7 +23,7 @@ func (s *Snapshot) Get(key []byte) ([]byte, error) {
 
 func (s *Snapshot) NewIterator() driver.IIterator {
 	it := &Iterator{
-		s.snp.NewIterator(nil, s.db.iteratorOpts),
+		s.snp.NewIterator(nil, nil),
 	}
 	return it
 }
