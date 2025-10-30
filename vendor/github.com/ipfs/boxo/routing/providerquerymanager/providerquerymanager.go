@@ -192,7 +192,9 @@ func (pqm *ProviderQueryManager) FindProvidersAsync(sessionCtx context.Context, 
 	inProgressRequestChan := make(chan inProgressRequest)
 
 	var span trace.Span
-	sessionCtx, span = otel.Tracer("routing").Start(sessionCtx, "ProviderQueryManager.FindProvidersAsync", trace.WithAttributes(attribute.Stringer("cid", k)))
+	sessionCtx, span = otel.Tracer("routing").Start(sessionCtx, "ProviderQueryManager.FindProvidersAsync", // ProbeLab: don't delete/change name without notice
+		trace.WithAttributes(attribute.Stringer("cid", k)), // ProbeLab: don't delete/change key/value without notice
+	)
 
 	select {
 	case pqm.providerQueryMessages <- &newProvideQueryMessage{
@@ -381,7 +383,7 @@ func (pqm *ProviderQueryManager) findProviderWorker() {
 						return
 					}
 
-					span.AddEvent("FoundProvider", trace.WithAttributes(attribute.Stringer("peer", p.ID)))
+					span.AddEvent("FoundProvider", trace.WithAttributes(attribute.Stringer("peer", p.ID))) // ProbeLab: don't delete/change name without notice
 					if retrievalState != nil {
 						retrievalState.ProvidersFound.Add(1)
 						retrievalState.AddFoundProvider(p.ID)
@@ -398,7 +400,7 @@ func (pqm *ProviderQueryManager) findProviderWorker() {
 						}
 						return
 					}
-					span.AddEvent("ConnectedToProvider", trace.WithAttributes(attribute.Stringer("peer", p.ID)))
+					span.AddEvent("ConnectedToProvider", trace.WithAttributes(attribute.Stringer("peer", p.ID))) // ProbeLab: don't delete/change name without notice
 					if retrievalState != nil {
 						retrievalState.ProvidersConnected.Add(1)
 					}

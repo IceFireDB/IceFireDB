@@ -134,6 +134,7 @@ func (rs *State) GetPhase() RetrievalPhase {
 
 // appendProviders is a helper to append providers to a sample list with size limit.
 // Only the first MaxProvidersSampleSize providers are kept to prevent unbounded memory growth.
+// Duplicate peer IDs are automatically filtered out to ensure each peer appears only once.
 // This follows the idiomatic append pattern but operates on internal state.
 func (rs *State) appendProviders(list *[]peer.ID, peerIDs ...peer.ID) {
 	rs.mu.Lock()
@@ -141,11 +142,17 @@ func (rs *State) appendProviders(list *[]peer.ID, peerIDs ...peer.ID) {
 	if len(*list) >= MaxProvidersSampleSize {
 		return
 	}
-	remaining := MaxProvidersSampleSize - len(*list)
-	if len(peerIDs) > remaining {
-		peerIDs = peerIDs[:remaining]
+	for _, peerID := range peerIDs {
+		// Skip if we already have this peer ID in the list
+		if slices.Contains(*list, peerID) {
+			continue
+		}
+		// Stop if we've reached the sample size limit
+		if len(*list) >= MaxProvidersSampleSize {
+			return
+		}
+		*list = append(*list, peerID)
 	}
-	*list = append(*list, peerIDs...)
 }
 
 // AddFoundProvider records a provider peer ID that was discovered during provider search.

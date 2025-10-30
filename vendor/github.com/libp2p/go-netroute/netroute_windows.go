@@ -13,7 +13,6 @@ import (
 	"net"
 	"unsafe"
 
-	"github.com/google/gopacket/routing"
 	"golang.org/x/sys/windows"
 )
 
@@ -236,7 +235,7 @@ func (r *winRouter) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface
 	return iface, nextHop, pref, nil
 }
 
-func New() (routing.Router, error) {
+func New() (Router, error) {
 	rtr := &winRouter{}
 	return rtr, nil
 }

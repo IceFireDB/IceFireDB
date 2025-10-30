@@ -62,9 +62,11 @@ func (q *ProvideQueue) Enqueue(prefix bitstr.Key, keys ...mh.Multihash) {
 	q.queue.Push(prefix)
 
 	// Add keys to the keys trie.
-	for _, h := range keys {
-		q.keys.Add(keyspace.MhToBit256(h), h)
+	entries := make([]trie.Entry[bit256.Key, mh.Multihash], len(keys))
+	for i, h := range keys {
+		entries[i] = trie.Entry[bit256.Key, mh.Multihash]{Key: keyspace.MhToBit256(h), Data: h}
 	}
+	q.keys.AddMany(entries...)
 }
 
 // Dequeue pops the first prefix of the queue along with all matching keys.

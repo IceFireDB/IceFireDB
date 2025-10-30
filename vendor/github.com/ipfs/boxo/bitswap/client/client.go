@@ -24,7 +24,6 @@ import (
 	"github.com/ipfs/boxo/bitswap/tracer"
 	blockstore "github.com/ipfs/boxo/blockstore"
 	exchange "github.com/ipfs/boxo/exchange"
-	"github.com/ipfs/boxo/retrieval"
 	rpqm "github.com/ipfs/boxo/routing/providerquerymanager"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
@@ -299,6 +298,7 @@ func New(parent context.Context, network bsnet.BitSwapNetwork, providerFinder ro
 	}
 
 	sessionFactory := func(
+		sessctx context.Context,
 		sessmgr bssession.SessionManager,
 		id uint64,
 		spm bssession.SessionPeerManager,
@@ -309,7 +309,6 @@ func New(parent context.Context, network bsnet.BitSwapNetwork, providerFinder ro
 		provSearchDelay time.Duration,
 		rebroadcastDelay time.Duration,
 		self peer.ID,
-		retrievalState *retrieval.State,
 	) bssm.Session {
 		// careful when bs.pqm is nil. Since we are type-casting it
 		// into routing.ContentDiscovery when passing it, it will become
@@ -321,7 +320,7 @@ func New(parent context.Context, network bsnet.BitSwapNetwork, providerFinder ro
 		} else if providerFinder != nil {
 			sessionProvFinder = providerFinder
 		}
-		return bssession.New(sessmgr, id, spm, sessionProvFinder, sim, pm, bpm, notif, provSearchDelay, rebroadcastDelay, self, bs.havesReceivedGauge, retrievalState)
+		return bssession.New(sessctx, sessmgr, id, spm, sessionProvFinder, sim, pm, bpm, notif, provSearchDelay, rebroadcastDelay, self, bs.havesReceivedGauge)
 	}
 	sessionPeerManagerFactory := func(id uint64) bssession.SessionPeerManager {
 		return bsspm.New(id, network)
@@ -446,19 +445,27 @@ func (bs *Client) GetBlocks(ctx context.Context, keys []cid.Cid) (<-chan blocks.
 	ctx, span := internal.StartSpan(ctx, "GetBlocks", trace.WithAttributes(attribute.Int("NumKeys", len(keys))))
 	defer span.End()
 
-	session := bs.sm.NewSession(bs.provSearchDelay, bs.rebroadcastDelay, retrieval.StateFromContext(ctx))
+	// Create a session context for the goroutine created here to use to close
+	// the session after reading all blocks.
+	sessCtx, cancelSession := context.WithCancel(ctx)
+
+	session := bs.sm.NewSession(sessCtx, bs.provSearchDelay, bs.rebroadcastDelay)
 
 	blocksChan, err := session.GetBlocks(ctx, keys)
 	if err != nil {
-		session.Close()
+		cancelSession()
 		return nil, err
 	}
 
+	// The purpose of creating this goroutine to read the blocks from one
+	// channel and then put them on another channel, instead of simply
+	// returning the first channel, is to ensure that the session created here
+	// is closed after reading the blocks.
 	out := make(chan blocks.Block)
 	go func() {
 		defer func() {
 			close(out)
-			session.Close()
+			cancelSession()
 		}()
 
 		ctxDone := ctx.Done()
@@ -717,9 +724,5 @@ func (bs *Client) NewSession(ctx context.Context) exchange.Fetcher {
 	ctx, span := internal.StartSpan(ctx, "NewSession")
 	defer span.End()
 
-	session := bs.sm.NewSession(bs.provSearchDelay, bs.rebroadcastDelay, retrieval.StateFromContext(ctx))
-	context.AfterFunc(ctx, func() {
-		session.Close()
-	})
-	return session
+	return bs.sm.NewSession(ctx, bs.provSearchDelay, bs.rebroadcastDelay)
 }

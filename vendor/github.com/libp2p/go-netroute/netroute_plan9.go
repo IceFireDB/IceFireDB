@@ -12,13 +12,11 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/google/gopacket/routing"
 )
 
 const netdir = "/net"
 
-func New() (routing.Router, error) {
+func New() (Router, error) {
 	rtr := &router{}
 	rtr.ifaces = make(map[int]net.Interface)
 	rtr.addrs = make(map[int]ipAddrs)

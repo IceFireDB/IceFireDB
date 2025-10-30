@@ -13,6 +13,8 @@ import (
 	"github.com/probe-lab/go-libdht/kad/trie"
 )
 
+var zeroKey = bit256.ZeroKey()
+
 // AllEntries returns all entries (key + value) stored in the trie `t` sorted
 // by their keys in the supplied `order`.
 func AllEntries[K0 kad.Key[K0], K1 kad.Key[K1], D any](t *trie.Trie[K0, D], order K1) []*trie.Entry[K0, D] {
@@ -313,48 +315,51 @@ func AllocateToKClosest[K kad.Key[K], V0 any, V1 comparable](items *trie.Trie[K,
 //
 // Returns a map of destination values to their allocated items.
 func allocateToKClosestAtDepth[K kad.Key[K], V0 any, V1 comparable](items *trie.Trie[K, V0], dests *trie.Trie[K, V1], k, depth int) map[V1][]V0 {
-	m := make(map[V1][]V0)
 	if k == 0 {
-		return m
+		return nil
 	}
-	for i := range 2 {
+	destBranches := []*trie.Trie[K, V1]{
+		dests.Branch(0),
+		dests.Branch(1),
+	}
+	destValues := [][]V1{
+		AllValues(dests.Branch(0), zeroKey),
+		AllValues(dests.Branch(1), zeroKey),
+	}
+	if dests.IsLeaf() {
+		if !dests.HasKey() {
+			return nil
+		}
+		b := int((*dests.Key()).Bit(depth))
+		destValues[b] = []V1{dests.Data()}
+		destValues[1-b] = nil
+		destBranches[b] = dests
+		destBranches[1-b] = nil
+	}
+	m := make(map[V1][]V0, len(destValues[0])+len(destValues[1]))
+	for i := range destValues {
 		// Assign all items from branch i
 
+		matchingDestsBranch := destBranches[i]
+		otherDestsBranch := destBranches[1-i]
+		matchingDests := destValues[i]
+		otherDests := destValues[1-i]
+
 		matchingItemsBranch := items.Branch(i)
-		matchingItems := AllValues(matchingItemsBranch, bit256.ZeroKey())
-		if len(matchingItems) == 0 {
+		if matchingItemsBranch == nil || matchingItemsBranch.IsEmptyLeaf() {
+			// No matching items
 			if !items.IsNonEmptyLeaf() || int((*items.Key()).Bit(depth)) != i {
 				// items' current branch is empty, skip it
 				continue
 			}
 			// items' current branch contains a single leaf
-			matchingItems = []V0{items.Data()}
 			matchingItemsBranch = items
 		}
-
-		matchingDestsBranch := dests.Branch(i)
-		otherDestsBranch := dests.Branch(1 - i)
-		matchingDests := AllValues(matchingDestsBranch, bit256.ZeroKey())
-		otherDests := AllValues(otherDestsBranch, bit256.ZeroKey())
-		if dests.IsLeaf() {
-			// Single key (leaf) in dests
-			if dests.IsNonEmptyLeaf() {
-				if int((*dests.Key()).Bit(depth)) == i {
-					// Leaf matches current branch
-					matchingDests = []V1{dests.Data()}
-					matchingDestsBranch = dests
-				} else {
-					// Leaf matches other branch
-					otherDests = []V1{dests.Data()}
-					otherDestsBranch = dests
-				}
-			} else {
-				// Empty leaf, no dests to allocate items.
-				return m
-			}
-		}
-
 		if nMatchingDests := len(matchingDests); nMatchingDests <= k {
+			matchingItems := AllValues(matchingItemsBranch, zeroKey)
+			if len(matchingItems) == 0 {
+				matchingItems = []V0{items.Data()}
+			}
 			// Allocate matching items to the matching dests branch
 			for _, dest := range matchingDests {
 				m[dest] = append(m[dest], matchingItems...)
@@ -408,11 +413,13 @@ func RegionsFromPeers(peers []peer.ID, regionSize int, order bit256.Key) ([]Regi
 	peersTrie := trie.New[bit256.Key, peer.ID]()
 	minCpl := KeyLen
 	firstPeerKey := PeerIDToBit256(peers[0])
-	for _, p := range peers {
+	peerEntries := make([]trie.Entry[bit256.Key, peer.ID], len(peers))
+	for i, p := range peers {
 		k := PeerIDToBit256(p)
-		peersTrie.Add(k, p)
+		peerEntries[i] = trie.Entry[bit256.Key, peer.ID]{Key: k, Data: p}
 		minCpl = min(minCpl, firstPeerKey.CommonPrefixLength(k))
 	}
+	peersTrie.AddMany(peerEntries...)
 	commonPrefix := bitstr.Key(key.BitString(firstPeerKey)[:minCpl])
 	regions := extractMinimalRegions(peersTrie, commonPrefix, regionSize, order)
 	return regions, commonPrefix
@@ -440,14 +447,18 @@ func AssignKeysToRegions(regions []Region, keys []mh.Multihash) []Region {
 	for i := range regions {
 		regions[i].Keys = trie.New[bit256.Key, mh.Multihash]()
 	}
+	keyEntriesByRegion := make(map[bitstr.Key][]trie.Entry[bit256.Key, mh.Multihash], len(regions))
 	for _, k := range keys {
 		h := MhToBit256(k)
-		for i, r := range regions {
+		for _, r := range regions {
 			if IsPrefix(r.Prefix, h) {
-				regions[i].Keys.Add(h, k)
+				keyEntriesByRegion[r.Prefix] = append(keyEntriesByRegion[r.Prefix], trie.Entry[bit256.Key, mh.Multihash]{Key: h, Data: k})
 				break
 			}
 		}
+	}
+	for _, r := range regions {
+		r.Keys.AddMany(keyEntriesByRegion[r.Prefix]...)
 	}
 	return regions
 }

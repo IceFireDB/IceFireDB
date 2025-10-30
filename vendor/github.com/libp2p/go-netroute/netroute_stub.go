@@ -6,11 +6,9 @@ package netroute
 
 import (
 	"net"
-
-	"github.com/google/gopacket/routing"
 )
 
-func New() (routing.Router, error) {
+func New() (Router, error) {
 	rtr := &router{}
 	rtr.ifaces = make(map[int]net.Interface)
 	rtr.ifaces[0] = net.Interface{}

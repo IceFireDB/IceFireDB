@@ -62,7 +62,7 @@ func (tr *Trie[K, D]) IsEmptyLeaf() bool {
 	return !tr.HasKey() && tr.IsLeaf()
 }
 
-// IsEmptyLeaf reports whether the Trie is a leaf node without branches but has a key.
+// IsNonEmptyLeaf reports whether the Trie is a leaf node without branches but has a key.
 func (tr *Trie[K, D]) IsNonEmptyLeaf() bool {
 	return tr.HasKey() && tr.IsLeaf()
 }
@@ -97,33 +97,75 @@ func (tr *Trie[K, D]) shrink() {
 // Add attempts to add a key to the trie, mutating the trie.
 // Returns true if the key was added, false otherwise.
 func (tr *Trie[K, D]) Add(kk K, data D) bool {
-	return tr.addAtDepth(0, kk, data)
+	return tr.addManyAtDepth(0, Entry[K, D]{Key: kk, Data: data}) == 1
 }
 
-func (tr *Trie[K, D]) addAtDepth(depth int, kk K, data D) bool {
-	switch {
-	case tr.IsEmptyLeaf():
-		tr.key = &kk
-		tr.data = data
-		return true
-	case tr.IsNonEmptyLeaf():
-		if key.Equal(*tr.key, kk) {
-			return false
-		} else {
-			p := tr.key // non-nil since IsNonEmptyLeaf
+// AddMany attempts to add multiple entries to the trie, mutating the trie.
+// Returns the number of entries that were successfully added.
+// Duplicate keys within entries or keys already in the trie are ignored.
+func (tr *Trie[K, D]) AddMany(entries ...Entry[K, D]) int {
+	return tr.addManyAtDepth(0, entries...)
+}
+
+func (tr *Trie[K, D]) addManyAtDepth(depth int, entries ...Entry[K, D]) int {
+	if len(entries) == 0 {
+		return 0
+	}
+
+	// Partition entries by direction
+	sortedEntries := [2][]Entry[K, D]{}
+	for i := range entries {
+		if entries[i].Key.BitLen() <= depth {
+			// Ignore keys that are too short, it means the node already exists in
+			// trie, but isn't a leaf.
+			continue
+		}
+		b := entries[i].Key.Bit(depth)
+		sortedEntries[b] = append(sortedEntries[b], entries[i])
+	}
+
+	if tr.IsLeaf() {
+		if tr.HasKey() {
+			// Check if any entry matches existing key
+			if len(entries) == 1 && key.Equal(*tr.key, entries[0].Key) {
+				// Key already exists
+				return 0
+			}
+
+			b := int((*tr.key).Bit(depth))
+			// Split this leaf into branches
+			p := tr.key
 			d := tr.data
 			tr.key = nil
 			var v D
 			tr.data = v
-			// both branches are nil
 			tr.branch[0], tr.branch[1] = &Trie[K, D]{}, &Trie[K, D]{}
-			tr.branch[(*p).Bit(depth)].key = p
-			tr.branch[(*p).Bit(depth)].data = d
-			return tr.branch[kk.Bit(depth)].addAtDepth(depth+1, kk, data)
+			tr.branch[b].key = p
+			tr.branch[b].data = d
+		} else {
+			if len(entries) == 1 {
+				tr.key = &entries[0].Key
+				tr.data = entries[0].Data
+				return 1
+			}
+			// Create branches to distribute entries
+			tr.branch[0], tr.branch[1] = &Trie[K, D]{}, &Trie[K, D]{}
 		}
-	default:
-		return tr.branch[kk.Bit(depth)].addAtDepth(depth+1, kk, data)
 	}
+	added := 0
+	for i, branchEntries := range sortedEntries {
+		for range len(branchEntries) - 1 {
+			// Lazily removes duplicates
+			if !key.Equal(branchEntries[0].Key, branchEntries[len(branchEntries)-1].Key) {
+				break
+			}
+			branchEntries = branchEntries[:len(branchEntries)-1]
+		}
+		if len(branchEntries) > 0 {
+			added += tr.branch[i].addManyAtDepth(depth+1, branchEntries...)
+		}
+	}
+	return added
 }
 
 // Add adds the key to trie, returning a new trie if the key was not already in the trie.

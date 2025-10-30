@@ -10,6 +10,8 @@ import (
 	cid "github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var log = logging.Logger("bitswap/client/getter")
@@ -96,6 +98,9 @@ func AsyncGetBlocks(ctx, sessctx context.Context, keys []cid.Cid, notif notifica
 // If the context is cancelled or the incoming channel closes, calls cfun with
 // any keys corresponding to blocks that were never received.
 func handleIncoming(ctx, sessctx context.Context, remaining *cid.Set, in <-chan blocks.Block, out chan blocks.Block, cfun func([]cid.Cid)) {
+	ctx, span := internal.StartSpan(ctx, "Getter.handleIncoming") // ProbeLab: don't delete/change span without notice
+	defer span.End()
+
 	// Clean up before exiting this function, and call the cancel function on
 	// any remaining keys
 	defer func() {
@@ -114,6 +119,8 @@ func handleIncoming(ctx, sessctx context.Context, remaining *cid.Set, in <-chan 
 			if !ok {
 				return
 			}
+
+			span.AddEvent("received block", trace.WithAttributes(attribute.String("cid", blk.Cid().String()))) // ProbeLab: don't delete/change without notice
 
 			remaining.Remove(blk.Cid())
 			select {

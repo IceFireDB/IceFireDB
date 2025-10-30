@@ -411,16 +411,10 @@ func (q *DSQueue) clearDatastore(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("cannot create datastore batch: %w", err)
 	}
 
-	var rmCount, writeCount int
+	var rmCount int
 	for result := range results.Next() {
 		if ctx.Err() != nil {
 			return 0, ctx.Err()
-		}
-		if writeCount >= DefaultBufferSize {
-			writeCount = 0
-			if err = batch.Commit(ctx); err != nil {
-				return 0, fmt.Errorf("cannot commit datastore updates: %w", err)
-			}
 		}
 		if result.Error != nil {
 			return 0, fmt.Errorf("cannot read query result from datastore: %w", result.Error)
@@ -429,7 +423,6 @@ func (q *DSQueue) clearDatastore(ctx context.Context) (int, error) {
 			return 0, fmt.Errorf("cannot delete key from datastore: %w", err)
 		}
 		rmCount++
-		writeCount++
 	}
 
 	if err = batch.Commit(ctx); err != nil {
@@ -509,7 +502,6 @@ func (q *DSQueue) readDatastore(ctx context.Context, n int, items [][]byte) ([][
 	if err != nil {
 		return nil, fmt.Errorf("cannot create datastore batch: %w", err)
 	}
-	var delCount int
 
 	for result := range results.Next() {
 		if ctx.Err() != nil {
@@ -521,14 +513,6 @@ func (q *DSQueue) readDatastore(ctx context.Context, n int, items [][]byte) ([][
 
 		if err = batch.Delete(ctx, datastore.NewKey(result.Key)); err != nil {
 			return nil, fmt.Errorf("error deleting queue item: %w", err)
-		}
-		delCount++
-
-		if delCount >= DefaultBufferSize {
-			delCount = 0
-			if err = batch.Commit(ctx); err != nil {
-				return nil, fmt.Errorf("cannot commit datastore updates: %w", err)
-			}
 		}
 
 		parts := strings.SplitN(strings.TrimPrefix(result.Key, "/"), "/", 2)
