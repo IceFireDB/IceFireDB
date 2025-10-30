@@ -10,7 +10,6 @@ import (
 	notifications "github.com/ipfs/boxo/bitswap/client/internal/notifications"
 	bspm "github.com/ipfs/boxo/bitswap/client/internal/peermanager"
 	bssim "github.com/ipfs/boxo/bitswap/client/internal/sessioninterestmanager"
-	"github.com/ipfs/boxo/retrieval"
 	blocks "github.com/ipfs/go-block-format"
 	cid "github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -133,13 +132,11 @@ type Session struct {
 	self peer.ID
 }
 
-// New creates a new bitswap session.
+// New creates a new bitswap session whose lifetime is bounded by the
+// given context.
 //
-// The session maintains its own internal context for operations and is not
-// tied to any external context lifecycle. The caller MUST call Close() when
-// the session is no longer needed to ensure proper cleanup. When sessions are
-// created via Client.NewSession(ctx), automatic cleanup via context.AfterFunc
-// is provided.
+// The caller MUST call Close() or cancel the context when the session is no
+// longer needed to ensure proper cleanup.
 //
 // The retrievalState parameter, if provided, enables diagnostic tracking of
 // the retrieval process. It is attached to the session's internal context and
@@ -147,6 +144,7 @@ type Session struct {
 // phases. This is particularly useful for debugging timeout errors and
 // understanding retrieval performance.
 func New(
+	ctx context.Context,
 	sm SessionManager,
 	id uint64,
 	sprm SessionPeerManager,
@@ -159,14 +157,8 @@ func New(
 	periodicSearchDelay time.Duration,
 	self peer.ID,
 	havesReceivedGauge bspm.Gauge,
-	retrievalState *retrieval.State,
 ) *Session {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// If a retrieval state is passed in, then keep it in the context.
-	if retrievalState != nil {
-		ctx = context.WithValue(ctx, retrieval.ContextKey, retrievalState)
-	}
+	ctx, cancel := context.WithCancel(ctx)
 
 	s := &Session{
 		sw:                  newSessionWants(broadcastLiveWantsLimit),
@@ -198,14 +190,10 @@ func (s *Session) ID() uint64 {
 	return s.id
 }
 
-// Close terminates the session and cleans up its resources. This method MUST
-// be called when the session is no longer needed to avoid resource leaks.
-// After calling Close, the session should not be used anymore.
-//
-// Session lifecycle is independent of the context used to create requests -
-// canceling a request context does not close the session. When context-based
-// automation is desired, Client.NewSession(ctx) uses context.AfterFunc to
-// automatically close sessions when the context is canceled.
+// Close terminates the session and cleans up its resources. This method must
+// be called, or the context used to create the session must be canceled, when
+// the session is no longer needed to avoid resource leaks. After calling
+// Close, the session should not be used anymore.
 func (s *Session) Close() {
 	s.cancel()
 }
@@ -358,7 +346,7 @@ func (s *Session) run(ctx context.Context) {
 			}
 		case <-s.idleTick.C:
 			// The session hasn't received blocks for a while, broadcast
-			opCtx, span := internal.StartSpan(ctx, "Session.IdleBroadcast")
+			opCtx, span := internal.StartSpan(ctx, "Session.IdleBroadcast") // ProbeLab: don't delete/change span without notice
 			s.broadcast(opCtx, nil)
 			span.End()
 		case <-periodicSearchTimer.C:

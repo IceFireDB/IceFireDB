@@ -8,7 +8,7 @@ import (
 )
 
 func StartSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	return startSpan(ctx, "Bitswap.Client."+name, opts...)
+	return startSpan(ctx, "Bitswap.Client."+name, opts...) // ProbeLab: don't delete/change the prefix without notice
 }
 
 // outline logic so the string concatenation can be inlined and executed at compile time

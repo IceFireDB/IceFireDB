@@ -32,6 +32,15 @@ func Parse(name string) (LogLevel, error) {
 	return LogLevel(lvl), err
 }
 
+// LevelFromString parses a string-based level and returns the corresponding
+// LogLevel.
+//
+// This function is maintained for v1 compatibility only and will be removed in a
+// future version. New code should use Parse instead.
+func LevelFromString(level string) (LogLevel, error) {
+	return Parse(level)
+}
+
 // DefaultLevel returns the current default LogLevel.
 func DefaultLevel() LogLevel {
 	loggerMutex.RLock()

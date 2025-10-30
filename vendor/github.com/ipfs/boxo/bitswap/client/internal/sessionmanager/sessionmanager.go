@@ -12,7 +12,6 @@ import (
 	bssession "github.com/ipfs/boxo/bitswap/client/internal/session"
 	bssim "github.com/ipfs/boxo/bitswap/client/internal/sessioninterestmanager"
 	exchange "github.com/ipfs/boxo/exchange"
-	"github.com/ipfs/boxo/retrieval"
 	cid "github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"go.opentelemetry.io/otel/attribute"
@@ -20,8 +19,6 @@ import (
 )
 
 // Session represents a bitswap session managed by the SessionManager.
-// Sessions have their own lifecycle independent of request contexts and
-// must be explicitly closed via the Close() method when no longer needed.
 type Session interface {
 	exchange.Fetcher
 	ID() uint64
@@ -31,6 +28,7 @@ type Session interface {
 
 // SessionFactory generates a new session for the SessionManager to track.
 type SessionFactory func(
+	ctx context.Context,
 	sm bssession.SessionManager,
 	id uint64,
 	sprm bssession.SessionPeerManager,
@@ -40,8 +38,7 @@ type SessionFactory func(
 	notif notifications.PubSub,
 	provSearchDelay time.Duration,
 	rebroadcastDelay time.Duration,
-	self peer.ID,
-	retrievalState *retrieval.State) Session
+	self peer.ID) Session
 
 // PeerManagerFactory generates a new peer manager for a session.
 type PeerManagerFactory func(id uint64) bssession.SessionPeerManager
@@ -85,23 +82,16 @@ func New(sessionFactory SessionFactory, sessionInterestManager *bssim.SessionInt
 
 // NewSession initializes a session and adds to the session manager.
 //
-// The session is created with its own internal context and lifecycle management.
-// The retrievalState parameter, if provided, will be attached to the session's
-// internal context to enable diagnostic tracking of the retrieval process. This
-// includes tracking provider discovery attempts, peer connections, and data
-// retrieval phases, which is particularly useful for debugging timeout errors.
-//
-// The returned Session must be closed via its Close() method when no longer needed.
-// Note: When sessions are created via Client.NewSession(ctx), automatic cleanup
-// via context.AfterFunc is provided.
-func (sm *SessionManager) NewSession(provSearchDelay, rebroadcastDelay time.Duration, retrievalState *retrieval.State) Session {
+// The returned Session must be closed via its Close() method, or by canceling
+// the context, when no longer needed.
+func (sm *SessionManager) NewSession(ctx context.Context, provSearchDelay, rebroadcastDelay time.Duration) Session {
 	id := sm.GetNextSessionID()
 
-	_, span := internal.StartSpan(context.Background(), "SessionManager.NewSession", trace.WithAttributes(attribute.String("ID", strconv.FormatUint(id, 10))))
+	ctx, span := internal.StartSpan(ctx, "SessionManager.NewSession", trace.WithAttributes(attribute.String("ID", strconv.FormatUint(id, 10))))
 	defer span.End()
 
 	pm := sm.peerManagerFactory(id)
-	session := sm.sessionFactory(sm, id, pm, sm.sessionInterestManager, sm.peerManager, sm.blockPresenceManager, sm.notif, provSearchDelay, rebroadcastDelay, sm.self, retrievalState)
+	session := sm.sessionFactory(ctx, sm, id, pm, sm.sessionInterestManager, sm.peerManager, sm.blockPresenceManager, sm.notif, provSearchDelay, rebroadcastDelay, sm.self)
 
 	sm.sessLk.Lock()
 	if sm.sessions != nil { // check if SessionManager was shutdown

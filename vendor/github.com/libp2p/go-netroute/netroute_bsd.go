@@ -13,137 +13,371 @@
 package netroute
 
 import (
+	"errors"
 	"fmt"
 	"net"
-	"sort"
+	"os"
+	"sync/atomic"
 	"syscall"
+	"time"
 
-	"github.com/google/gopacket/routing"
 	"golang.org/x/net/route"
+	"golang.org/x/sys/unix"
 )
 
-func toIPAddr(a route.Addr) (net.IP, error) {
+const (
+	RTF_IFSCOPE     = 0x1000000
+	ROUTE_MSGFILTER = 1
+)
+
+type bsdRouter struct {
+	id  uintptr
+	seq atomic.Uint32
+}
+
+// toIPAddr converts a route.Addr to a net.IP.
+// Returns nil if the address type is not recognized.
+func toIPAddr(a route.Addr) net.IP {
 	switch t := a.(type) {
 	case *route.Inet4Addr:
-		return t.IP[:], nil
+		return t.IP[:]
 	case *route.Inet6Addr:
-		return t.IP[:], nil
+		return t.IP[:]
 	default:
-		return net.IP{}, fmt.Errorf("unknown family: %v", t)
+		return nil
 	}
 }
 
-// selected BSD Route flags.
-const (
-	RTF_UP        = 0x1
-	RTF_GATEWAY   = 0x2
-	RTF_HOST      = 0x4
-	RTF_REJECT    = 0x8
-	RTF_DYNAMIC   = 0x10
-	RTF_MODIFIED  = 0x20
-	RTF_STATIC    = 0x800
-	RTF_BLACKHOLE = 0x1000
-	RTF_LOCAL     = 0x200000
-	RTF_BROADCAST = 0x400000
-	RTF_MULTICAST = 0x800000
-)
-
-func New() (routing.Router, error) {
-	rtr := &router{}
-	rtr.ifaces = make(map[int]net.Interface)
-	rtr.addrs = make(map[int]ipAddrs)
-	tab, err := route.FetchRIB(syscall.AF_UNSPEC, route.RIBTypeRoute, 0)
-	if err != nil {
-		return nil, err
+// toRouteAddr takes a net.IP and returns the corresponding route.Addr.
+// Returns nil if the IP is empty or has an invalid length.
+// IPv4 addresses are converted to route.Inet4Addr and IPv6 to route.Inet6Addr.
+func toRouteAddr(ip net.IP) route.Addr {
+	if len(ip) == 0 {
+		return nil
 	}
-	msgs, err := route.ParseRIB(route.RIBTypeRoute, tab)
-	if err != nil {
-		return nil, err
+
+	if len(ip) != net.IPv4len && len(ip) != net.IPv6len {
+		return nil
 	}
-	var ipn *net.IPNet
-	for _, msg := range msgs {
-		m := msg.(*route.RouteMessage)
-		// We ignore the error (m.Err) here. It's not clear what this error actually means,
-		// and it makes us miss routes that _should_ be included.
-		routeInfo := new(rtInfo)
-
-		if m.Version < 3 || m.Version > 5 {
-			return nil, fmt.Errorf("unexpected RIB message version: %d", m.Version)
-		}
-		if m.Type != 4 /* RTM_GET */ {
-			return nil, fmt.Errorf("unexpected RIB message type: %d", m.Type)
-		}
-
-		if m.Flags&RTF_UP == 0 ||
-			m.Flags&(RTF_REJECT|RTF_BLACKHOLE) != 0 {
-			continue
-		}
-
-		dst, err := toIPAddr(m.Addrs[0])
-		if err == nil {
-			mask, _ := toIPAddr(m.Addrs[2])
-			if mask == nil {
-				mask = net.IP(net.CIDRMask(0, 8*len(dst)))
-			}
-			ipn = &net.IPNet{IP: dst, Mask: net.IPMask(mask)}
-			if m.Flags&RTF_HOST != 0 {
-				ipn.Mask = net.CIDRMask(8*len(ipn.IP), 8*len(ipn.IP))
-			}
-			routeInfo.Dst = ipn
-		} else {
-			return nil, fmt.Errorf("unexpected RIB destination: %v", err)
-		}
-
-		if m.Flags&RTF_GATEWAY != 0 {
-			if gw, err := toIPAddr(m.Addrs[1]); err == nil {
-				routeInfo.Gateway = gw
-			}
-		}
-		if src, err := toIPAddr(m.Addrs[5]); err == nil {
-			ipn = &net.IPNet{IP: src, Mask: net.CIDRMask(8*len(src), 8*len(src))}
-			routeInfo.Src = ipn
-			routeInfo.PrefSrc = src
-			if m.Flags&0x2 != 0 /* RTF_GATEWAY */ {
-				routeInfo.Src.Mask = net.CIDRMask(0, 8*len(routeInfo.Src.IP))
-			}
-		}
-		routeInfo.OutputIface = uint32(m.Index)
-
-		switch m.Addrs[0].(type) {
-		case *route.Inet4Addr:
-			rtr.v4 = append(rtr.v4, routeInfo)
-		case *route.Inet6Addr:
-			rtr.v6 = append(rtr.v6, routeInfo)
-		}
+	if p4 := ip.To4(); len(p4) == net.IPv4len {
+		return &route.Inet4Addr{IP: [4]byte(p4)}
 	}
-	sort.Sort(rtr.v4)
-	sort.Sort(rtr.v6)
+	return &route.Inet6Addr{IP: [16]byte(ip)}
+}
+
+// ipToIfIndex takes an IP and returns the index of the interface with the given IP assigned.
+// Returns an error if no interface is found with the specified IP address.
+func ipToIfIndex(ip net.IP) (int, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return nil, err
+		return -1, fmt.Errorf("failed to get interfaces: %w", err)
 	}
 	for _, iface := range ifaces {
-		rtr.ifaces[iface.Index] = iface
-		var addrs ipAddrs
-		ifaceAddrs, err := iface.Addrs()
+		addrs, err := iface.Addrs()
 		if err != nil {
-			return nil, err
+			continue
 		}
-		for _, addr := range ifaceAddrs {
-			if inet, ok := addr.(*net.IPNet); ok {
-				// Go has a nasty habit of giving you IPv4s as ::ffff:1.2.3.4 instead of 1.2.3.4.
-				// We want to use mapped v4 addresses as v4 preferred addresses, never as v6
-				// preferred addresses.
-				if v4 := inet.IP.To4(); v4 != nil {
-					if addrs.v4 == nil {
-						addrs.v4 = v4
-					}
-				} else if addrs.v6 == nil {
-					addrs.v6 = inet.IP
-				}
+		for _, addr := range addrs {
+			inet, ok := addr.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			if inet.IP.Equal(ip) {
+				return iface.Index, nil
 			}
 		}
-		rtr.addrs[iface.Index] = addrs
 	}
-	return rtr, nil
+	return -1, fmt.Errorf("no interface found for IP: %s", ip)
+}
+
+// macToIfIndex takes a MAC address and returns the index of the interface with the matching hardware address.
+// Returns an error if no interface is found with the specified MAC address.
+func macToIfIndex(hwAddr net.HardwareAddr) (int, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return -1, fmt.Errorf("failed to get interfaces: %w", err)
+	}
+	for _, iface := range ifaces {
+		if hwAddr.String() == iface.HardwareAddr.String() {
+			return iface.Index, nil
+		}
+	}
+	return -1, fmt.Errorf("no interface found for MAC: %s", hwAddr.String())
+}
+
+// getIfIndex determines the interface index based on the provided MAC address and/or IP address.
+// If both are provided, it ensures they resolve to the same interface.
+// Returns -1 if neither MAC nor IP is provided, or an error if they resolve to different interfaces.
+func getIfIndex(MACAddr net.HardwareAddr, ip net.IP) (int, error) {
+	ipIndex := -1
+	macIndex := -1
+	var err error
+	if ip == nil && MACAddr == nil {
+		return -1, nil
+	}
+
+	if ip != nil {
+		ipIndex, err = ipToIfIndex(ip)
+		if err != nil {
+			return -1, fmt.Errorf("failed to find interface with IP: %s", ip.String())
+		}
+	}
+
+	if MACAddr != nil {
+		macIndex, err = macToIfIndex(MACAddr)
+		if err != nil {
+			return -1, fmt.Errorf("failed to find interface with MAC: %s", MACAddr.String())
+		}
+	}
+
+	switch {
+	case (ipIndex >= 0 && macIndex >= 0) && (macIndex != ipIndex):
+		return -1, fmt.Errorf("given MAC address and source IP resolve to different interfaces")
+	case (ipIndex >= 0 && macIndex >= 0) && (macIndex == ipIndex):
+		return ipIndex, nil
+	case ipIndex >= 0:
+		return ipIndex, nil
+	case macIndex >= 0:
+		return macIndex, nil
+	default:
+		return -1, fmt.Errorf("no index found for given ip and/or MAC address")
+	}
+}
+
+// composeRouteMsg creates a RTM_GET RouteMessage for querying the routing table.
+// It takes the process ID, optional MAC address, optional source IP, and destination IP.
+// The function determines the appropriate interface index if MAC or source IP is provided.
+func composeRouteMsg(id uintptr, seq int, MACAddr net.HardwareAddr, src, dst net.IP) (*route.RouteMessage, error) {
+	dstAddr := toRouteAddr(dst)
+	if dstAddr == nil {
+		return nil, fmt.Errorf("failed to parse dst: %#v", dst)
+	}
+
+	msg := &route.RouteMessage{
+		Version: syscall.RTM_VERSION,
+		Type:    unix.RTM_GET,
+		ID:      id,
+		Seq:     seq,
+		Addrs: []route.Addr{
+			dstAddr,
+			nil,
+			nil,
+			nil,
+			&route.LinkAddr{},
+		},
+	}
+
+	ifIndex, err := getIfIndex(MACAddr, src)
+	if err != nil {
+		return nil, err
+	}
+
+	if ifIndex >= 0 {
+		msg.Flags = RTF_IFSCOPE
+		msg.Index = ifIndex
+	}
+
+	return msg, nil
+}
+
+func (r *bsdRouter) getSeq() int {
+	return int(r.seq.Add(1))
+}
+
+// getRouteMsgReply takes an RTM_GET RouteMessage and returns reply (RouteMessage)
+func getRouteMsgReply(msg *route.RouteMessage) (*route.RouteMessage, error) {
+	if msg.Type != syscall.RTM_GET {
+		return nil, errors.New("message type is not RTM_GET")
+	}
+
+	fd, err := getRouteFD()
+	if err != nil {
+		return nil, err
+	}
+	defer unix.Close(fd)
+
+	err = writeMsg(fd, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Read the response message
+	return readMsg(msg.ID, msg.Seq, fd)
+}
+
+// getRouteFD opens a routing socket.
+// Returns the file descriptor for the socket or an error if the socket cannot be created.
+func getRouteFD() (int, error) {
+	fd, err := unix.Socket(unix.AF_ROUTE, unix.SOCK_RAW, unix.AF_UNSPEC)
+	if err != nil {
+		scope := "route socket - open"
+		return -1, annotateUnixError(err, scope)
+	}
+
+	return fd, nil
+}
+
+// writeMsg marshals and writes a RouteMessage to the specified file descriptor.
+// Returns an error if marshaling fails or if the write operation fails.
+func writeMsg(fd int, msg *route.RouteMessage) error {
+	buf, err := msg.Marshal()
+	if err != nil {
+		return fmt.Errorf("invalid route message given: %w", err)
+	}
+
+	if _, err = unix.Write(fd, buf); err != nil {
+		scope := "route socket - write"
+		return annotateUnixError(err, scope)
+	}
+
+	return nil
+}
+
+// readMsg reads a response from the routing socket and returns the matching RouteMessage.
+// It spawns a goroutine to read from the socket and filters messages based on the provided ID and sequence number.
+// The function includes a 10-second timeout to prevent indefinite blocking.
+func readMsg(id uintptr, seq, fd int) (*route.RouteMessage, error) {
+	type readResult struct {
+		msg *route.RouteMessage
+		err error
+	}
+
+	// Create a channel to receive the result
+	resultCh := make(chan readResult, 1)
+
+	go func() {
+		var rb [2 << 10]byte
+		for {
+			n, err := unix.Read(fd, rb[:])
+			if err != nil {
+				scope := "route socket - read"
+				resultCh <- readResult{
+					err: annotateUnixError(err, scope),
+				}
+				return
+			}
+
+			// Parse response messages
+			msgs, err := route.ParseRIB(route.RIBTypeRoute, rb[:n])
+			if err != nil {
+				resultCh <- readResult{
+					err: fmt.Errorf("failed to parse messages: %w", err),
+				}
+				return
+			}
+
+			if len(msgs) != 1 {
+				resultCh <- readResult{
+					err: fmt.Errorf("unexpected number of messages received: %d", len(msgs)),
+				}
+				return
+			}
+
+			msg, ok := msgs[0].(*route.RouteMessage)
+			// confirm it is a reply to our query
+			if !ok || (id != msg.ID && seq != msg.Seq) {
+				continue
+			}
+
+			resultCh <- readResult{
+				msg: msg,
+			}
+
+			return
+		}
+	}()
+
+	select {
+	case result := <-resultCh:
+		return result.msg, result.err
+	case <-time.After(10 * time.Second):
+		return nil, fmt.Errorf("route socket - read: timedout")
+	}
+}
+
+func annotateUnixError(err error, scope string) error {
+	var msg string
+	switch err {
+	case nil:
+		return nil
+	case unix.ESRCH:
+		msg = "route not found"
+	// socket errors
+	case unix.EACCES:
+		msg = "permission denied"
+	case unix.EMFILE:
+		msg = "file system table full"
+	case unix.ENOBUFS:
+		msg = "insufficient buffer space"
+	case unix.EPERM:
+		msg = "insufficient privileges"
+	case unix.EPROTOTYPE:
+		msg = "socket type not supported"
+	// read errors
+	case unix.EBADF:
+		msg = "invalid socket"
+	case unix.ECONNRESET:
+		msg = "socket closed"
+	case unix.EFAULT:
+		msg = "invalid buffer"
+	case unix.EIO:
+		msg = "I/O error"
+	case unix.EBUSY:
+		msg = "failed to read from file descriptor"
+	case unix.EINVAL:
+		msg = "invalid file descriptor"
+	case unix.EAGAIN:
+		msg = "no data available, try again later"
+	default: // unexpected system error; fatal
+		msg = "unexpected error"
+	}
+	if scope != "" {
+		msg = scope + ": " + msg
+	}
+	return fmt.Errorf("%s: %w", msg, err)
+}
+
+// Route implements the routing.Router interface to find the best route to the destination IP.
+// Returns the outgoing interface, gateway IP, preferred source IP, and any error encountered.
+func (r *bsdRouter) Route(dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
+	return r.RouteWithSrc(nil, nil, dst)
+}
+
+// RouteWithSrc extends the Route method to allow specifying a source MAC address and IP.
+// This enables more precise routing decisions when multiple interfaces are available.
+// Returns the outgoing interface, gateway IP, preferred source IP, and any error encountered.
+func (r *bsdRouter) RouteWithSrc(MACAddr net.HardwareAddr, src, dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
+	msg, err := composeRouteMsg(r.id, r.getSeq(), MACAddr, src, dst)
+	if err != nil {
+		return
+	}
+
+	var reply *route.RouteMessage
+	if reply, err = getRouteMsgReply(msg); err != nil {
+		return
+	}
+
+	if iface, err = net.InterfaceByIndex(reply.Index); err != nil {
+		return
+	}
+
+	preferredSrc = toIPAddr(reply.Addrs[5])
+
+	isGatewayRequired := dst.String() != preferredSrc.String()
+	if !isGatewayRequired {
+		return
+	}
+
+	gateway = toIPAddr(reply.Addrs[1])
+
+	return
+}
+
+// New returns a new instance of a BSD-specific routing.Router implementation.
+// The router is stateless and uses the routing tables of the host system.
+func New() (Router, error) {
+	r := &bsdRouter{}
+	r.id = uintptr(os.Getpid())
+
+	return r, nil
 }
