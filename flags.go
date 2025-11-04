@@ -40,6 +40,9 @@ Security options:
 
 Networking options: 
   --advertise addr : advertise address  (default: network bound address)
+  --network-mode mode : network transport mode (default: tcp) [tcp, webrtc]
+  --webrtc-stun servers : STUN servers for WebRTC (default: stun:stun.l.google.com:19302)
+  --webrtc-turn servers : TURN servers for WebRTC
 
 Store options: 
   --hot-cache-size int : memory cache capacity,unit:MB (default 1024)
@@ -116,6 +119,9 @@ func confInit(conf *rafthub.Config) {
 	flag.BoolVar(&conf.LocalTime, "localtime", conf.LocalTime, "")
 	flag.StringVar(&conf.Auth, "auth", conf.Auth, "")
 	flag.StringVar(&conf.Advertise, "advertise", conf.Advertise, "")
+	flag.StringVar(&networkMode, "network-mode", "tcp", "")
+	flag.StringVar(&webrtcStunServers, "webrtc-stun", "stun:stun.l.google.com:19302", "")
+	flag.StringVar(&webrtcTurnServers, "webrtc-turn", "", "")
 	flag.StringVar(&testNode, "t", "", "")
 
 	flag.StringVar(&ipfs.IpfsDefaultConfig.EndPointConnection, "ipfs-endpoint", "", "")
