@@ -25,25 +25,18 @@ func (h *mysqlProxy) UseDB(c *server.Conn, dbName string) error {
 }
 
 func (h *mysqlProxy) HandleQuery(c *server.Conn, query string) (res *mysql.Result, err error) {
-	if strings.ToUpper(query[:3]) == "SET" {
+	if len(query) >= 3 && strings.EqualFold(query[:3], "SET") {
 		res = &mysql.Result{
 			Status: 2,
 		}
 		return
 	}
-	if strings.ToUpper(query) == "SELECT VERSION()" {
+	if strings.EqualFold(query, "SELECT VERSION()") {
 		query = "SELECT SQLITE_VERSION()"
-		//query = "SELECT '5.7.30-log' AS 'VERSION()'"
 	}
-	if strings.ToUpper(query) == "SELECT NOW()" {
+	if strings.EqualFold(query, "SELECT NOW()") {
 		query = "SELECT STRFTIME('%Y-%m-%d %H:%M:%S','now') AS 'NOW()'"
 	}
-	//if strings.ToUpper(query) == "START TRANSACTION" {
-	//	res = &mysql.Result{
-	//		Status: 2,
-	//	}
-	//	return
-	//}
 	return sqlite.Exec(query)
 }
 

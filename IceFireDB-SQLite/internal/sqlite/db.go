@@ -168,10 +168,10 @@ func asyncSQL(ctx context.Context) {
 			case s := <-p2pPubSub.Inbound:
 				_, err := db.Exec(s.Message)
 				if err != nil {
-					logrus.Infof("Inbound sql: %s err: %v", s, err)
+					logrus.Warnf("Inbound sql execution failed: %s error: %v", s.Message, err)
 					continue
 				}
-				logrus.Infof("Inbound sql: %s", s.Message)
+				logrus.Debugf("Inbound sql executed: %s", s.Message)
 			}
 		}
 	}, func(r interface{}) {
@@ -187,8 +187,8 @@ func getTableName(sql string) string {
 	if fromIndex == -1 {
 		return ""
 	}
-	behindSQL := strings.Trim(s[fromIndex+4:], " \t")
-	spaceIndex := strings.Index(behindSQL, " ")
+	behindSQL := strings.TrimSpace(s[fromIndex+4:])
+	spaceIndex := strings.IndexAny(behindSQL, " \t\n\r")
 	if spaceIndex == -1 {
 		return behindSQL
 	}

@@ -50,7 +50,7 @@ func main() {
 
 	app.Action = func(c *cli.Context) error {
 		ctx, cancel := context.WithCancel(context.Background())
-		stop := make(chan struct{})
+		stop := make(chan struct{}, 1)
 
 		go func() {
 			ms := mysql.NewMysqlProxy()
