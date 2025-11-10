@@ -12,7 +12,7 @@ import (
 )
 
 func (h *mysqlProxy) CloseConn(c *server.Conn) error {
-	if c.IsInTransaction() || c.IsAutoCommit() {
+	if c != nil && (c.IsInTransaction() || c.IsAutoCommit()) {
 		_, err := sqlite.Exec("COMMIT")
 		return err
 	}
@@ -68,12 +68,15 @@ func (h *mysqlProxy) HandleStmtExecute(c *server.Conn, context interface{}, quer
 }
 
 func (h *mysqlProxy) HandleStmtClose(c *server.Conn, context interface{}) error {
+	// 对于nil上下文，直接返回nil
+	if context == nil {
+		return nil
+	}
 	stmt, ok := context.(*client.Stmt)
 	if !ok {
 		return errors.New("other error")
 	}
 	return stmt.Close()
-	//return nil
 }
 
 func (h *mysqlProxy) HandleOtherCommand(c *server.Conn, cmd byte, data []byte) error {

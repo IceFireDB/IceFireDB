@@ -21,3 +21,10 @@ clean:
 
 run:
 	go run --race main.go -c config/config.yaml
+
+test:
+	go test -v -timeout 60s ./internal/sqlite/...
+	go test -v -timeout 60s ./internal/mysql/...
+
+test-all:
+	go test -v -timeout 60s ./...

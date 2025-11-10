@@ -50,6 +50,11 @@ jobs:
           cd IceFireDB-SQLite
           go mod tidy && go mod vendor
 
+      - name: Run tests
+        run: |
+          cd IceFireDB-SQLite
+          make test
+
       - name: Build
         run: |
           cd IceFireDB-SQLite
