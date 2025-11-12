@@ -33,6 +33,12 @@ func TestPerformanceConcurrentOperations(t *testing.T) {
 	)`)
 	require.NoError(t, err)
 
+	// Ensure table is ready by doing a test insert
+	_, err = db.Exec("INSERT INTO perf_test (name, value) VALUES ('test', 0)")
+	require.NoError(t, err)
+	_, err = db.Exec("DELETE FROM perf_test WHERE name = 'test'")
+	require.NoError(t, err)
+
 	// Test concurrent inserts using a single connection
 	numWorkers := 5
 	numInserts := 10
