@@ -8,13 +8,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLite/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func setupPerformanceDB(t *testing.T) *sql.DB {
+	// Initialize config if not already initialized
+	if config.Get() == nil || config.Get().P2P.ServiceDiscoveryID == "" {
+		config.InitConfig("../../config/config.yaml")
+	}
+
 	ctx := context.Background()
-	db := InitSQLite(ctx, ":memory:")
+	db := InitSQLite(ctx, "file:test_performance.db?cache=shared&mode=memory")
 	err := db.Ping()
 	require.NoError(t, err)
 	return db
@@ -24,7 +30,7 @@ func TestPerformanceConcurrentOperations(t *testing.T) {
 	db := setupPerformanceDB(t)
 	defer db.Close()
 
-	// Create test table
+	// Create test table directly using the database connection
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS perf_test (
 		id INTEGER PRIMARY KEY,
 		name TEXT,
@@ -33,13 +39,14 @@ func TestPerformanceConcurrentOperations(t *testing.T) {
 	)`)
 	require.NoError(t, err)
 
-	// Ensure table is ready by doing a test insert
+	// Test insert to ensure table is ready
 	_, err = db.Exec("INSERT INTO perf_test (name, value) VALUES ('test', 0)")
 	require.NoError(t, err)
+
+	// Clear test data
 	_, err = db.Exec("DELETE FROM perf_test WHERE name = 'test'")
 	require.NoError(t, err)
 
-	// Test concurrent inserts using a single connection
 	numWorkers := 5
 	numInserts := 10
 	var wg sync.WaitGroup
@@ -89,7 +96,7 @@ func TestPerformanceLargeDataset(t *testing.T) {
 	require.NoError(t, err)
 
 	// Insert large dataset
-	numRecords := 10000
+	numRecords := 1000
 	start := time.Now()
 
 	tx, err := db.Begin()

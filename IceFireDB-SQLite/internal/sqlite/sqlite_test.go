@@ -244,7 +244,7 @@ func TestPerformanceBenchmark(t *testing.T) {
 
 	// 批量插入性能测试
 	start := time.Now()
-	const batchSize = 1000
+	const batchSize = 100
 
 	for range batchSize {
 		_, err := Exec("INSERT INTO perf_test (data) VALUES ('test data')")

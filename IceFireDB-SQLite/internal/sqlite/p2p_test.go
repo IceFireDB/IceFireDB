@@ -123,6 +123,10 @@ func TestP2PLogging(t *testing.T) {
 }
 
 func TestP2PNetworkIsolation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P network isolation test in short mode")
+	}
+
 	// Skip in CI environment to avoid network timeouts
 	if os.Getenv("CI") == "true" || os.Getenv("GITHUB_ACTIONS") == "true" {
 		t.Skip("Skipping P2P network isolation test in CI environment")
