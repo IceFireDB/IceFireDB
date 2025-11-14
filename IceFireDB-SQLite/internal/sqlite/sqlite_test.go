@@ -17,6 +17,9 @@ func TestMain(m *testing.M) {
 }
 
 func TestInitSQLite(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping InitSQLite test in short mode")
+	}
 	ctx := context.Background()
 
 	// 测试正常初始化
@@ -34,6 +37,9 @@ func TestInitSQLite(t *testing.T) {
 }
 
 func TestSQLiteIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping SQLite integration test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, "test.db")
 	defer db.Close()
@@ -97,6 +103,9 @@ func TestSQLiteIntegration(t *testing.T) {
 }
 
 func TestTransactionOperations(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping transaction operations test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, "test.db")
 	defer db.Close()
@@ -140,6 +149,9 @@ func TestTransactionOperations(t *testing.T) {
 }
 
 func TestDDLOperations(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping DDL operations test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, "test.db")
 	defer db.Close()
@@ -164,6 +176,9 @@ func TestDDLOperations(t *testing.T) {
 }
 
 func TestConcurrentOperations(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping concurrent operations test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, "test.db")
 	defer db.Close()
@@ -204,6 +219,9 @@ func TestConcurrentOperations(t *testing.T) {
 }
 
 func TestErrorHandling(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping error handling test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, "test.db")
 	defer db.Close()

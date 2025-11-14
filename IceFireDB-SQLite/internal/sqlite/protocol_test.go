@@ -7,6 +7,9 @@ import (
 )
 
 func TestMySQLProtocolCompatibility(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping MySQL protocol compatibility test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, ":memory:")
 	defer db.Close()
@@ -57,6 +60,9 @@ func TestMySQLProtocolCompatibility(t *testing.T) {
 }
 
 func TestConnectionManagement(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping connection management test in short mode")
+	}
 	ctx := context.Background()
 
 	// 测试多个连接
@@ -95,6 +101,9 @@ func TestConnectionManagement(t *testing.T) {
 }
 
 func TestPreparedStatements(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping prepared statements test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, ":memory:")
 	defer db.Close()
@@ -141,6 +150,9 @@ func TestPreparedStatements(t *testing.T) {
 }
 
 func TestProtocolErrorHandling(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping protocol error handling test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, ":memory:")
 	defer db.Close()

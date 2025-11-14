@@ -12,6 +12,10 @@ import (
 )
 
 func TestBoundaryLargeData(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping boundary large data test in short mode")
+	}
+
 	db := setupPerformanceDB(t)
 	defer db.Close()
 
@@ -36,6 +40,10 @@ func TestBoundaryLargeData(t *testing.T) {
 }
 
 func TestBoundaryNumericLimits(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping boundary numeric limits test in short mode")
+	}
+
 	db := setupPerformanceDB(t)
 	defer db.Close()
 
@@ -70,6 +78,10 @@ func TestBoundaryNumericLimits(t *testing.T) {
 }
 
 func TestBoundaryManyColumns(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping boundary many columns test in short mode")
+	}
+
 	db := setupPerformanceDB(t)
 	defer db.Close()
 
@@ -107,6 +119,10 @@ func TestBoundaryManyColumns(t *testing.T) {
 }
 
 func TestBoundaryEmptyAndNullValues(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping boundary empty and null values test in short mode")
+	}
+
 	db := setupPerformanceDB(t)
 	defer db.Close()
 
@@ -144,6 +160,10 @@ func TestBoundaryEmptyAndNullValues(t *testing.T) {
 }
 
 func TestBoundaryTransactionRollback(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping boundary transaction rollback test in short mode")
+	}
+
 	db := setupPerformanceDB(t)
 	defer db.Close()
 
@@ -187,6 +207,10 @@ func TestBoundaryTransactionRollback(t *testing.T) {
 }
 
 func TestBoundarySQLInjectionAttempts(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping boundary SQL injection attempts test in short mode")
+	}
+
 	db := setupPerformanceDB(t)
 	defer db.Close()
 
@@ -233,6 +257,9 @@ func TestBoundaryConcurrentTransactions(t *testing.T) {
 }
 
 func TestBoundaryDatabaseRecovery(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping boundary database recovery test in short mode")
+	}
 	// Test database recovery by creating, closing, and reopening
 	ctx := context.Background()
 	testFile := "test_recovery.db"

@@ -10,6 +10,9 @@ import (
 )
 
 func TestIntegrationCompleteWorkflow(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration workflow test in short mode")
+	}
 	// Test a complete application workflow
 	ctx := context.Background()
 	db := InitSQLite(ctx, ":memory:")
@@ -221,6 +224,9 @@ func TestIntegrationCompleteWorkflow(t *testing.T) {
 }
 
 func TestIntegrationWithRealFile(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration with real file test in short mode")
+	}
 	// Test with actual file-based database
 	ctx := context.Background()
 	testFile := "test_integration.db"
@@ -259,6 +265,9 @@ func TestIntegrationWithRealFile(t *testing.T) {
 }
 
 func TestIntegrationErrorScenarios(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration error scenarios test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, ":memory:")
 	defer db.Close()

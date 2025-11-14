@@ -12,6 +12,9 @@ import (
 )
 
 func TestDBSet(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	db := getTestConn()
 	ctx := context.Background()
 
@@ -99,6 +102,9 @@ func TestDBSet(t *testing.T) {
 }
 
 func TestSetOperation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	db := getTestConn()
 	testUnion(db, t)
 	testInter(db, t)
@@ -298,6 +304,9 @@ func testDiff(db *redis.Client, t *testing.T) {
 }
 
 func TestSKeyExists(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	db := getTestConn()
 	ctx := context.Background()
 	key := "skeyexists_test"

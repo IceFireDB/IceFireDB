@@ -24,6 +24,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
+	"testing"
 
 	"github.com/IceFireDB/IceFireDB/IceFireDB-PubSub/proxy"
 
@@ -102,16 +104,45 @@ func (pt *ProxyTest) Addr() string {
 	// return pt.minis.Addr()
 }
 
-var defaultProxy = newProxy2Server()
+var defaultProxy *ProxyTest
+var defaultProxyOnce sync.Once
+
+func getDefaultProxy() *ProxyTest {
+	defaultProxyOnce.Do(func() {
+		// Skip P2P initialization in short mode to avoid timeout
+		if testing.Testing() && !testing.Short() {
+			defaultProxy = newProxy2Server()
+		}
+	})
+	return defaultProxy
+}
 
 func Addr() string {
-	return defaultProxy.Addr()
+	proxy := getDefaultProxy()
+	if proxy == nil {
+		panic("proxy not initialized - run tests without -short flag")
+	}
+	return proxy.Addr()
 }
 
 func Clear() {
-	defaultProxy.minis.FlushAll()
+	proxy := getDefaultProxy()
+	if proxy == nil {
+		panic("proxy not initialized - run tests without -short flag")
+	}
+	proxy.minis.FlushAll()
 }
 
 func Direct() *miniredis.Miniredis {
-	return defaultProxy.minis
+	proxy := getDefaultProxy()
+	if proxy == nil {
+		panic("proxy not initialized - run tests without -short flag")
+	}
+	return proxy.minis
+}
+
+func SkipIfShort(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 }

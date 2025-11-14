@@ -12,6 +12,9 @@ import (
 )
 
 func TestKV(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -314,6 +317,9 @@ func TestKV(t *testing.T) {
 }
 
 func TestMGET(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -352,6 +358,9 @@ func TestMGET(t *testing.T) {
 }
 
 func TestKVIncrDecr(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	c := getTestConn()
 
 	ctx := context.Background()
@@ -387,6 +396,9 @@ func TestKVIncrDecr(t *testing.T) {
 }
 
 func TestKVErrorParams(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 

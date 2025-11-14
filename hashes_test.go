@@ -12,6 +12,9 @@ import (
 )
 
 func TestHash(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 
 	ctx := context.Background()
@@ -91,6 +94,9 @@ func testHashArray(ay []interface{}, checkValues ...int) error {
 }
 
 func TestHashM(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 
 	ctx := context.Background()
@@ -144,6 +150,9 @@ func TestHashM(t *testing.T) {
 }
 
 func TestHashIncr(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 
 	ctx := context.Background()
@@ -180,6 +189,9 @@ func TestHashIncr(t *testing.T) {
 }
 
 func TestHashGetAll(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 
 	ctx := context.Background()
@@ -229,6 +241,9 @@ func TestHashGetAll(t *testing.T) {
 }
 
 func TestHashErrorParams(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 

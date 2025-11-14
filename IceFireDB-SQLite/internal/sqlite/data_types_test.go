@@ -7,6 +7,9 @@ import (
 )
 
 func TestDataTypeMapping(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping data type mapping test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, "test.db")
 	defer db.Close()

@@ -27,6 +27,10 @@ func setupPerformanceDB(t *testing.T) *sql.DB {
 }
 
 func TestPerformanceConcurrentOperations(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping performance concurrent operations test in short mode")
+	}
+
 	db := setupPerformanceDB(t)
 	defer db.Close()
 
@@ -83,6 +87,10 @@ func TestPerformanceConcurrentOperations(t *testing.T) {
 }
 
 func TestPerformanceLargeDataset(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping performance large dataset test in short mode")
+	}
+
 	db := setupPerformanceDB(t)
 	defer db.Close()
 
@@ -135,6 +143,10 @@ func TestPerformanceLargeDataset(t *testing.T) {
 }
 
 func TestPerformanceIndexing(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping performance indexing test in short mode")
+	}
+
 	db := setupPerformanceDB(t)
 	defer db.Close()
 
@@ -192,6 +204,10 @@ func TestPerformanceIndexing(t *testing.T) {
 }
 
 func TestPerformanceMemoryUsage(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping performance memory usage test in short mode")
+	}
+
 	db := setupPerformanceDB(t)
 	defer db.Close()
 
@@ -231,7 +247,14 @@ func TestPerformanceMemoryUsage(t *testing.T) {
 }
 
 func TestPerformanceConnectionPool(t *testing.T) {
-	// Test concurrent connections
+	if testing.Short() {
+		t.Skip("Skipping performance connection pool test in short mode")
+	}
+
+	db := setupPerformanceDB(t)
+	defer db.Close()
+
+	// Test multiple concurrent connections
 	numConnections := 5
 	var wg sync.WaitGroup
 	errors := make(chan error, numConnections)
@@ -240,8 +263,6 @@ func TestPerformanceConnectionPool(t *testing.T) {
 		wg.Add(1)
 		go func(connID int) {
 			defer wg.Done()
-			db := setupPerformanceDB(t)
-			defer db.Close()
 
 			// Each connection performs operations
 			tableName := fmt.Sprintf("conn_test_%d", connID)
@@ -271,6 +292,10 @@ func TestPerformanceConnectionPool(t *testing.T) {
 }
 
 func TestPerformanceTransactionThroughput(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping performance transaction throughput test in short mode")
+	}
+
 	db := setupPerformanceDB(t)
 	defer db.Close()
 

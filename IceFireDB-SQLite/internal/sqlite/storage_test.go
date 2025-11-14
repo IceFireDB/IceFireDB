@@ -10,6 +10,9 @@ import (
 )
 
 func TestStorageEngine(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping storage engine test in short mode")
+	}
 	ctx := context.Background()
 
 	// 测试不同的存储文件
@@ -57,6 +60,9 @@ func TestStorageEngine(t *testing.T) {
 }
 
 func TestDataTypesComprehensive(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping data types comprehensive test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, ":memory:")
 	defer db.Close()
@@ -135,6 +141,9 @@ func TestDataTypesComprehensive(t *testing.T) {
 }
 
 func TestDatabaseOperations(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping database operations test in short mode")
+	}
 	ctx := context.Background()
 
 	// 测试数据库文件操作
@@ -198,6 +207,9 @@ func TestDatabaseOperations(t *testing.T) {
 }
 
 func TestTransactionIsolation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping transaction isolation test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, ":memory:")
 	defer db.Close()
@@ -249,6 +261,9 @@ func TestTransactionIsolation(t *testing.T) {
 }
 
 func TestDatabaseConstraints(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping database constraints test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, ":memory:")
 	defer db.Close()

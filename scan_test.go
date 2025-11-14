@@ -12,6 +12,9 @@ import (
 )
 
 func TestScan(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 
 	ctx := context.Background()
@@ -121,6 +124,9 @@ func testSetKeyScan(t *testing.T, c *redis.Client) {
 }
 
 func TestXHashScan(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 
 	ctx := context.Background()
@@ -137,6 +143,9 @@ func TestXHashScan(t *testing.T) {
 }
 
 func TestHashScan(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 
 	ctx := context.Background()
@@ -153,6 +162,9 @@ func TestHashScan(t *testing.T) {
 }
 
 func TestXSetScan(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 
 	ctx := context.Background()
@@ -169,6 +181,9 @@ func TestXSetScan(t *testing.T) {
 }
 
 func TestSetScan(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 
 	ctx := context.Background()
@@ -185,6 +200,9 @@ func TestSetScan(t *testing.T) {
 }
 
 func TestXZSetScan(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -201,6 +219,9 @@ func TestXZSetScan(t *testing.T) {
 }
 
 func TestZSetScan(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 

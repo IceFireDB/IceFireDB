@@ -30,6 +30,8 @@ import (
 
 // Test simple GET/SET keys
 func TestString(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -84,6 +86,8 @@ func TestString(t *testing.T) {
 }
 
 func TestSet(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -228,6 +232,8 @@ func TestSet(t *testing.T) {
 }
 
 func TestMget(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -255,6 +261,8 @@ func TestMget(t *testing.T) {
 }
 
 func TestMset(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -300,6 +308,8 @@ func TestMset(t *testing.T) {
 }
 
 func TestSetex(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -350,6 +360,8 @@ func TestSetex(t *testing.T) {
 }
 
 func TestPsetex(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -400,6 +412,8 @@ func TestPsetex(t *testing.T) {
 }
 
 func TestSetnx(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -437,6 +451,8 @@ func TestSetnx(t *testing.T) {
 }
 
 func TestIncr(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -505,6 +521,8 @@ func TestIncr(t *testing.T) {
 }
 
 func TestIncrBy(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -568,6 +586,8 @@ func TestIncrBy(t *testing.T) {
 }
 
 func TestIncrbyfloat(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -644,6 +664,8 @@ func TestIncrbyfloat(t *testing.T) {
 }
 
 func TestDecrBy(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -707,6 +729,8 @@ func TestDecrBy(t *testing.T) {
 }
 
 func TestDecr(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -771,6 +795,8 @@ func TestDecr(t *testing.T) {
 }
 
 func TestGetSet(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -830,7 +856,10 @@ func TestGetSet(t *testing.T) {
 }
 
 /*
-	func TestGetdel(t *testing.T) {
+func TestGetdel(t *testing.T) {
+	server.SkipIfShort(t)
+server.SkipIfShort(t)
+
 		server.Clear()
 		c, err := proto.Dial(server.Addr())
 		ok(t, err)
@@ -875,6 +904,8 @@ func TestGetSet(t *testing.T) {
 	}
 */
 func TestStrlen(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -920,6 +951,8 @@ func TestStrlen(t *testing.T) {
 }
 
 func TestAppend(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -968,6 +1001,8 @@ func TestAppend(t *testing.T) {
 }
 
 func TestGetrange(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1037,6 +1072,8 @@ func TestGetrange(t *testing.T) {
 }
 
 func TestSetrange(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1100,6 +1137,8 @@ func TestSetrange(t *testing.T) {
 }
 
 func TestBitcount(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1173,7 +1212,10 @@ func TestBitcount(t *testing.T) {
 }
 
 /*
-	func TestBitop(t *testing.T) {
+func TestBitop(t *testing.T) {
+	server.SkipIfShort(t)
+server.SkipIfShort(t)
+
 		server.Clear()
 		c, err := proto.Dial(server.Addr())
 		ok(t, err)
@@ -1286,6 +1328,8 @@ func TestBitcount(t *testing.T) {
 	}
 */
 func TestBitpos(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1464,6 +1508,8 @@ func TestBitpos(t *testing.T) {
 }
 
 func TestGetbit(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1520,6 +1566,8 @@ func TestGetbit(t *testing.T) {
 }
 
 func TestSetbit(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1600,6 +1648,8 @@ func TestSetbit(t *testing.T) {
 
 /*
 func TestMsetnx(t *testing.T) {
+	server.SkipIfShort(t)
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)

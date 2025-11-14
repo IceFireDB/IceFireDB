@@ -9,6 +9,9 @@ import (
 )
 
 func TestIterator(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	tmpDir, err := os.MkdirTemp("", "ipfs-synckv-test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
@@ -49,6 +52,9 @@ func TestIterator(t *testing.T) {
 }
 
 func TestIteratorPrefix(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	tmpDir, err := os.MkdirTemp("", "ipfs-synckv-test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)

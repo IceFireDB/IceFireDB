@@ -59,6 +59,9 @@ func testListRange(key []byte, start int64, stop int64, checkValues ...int) erro
 }
 
 func TestList(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -212,6 +215,9 @@ func TestList(t *testing.T) {
 }
 
 func TestListMPush(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -238,6 +244,9 @@ func TestListMPush(t *testing.T) {
 }
 
 func TestPop(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -301,6 +310,9 @@ func TestPop(t *testing.T) {
 }
 
 func TestRPopLPush(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -370,6 +382,9 @@ func TestRPopLPush(t *testing.T) {
 }
 
 func TestRPopLPushSingleElement(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -401,6 +416,9 @@ func TestRPopLPushSingleElement(t *testing.T) {
 }
 
 func TestTrim(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -437,6 +455,9 @@ func TestTrim(t *testing.T) {
 }
 
 func TestListErrorParams(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 

@@ -9,6 +9,9 @@ import (
 )
 
 func TestDBOpen(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	tmpDir, err := os.MkdirTemp("", "ipfs-synckv-test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
@@ -24,6 +27,9 @@ func TestDBOpen(t *testing.T) {
 }
 
 func TestDBPutGet(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	tmpDir, err := os.MkdirTemp("", "ipfs-synckv-test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
@@ -46,6 +52,9 @@ func TestDBPutGet(t *testing.T) {
 }
 
 func TestDBDelete(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	tmpDir, err := os.MkdirTemp("", "ipfs-synckv-test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
@@ -71,6 +80,9 @@ func TestDBDelete(t *testing.T) {
 }
 
 func TestDBMetrics(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping P2P test in short mode")
+	}
 	tmpDir, err := os.MkdirTemp("", "ipfs-synckv-test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)

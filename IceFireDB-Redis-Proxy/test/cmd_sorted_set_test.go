@@ -29,6 +29,7 @@ import (
 
 // Test ZADD / ZCARD / ZRANK / ZREVRANK.
 func TestSortedSet(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -176,6 +177,7 @@ func TestSortedSet(t *testing.T) {
 
 // Test ZADD
 func TestSortedSetAdd(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -302,6 +304,7 @@ func TestSortedSetAdd(t *testing.T) {
 
 // Test ZRANGE and ZREVRANGE
 func TestSortedSetRange(t *testing.T) {
+	server.SkipIfShort(t)
 	// ZREVRANGE is the same code as ZRANGE
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
@@ -426,6 +429,7 @@ func TestSortedSetRange(t *testing.T) {
 
 // Test ZRANGEBYSCORE,  ZREVRANGEBYSCORE, and ZCOUNT
 func TestSortedSetRangeByScore(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -642,6 +646,7 @@ func TestSortedSetRangeByScore(t *testing.T) {
 }
 
 func TestIssue10(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -663,6 +668,7 @@ func TestIssue10(t *testing.T) {
 
 // Test ZREM
 func TestSortedSetRem(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -726,6 +732,7 @@ func TestSortedSetRem(t *testing.T) {
 
 // Test ZREMRANGEBYLEX
 func TestSortedSetRemRangeByLex(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -804,6 +811,7 @@ func TestSortedSetRemRangeByLex(t *testing.T) {
 
 // Test ZREMRANGEBYRANK
 func TestSortedSetRemRangeByRank(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -887,6 +895,7 @@ func TestSortedSetRemRangeByRank(t *testing.T) {
 
 // Test ZREMRANGEBYSCORE
 func TestSortedSetRangeRemByScore(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -973,6 +982,7 @@ func TestSortedSetRangeRemByScore(t *testing.T) {
 
 // Test ZSCORE
 func TestSortedSetScore(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1032,6 +1042,7 @@ func TestSortedSetScore(t *testing.T) {
 
 // Test ZRANGEBYLEX, ZREVRANGEBYLEX, ZLEXCOUNT
 func TestSortedSetRangeByLex(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1257,6 +1268,7 @@ func TestSortedSetRangeByLex(t *testing.T) {
 
 // Test ZINCRBY
 func TestSortedSetIncrby(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1311,6 +1323,7 @@ func TestSortedSetIncrby(t *testing.T) {
 }
 
 func TestZscan(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1409,6 +1422,7 @@ func TestZscan(t *testing.T) {
 }
 
 /*func TestZunionstore(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1543,6 +1557,7 @@ func TestZscan(t *testing.T) {
 }*/
 
 /*func TestZunion(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1639,6 +1654,7 @@ func TestZscan(t *testing.T) {
 }
 */
 /*func TestZinterstore(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1771,6 +1787,7 @@ func TestZscan(t *testing.T) {
 */
 // Test ZPOPMIN
 func TestSortedSetPopMin(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1837,6 +1854,7 @@ func TestSortedSetPopMin(t *testing.T) {
 
 // Test ZPOPMAX
 func TestSortedSetPopMax(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1904,6 +1922,7 @@ func TestSortedSetPopMax(t *testing.T) {
 
 // Test ZRANDMEMBER
 /*func TestSortedSetRandmember(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)

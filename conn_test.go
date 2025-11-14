@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/ledisdb/ledisdb/ledis"
@@ -28,6 +29,15 @@ var (
 func getTestConn() *redis.Client {
 	log.SetOutput(os.Stderr)
 	f := func() {
+		// Skip P2P initialization in short mode
+		if testing.Short() {
+			// Create a mock client that will fail gracefully
+			testRedisClient = redis.NewClient(&redis.Options{
+				Addr: "127.0.0.1:11001",
+			})
+			return
+		}
+
 		conf.DataDir = "/tmp/icefiredb"
 		os.RemoveAll(conf.DataDir)
 		conf.DataDirReady = func(dir string) {

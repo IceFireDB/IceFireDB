@@ -13,6 +13,9 @@ import (
 )
 
 func TestZSet(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -111,6 +114,9 @@ func TestZSet(t *testing.T) {
 }
 
 func TestZSetCount(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -173,6 +179,9 @@ func TestZSetCount(t *testing.T) {
 }
 
 func TestZSetRank(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -226,6 +235,9 @@ func testZSetRange(ay []interface{}, checkValues ...interface{}) error {
 }
 
 func TestZSetRangeScore(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 
@@ -320,6 +332,9 @@ func TestZSetRangeScore(t *testing.T) {
 }
 
 func TestZSetRange(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	c := getTestConn()
 
 	ctx := context.Background()
@@ -433,6 +448,9 @@ func TestZSetRange(t *testing.T) {
 }
 
 func TestZsetErrorParams(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode")
+	}
 	c := getTestConn()
 	ctx := context.Background()
 

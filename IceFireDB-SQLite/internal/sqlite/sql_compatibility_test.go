@@ -7,6 +7,9 @@ import (
 )
 
 func TestSQLCompatibility(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping SQL compatibility test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, ":memory:")
 	defer db.Close()
@@ -78,6 +81,9 @@ func TestSQLCompatibility(t *testing.T) {
 }
 
 func TestSQLInjectionProtection(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping SQL injection protection test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, ":memory:")
 	defer db.Close()
@@ -124,6 +130,9 @@ func TestSQLInjectionProtection(t *testing.T) {
 }
 
 func TestSQLFunctions(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping SQL functions test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, ":memory:")
 	defer db.Close()
@@ -170,6 +179,9 @@ func TestSQLFunctions(t *testing.T) {
 }
 
 func TestComplexQueries(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping complex queries test in short mode")
+	}
 	ctx := context.Background()
 	db := InitSQLite(ctx, ":memory:")
 	defer db.Close()

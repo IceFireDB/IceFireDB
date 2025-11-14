@@ -28,6 +28,7 @@ import (
 
 // Test SADD / SMEMBERS.
 func TestSadd(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -121,6 +122,7 @@ func TestSadd(t *testing.T) {
 
 // Test SISMEMBER
 func TestSismember(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -167,6 +169,7 @@ func TestSismember(t *testing.T) {
 
 // Test SREM
 func TestSrem(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -226,6 +229,7 @@ func TestSrem(t *testing.T) {
 
 // Test SMOVE
 /*func TestSmove(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -298,6 +302,7 @@ func TestSrem(t *testing.T) {
 
 // Test SPOP
 func TestSpop(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -361,6 +366,7 @@ func TestSpop(t *testing.T) {
 
 // Test SRANDMEMBER
 func TestSrandmember(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -437,6 +443,7 @@ func TestSrandmember(t *testing.T) {
 
 // Test SDIFF
 /*func TestSdiff(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -494,6 +501,7 @@ func TestSrandmember(t *testing.T) {
 
 // Test SDIFFSTORE
 /*func TestSdiffstore(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -533,6 +541,7 @@ func TestSrandmember(t *testing.T) {
 */
 // Test SINTER
 /*func TestSinter(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -598,6 +607,7 @@ func TestSrandmember(t *testing.T) {
 
 // Test SINTERSTORE
 /*func TestSinterstore(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -646,6 +656,7 @@ func TestSrandmember(t *testing.T) {
 */
 // Test SUNION
 /*func TestSunion(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -709,6 +720,7 @@ func TestSrandmember(t *testing.T) {
 */
 // Test SUNIONSTORE
 /*func TestSunionstore(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -748,6 +760,7 @@ func TestSrandmember(t *testing.T) {
 }
 */
 func TestSscan(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)

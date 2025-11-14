@@ -28,6 +28,7 @@ import (
 )
 
 func TestHash(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())
@@ -114,6 +115,7 @@ func TestHash(t *testing.T) {
 }
 
 func TestHashSetNX(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())
@@ -137,6 +139,7 @@ func TestHashSetNX(t *testing.T) {
 }
 
 func TestHashMSet(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())
@@ -175,6 +178,7 @@ func TestHashMSet(t *testing.T) {
 }
 
 func TestHashDel(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())
@@ -197,6 +201,7 @@ func TestHashDel(t *testing.T) {
 }
 
 func TestHashExists(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())
@@ -216,6 +221,7 @@ func TestHashExists(t *testing.T) {
 }
 
 func TestHashGetall(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())
@@ -249,6 +255,7 @@ func TestHashGetall(t *testing.T) {
 }
 
 func TestHashKeys(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())
@@ -292,6 +299,7 @@ func TestHashKeys(t *testing.T) {
 }
 
 func TestHashValues(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -317,6 +325,7 @@ func TestHashValues(t *testing.T) {
 }
 
 func TestHashLen(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())
@@ -337,6 +346,7 @@ func TestHashLen(t *testing.T) {
 }
 
 func TestHashMget(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())
@@ -372,6 +382,7 @@ func TestHashMget(t *testing.T) {
 }
 
 func TestHashIncrby(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())
@@ -420,6 +431,7 @@ func TestHashIncrby(t *testing.T) {
 }
 
 func TestHashIncrbyfloat(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())
@@ -493,6 +505,7 @@ func TestHashIncrbyfloat(t *testing.T) {
 }
 
 func TestHscan(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())
@@ -584,6 +597,7 @@ func TestHscan(t *testing.T) {
 }
 
 func TestHstrlen(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 
 	c, err := proto.Dial(server.Addr())

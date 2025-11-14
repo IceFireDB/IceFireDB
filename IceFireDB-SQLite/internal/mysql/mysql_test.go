@@ -16,6 +16,9 @@ func TestNewMysqlProxy(t *testing.T) {
 }
 
 func TestMysqlProxyHandleQuery(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping MySQL proxy handle query test in short mode")
+	}
 	// 初始化SQLite数据库
 	ctx := context.Background()
 	sqlite.InitSQLite(ctx, ":memory:")

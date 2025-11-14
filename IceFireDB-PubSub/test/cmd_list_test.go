@@ -50,6 +50,7 @@ func goStrings(t *testing.T, s *miniredis.Miniredis, args ...string) <-chan stri
 }
 
 func TestLpush(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -140,6 +141,7 @@ func TestLpush(t *testing.T) {
 }
 
 func TestLpushx(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -205,6 +207,7 @@ func TestLpushx(t *testing.T) {
 }
 
 func TestLpop(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -281,6 +284,7 @@ func TestLpop(t *testing.T) {
 }
 
 func TestRPushPop(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -354,6 +358,7 @@ func TestRPushPop(t *testing.T) {
 }
 
 func TestRpop(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -387,6 +392,7 @@ func TestRpop(t *testing.T) {
 }
 
 func TestLindex(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -446,6 +452,7 @@ func TestLindex(t *testing.T) {
 }
 
 func TestLlen(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -478,6 +485,7 @@ func TestLlen(t *testing.T) {
 }
 
 func TestLtrim(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -537,6 +545,7 @@ func TestLtrim(t *testing.T) {
 }
 
 func TestLrem(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -634,6 +643,7 @@ func TestLrem(t *testing.T) {
 }
 
 func TestLset(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -704,6 +714,7 @@ func TestLset(t *testing.T) {
 }
 
 func TestLinsert(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -800,6 +811,7 @@ func TestLinsert(t *testing.T) {
 }
 
 /*func TestRpoplpush(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -891,6 +903,7 @@ func TestLinsert(t *testing.T) {
 }*/
 
 func TestRpushx(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -954,6 +967,7 @@ func TestRpushx(t *testing.T) {
 
 /*
 func TestBrpop(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -989,6 +1003,7 @@ func TestBrpop(t *testing.T) {
 }
 
 func TestBrpopSimple(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1011,6 +1026,7 @@ func TestBrpopSimple(t *testing.T) {
 }
 
 func TestBrpopMulti(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1038,6 +1054,7 @@ func TestBrpopMulti(t *testing.T) {
 }
 
 func TestBrpopTimeout(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1053,6 +1070,7 @@ func TestBrpopTimeout(t *testing.T) {
 }
 
 func TestBrpopTx(t *testing.T) {
+	server.SkipIfShort(t)
 	// BRPOP in a transaction behaves as if the timeout triggers right away
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
@@ -1107,6 +1125,7 @@ func TestBrpopTx(t *testing.T) {
 }
 
 func TestBlpop(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1141,6 +1160,7 @@ func TestBlpop(t *testing.T) {
 }
 
 func TestBlpopResourceCleanup(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1157,6 +1177,7 @@ func TestBlpopResourceCleanup(t *testing.T) {
 }
 
 func TestBrpoplpush(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1204,6 +1225,7 @@ func TestBrpoplpush(t *testing.T) {
 }
 
 func TestBrpoplpushSimple(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	c, err := proto.Dial(server.Addr())
 	ok(t, err)
@@ -1233,6 +1255,7 @@ func TestBrpoplpushSimple(t *testing.T) {
 }
 
 func TestBrpoplpushTimeout(t *testing.T) {
+	server.SkipIfShort(t)
 	server.Clear()
 	s := server.Direct()
 	got := goStrings(t, s, "BRPOPLPUSH", "l1", "l2", "1")
