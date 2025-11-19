@@ -100,7 +100,7 @@ func asyncSQL(m *mysqlProxy) {
 				handleInboundSQL(m, s, readonlyTxConn, "readonly")
 			}
 		}
-	}, func(r interface{}) {
+	}, func(r any) {
 		time.Sleep(time.Second)
 		asyncSQL(m)
 	})

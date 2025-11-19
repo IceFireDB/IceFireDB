@@ -150,7 +150,7 @@ type Stats struct {
 	StartTime    time.Time
 }
 
-func (s *DB) GetStorageEngine() interface{} {
+func (s *DB) GetStorageEngine() any {
 	return s.db
 }
 
@@ -406,16 +406,16 @@ func (db *DB) GetStats() *Stats {
 	return &stats
 }
 
-func (db *DB) Metrics() (tit string, metrics []map[string]interface{}) {
+func (db *DB) Metrics() (tit string, metrics []map[string]any) {
 	tit = "hybriddb cache"
 
 	stats := db.GetStats()
 
 	// Add cache metrics if available
-	var cacheMetrics []map[string]interface{}
+	var cacheMetrics []map[string]any
 	if db.cache != nil && db.cache.Metrics != nil {
 		m := db.cache.Metrics
-		cacheMetrics = []map[string]interface{}{
+		cacheMetrics = []map[string]any{
 			{"used_cost": m.CostAdded() - m.CostEvicted()},
 			{"cost_added": m.CostAdded()},
 			{"cost_evicted": m.CostEvicted()},
@@ -433,7 +433,7 @@ func (db *DB) Metrics() (tit string, metrics []map[string]interface{}) {
 	}
 
 	// Add operational statistics
-	operationalMetrics := []map[string]interface{}{
+	operationalMetrics := []map[string]any{
 		{"cache_hits": stats.CacheHits},
 		{"cache_misses": stats.CacheMisses},
 		{"cache_hit_ratio": fmt.Sprintf("%.2f%%", float64(stats.CacheHits)/float64(stats.CacheHits+stats.CacheMisses)*100)},

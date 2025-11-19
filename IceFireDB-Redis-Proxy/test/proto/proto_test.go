@@ -183,7 +183,7 @@ func TestParse(t *testing.T) {
 		if err != nil {
 			t.Errorf("read: %s", err)
 		}
-		if want := []interface{}{"foo", "bar"}; !reflect.DeepEqual(have, want) {
+		if want := []any{"foo", "bar"}; !reflect.DeepEqual(have, want) {
 			t.Errorf("have %q, want %q", have, want)
 		}
 	})
@@ -193,7 +193,7 @@ func TestParse(t *testing.T) {
 		if err != nil {
 			t.Errorf("read: %s", err)
 		}
-		if want := map[interface{}]interface{}{"foo": "bar", "aap": "noot"}; !reflect.DeepEqual(have, want) {
+		if want := map[any]any{"foo": "bar", "aap": "noot"}; !reflect.DeepEqual(have, want) {
 			t.Errorf("have %q, want %q", have, want)
 		}
 	})

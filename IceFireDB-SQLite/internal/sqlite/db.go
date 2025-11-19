@@ -135,9 +135,9 @@ func Exec(sql string) (*mysql.Result, error) {
 		res.Fields[k] = f
 	}
 
-	c := make([]interface{}, len(column))
+	c := make([]any, len(column))
 	for index := range c {
-		var a interface{}
+		var a any
 		c[index] = &a
 	}
 
@@ -146,7 +146,7 @@ func Exec(sql string) (*mysql.Result, error) {
 		_ = resp.Scan(c...)
 		rowData := make([]byte, 0)
 		for _, data := range c {
-			cv, err := utils.GetString(*data.(*interface{}))
+			cv, err := utils.GetString(*data.(*any))
 			if err != nil {
 				return nil, err
 			}
@@ -174,7 +174,7 @@ func asyncSQL(ctx context.Context) {
 				logrus.Infof("Inbound sql: %s", s.Message)
 			}
 		}
-	}, func(r interface{}) {
+	}, func(r any) {
 		time.Sleep(time.Second)
 		asyncSQL(ctx)
 	})

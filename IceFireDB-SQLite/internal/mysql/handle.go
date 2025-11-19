@@ -52,7 +52,7 @@ func (h *mysqlProxy) HandleFieldList(c *server.Conn, table string, fieldWildcard
 	return nil, nil
 }
 
-func (h *mysqlProxy) HandleStmtPrepare(c *server.Conn, query string) (int, int, interface{}, error) {
+func (h *mysqlProxy) HandleStmtPrepare(c *server.Conn, query string) (int, int, any, error) {
 	//stmt, err := h.db.Prepare(query)
 	//if err != nil {
 	//	return 0, 0, nil, err
@@ -61,7 +61,7 @@ func (h *mysqlProxy) HandleStmtPrepare(c *server.Conn, query string) (int, int, 
 	return 0, 0, nil, nil
 }
 
-func (h *mysqlProxy) HandleStmtExecute(c *server.Conn, context interface{}, query string, args []interface{}) (*mysql.Result, error) {
+func (h *mysqlProxy) HandleStmtExecute(c *server.Conn, context any, query string, args []any) (*mysql.Result, error) {
 	stmt, ok := context.(*client.Stmt)
 	//stmt, ok := context.(*sql.Stmt)
 	if !ok {
@@ -74,7 +74,7 @@ func (h *mysqlProxy) HandleStmtExecute(c *server.Conn, context interface{}, quer
 	return res, err
 }
 
-func (h *mysqlProxy) HandleStmtClose(c *server.Conn, context interface{}) error {
+func (h *mysqlProxy) HandleStmtClose(c *server.Conn, context any) error {
 	stmt, ok := context.(*client.Stmt)
 	if !ok {
 		return errors.New("other error")

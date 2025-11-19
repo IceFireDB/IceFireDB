@@ -168,7 +168,7 @@ func (c *Conn) GetDB() string {
 	return c.db
 }
 
-func (c *Conn) Execute(command string, args ...interface{}) (*Result, error) {
+func (c *Conn) Execute(command string, args ...any) (*Result, error) {
 	if len(args) == 0 {
 		return c.exec(command)
 	} else {

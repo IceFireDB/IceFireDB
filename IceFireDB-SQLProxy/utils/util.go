@@ -19,7 +19,7 @@ func InArray(in string, array []string) bool {
 	return slices.Contains(array, in)
 }
 
-func GoWithRecover(handler func(), recoverHandler func(r interface{})) {
+func GoWithRecover(handler func(), recoverHandler func(r any)) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -40,7 +40,7 @@ func GoWithRecover(handler func(), recoverHandler func(r interface{})) {
 	}()
 }
 
-func GetString(d interface{}) (string, error) {
+func GetString(d any) (string, error) {
 	switch v := d.(type) {
 	case string:
 		return v, nil

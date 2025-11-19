@@ -31,7 +31,7 @@ func (s *Stmt) WarningsNum() int {
 	return s.warnings
 }
 
-func (s *Stmt) Execute(args ...interface{}) (*Result, error) {
+func (s *Stmt) Execute(args ...any) (*Result, error) {
 	if err := s.write(args...); err != nil {
 		return nil, errors.Trace(err)
 	}
@@ -47,7 +47,7 @@ func (s *Stmt) Close() error {
 	return nil
 }
 
-func (s *Stmt) write(args ...interface{}) error {
+func (s *Stmt) write(args ...any) error {
 	paramsNum := s.params
 
 	if len(args) != paramsNum {

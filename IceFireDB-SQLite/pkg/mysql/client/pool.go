@@ -24,7 +24,7 @@ Usage:
 type (
 	Timestamp int64
 
-	LogFunc func(format string, args ...interface{})
+	LogFunc func(format string, args ...any)
 
 	Pool struct {
 		logFunc          LogFunc

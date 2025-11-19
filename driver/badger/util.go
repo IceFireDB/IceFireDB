@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-func printf(tpl string, args ...interface{}) {
-	newArgs := make([]interface{}, 0, len(args))
+func printf(tpl string, args ...any) {
+	newArgs := make([]any, 0, len(args))
 	for _, arg := range args {
-		var newArg interface{}
+		var newArg any
 		switch v := arg.(type) {
 		case string:
 			newArg = strings.TrimSpace(v)

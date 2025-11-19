@@ -11,7 +11,7 @@ type Result struct {
 }
 
 type Executer interface {
-	Execute(query string, args ...interface{}) (*Result, error)
+	Execute(query string, args ...any) (*Result, error)
 }
 
 func (r *Result) Close() {
