@@ -231,7 +231,7 @@ func Write(w io.Writer, cmd []string) error {
 }
 
 // Parse into interfaces. `b` must contain exactly a single command (which can be nested).
-func Parse(b string) (interface{}, error) {
+func Parse(b string) (any, error) {
 	if len(b) < 1 {
 		return nil, ErrUnexpected
 	}
@@ -260,7 +260,7 @@ func Parse(b string) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		var res []interface{}
+		var res []any
 		for _, elem := range elems {
 			e, err := Parse(elem)
 			if err != nil {
@@ -274,7 +274,7 @@ func Parse(b string) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		res := map[interface{}]interface{}{}
+		res := map[any]any{}
 		for len(elems) > 1 {
 			key, err := Parse(elems[0])
 			if err != nil {

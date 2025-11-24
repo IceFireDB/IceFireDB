@@ -9,10 +9,10 @@ import (
 var _ driver.IDB = (*DB)(nil)
 
 type DB struct {
-	cfg          *config.Config
-	opts         badger.Options
-	db           *badger.DB
-	iteratorOpts badger.IteratorOptions
+	cfg           *config.Config
+	opts          badger.Options
+	db            *badger.DB
+	iteratorOpts  badger.IteratorOptions
 	encryptionKey []byte // For encryption support
 }
 
@@ -37,7 +37,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 		if err != nil {
 			return err
 		}
-		
+
 		// Handle encrypted data if needed
 		if db.encryptionKey != nil && item.UserMeta() == 1 {
 			return item.Value(func(val []byte) error {
@@ -46,14 +46,14 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 				return nil
 			})
 		}
-		
+
 		v, err = item.ValueCopy(v)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
-	
+
 	if err == badger.ErrKeyNotFound {
 		return nil, nil
 	}
@@ -110,6 +110,6 @@ func (db *DB) Compact() error {
 	return nil
 }
 
-func (db *DB) GetStorageEngine() interface{} {
+func (db *DB) GetStorageEngine() any {
 	return db.db
 }

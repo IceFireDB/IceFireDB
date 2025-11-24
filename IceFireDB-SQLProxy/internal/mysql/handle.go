@@ -46,7 +46,7 @@ func (h *Handle) HandleFieldList(c *server.Conn, table string, fieldWildcard str
 	return h.conn.FieldList(table, fieldWildcard)
 }
 
-func (h *Handle) HandleStmtPrepare(c *server.Conn, query string) (int, int, interface{}, error) {
+func (h *Handle) HandleStmtPrepare(c *server.Conn, query string) (int, int, any, error) {
 	stmt, err := h.conn.Prepare(query)
 	if err != nil {
 		return 0, 0, nil, err
@@ -54,7 +54,7 @@ func (h *Handle) HandleStmtPrepare(c *server.Conn, query string) (int, int, inte
 	return stmt.ParamNum(), stmt.ColumnNum(), stmt, nil
 }
 
-func (h *Handle) HandleStmtExecute(c *server.Conn, context interface{}, query string, args []interface{}) (*mysql.Result, error) {
+func (h *Handle) HandleStmtExecute(c *server.Conn, context any, query string, args []any) (*mysql.Result, error) {
 	// Check if this is a readonly connection attempting a write
 	if h.conn.GetUser() == config.Get().Mysql.Readonly.User && isDML(query) {
 		return nil, errors.New("readonly user cannot execute write operations")
@@ -76,7 +76,7 @@ func (h *Handle) HandleStmtExecute(c *server.Conn, context interface{}, query st
 	return res, err
 }
 
-func (h *Handle) HandleStmtClose(c *server.Conn, context interface{}) error {
+func (h *Handle) HandleStmtClose(c *server.Conn, context any) error {
 	stmt, ok := context.(*client.Stmt)
 	if !ok {
 		return errors.New("other error")

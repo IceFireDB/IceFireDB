@@ -4,7 +4,7 @@ import "sync"
 
 var (
 	byteSlicePool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return []byte{}
 		},
 	}

@@ -21,13 +21,13 @@ type Handler interface {
 	HandleFieldList(conn *Conn, table string, fieldWildcard string) ([]*Field, error)
 	// handle COM_STMT_PREPARE, params is the param number for this statement, columns is the column number
 	// context will be used later for statement execute
-	HandleStmtPrepare(conn *Conn, query string) (params int, columns int, context interface{}, err error)
+	HandleStmtPrepare(conn *Conn, query string) (params int, columns int, context any, err error)
 	// handle COM_STMT_EXECUTE, context is the previous one set in prepare
 	// query is the statement prepare query, and args is the params for this statement
-	HandleStmtExecute(conn *Conn, context interface{}, query string, args []interface{}) (*Result, error)
+	HandleStmtExecute(conn *Conn, context any, query string, args []any) (*Result, error)
 	// handle COM_STMT_CLOSE, context is the previous one set in prepare
 	// this handler has no response
-	HandleStmtClose(conn *Conn, context interface{}) error
+	HandleStmtClose(conn *Conn, context any) error
 	// handle any other command that is not currently handled by the library,
 	// default implementation for this method will return an ER_UNKNOWN_ERROR
 	HandleOtherCommand(conn *Conn, cmd byte, data []byte) error
@@ -88,7 +88,7 @@ func (c *Conn) HandleCommand() error {
 		return err
 	}
 */
-func (c *Conn) dispatch(data []byte) interface{} {
+func (c *Conn) dispatch(data []byte) any {
 	cmd := data[0]
 	data = data[1:]
 	switch cmd {
@@ -184,15 +184,15 @@ func (h EmptyHandler) HandleFieldList(c *Conn, table string, fieldWildcard strin
 	return nil, fmt.Errorf("not supported now")
 }
 
-func (h EmptyHandler) HandleStmtPrepare(c *Conn, query string) (int, int, interface{}, error) {
+func (h EmptyHandler) HandleStmtPrepare(c *Conn, query string) (int, int, any, error) {
 	return 0, 0, nil, fmt.Errorf("not supported now")
 }
 
-func (h EmptyHandler) HandleStmtExecute(c *Conn, context interface{}, query string, args []interface{}) (*Result, error) {
+func (h EmptyHandler) HandleStmtExecute(c *Conn, context any, query string, args []any) (*Result, error) {
 	return nil, fmt.Errorf("not supported now")
 }
 
-func (h EmptyHandler) HandleStmtClose(c *Conn, context interface{}) error {
+func (h EmptyHandler) HandleStmtClose(c *Conn, context any) error {
 	return nil
 }
 

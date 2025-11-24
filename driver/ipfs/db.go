@@ -71,7 +71,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 		NumCounters: defaultHotCacheNumCounters,
 		BufferItems: 64,
 		Metrics:     true,
-		Cost: func(value interface{}) int64 {
+		Cost: func(value any) int64 {
 			return int64(len(value.([]byte)))
 		},
 	})
@@ -116,7 +116,7 @@ type DB struct {
 	remoteShell *shell.Shell
 }
 
-func (s *DB) GetStorageEngine() interface{} {
+func (s *DB) GetStorageEngine() any {
 	return s.db
 }
 
@@ -255,11 +255,11 @@ func (db *DB) Compact() error {
 	})
 }
 
-func (db *DB) Metrics() (tit string, metrics []map[string]interface{}) {
+func (db *DB) Metrics() (tit string, metrics []map[string]any) {
 	tit = "hybriddb cache"
 	costAdd := db.cache.Metrics.CostAdded()
 	costEvicted := db.cache.Metrics.CostEvicted()
-	metrics = []map[string]interface{}{
+	metrics = []map[string]any{
 		{"used_cost": costAdd - costEvicted},                     // Current memory usage (bytes)
 		{"cost_added": costAdd},                                  // Total memory sum of data added in history, incrementing (bytes)
 		{"cost_evicted": costEvicted},                            // Free total memory, incrementing (bytes)

@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-func GoWithRecover(handler func(), recoverHandler func(r interface{})) {
+func GoWithRecover(handler func(), recoverHandler func(r any)) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -50,7 +50,7 @@ func GoWithRecover(handler func(), recoverHandler func(r interface{})) {
 	}()
 }
 
-func GetInterfaceString(param interface{}) string {
+func GetInterfaceString(param any) string {
 	switch param := param.(type) {
 	case []byte:
 		return string(param)
