@@ -2,6 +2,8 @@
 package trie
 
 import (
+	"slices"
+
 	"github.com/probe-lab/go-libdht/kad"
 	"github.com/probe-lab/go-libdht/kad/key"
 )
@@ -97,43 +99,73 @@ func (tr *Trie[K, D]) shrink() {
 // Add attempts to add a key to the trie, mutating the trie.
 // Returns true if the key was added, false otherwise.
 func (tr *Trie[K, D]) Add(kk K, data D) bool {
-	return tr.addManyAtDepth(0, Entry[K, D]{Key: kk, Data: data}) == 1
+	return tr.addManyAtDepth(0, []Entry[K, D]{{Key: kk, Data: data}}) == 1
 }
 
 // AddMany attempts to add multiple entries to the trie, mutating the trie.
 // Returns the number of entries that were successfully added.
 // Duplicate keys within entries or keys already in the trie are ignored.
+//
+// Performance: This function sorts entries once (O(N log N)) and removes duplicates
+// in a single pass (O(N)). The sorted entries enable zero-allocation partitioning
+// during recursive insertion via subslicing.
 func (tr *Trie[K, D]) AddMany(entries ...Entry[K, D]) int {
-	return tr.addManyAtDepth(0, entries...)
-}
-
-func (tr *Trie[K, D]) addManyAtDepth(depth int, entries ...Entry[K, D]) int {
 	if len(entries) == 0 {
 		return 0
 	}
 
-	// Partition entries by direction
-	sortedEntries := [2][]Entry[K, D]{}
-	for i := range entries {
-		if entries[i].Key.BitLen() <= depth {
-			// Ignore keys that are too short, it means the node already exists in
-			// trie, but isn't a leaf.
-			continue
+	// Sort entries by key to enable efficient subslicing during recursion
+	slices.SortFunc(entries, func(a, b Entry[K, D]) int {
+		return a.Key.Compare(b.Key)
+	})
+
+	// Remove adjacent duplicates in-place using read/write pointers
+	// After sorting, duplicates are adjacent so we only compare neighbors
+	if len(entries) > 1 {
+		writeIdx := 1
+		for readIdx := 1; readIdx < len(entries); readIdx++ {
+			if !key.Equal(entries[readIdx].Key, entries[readIdx-1].Key) {
+				if writeIdx != readIdx {
+					entries[writeIdx] = entries[readIdx]
+				}
+				writeIdx++
+			}
 		}
-		b := entries[i].Key.Bit(depth)
-		sortedEntries[b] = append(sortedEntries[b], entries[i])
+		entries = entries[:writeIdx]
 	}
 
+	return tr.addManyAtDepth(0, entries)
+}
+
+// addManyAtDepth recursively adds sorted entries to the trie starting at the given depth.
+//
+// Assumes: entries are sorted by key and contain no duplicate keys.
+//
+// This function uses in-place compaction to partition entries by their bit value at depth,
+// while filtering out keys that are too short (BitLen() <= depth). The compaction uses
+// read/write pointers to move valid entries to the front of the slice, maintaining sort order.
+// After compaction, subslices are passed to child branches, achieving zero-allocation partitioning.
+//
+// The compaction produces three logical regions:
+//   - entries[0:splitIdx]: valid entries with Bit(depth) == 0
+//   - entries[splitIdx:writeIdx]: valid entries with Bit(depth) == 1
+//   - entries[writeIdx:]: entries with BitLen() <= depth (filtered out, not used)
+func (tr *Trie[K, D]) addManyAtDepth(depth int, entries []Entry[K, D]) int {
+	if len(entries) == 0 {
+		return 0
+	}
+
+	// Handle leaf node cases: either add directly or split into branches
 	if tr.IsLeaf() {
 		if tr.HasKey() {
-			// Check if any entry matches existing key
+			// Leaf already has a key - need to split it into branches
 			if len(entries) == 1 && key.Equal(*tr.key, entries[0].Key) {
-				// Key already exists
+				// Key already exists, nothing to add
 				return 0
 			}
 
+			// Split this leaf into branches to accommodate both existing and new keys
 			b := int((*tr.key).Bit(depth))
-			// Split this leaf into branches
 			p := tr.key
 			d := tr.data
 			tr.key = nil
@@ -143,27 +175,49 @@ func (tr *Trie[K, D]) addManyAtDepth(depth int, entries ...Entry[K, D]) int {
 			tr.branch[b].key = p
 			tr.branch[b].data = d
 		} else {
+			// Empty leaf - fast path for single entry
 			if len(entries) == 1 {
 				tr.key = &entries[0].Key
 				tr.data = entries[0].Data
 				return 1
 			}
-			// Create branches to distribute entries
+			// Multiple entries - create branches to distribute them
 			tr.branch[0], tr.branch[1] = &Trie[K, D]{}, &Trie[K, D]{}
 		}
 	}
+
+	// In-place compaction: filter short keys and partition by bit value at depth
+	// Single pass with read/write pointers maintains sort order with zero allocations
+	writeIdx := 0  // Write position for valid entries
+	splitIdx := -1 // Position where bit changes from 0 to 1
+
+	for readIdx := range entries {
+		if entries[readIdx].Key.BitLen() <= depth {
+			// Key is too short to descend further - skip it.
+			// Node already exists in trie but isn't a leaf.
+			continue
+		}
+		// Move valid entry to write position
+		if writeIdx != readIdx {
+			entries[writeIdx] = entries[readIdx]
+		}
+		// Track where bit value changes from 0 to 1 (entries are sorted)
+		if splitIdx == -1 && entries[readIdx].Key.Bit(depth) == 1 {
+			splitIdx = writeIdx
+		}
+		writeIdx++
+	}
+	if splitIdx == -1 {
+		splitIdx = writeIdx // All valid entries start with 0 at this depth
+	}
+
+	// Recursively add entries to child branches using subslices
 	added := 0
-	for i, branchEntries := range sortedEntries {
-		for range len(branchEntries) - 1 {
-			// Lazily removes duplicates
-			if !key.Equal(branchEntries[0].Key, branchEntries[len(branchEntries)-1].Key) {
-				break
-			}
-			branchEntries = branchEntries[:len(branchEntries)-1]
-		}
-		if len(branchEntries) > 0 {
-			added += tr.branch[i].addManyAtDepth(depth+1, branchEntries...)
-		}
+	if splitIdx > 0 {
+		added += tr.branch[0].addManyAtDepth(depth+1, entries[:splitIdx])
+	}
+	if splitIdx < writeIdx {
+		added += tr.branch[1].addManyAtDepth(depth+1, entries[splitIdx:writeIdx])
 	}
 	return added
 }
