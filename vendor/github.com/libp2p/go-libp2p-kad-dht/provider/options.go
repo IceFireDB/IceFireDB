@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-kad-dht/amino"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
+	"github.com/libp2p/go-libp2p-kad-dht/provider/internal"
 	"github.com/libp2p/go-libp2p-kad-dht/provider/keystore"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	mh "github.com/multiformats/go-multihash"
@@ -28,6 +31,9 @@ const (
 	// a network operation fails, and the ConnectivityCheckOnlineInterval limits
 	// how often such a check is performed.
 	DefaultConnectivityCheckOnlineInterval = 1 * time.Minute
+
+	// DefaultLoggerName is the default logger name for the DHT provider.
+	DefaultLoggerName = internal.DefaultLoggerName
 )
 
 type config struct {
@@ -37,11 +43,14 @@ type config struct {
 
 	offlineDelay                    time.Duration
 	connectivityCheckOnlineInterval time.Duration
+	connectivityCallbacks           [3]func()
 
 	peerid peer.ID
+	host   host.Host
 	router KadClosestPeersRouter
 
-	keystore keystore.Keystore
+	keystore  keystore.Keystore
+	datastore datastore.Batching
 
 	msgSender      pb.MessageSender
 	selfAddrs      func() []ma.Multiaddr
@@ -51,6 +60,11 @@ type config struct {
 	dedicatedPeriodicWorkers int
 	dedicatedBurstWorkers    int
 	maxProvideConnsPerWorker int
+
+	resumeCycle            bool
+	skipBootstrapReprovide bool
+	loggerName             string
+	metricsDhtType         string
 }
 
 type Option func(opt *config) error
@@ -63,6 +77,7 @@ func getOpts(opts []Option) (config, error) {
 		maxReprovideDelay:               DefaultMaxReprovideDelay,
 		offlineDelay:                    DefaultOfflineDelay,
 		connectivityCheckOnlineInterval: DefaultConnectivityCheckOnlineInterval,
+		loggerName:                      DefaultLoggerName,
 
 		maxWorkers:               4,
 		dedicatedPeriodicWorkers: 2,
@@ -70,30 +85,35 @@ func getOpts(opts []Option) (config, error) {
 		maxProvideConnsPerWorker: 20,
 
 		addLocalRecord: func(mh mh.Multihash) error { return nil },
+
+		resumeCycle: true,
 	}
 
 	// Apply options
 	for i, opt := range opts {
 		if err := opt(&cfg); err != nil {
-			return config{}, fmt.Errorf("reprovider dht option %d error: %s", i, err)
+			return config{}, fmt.Errorf("provider dht option %d error: %s", i, err)
 		}
 	}
 
 	// Validate config
 	if len(cfg.peerid) == 0 {
-		return config{}, errors.New("reprovider config: peer id is required")
+		if cfg.host == nil {
+			return config{}, errors.New("provider config: peer id or host is required")
+		}
+		cfg.peerid = cfg.host.ID()
 	}
 	if cfg.router == nil {
-		return config{}, errors.New("reprovider config: router is required")
+		return config{}, errors.New("provider config: router is required")
 	}
 	if cfg.msgSender == nil {
-		return config{}, errors.New("reprovider config: message sender is required")
+		return config{}, errors.New("provider config: message sender is required")
 	}
 	if cfg.selfAddrs == nil {
-		return config{}, errors.New("reprovider config: self addrs func is required")
+		return config{}, errors.New("provider config: self addrs func is required")
 	}
 	if cfg.dedicatedPeriodicWorkers+cfg.dedicatedBurstWorkers > cfg.maxWorkers {
-		return config{}, errors.New("reprovider config: total dedicated workers exceed max workers")
+		return config{}, errors.New("provider config: total dedicated workers exceed max workers")
 	}
 	return cfg, nil
 }
@@ -104,7 +124,7 @@ func getOpts(opts []Option) (config, error) {
 func WithReplicationFactor(n int) Option {
 	return func(cfg *config) error {
 		if n <= 0 {
-			return errors.New("reprovider config: replication factor must be a positive integer")
+			return errors.New("provider config: replication factor must be a positive integer")
 		}
 		cfg.replicationFactor = n
 		return nil
@@ -115,7 +135,7 @@ func WithReplicationFactor(n int) Option {
 func WithReprovideInterval(d time.Duration) Option {
 	return func(cfg *config) error {
 		if d <= 0 {
-			return errors.New("reprovider config: reprovide interval must be greater than 0")
+			return errors.New("provider config: reprovide interval must be greater than 0")
 		}
 		cfg.reprovideInterval = d
 		return nil
@@ -131,7 +151,7 @@ func WithReprovideInterval(d time.Duration) Option {
 func WithMaxReprovideDelay(d time.Duration) Option {
 	return func(cfg *config) error {
 		if d <= 0 {
-			return errors.New("reprovider config: max reprovide delay must be greater than 0")
+			return errors.New("provider config: max reprovide delay must be greater than 0")
 		}
 		cfg.maxReprovideDelay = d
 		return nil
@@ -145,7 +165,7 @@ func WithMaxReprovideDelay(d time.Duration) Option {
 func WithOfflineDelay(d time.Duration) Option {
 	return func(cfg *config) error {
 		if d < 0 {
-			return errors.New("reprovider config: offline delay must be non-negative")
+			return errors.New("provider config: offline delay must be non-negative")
 		}
 		cfg.offlineDelay = d
 		return nil
@@ -159,6 +179,20 @@ func WithOfflineDelay(d time.Duration) Option {
 func WithConnectivityCheckOnlineInterval(d time.Duration) Option {
 	return func(cfg *config) error {
 		cfg.connectivityCheckOnlineInterval = d
+		return nil
+	}
+}
+
+// WithHost sets the libp2p host running the provider.
+// It is useful to protect the open connections and keep addresses in the
+// peerstore during provide operations. Additionally, it is used to get the
+// peer.ID if missing.
+func WithHost(h host.Host) Option {
+	return func(cfg *config) error {
+		if h == nil {
+			return errors.New("provider config: host cannot be nil")
+		}
+		cfg.host = h
 		return nil
 	}
 }
@@ -202,7 +236,7 @@ func WithSelfAddrs(f func() []ma.Multiaddr) Option {
 func WithAddLocalRecord(f func(mh.Multihash) error) Option {
 	return func(cfg *config) error {
 		if f == nil {
-			return errors.New("reprovider config: add local record function cannot be nil")
+			return errors.New("provider config: add local record function cannot be nil")
 		}
 		cfg.addLocalRecord = f
 		return nil
@@ -222,7 +256,7 @@ func WithAddLocalRecord(f func(mh.Multihash) error) Option {
 func WithMaxWorkers(n int) Option {
 	return func(cfg *config) error {
 		if n < 0 {
-			return errors.New("reprovider config: max workers must be non-negative")
+			return errors.New("provider config: max workers must be non-negative")
 		}
 		cfg.maxWorkers = n
 		return nil
@@ -234,7 +268,7 @@ func WithMaxWorkers(n int) Option {
 func WithDedicatedPeriodicWorkers(n int) Option {
 	return func(cfg *config) error {
 		if n < 0 {
-			return errors.New("reprovider config: dedicated periodic workers must be non-negative")
+			return errors.New("provider config: dedicated periodic workers must be non-negative")
 		}
 		cfg.dedicatedPeriodicWorkers = n
 		return nil
@@ -248,7 +282,7 @@ func WithDedicatedPeriodicWorkers(n int) Option {
 func WithDedicatedBurstWorkers(n int) Option {
 	return func(cfg *config) error {
 		if n < 0 {
-			return errors.New("reprovider config: dedicated burst workers must be non-negative")
+			return errors.New("provider config: dedicated burst workers must be non-negative")
 		}
 		cfg.dedicatedBurstWorkers = n
 		return nil
@@ -261,7 +295,7 @@ func WithDedicatedBurstWorkers(n int) Option {
 func WithMaxProvideConnsPerWorker(n int) Option {
 	return func(cfg *config) error {
 		if n <= 0 {
-			return errors.New("reprovider config: max provide conns per worker must be greater than 0")
+			return errors.New("provider config: max provide conns per worker must be greater than 0")
 		}
 		cfg.maxProvideConnsPerWorker = n
 		return nil
@@ -273,9 +307,108 @@ func WithMaxProvideConnsPerWorker(n int) Option {
 func WithKeystore(ks keystore.Keystore) Option {
 	return func(cfg *config) error {
 		if ks == nil {
-			return errors.New("reprovider config: multihash store cannot be nil")
+			return errors.New("provider config: keystore cannot be nil")
 		}
 		cfg.keystore = ks
+		return nil
+	}
+}
+
+// WithDatastore defines the datastore used to keep track of the keyspace
+// region reprovides and persist the provide queue on close.
+func WithDatastore(ds datastore.Batching) Option {
+	return func(cfg *config) error {
+		if ds == nil {
+			return errors.New("provider config: datastore cannot be nil")
+		}
+		cfg.datastore = ds
+		return nil
+	}
+}
+
+// WithResumeCycle sets whether the reprovider should resume the previous
+// reprovide cycle from where it left off when the node was last shut down.
+//
+// When set to true (default), the provider will restore its state from the
+// datastore and continue reproviding regions according to their previous
+// schedule. This ensures continuity across node restarts and prevents gaps
+// in provider record availability.
+//
+// When set to false, the provider starts a fresh reprovide cycle, ignoring
+// any previously persisted state. All regions will be scheduled for
+// reprovision from scratch. This is useful for testing or when you want to
+// reset the reprovide schedule.
+func WithResumeCycle(resume bool) Option {
+	return func(cfg *config) error {
+		cfg.resumeCycle = resume
+		return nil
+	}
+}
+
+// WithLoggerName sets the go-log logger name for the DHT provider.
+func WithLoggerName(name string) Option {
+	return func(cfg *config) error {
+		if len(name) > 0 {
+			cfg.loggerName = name
+		}
+		return nil
+	}
+}
+
+// WithDhtType sets the DHT type label used in the prometheus metrics. It
+// should be used when multiple providers are running in the same process to
+// differentiate them.
+func WithDhtType(dhtType string) Option {
+	return func(cfg *config) error {
+		if len(dhtType) > 0 {
+			cfg.metricsDhtType = dhtType
+		}
+		return nil
+	}
+}
+
+// WithSkipBootstrapReprovide sets whether the initial reprovide should be
+// skipped when the provider starts.
+//
+// This option should be set to true if the node has a low memory profile or
+// low bandwidth configuration and can afford to wait a full reprovide cycle
+// for all keys to be provided to the DHT. It essentially avoids a spike in
+// resource usage (memory & bandwidth) at startup.
+func WithSkipBootstrapReprovide(skip bool) Option {
+	return func(cfg *config) error {
+		cfg.skipBootstrapReprovide = skip
+		return nil
+	}
+}
+
+// WithConnectivityCallbacks sets the connectivity state change callbacks for
+// the provider's internal connectivity checker state machine.
+//
+// The connectivity checker tracks three states: OFFLINE, DISCONNECTED, and
+// ONLINE. The callbacks are invoked during state transitions:
+//
+//   - onOnline: Called when the node transitions to ONLINE state (from either
+//     OFFLINE or DISCONNECTED). After this callback, the provider measures the
+//     network prefix length and refreshes the reprovide schedule.
+//
+//   - onDisconnected: Called when the node transitions from ONLINE to
+//     DISCONNECTED state (i.e., connectivity check failed while online). No
+//     provider action is triggered for this transition.
+//
+//   - onOffline: Called when the node transitions from DISCONNECTED to OFFLINE
+//     state (after remaining disconnected for OfflineDelay duration). After
+//     this callback, the provider clears the provide queue and invalidates
+//     cached metrics.
+//
+// User-supplied callbacks are invoked before the provider's internal actions.
+// All callbacks should be fast and non-blocking to avoid delaying state
+// transitions and provider operations. Long-running operations should be
+// dispatched to separate goroutines.
+func WithConnectivityCallbacks(onOnline, onDisconnected, onOffline func()) Option {
+	return func(cfg *config) error {
+		cfg.connectivityCallbacks[0] = onOnline
+		cfg.connectivityCallbacks[1] = onDisconnected
+		cfg.connectivityCallbacks[2] = onOffline
 		return nil
 	}
 }

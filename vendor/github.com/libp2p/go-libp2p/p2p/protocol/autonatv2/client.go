@@ -21,19 +21,14 @@ import (
 // client implements the client for making dial requests for AutoNAT v2. It verifies successful
 // dials and provides an option to send data for dial requests.
 type client struct {
-	host               host.Host
-	dialData           []byte
-	normalizeMultiaddr func(ma.Multiaddr) ma.Multiaddr
-	metricsTracer      MetricsTracer
+	host          host.Host
+	dialData      []byte
+	metricsTracer MetricsTracer
 
 	mu sync.Mutex
 	// dialBackQueues maps nonce to the channel for providing the local multiaddr of the connection
 	// the nonce was received on
 	dialBackQueues map[uint64]chan ma.Multiaddr
-}
-
-type normalizeMultiaddrer interface {
-	NormalizeMultiaddr(ma.Multiaddr) ma.Multiaddr
 }
 
 func newClient(s *autoNATSettings) *client {
@@ -45,12 +40,7 @@ func newClient(s *autoNATSettings) *client {
 }
 
 func (ac *client) Start(h host.Host) {
-	normalizeMultiaddr := func(a ma.Multiaddr) ma.Multiaddr { return a }
-	if hn, ok := h.(normalizeMultiaddrer); ok {
-		normalizeMultiaddr = hn.NormalizeMultiaddr
-	}
 	ac.host = h
-	ac.normalizeMultiaddr = normalizeMultiaddr
 	ac.host.SetStreamHandler(DialBackProtocol, ac.handleDialBack)
 }
 
@@ -219,7 +209,9 @@ func (ac *client) newResult(resp *pb.DialResponse, reqs []Request, dialBackAddr 
 		rch = network.ReachabilityPrivate
 	default:
 		// Unexpected response code. Discard the response and fail.
-		log.Warnf("invalid status code received in response for addr %s: %d", addr, resp.DialStatus)
+		log.Warn("invalid status code received in response",
+			"address", addr,
+			"dial_status", resp.DialStatus)
 		return Result{}, fmt.Errorf("invalid response: invalid status code for addr %s: %d", addr, resp.DialStatus)
 	}
 
@@ -274,13 +266,17 @@ func (ac *client) handleDialBack(s network.Stream) {
 	}()
 
 	if err := s.Scope().SetService(ServiceName); err != nil {
-		log.Debugf("failed to attach stream to service %s: %w", ServiceName, err)
+		log.Debug("failed to attach stream to service",
+			"service_name", ServiceName,
+			"error", err)
 		s.Reset()
 		return
 	}
 
 	if err := s.Scope().ReserveMemory(dialBackMaxMsgSize, network.ReservationPriorityAlways); err != nil {
-		log.Debugf("failed to reserve memory for stream %s: %w", DialBackProtocol, err)
+		log.Debug("failed to reserve memory for stream",
+			"protocol", DialBackProtocol,
+			"error", err)
 		s.Reset()
 		return
 	}
@@ -292,7 +288,9 @@ func (ac *client) handleDialBack(s network.Stream) {
 	r := pbio.NewDelimitedReader(s, dialBackMaxMsgSize)
 	var msg pb.DialBack
 	if err := r.ReadMsg(&msg); err != nil {
-		log.Debugf("failed to read dialback msg from %s: %s", s.Conn().RemotePeer(), err)
+		log.Debug("failed to read dialback message",
+			"remote_peer", s.Conn().RemotePeer(),
+			"error", err)
 		s.Reset()
 		return
 	}
@@ -302,31 +300,85 @@ func (ac *client) handleDialBack(s network.Stream) {
 	ch := ac.dialBackQueues[nonce]
 	ac.mu.Unlock()
 	if ch == nil {
-		log.Debugf("dialback received with invalid nonce: localAdds: %s peer: %s nonce: %d", s.Conn().LocalMultiaddr(), s.Conn().RemotePeer(), nonce)
+		log.Debug("dialback received with invalid nonce",
+			"local_multiaddr", s.Conn().LocalMultiaddr(),
+			"remote_peer", s.Conn().RemotePeer(),
+			"nonce", nonce)
 		s.Reset()
 		return
 	}
 	select {
 	case ch <- s.Conn().LocalMultiaddr():
 	default:
-		log.Debugf("multiple dialbacks received: localAddr: %s peer: %s", s.Conn().LocalMultiaddr(), s.Conn().RemotePeer())
+		log.Debug("multiple dialbacks received",
+			"local_multiaddr", s.Conn().LocalMultiaddr(),
+			"remote_peer", s.Conn().RemotePeer())
 		s.Reset()
 		return
 	}
 	w := pbio.NewDelimitedWriter(s)
 	res := pb.DialBackResponse{}
 	if err := w.WriteMsg(&res); err != nil {
-		log.Debugf("failed to write dialback response: %s", err)
+		log.Debug("failed to write dialback response",
+			"error", err)
 		s.Reset()
 	}
+}
+
+var tlsWSAddr = ma.StringCast("/tls/ws")
+
+// normalizeMultiaddr returns a multiaddr suitable for equality checks.
+// it removes trailing certhashes and p2p components, removes sni components,
+// and translates /wss to /tls/ws.
+// Remove sni components because there's no way for us to verify whether the
+// correct sni was dialled by the remote host as the LocalAddr on the websocket conn
+// doesn't have sni information.
+// Note: This is used for comparing two addresses where both the addresses are
+// controlled by the host not by a remote node.
+func normalizeMultiaddr(addr ma.Multiaddr) ma.Multiaddr {
+	addr = removeTrailing(addr, ma.P_P2P)
+	addr = removeTrailing(addr, ma.P_CERTHASH)
+
+	// /wss => /tls/ws
+	for i, c := range addr {
+		if c.Code() == ma.P_WSS {
+			na := make(ma.Multiaddr, 0, len(addr)+1)
+			na = append(na, addr[:i]...)
+			na = append(na, tlsWSAddr...)
+			na = append(na, addr[i+1:]...)
+			addr = na
+			break // only do this once; there shouldn't be two /wss components anyway
+		}
+	}
+
+	// remove the sni component
+	for i, c := range addr {
+		if c.Code() == ma.P_SNI {
+			na := make(ma.Multiaddr, 0, len(addr)-1)
+			na = append(na, addr[:i]...)
+			na = append(na, addr[i+1:]...)
+			addr = na
+			break // only do this once; there shouldn't be two /sni components anyway
+		}
+	}
+	return addr
+}
+
+func removeTrailing(addr ma.Multiaddr, protocolCode int) ma.Multiaddr {
+	for i := len(addr) - 1; i >= 0; i-- {
+		if addr[i].Code() != protocolCode {
+			return addr[:i+1]
+		}
+	}
+	return nil
 }
 
 func (ac *client) areAddrsConsistent(connLocalAddr, dialedAddr ma.Multiaddr) bool {
 	if len(connLocalAddr) == 0 || len(dialedAddr) == 0 {
 		return false
 	}
-	connLocalAddr = ac.normalizeMultiaddr(connLocalAddr)
-	dialedAddr = ac.normalizeMultiaddr(dialedAddr)
+	connLocalAddr = normalizeMultiaddr(connLocalAddr)
+	dialedAddr = normalizeMultiaddr(dialedAddr)
 
 	localProtos := connLocalAddr.Protocols()
 	externalProtos := dialedAddr.Protocols()

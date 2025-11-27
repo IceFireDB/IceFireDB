@@ -5,9 +5,10 @@ import (
 )
 
 type config struct {
-	cacheSize  int64
-	db         *pebble.DB
-	pebbleOpts *pebble.Options
+	cacheSize          int64
+	db                 *pebble.DB
+	pebbleOpts         *pebble.Options
+	pebbleWriteOptions *pebble.WriteOptions
 }
 
 type Option func(*config)
@@ -44,5 +45,13 @@ func WithPebbleDB(db *pebble.DB) Option {
 func WithPebbleOpts(opts *pebble.Options) Option {
 	return func(c *config) {
 		c.pebbleOpts = opts
+	}
+}
+
+// WithPebbleWriteOptions configures the write options for the datastore. If
+// not set, pebble.NoSync is used.
+func WithPebbleWriteOptions(opts *pebble.WriteOptions) Option {
+	return func(c *config) {
+		c.pebbleWriteOptions = opts
 	}
 }

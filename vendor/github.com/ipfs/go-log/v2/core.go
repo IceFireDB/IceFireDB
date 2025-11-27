@@ -51,6 +51,7 @@ func (l *lockedMultiCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *za
 func (l *lockedMultiCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
+
 	var errs []error
 	for i := range l.cores {
 		err := l.cores[i].Write(ent, fields)

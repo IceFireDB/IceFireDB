@@ -3,10 +3,12 @@ package log
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/mattn/go-isatty"
 	"go.uber.org/zap"
@@ -35,8 +37,9 @@ const (
 	envLoggingFile = "GOLOG_FILE" // /path/to/file
 	envLoggingURL  = "GOLOG_URL"  // url that will be processed by sink in the zap
 
-	envLoggingOutput = "GOLOG_OUTPUT"     // possible values: stdout|stderr|file combine multiple values with '+'
-	envLoggingLabels = "GOLOG_LOG_LABELS" // comma-separated key-value pairs, i.e. "app=example_app,dc=sjc-1"
+	envLoggingOutput = "GOLOG_OUTPUT"               // possible values: stdout|stderr|file combine multiple values with '+'
+	envLoggingLabels = "GOLOG_LOG_LABELS"           // comma-separated key-value pairs, i.e. "app=example_app,dc=sjc-1"
+	envCaptureSlog   = "GOLOG_CAPTURE_DEFAULT_SLOG" // set to "true" to enable routing slog logs through go-log's zap core
 )
 
 type LogFormat int
@@ -94,6 +97,12 @@ var primaryCore zapcore.Core
 
 // loggerCore is the base for all loggers created by this package
 var loggerCore = &lockedMultiCore{}
+
+// slogBridge is go-log's slog.Handler that routes slog logs through zap.
+// It's always created during SetupLogging, even when GOLOG_CAPTURE_DEFAULT_SLOG=false.
+// This allows applications to explicitly wire slog-based libraries (like go-libp2p)
+// to go-log using SlogHandler(), regardless of whether it's installed as slog.Default().
+var slogBridge atomic.Pointer[slog.Handler]
 
 // GetConfig returns a copy of the saved config. It can be inspected, modified,
 // and re-applied using a subsequent call to SetupLogging().
@@ -156,6 +165,70 @@ func SetupLogging(cfg Config) {
 			levels[name] = zap.NewAtomicLevelAt(zapcore.Level(level))
 		}
 	}
+
+	// Create the slog bridge (always available via SlogHandler()).
+	// This allows applications to explicitly wire slog-based libraries to go-log
+	// regardless of GOLOG_CAPTURE_DEFAULT_SLOG setting.
+	bridge := newZapToSlogBridge(loggerCore)
+	slogBridge.Store(&bridge)
+
+	// Install the bridge as slog.Default() if explicitly enabled.
+	// When enabled, libraries using slog automatically use go-log's formatting.
+	// Libraries can also opt-in to dynamic per-logger level control if they include "logger" attribute.
+	if os.Getenv(envCaptureSlog) == "true" {
+		captureSlogDefault(bridge)
+	}
+}
+
+// SlogHandler returns go-log's slog.Handler for explicit wiring.
+// This allows applications to integrate slog-based logging with go-log's
+// formatting and level control.
+//
+// Example usage in an application's init():
+//
+//	import (
+//	    "log/slog"
+//	    golog "github.com/ipfs/go-log/v2"
+//	    "github.com/libp2p/go-libp2p/gologshim"
+//	)
+//
+//	func init() {
+//	    // Set go-log's slog handler as the application-wide default.
+//	    // This ensures all slog-based logging uses go-log's formatting.
+//	    slog.SetDefault(slog.New(golog.SlogHandler()))
+//
+//	    // Wire go-log's slog bridge to go-libp2p's gologshim.
+//	    // This provides go-libp2p loggers with the "logger" attribute
+//	    // for per-subsystem level control.
+//	    gologshim.SetDefaultHandler(golog.SlogHandler())
+//	}
+func SlogHandler() slog.Handler {
+	if h := slogBridge.Load(); h != nil {
+		return *h
+	}
+	// Should never happen since SetupLogging() is called in init()
+	panic("go-log: SlogHandler called before SetupLogging")
+}
+
+// captureSlogDefault installs go-log's slog bridge as slog.Default()
+func captureSlogDefault(bridge slog.Handler) {
+	// Check if slog.Default() is already customized (not stdlib default)
+	// and warn the user that we're replacing it
+	defaultHandler := slog.Default().Handler()
+	if _, isGoLogBridge := defaultHandler.(interface{ GoLogBridge() }); !isGoLogBridge {
+		// Not a go-log bridge, check if it's a custom handler
+		// We detect custom handlers by checking if it's not a standard text/json handler
+		// This is imperfect but reasonably safe - custom handlers are likely wrapped or different types
+		handlerType := fmt.Sprintf("%T", defaultHandler)
+		if !strings.Contains(handlerType, "slog.defaultHandler") &&
+			!strings.Contains(handlerType, "slog.commonHandler") {
+
+			fmt.Fprintf(os.Stderr, "WARN: go-log is overriding custom slog.Default() handler (%s) to ensure logs from slog-based libraries are captured and formatted consistently. This prevents missing logs or stderr pollution. Set GOLOG_CAPTURE_DEFAULT_SLOG=false to disable this behavior.\n", handlerType)
+
+		}
+	}
+
+	slog.SetDefault(slog.New(bridge))
 }
 
 // SetPrimaryCore changes the primary logging core. If the SetupLogging was
@@ -195,8 +268,12 @@ func setAllLoggers(lvl LogLevel) {
 	}
 }
 
-// SetLogLevel changes the log level of a specific subsystem
-// name=="*" changes all subsystems
+// SetLogLevel changes the log level of a specific subsystem.
+// name=="*" changes all subsystems.
+//
+// This function works for both native go-log loggers and slog-based loggers
+// (e.g., from go-libp2p via gologshim). If the subsystem doesn't exist yet,
+// a level entry is created and will be applied when the logger is created.
 func SetLogLevel(name, level string) error {
 	lvl, err := Parse(level)
 	if err != nil {
@@ -210,15 +287,17 @@ func SetLogLevel(name, level string) error {
 		return nil
 	}
 
-	loggerMutex.RLock()
-	defer loggerMutex.RUnlock()
+	loggerMutex.Lock()
+	defer loggerMutex.Unlock()
 
-	// Check if we have a logger by that name
-	if _, ok := levels[name]; !ok {
-		return ErrNoSuchLogger
+	// Get or create atomic level for this subsystem
+	atomicLevel, ok := levels[name]
+	if !ok {
+		atomicLevel = zap.NewAtomicLevelAt(zapcore.Level(lvl))
+		levels[name] = atomicLevel
+	} else {
+		atomicLevel.SetLevel(zapcore.Level(lvl))
 	}
-
-	levels[name].SetLevel(zapcore.Level(lvl))
 
 	return nil
 }

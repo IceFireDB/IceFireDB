@@ -1,3 +1,5 @@
+// Package keyspace provides utilities for Kademlia keyspace operations,
+// including keys, prefixes, and trie operations.
 package keyspace
 
 import (
@@ -21,15 +23,13 @@ const KeyLen = bit256.KeyLen * 8 // 256
 // MhToBit256 converts a multihash to a its 256-bit kademlia identifier by
 // hashing it with SHA-256.
 func MhToBit256(h mh.Multihash) bit256.Key {
-	hash := sha256.Sum256(h)
-	return bit256.NewKey(hash[:])
+	return bit256.NewKeyFromArray(sha256.Sum256(h))
 }
 
 // PeerIDToBit256 converts a peer.ID to a its 256-bit kademlia identifier by
 // hashing it with SHA-256.
 func PeerIDToBit256(id peer.ID) bit256.Key {
-	hash := sha256.Sum256([]byte(id))
-	return bit256.NewKey(hash[:])
+	return bit256.NewKeyFromArray(sha256.Sum256([]byte(id)))
 }
 
 // FlipLastBit flips the last bit of the given key.
