@@ -464,8 +464,7 @@ func (q *DSQueue) commitInput(ctx context.Context, counter uint64, items *deque.
 		return fmt.Errorf("failed to create batch: %w", err)
 	}
 
-	for i := range items.Len() {
-		item := items.At(i)
+	for item := range items.Iter() {
 		key := makeKey(item, counter)
 		if err = b.Put(ctx, key, nil); err != nil {
 			log.Errorw("failed to add item to batch", "err", err, "qname", q.name)

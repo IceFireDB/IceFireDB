@@ -1,3 +1,4 @@
+// Package dual provides a SweepingProvider for dual DHT setups (LAN and WAN).
 package dual
 
 import (
@@ -56,14 +57,14 @@ func New(d *dual.DHT, opts ...Option) (*SweepingProvider, error) {
 			continue
 		}
 		dhtOpts := []provider.Option{
-			provider.WithPeerID(dht.PeerID()),
+			provider.WithHost(dht.Host()),
 			provider.WithReplicationFactor(dht.BucketSize()),
 			provider.WithSelfAddrs(dht.FilteredAddrs),
 			provider.WithRouter(dht),
 			provider.WithAddLocalRecord(func(h mh.Multihash) error {
 				return dht.Provide(dht.Context(), cid.NewCidV1(cid.Raw, h), false)
 			}),
-			provider.WithKeystore(cfg.keystore),
+			provider.WithResumeCycle(cfg.resumeCycle[i]),
 			provider.WithMessageSender(cfg.msgSenders[i]),
 			provider.WithReprovideInterval(cfg.reprovideInterval[i]),
 			provider.WithMaxReprovideDelay(cfg.maxReprovideDelay[i]),
@@ -73,6 +74,14 @@ func New(d *dual.DHT, opts ...Option) (*SweepingProvider, error) {
 			provider.WithDedicatedPeriodicWorkers(cfg.dedicatedPeriodicWorkers[i]),
 			provider.WithDedicatedBurstWorkers(cfg.dedicatedBurstWorkers[i]),
 			provider.WithMaxProvideConnsPerWorker(cfg.maxProvideConnsPerWorker[i]),
+			provider.WithLoggerName(cfg.loggerNames[i]),
+			provider.WithDhtType(descriptors[i]),
+		}
+		if cfg.keystore != nil {
+			dhtOpts = append(dhtOpts, provider.WithKeystore(cfg.keystore))
+		}
+		if cfg.datastores[i] != nil {
+			dhtOpts = append(dhtOpts, provider.WithDatastore(cfg.datastores[i]))
 		}
 		sweepingProviders[i], err = provider.New(dhtOpts...)
 		if err != nil {

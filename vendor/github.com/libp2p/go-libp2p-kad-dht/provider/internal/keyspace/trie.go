@@ -1,6 +1,7 @@
 package keyspace
 
 import (
+	"iter"
 	"slices"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -15,33 +16,108 @@ import (
 
 var zeroKey = bit256.ZeroKey()
 
-// AllEntries returns all entries (key + value) stored in the trie `t` sorted
-// by their keys in the supplied `order`.
-func AllEntries[K0 kad.Key[K0], K1 kad.Key[K1], D any](t *trie.Trie[K0, D], order K1) []*trie.Entry[K0, D] {
-	return allEntriesAtDepth(t, order, 0)
+// trieIter is a generic helper that iterates over the trie and yields values
+// extracted by the provided extract function. This allows efficient iteration
+// without constructing unnecessary intermediate structures.
+func trieIter[K0 kad.Key[K0], K1 kad.Key[K1], D any, T any](
+	t *trie.Trie[K0, D],
+	order K1,
+	extract func(*trie.Trie[K0, D]) T,
+) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		trieIterAtDepth(t, order, 0, extract, yield)
+	}
 }
 
-func allEntriesAtDepth[K0 kad.Key[K0], K1 kad.Key[K1], D any](t *trie.Trie[K0, D], order K1, depth int) []*trie.Entry[K0, D] {
+func trieIterAtDepth[K0 kad.Key[K0], K1 kad.Key[K1], D any, T any](
+	t *trie.Trie[K0, D],
+	order K1,
+	depth int,
+	extract func(*trie.Trie[K0, D]) T,
+	yield func(T) bool,
+) bool {
 	if t == nil || t.IsEmptyLeaf() {
-		return nil
+		return true
 	}
 	if t.IsNonEmptyLeaf() {
-		return []*trie.Entry[K0, D]{{Key: *t.Key(), Data: t.Data()}}
+		return yield(extract(t))
 	}
 	b := int(order.Bit(depth))
-	return append(allEntriesAtDepth(t.Branch(b), order, depth+1),
-		allEntriesAtDepth(t.Branch(1-b), order, depth+1)...)
+	// First traverse the branch according to order
+	if !trieIterAtDepth(t.Branch(b), order, depth+1, extract, yield) {
+		return false
+	}
+	// Then traverse the other branch
+	return trieIterAtDepth(t.Branch(1-b), order, depth+1, extract, yield)
+}
+
+// EntriesIter returns an iterator over all entries (key + value) stored in
+// the trie `t` sorted by their keys in the supplied `order`.
+// The iterator allows processing entries one at a time without loading all of
+// them into memory.
+func EntriesIter[K0 kad.Key[K0], K1 kad.Key[K1], D any](t *trie.Trie[K0, D], order K1) iter.Seq[trie.Entry[K0, D]] {
+	return trieIter(t, order, func(node *trie.Trie[K0, D]) trie.Entry[K0, D] {
+		return trie.Entry[K0, D]{Key: *node.Key(), Data: node.Data()}
+	})
+}
+
+// ValuesIter returns an iterator over all values stored in the trie `t`
+// sorted by their keys in the supplied `order`.
+// The iterator allows processing values one at a time without loading all of
+// them into memory.
+func ValuesIter[K0 kad.Key[K0], K1 kad.Key[K1], D any](t *trie.Trie[K0, D], order K1) iter.Seq[D] {
+	return trieIter(t, order, func(node *trie.Trie[K0, D]) D {
+		return node.Data()
+	})
+}
+
+// KeysIter returns an iterator over all keys stored in the trie `t`
+// sorted by their keys in the supplied `order`.
+// The iterator allows processing keys one at a time without loading all of
+// them into memory.
+func KeysIter[K0 kad.Key[K0], K1 kad.Key[K1], D any](t *trie.Trie[K0, D], order K1) iter.Seq[K0] {
+	return trieIter(t, order, func(node *trie.Trie[K0, D]) K0 {
+		return *node.Key()
+	})
+}
+
+// AllEntries returns all entries (key + value) stored in the trie `t` sorted
+// by their keys in the supplied `order`.
+func AllEntries[K0 kad.Key[K0], K1 kad.Key[K1], D any](t *trie.Trie[K0, D], order K1) []trie.Entry[K0, D] {
+	if t == nil || t.IsEmptyLeaf() {
+		return []trie.Entry[K0, D]{}
+	}
+	result := make([]trie.Entry[K0, D], 0, t.Size())
+	for entry := range EntriesIter(t, order) {
+		result = append(result, entry)
+	}
+	return result
 }
 
 // AllValues returns all values stored in the trie `t` sorted by their keys in
 // the supplied `order`.
 func AllValues[K0 kad.Key[K0], K1 kad.Key[K1], D any](t *trie.Trie[K0, D], order K1) []D {
-	entries := AllEntries(t, order)
-	out := make([]D, len(entries))
-	for i, entry := range entries {
-		out[i] = entry.Data
+	if t == nil || t.IsEmptyLeaf() {
+		return []D{}
 	}
-	return out
+	result := make([]D, 0, t.Size())
+	for value := range ValuesIter(t, order) {
+		result = append(result, value)
+	}
+	return result
+}
+
+// AllKeys returns all keys stored in the trie `t` sorted by their keys in
+// the supplied `order`.
+func AllKeys[K0 kad.Key[K0], K1 kad.Key[K1], D any](t *trie.Trie[K0, D], order K1) []K0 {
+	if t == nil || t.IsEmptyLeaf() {
+		return []K0{}
+	}
+	result := make([]K0, 0, t.Size())
+	for key := range KeysIter(t, order) {
+		result = append(result, key)
+	}
+	return result
 }
 
 // FindPrefixOfKey checks whether the trie contains a leave whose key is a
@@ -188,6 +264,109 @@ func pruneSubtrieAtDepth[K0 kad.Key[K0], K1 kad.Key[K1], D any](t *trie.Trie[K0,
 	return false
 }
 
+// CoalesceTrie merges sibling keys into their parent prefix recursively. When
+// two keys in the trie differ only in their last bit (e.g., "1100" and "1101"),
+// they are replaced by their common parent prefix (e.g., "110"). This process
+// continues recursively until no more sibling pairs exist, reducing the trie to
+// its minimal prefix coverage.
+// Data associated with coalesced keys is discarded.
+func CoalesceTrie[D any](t *trie.Trie[bitstr.Key, D]) {
+	if t == nil || t.IsLeaf() {
+		return
+	}
+	branches := [2]*trie.Trie[bitstr.Key, D]{t.Branch(0), t.Branch(1)}
+	for _, b := range branches {
+		if b != nil && !b.IsLeaf() {
+			CoalesceTrie(b)
+		}
+	}
+	if branches[0].IsNonEmptyLeaf() && branches[1].IsNonEmptyLeaf() {
+		keys := [2]bitstr.Key{*branches[0].Key(), *branches[1].Key()}
+		l := keys[0].BitLen() - 1
+		if keys[0].BitLen() == keys[1].BitLen() && keys[0].CommonPrefixLength(keys[1]) == l {
+			// Remove siblings from self (parent), and set common prefix as key.
+			*t = trie.Trie[bitstr.Key, D]{}
+			parentKey := keys[0][:l]
+			var d D
+			t.Add(parentKey, d)
+		}
+	}
+}
+
+// SubtractTrie returns a new trie containing all entries from trie `t0` that
+// are not covered by any prefix in trie `t1`. This performs a set subtraction
+// operation (t0 - t1) where keys in `t0` are excluded if they match or are
+// prefixed by any key in `t1`.
+//
+// For example:
+//   - t0: ["0000", "0010", "0100"]
+//   - t1: ["00"]
+//   - Result: ["0100"]
+//
+// The subtraction is prefix-aware: if `t1` contains "00", all keys in `t0`
+// starting with "00" (like "0000" and "0010") are excluded from the result.
+func SubtractTrie[D0, D1 any](t0 *trie.Trie[bitstr.Key, D0], t1 *trie.Trie[bitstr.Key, D1]) *trie.Trie[bitstr.Key, D0] {
+	res := trie.New[bitstr.Key, D0]()
+	subtractTrieAtDepth(t0, t1, res, 0)
+	return res
+}
+
+// subtractTrieAtDepth recursively performs trie subtraction (t0 - t1) at the
+// specified depth, adding entries from `t0` to `res` that are not covered by
+// prefixes in `t1`. The `depth` parameter tracks the current bit position being
+// examined during the traversal.
+func subtractTrieAtDepth[D0, D1 any](t0 *trie.Trie[bitstr.Key, D0],
+	t1 *trie.Trie[bitstr.Key, D1], res *trie.Trie[bitstr.Key, D0], depth int,
+) {
+	if t0 == nil || t0.IsEmptyLeaf() {
+		return
+	}
+	if t1 == nil || t1.IsEmptyLeaf() {
+		// t1 is empty, nothing to subtract, add all t0 to result.
+		res.AddMany(AllEntries(t0, zeroKey)...)
+		return
+	}
+
+	if t0.HasKey() && t1.HasKey() {
+		// Both t0 and t1 are leaves.
+		k0, k1 := *t0.Key(), *t1.Key()
+		if !IsBitstrPrefix(k1, k0) {
+			res.Add(k0, t0.Data())
+		}
+		return
+	}
+	if t0.HasKey() && !t1.HasKey() {
+		// t0 is a leaf, but t1 is not.
+		k0 := t0.Key()
+		if k0.BitLen() <= depth {
+			res.Add(*k0, t0.Data())
+			return
+		}
+		b := int(k0.Bit(depth))
+		// Go deeper in t1's branch that could cover t0's key.
+		subtractTrieAtDepth(t0, t1.Branch(b), res, depth+1)
+		return
+	}
+	if t1.HasKey() && !t0.HasKey() {
+		// t1 is a leaf, but t0 is not.
+		k1 := t1.Key()
+		if k1.BitLen() <= depth {
+			// t1 covers all entries in t0, nothing to add.
+			return
+		}
+		b := int(k1.Bit(depth))
+		// Add all entries in t0's branch that is not covered by t1.
+		res.AddMany(AllEntries(t0.Branch(1-b), zeroKey)...)
+		// Go deeper in the branch covered by t1.
+		subtractTrieAtDepth(t0.Branch(b), t1, res, depth+1)
+		return
+	}
+	// Both t0 and t1 are not leaves.
+	for i := range 2 {
+		subtractTrieAtDepth(t0.Branch(i), t1.Branch(i), res, depth+1)
+	}
+}
+
 // TrieGaps returns all prefixes that aren't covered by a key (prefix) in the
 // trie, at the `target` location. Combining the prefixes included in the trie
 // with the gap prefixes results in a full keyspace coverage of the `target`
@@ -275,128 +454,159 @@ func sortBitstrKeysByOrder[K kad.Key[K]](keys []bitstr.Key, order K) {
 	})
 }
 
-// mapMerge merges all key-value pairs from the source map into the destination
-// map. Values from the source are appended to existing slices in the
-// destination.
-func mapMerge[K comparable, V any](dst, src map[K][]V) {
-	for k, vs := range src {
-		dst[k] = append(dst[k], vs...)
-	}
-}
-
 // AllocateToKClosest distributes items from the items trie to the k closest
-// destinations in the dests trie based on XOR distance between their keys.
+// destinations in batches based on XOR distance between their keys.
 //
-// The algorithm uses the trie structure to efficiently compute proximity
-// without explicit distance calculations. Items are allocated to destinations
-// by traversing both tries simultaneously and selecting the k destinations
-// with the smallest XOR distance to each item's key.
+// The algorithm uses the trie structure to efficiently compute proximity without
+// explicit distance calculations. Items are allocated to destinations by traversing
+// both tries simultaneously and selecting the k destinations with the smallest XOR
+// distance to each item's key.
 //
-// Returns a map where each destination value is associated with all items
-// allocated to it. If k is 0 or either trie is empty, returns an empty map.
-func AllocateToKClosest[K kad.Key[K], V0 any, V1 comparable](items *trie.Trie[K, V0], dests *trie.Trie[K, V1], k int) map[V1][]V0 {
-	return allocateToKClosestAtDepth(items, dests, k, 0)
+// Memory optimization is achieved by sharing batches of items among
+// destinations instead of duplicating them, reducing overhead when multiple
+// destinations receive the same batches.
+//
+// Returns a map where each destination has a slice of batches. Each batch is a slice
+// of items. To iterate: for each peer, for each batch, for each key.
+func AllocateToKClosest[K kad.Key[K], V0 any, V1 comparable](items *trie.Trie[K, V0], dests *trie.Trie[K, V1], k int) map[V1][][]V0 {
+	if dests.IsEmptyLeaf() || items.IsEmptyLeaf() || k == 0 {
+		return nil
+	}
+	// Expected number of batches per destination
+	result := make(map[V1][][]V0, 0)
+	allocateToKClosestAtDepth(items, dests, k, 0, result)
+	return result
 }
 
-// allocateToKClosestAtDepth performs the recursive allocation algorithm at a specific
-// trie depth. At each depth, it processes both branches (0 and 1) of the trie,
-// determining which destinations are closest to the items based on matching bit
-// patterns at the current depth.
-//
-// The algorithm prioritizes destinations in the same branch as items (smaller XOR
-// distance) and recursively processes deeper levels when more granular distance
-// calculations are needed to select exactly k destinations.
+// allocateToKClosestAtDepth performs recursive allocation using batch sharing.
+// Instead of copying individual items, it creates batches at recursion leaves and
+// shares the batch slice across destinations.
 //
 // Parameters:
 //   - items: trie containing items to be allocated
 //   - dests: trie containing destination candidates
 //   - k: maximum number of destinations to allocate each item to
 //   - depth: current bit depth in the trie traversal
-//
-// Returns a map of destination values to their allocated items.
-func allocateToKClosestAtDepth[K kad.Key[K], V0 any, V1 comparable](items *trie.Trie[K, V0], dests *trie.Trie[K, V1], k, depth int) map[V1][]V0 {
+//   - result: output map to write batch allocations into (modified in-place)
+func allocateToKClosestAtDepth[K kad.Key[K], V0 any, V1 comparable](
+	items *trie.Trie[K, V0], dests *trie.Trie[K, V1], k, depth int, result map[V1][][]V0,
+) {
 	if k == 0 {
-		return nil
-	}
-	destBranches := []*trie.Trie[K, V1]{
-		dests.Branch(0),
-		dests.Branch(1),
-	}
-	destValues := [][]V1{
-		AllValues(dests.Branch(0), zeroKey),
-		AllValues(dests.Branch(1), zeroKey),
+		return
 	}
 	if dests.IsLeaf() {
 		if !dests.HasKey() {
-			return nil
+			return
 		}
-		b := int((*dests.Key()).Bit(depth))
-		destValues[b] = []V1{dests.Data()}
-		destValues[1-b] = nil
-		destBranches[b] = dests
-		destBranches[1-b] = nil
+		// Single destination: create batch and add to result
+		dest := dests.Data()
+		batch := AllValues(items, zeroKey)
+		if len(batch) == 0 && items.IsNonEmptyLeaf() {
+			batch = []V0{items.Data()}
+		}
+		result[dest] = append(result[dest], batch)
+		return
 	}
-	m := make(map[V1][]V0, len(destValues[0])+len(destValues[1]))
-	for i := range destValues {
-		// Assign all items from branch i
 
-		matchingDestsBranch := destBranches[i]
-		otherDestsBranch := destBranches[1-i]
-		matchingDests := destValues[i]
-		otherDests := destValues[1-i]
+	destBranches := []*trie.Trie[K, V1]{dests.Branch(0), dests.Branch(1)}
+	destBranchSize := [2]int{destBranches[0].Size(), destBranches[1].Size()}
+
+	// Lazy evaluation of destination values
+	var destValues [2][]V1
+	getDestValues := func(i int) []V1 {
+		if destValues[i] == nil && destBranches[i] != nil && !destBranches[i].IsEmptyLeaf() {
+			destValues[i] = AllValues(destBranches[i], zeroKey)
+		}
+		return destValues[i]
+	}
+
+	// Process each branch
+	for i := range 2 {
+		sameBranch := destBranches[i]
+		otherBranch := destBranches[1-i]
+		sameCount := destBranchSize[i]
+		otherCount := destBranchSize[1-i]
 
 		matchingItemsBranch := items.Branch(i)
 		if matchingItemsBranch == nil || matchingItemsBranch.IsEmptyLeaf() {
-			// No matching items
 			if !items.IsNonEmptyLeaf() || int((*items.Key()).Bit(depth)) != i {
-				// items' current branch is empty, skip it
 				continue
 			}
-			// items' current branch contains a single leaf
 			matchingItemsBranch = items
 		}
-		if nMatchingDests := len(matchingDests); nMatchingDests <= k {
-			matchingItems := AllValues(matchingItemsBranch, zeroKey)
-			if len(matchingItems) == 0 {
-				matchingItems = []V0{items.Data()}
+		if sameCount <= k {
+			// Create batch from matching items
+			batch := AllValues(matchingItemsBranch, zeroKey)
+			if len(batch) == 0 {
+				batch = []V0{items.Data()}
 			}
-			// Allocate matching items to the matching dests branch
-			for _, dest := range matchingDests {
-				m[dest] = append(m[dest], matchingItems...)
+			// Share this batch across all same-branch destinations
+			for _, dest := range getDestValues(i) {
+				result[dest] = append(result[dest], batch)
 			}
-			if nMatchingDests == k || len(otherDests) == 0 {
-				// Items were assigned to all k dests, or other branch is empty.
+
+			if sameCount == k || otherCount == 0 {
 				continue
 			}
 
-			nMissingDests := k - nMatchingDests
-			if len(otherDests) <= nMissingDests {
-				// Other branch contains at most the missing number of dests to be
-				// allocated to. Allocate matching items to the other dests branch.
-				for _, dest := range otherDests {
-					m[dest] = append(m[dest], matchingItems...)
+			nMissingDests := k - sameCount
+			if otherCount <= nMissingDests {
+				// Share batch with other branch destinations too
+				for _, dest := range getDestValues(1 - i) {
+					result[dest] = append(result[dest], batch)
 				}
 			} else {
-				// Other branch contains more than the missing number of dests, go one
-				// level deeper to assign matching items to the closest dests.
-				allocs := allocateToKClosestAtDepth(matchingItemsBranch, otherDestsBranch, nMissingDests, depth+1)
-				mapMerge(m, allocs)
+				// Recurse into other branch
+				allocateToKClosestAtDepth(matchingItemsBranch, otherBranch, nMissingDests, depth+1, result)
 			}
 		} else {
-			// Number of matching dests is larger than k, go one level deeper.
-			allocs := allocateToKClosestAtDepth(matchingItemsBranch, matchingDestsBranch, k, depth+1)
-			mapMerge(m, allocs)
+			// Recurse into same branch
+			allocateToKClosestAtDepth(matchingItemsBranch, sameBranch, k, depth+1, result)
 		}
 	}
-	return m
+}
+
+// KeyspaceCovered checks whether the trie covers the entire keyspace without
+// gaps.
+func KeyspaceCovered[D any](t *trie.Trie[bitstr.Key, D]) bool {
+	if t.IsLeaf() {
+		if t.HasKey() {
+			return *t.Key() == ""
+		}
+		return false
+	}
+
+	stack := []bitstr.Key{"1", "0"}
+outerLoop:
+	for p := range KeysIter(t, zeroKey) {
+		stackTop := stack[len(stack)-1]
+		stackTopLen := len(stackTop)
+		if len(p) < stackTopLen {
+			return false
+		}
+
+		for len(p) == stackTopLen {
+			if stackTopLen == 1 && stackTop == p {
+				stack = stack[:len(stack)-1]
+				continue outerLoop
+			}
+			// Match with stackTop, pop stack and continue
+			p = p[:stackTopLen-1]
+			stack = stack[:len(stack)-1]
+			stackTop = stack[len(stack)-1]
+			stackTopLen = len(stackTop)
+		}
+
+		stack = append(stack, FlipLastBit(p))
+	}
+	return len(stack) == 0
 }
 
 // Region represents a subtrie of the complete DHT keyspace.
 //
 //   - Prefix is the identifier of the subtrie.
 //   - Peers contains all the network peers matching this region.
-//   - Keys contains all the keys provided by the local node matching this
-//     region.
+//   - Keys contains all the keys provided by the local node matching this region.
 type Region struct {
 	Prefix bitstr.Key
 	Peers  *trie.Trie[bit256.Key, peer.ID]
@@ -421,7 +631,21 @@ func RegionsFromPeers(peers []peer.ID, regionSize int, order bit256.Key) ([]Regi
 	}
 	peersTrie.AddMany(peerEntries...)
 	commonPrefix := bitstr.Key(key.BitString(firstPeerKey)[:minCpl])
-	regions := extractMinimalRegions(peersTrie, commonPrefix, regionSize, order)
+
+	// Navigate to the subtrie at the common prefix depth before extracting regions.
+	// This ensures extractMinimalRegions checks branches at the correct depth.
+	subtrie := peersTrie
+	for i := range commonPrefix {
+		if subtrie.IsLeaf() {
+			break
+		}
+		subtrie = subtrie.Branch(int(commonPrefix.Bit(i)))
+		if subtrie == nil || subtrie.IsEmptyLeaf() {
+			return nil, commonPrefix
+		}
+	}
+
+	regions := extractMinimalRegions(subtrie, commonPrefix, regionSize, order)
 	return regions, commonPrefix
 }
 
