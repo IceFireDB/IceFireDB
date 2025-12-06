@@ -65,7 +65,7 @@ jobs:
           export ipfs_data=/root/ipfs_data 
           docker run -d --name ipfs_host -v $ipfs_staging:/export -v $ipfs_data:/data/ipfs -p 4001:4001 -p 8080:8080 -p 5001:5001 ipfs/go-ipfs:latest
       - name: Test
-        run: go test -v -count=1 -tags alltest
+        run: go test -v -count=1 -tags alltest -timeout 300s
 
 
   ipfssynckvtest:
@@ -98,7 +98,7 @@ jobs:
           export ipfs_data=/root/ipfs_data 
           docker run -d --name ipfs_host -v $ipfs_staging:/export -v $ipfs_data:/data/ipfs -p 4001:4001 -p 8080:8080 -p 5001:5001 ipfs/go-ipfs:latest
       - name: Test
-        run: go test -v -count=1 -tags alltest
+        run: go test -v -count=1 -tags alltest -timeout 300s
 
 
   goleveldbtest:
@@ -174,7 +174,7 @@ jobs:
       - name: Install dependencies
         run: go mod tidy && go mod vendor
       - name: Test
-        run: go test -v -count=1 -tags alltest
+        run: go test -v -count=1 -tags alltest -timeout 300s
 
   badgerdbtest:
     strategy:
