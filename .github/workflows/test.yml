@@ -64,6 +64,20 @@ jobs:
           export ipfs_staging=/root/ipfs_staging
           export ipfs_data=/root/ipfs_data 
           docker run -d --name ipfs_host -v $ipfs_staging:/export -v $ipfs_data:/data/ipfs -p 4001:4001 -p 8080:8080 -p 5001:5001 ipfs/go-ipfs:latest
+          # Wait for IPFS daemon to be ready
+          sleep 10
+          docker exec ipfs_host ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["*"]'
+          docker exec ipfs_host ipfs config --json API.HTTPHeaders.Access-Control-Allow-Methods '["PUT", "GET", "POST"]'
+          docker exec ipfs_host ipfs config --json API.HTTPHeaders.Access-Control-Allow-Credentials '["true"]'
+          # Check if IPFS API is responding
+          for i in {1..30}; do
+            if curl -s http://localhost:5001/api/v0/version > /dev/null; then
+              echo "IPFS daemon is ready"
+              break
+            fi
+            echo "Waiting for IPFS daemon to start... ($i/30)"
+            sleep 2
+          done
       - name: Test
         run: go test -v -count=1 -tags alltest -timeout 300s
 
@@ -97,6 +111,20 @@ jobs:
           export ipfs_staging=/root/ipfs_staging
           export ipfs_data=/root/ipfs_data 
           docker run -d --name ipfs_host -v $ipfs_staging:/export -v $ipfs_data:/data/ipfs -p 4001:4001 -p 8080:8080 -p 5001:5001 ipfs/go-ipfs:latest
+          # Wait for IPFS daemon to be ready
+          sleep 10
+          docker exec ipfs_host ipfs config --json API.HTTPHeaders.Access-Control-Allow-Origin '["*"]'
+          docker exec ipfs_host ipfs config --json API.HTTPHeaders.Access-Control-Allow-Methods '["PUT", "GET", "POST"]'
+          docker exec ipfs_host ipfs config --json API.HTTPHeaders.Access-Control-Allow-Credentials '["true"]'
+          # Check if IPFS API is responding
+          for i in {1..30}; do
+            if curl -s http://localhost:5001/api/v0/version > /dev/null; then
+              echo "IPFS daemon is ready"
+              break
+            fi
+            echo "Waiting for IPFS daemon to start... ($i/30)"
+            sleep 2
+          done
       - name: Test
         run: go test -v -count=1 -tags alltest -timeout 300s
 
