@@ -8,11 +8,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"sync"
-	"syscall"
-	"testing"
 	"time"
 
 	"github.com/ledisdb/ledisdb/ledis"
@@ -26,7 +23,6 @@ import (
 var (
 	testConnOnce    sync.Once
 	testRedisClient *redis.Client
-	serverStopChan  chan os.Signal
 )
 
 func getTestConn() *redis.Client {
