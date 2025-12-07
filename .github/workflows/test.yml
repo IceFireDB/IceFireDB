@@ -63,7 +63,7 @@ jobs:
           sudo mkdir -p /root/ipfs_data
           export ipfs_staging=/root/ipfs_staging
           export ipfs_data=/root/ipfs_data 
-          docker run -d --name ipfs_host -v $ipfs_staging:/export -v $ipfs_data:/data/ipfs -p 4001:4001 -p 8080:8080 -p 5001:5001 ipfs/go-ipfs:latest
+          docker run -d --name ipfs_host -v $ipfs_staging:/export -v $ipfs_data:/data/ipfs -p 4001:4001 -p 8080:8080 -p 5001:5001 ipfs/kubo:latest
       - name: Test
         run: go test -v -count=1 -tags alltest
 
@@ -96,7 +96,7 @@ jobs:
           sudo mkdir -p /root/ipfs_data
           export ipfs_staging=/root/ipfs_staging
           export ipfs_data=/root/ipfs_data 
-          docker run -d --name ipfs_host -v $ipfs_staging:/export -v $ipfs_data:/data/ipfs -p 4001:4001 -p 8080:8080 -p 5001:5001 ipfs/go-ipfs:latest
+          docker run -d --name ipfs_host -v $ipfs_staging:/export -v $ipfs_data:/data/ipfs -p 4001:4001 -p 8080:8080 -p 5001:5001 ipfs/kubo:latest
       - name: Test
         run: go test -v -count=1 -tags alltest
 
