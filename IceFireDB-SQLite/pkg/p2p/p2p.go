@@ -105,7 +105,7 @@ func (p2p *P2P) AdvertiseConnect() {
 	ttl, err := p2p.Discovery.Advertise(p2p.Ctx, p2p.service)
 	// Debug log
 	logrus.Debugln("Advertised the p2p Service.")
-	// Sleep to give time for the advertisment to propagate
+	// Sleep to give time for the advertisement to propagate
 	time.Sleep(time.Second * 5)
 	// Debug log
 	logrus.Debugf("Service Time-to-Live is %s", ttl)
@@ -148,7 +148,7 @@ func (p2p *P2P) AnnounceConnect() {
 	}
 	// Debug log
 	logrus.Debugln("Announced the p2p Service.")
-	// Sleep to give time for the advertisment to propagate
+	// Sleep to give time for the advertisement to propagate
 	time.Sleep(time.Second * 5)
 
 	// Find the other providers for the service CID
@@ -329,7 +329,7 @@ func setupHost(ctx context.Context, nodeHostIP string, nodeHostPort int) (host.H
 func setupKadDHT(ctx context.Context, nodehost host.Host) (*dht.IpfsDHT, error) {
 	// Create DHT server mode option
 	dhtmode := dht.Mode(dht.ModeServer)
-	// Rertieve the list of bootstrap peer addresses
+	// Retrieve the list of bootstrap peer addresses
 	bootstrappeers := dht.GetDefaultBootstrapPeerAddrInfos()
 	// Create the DHT bootstrap peers option
 	dhtpeers := dht.BootstrapPeers(bootstrappeers...)
