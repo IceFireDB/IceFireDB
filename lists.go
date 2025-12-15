@@ -17,6 +17,9 @@ import (
 const mutexCount = 256 // Sufficient locks to reduce contention
 var listMutexes [mutexCount]sync.Mutex
 
+// Global mutex for same source/destination RPOPLPUSH operations
+var sameKeyMutex sync.Mutex
+
 // keyMutexIndex calculates mutex index based on key
 func keyMutexIndex(key []byte) uint32 {
 	h := fnv.New32a()
@@ -211,10 +214,66 @@ func cmdRPOPLPUSH(m uhaha.Machine, args []string) (interface{}, error) {
 		}
 	}
 
-	// Use key-based mutex lock to ensure atomicity
-	mutexIndex := keyMutexIndex(source)
-	listMutexes[mutexIndex].Lock()
-	defer listMutexes[mutexIndex].Unlock()
+	// Special handling for same source and destination (rotation)
+	if bytes.Compare(source, dest) == 0 {
+		// Use global mutex for same source/destination operations
+		// to ensure absolute atomicity
+		sameKeyMutex.Lock()
+		defer sameKeyMutex.Unlock()
+
+		// Get the last element
+		data, err := ldb.RPop(source)
+		if err != nil {
+			return nil, err
+		}
+
+		if data == nil {
+			return nil, nil
+		}
+
+		// Push it back to the front
+		if _, err := ldb.LPush(source, data); err != nil {
+			// If push fails, revert the pop
+			ldb.RPush(source, data)
+			return nil, err
+		}
+
+		//reset ttl using absolute time
+		if expireTime != -1 {
+			ldb.LExpireAt(source, expireTime)
+		}
+
+		return data, nil
+	}
+
+	// For different source and destination, we need to lock both keys
+	// to prevent deadlocks, we always lock in a consistent order
+	var firstKey, secondKey []byte
+	if bytes.Compare(source, dest) < 0 {
+		firstKey = source
+		secondKey = dest
+	} else {
+		firstKey = dest
+		secondKey = source
+	}
+
+	// Lock first key
+	firstMutexIndex := keyMutexIndex(firstKey)
+	listMutexes[firstMutexIndex].Lock()
+
+	// Lock second key (if different from first key)
+	secondMutexIndex := keyMutexIndex(secondKey)
+	if firstMutexIndex != secondMutexIndex {
+		listMutexes[secondMutexIndex].Lock()
+	}
+
+	// Ensure unlocks happen in reverse order
+	defer func() {
+		if firstMutexIndex != secondMutexIndex {
+			listMutexes[secondMutexIndex].Unlock()
+		}
+		listMutexes[firstMutexIndex].Unlock()
+	}()
 
 	data, err := ldb.RPop(source)
 	if err != nil {
@@ -228,11 +287,6 @@ func cmdRPOPLPUSH(m uhaha.Machine, args []string) (interface{}, error) {
 	if _, err := ldb.LPush(dest, data); err != nil {
 		ldb.RPush(source, data) //revert pop
 		return nil, err
-	}
-
-	//reset ttl using absolute time
-	if expireTime != -1 {
-		ldb.LExpireAt(source, expireTime)
 	}
 
 	return data, nil
