@@ -176,6 +176,16 @@ func (item *cacheItem) isExpired() bool {
 	return !item.expires.IsZero() && time.Now().After(item.expires)
 }
 
+// copyBytes returns a copy of the given byte slice
+func copyBytes(b []byte) []byte {
+	if b == nil {
+		return nil
+	}
+	c := make([]byte, len(b))
+	copy(c, b)
+	return c
+}
+
 func (db *DB) initOpts() {
 	db.opts = newOptions(db.cfg)
 
@@ -276,7 +286,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 			item.accesses++
 			db.stats.CacheHits++
 			db.stats.BytesRead += int64(len(item.value))
-			return item.value, nil
+			return copyBytes(item.value), nil
 		}
 		// Remove expired item from cache
 		db.cache.Del(key)
