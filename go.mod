@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go v1.55.8
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
-	github.com/dgraph-io/badger/v4 v4.8.0
+	github.com/dgraph-io/badger/v4 v4.9.0
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/dgraph-io/ristretto/v2 v2.3.0
 	github.com/ipfs/go-datastore v0.9.0

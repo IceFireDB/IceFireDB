@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: © Hypermode Inc. <hello@hypermode.com>
+ * SPDX-FileCopyrightText: © 2017-2025 Istari Digital, Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -45,8 +45,8 @@ func (p valuePointer) Encode() []byte {
 // Decode decodes the value pointer into the provided byte buffer.
 func (p *valuePointer) Decode(b []byte) {
 	// Copy over data from b into p. Using *p=unsafe.pointer(...) leads to
-	// pointer alignment issues. See https://github.com/hypermodeinc/badger/issues/1096
-	// and comment https://github.com/hypermodeinc/badger/pull/1097#pullrequestreview-307361714
+	// pointer alignment issues. See https://github.com/dgraph-io/badger/issues/1096
+	// and comment https://github.com/dgraph-io/badger/pull/1097#pullrequestreview-307361714
 	copy(((*[vptrSize]byte)(unsafe.Pointer(p))[:]), b[:vptrSize])
 }
 
@@ -65,7 +65,7 @@ const (
 	maxHeaderSize = 22
 )
 
-// Encode encodes the header into []byte. The provided []byte should be atleast 5 bytes. The
+// Encode encodes the header into []byte. The provided []byte should be at least 5 bytes. The
 // function will panic if out []byte isn't large enough to hold all the values.
 // The encoded header looks like
 // +------+----------+------------+--------------+-----------+
