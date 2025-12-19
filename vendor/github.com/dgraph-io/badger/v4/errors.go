@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: © Hypermode Inc. <hello@hypermode.com>
+ * SPDX-FileCopyrightText: © 2017-2025 Istari Digital, Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -33,7 +33,7 @@ var (
 	// ErrReadOnlyTxn is returned if an update function is called on a read-only transaction.
 	ErrReadOnlyTxn = stderrors.New("No sets or deletes are allowed in a read-only transaction")
 
-	// ErrDiscardedTxn is returned if a previously discarded transaction is re-used.
+	// ErrDiscardedTxn is returned if a previously discarded transaction is reused.
 	ErrDiscardedTxn = stderrors.New("This transaction has been discarded. Create a new one")
 
 	// ErrEmptyKey is returned if an empty key is passed on an update function.

@@ -311,7 +311,7 @@ github.com/dgraph-io/badger/skl
 github.com/dgraph-io/badger/table
 github.com/dgraph-io/badger/trie
 github.com/dgraph-io/badger/y
-# github.com/dgraph-io/badger/v4 v4.8.0
+# github.com/dgraph-io/badger/v4 v4.9.0
 ## explicit; go 1.23.0
 github.com/dgraph-io/badger/v4
 github.com/dgraph-io/badger/v4/fb
