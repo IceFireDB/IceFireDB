@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: © Hypermode Inc. <hello@hypermode.com>
+ * SPDX-FileCopyrightText: © 2017-2025 Istari Digital, Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -51,8 +51,8 @@ func (h header) Encode() []byte {
 // Decode decodes the header.
 func (h *header) Decode(buf []byte) {
 	// Copy over data from buf into h. Using *h=unsafe.pointer(...) leads to
-	// pointer alignment issues. See https://github.com/hypermodeinc/badger/issues/1096
-	// and comment https://github.com/hypermodeinc/badger/pull/1097#pullrequestreview-307361714
+	// pointer alignment issues. See https://github.com/dgraph-io/badger/issues/1096
+	// and comment https://github.com/dgraph-io/badger/pull/1097#pullrequestreview-307361714
 	copy(((*[headerSize]byte)(unsafe.Pointer(h))[:]), buf[:headerSize])
 }
 
@@ -356,7 +356,7 @@ func (b *Builder) addInternal(key []byte, value y.ValueStruct, valueLen uint32, 
 
 // ReachedCapacity returns true if we... roughly (?) reached capacity?
 func (b *Builder) ReachedCapacity() bool {
-	// If encryption/compression is enabled then use the compresssed size.
+	// If encryption/compression is enabled then use the compressed size.
 	sumBlockSizes := b.compressedSize.Load()
 	if b.opts.Compression == options.None && b.opts.DataKey == nil {
 		sumBlockSizes = b.uncompressedSize.Load()

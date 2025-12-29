@@ -2,7 +2,7 @@
 // +build windows
 
 /*
- * SPDX-FileCopyrightText: © Hypermode Inc. <hello@hypermode.com>
+ * SPDX-FileCopyrightText: © 2017-2025 Istari Digital, Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -74,7 +74,7 @@ func acquireDirectoryLock(dirPath string, pidFileName string, readOnly bool) (*d
 	// FILE_ATTRIBUTE_TEMPORARY is used to tell Windows to try to create the handle in memory.
 	// FILE_FLAG_DELETE_ON_CLOSE is not specified in syscall_windows.go but tells Windows to delete
 	// the file when all processes holding the handler are closed.
-	// XXX: this works but it's a bit klunky. i'd prefer to use LockFileEx but it needs unsafe pkg.
+	// XXX: this works but it's a bit clunky. i'd prefer to use LockFileEx but it needs unsafe pkg.
 	h, err := syscall.CreateFile(
 		syscall.StringToUTF16Ptr(absLockFilePath), 0, 0, nil,
 		syscall.OPEN_ALWAYS,
@@ -96,5 +96,5 @@ func (g *directoryLockGuard) release() error {
 }
 
 // Windows doesn't support syncing directories to the file system. See
-// https://github.com/hypermodeinc/badger/issues/699#issuecomment-504133587 for more details.
+// https://github.com/dgraph-io/badger/issues/699#issuecomment-504133587 for more details.
 func syncDir(dir string) error { return nil }
