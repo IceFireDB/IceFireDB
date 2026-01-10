@@ -91,7 +91,7 @@ func (s Store) Open(path string, cfg *config.Config) (driver.IDB, error) {
 	}
 
 	// Ristretto (hot tier) configuration
-	db.cache, err = ristretto.NewCache(&ristretto.Config[[]byte, *cacheItem]{
+	db.cache, err = ristretto.NewCache(&ristretto.Config[string, *cacheItem]{
 		MaxCost:     db.config.HotCacheSize * MB,
 		NumCounters: defaultHotCacheNumCounters,
 		BufferItems: 64,
@@ -126,7 +126,7 @@ type DB struct {
 	iteratorOpts *opt.ReadOptions
 	syncOpts     *opt.WriteOptions
 
-	cache *ristretto.Cache[[]byte, *cacheItem] // Hot tier storage
+	cache *ristretto.Cache[string, *cacheItem] // Hot tier storage (uses string keys for proper comparison)
 
 	filter filter.Filter
 
@@ -256,12 +256,12 @@ func (db *DB) Put(key, value []byte) error {
 
 	// Then update the cache to ensure consistency
 	item := &cacheItem{
-		key:      key,
-		value:    value,
+		key:      copyBytes(key),
+		value:    copyBytes(value),
 		expires:  time.Now().Add(db.config.CacheTTL),
 		accesses: 1,
 	}
-	db.cache.Set(key, item, int64(len(value)))
+	db.cache.Set(string(key), item, int64(len(value)))
 	return nil
 }
 
@@ -281,7 +281,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	db.stats.ReadOps++
 
 	// 1. Check hot tier
-	if item, ok := db.cache.Get(key); ok {
+	if item, ok := db.cache.Get(string(key)); ok {
 		if !item.isExpired() {
 			item.accesses++
 			db.stats.CacheHits++
@@ -289,7 +289,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 			return copyBytes(item.value), nil
 		}
 		// Remove expired item from cache
-		db.cache.Del(key)
+		db.cache.Del(string(key))
 	}
 
 	db.stats.CacheMisses++
@@ -308,12 +308,12 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	if v != nil {
 		db.stats.BytesRead += int64(len(v))
 		item := &cacheItem{
-			key:      key,
-			value:    v,
+			key:      copyBytes(key),
+			value:    copyBytes(v),
 			expires:  time.Now().Add(db.config.CacheTTL),
 			accesses: 1,
 		}
-		db.cache.Set(key, item, int64(len(v)))
+		db.cache.Set(string(key), item, int64(len(v)))
 	}
 
 	return v, nil
@@ -341,7 +341,7 @@ func (db *DB) Delete(key []byte) error {
 	db.stats.DeleteOps++
 
 	// Then remove from cache to ensure consistency
-	db.cache.Del(key)
+	db.cache.Del(string(key))
 	return nil
 }
 
@@ -352,8 +352,8 @@ func (db *DB) SyncPut(key, value []byte) error {
 	}
 
 	// Then update the cache to ensure consistency
-	item := &cacheItem{key: key, value: value}
-	db.cache.Set(key, item, int64(len(value)))
+	item := &cacheItem{key: copyBytes(key), value: copyBytes(value)}
+	db.cache.Set(string(key), item, int64(len(value)))
 	return nil
 }
 
@@ -364,7 +364,7 @@ func (db *DB) SyncDelete(key []byte) error {
 	}
 
 	// Then remove from cache to ensure consistency
-	db.cache.Del(key)
+	db.cache.Del(string(key))
 	return nil
 }
 

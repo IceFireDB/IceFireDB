@@ -13,13 +13,13 @@ type WriteBatch struct {
 func (w *WriteBatch) Put(key, value []byte) {
 	w.wbatch.Put(key, value)
 	// Track the key for cache invalidation after commit
-	w.keys = append(w.keys, key)
+	w.keys = append(w.keys, copyBytes(key))
 }
 
 func (w *WriteBatch) Delete(key []byte) {
 	w.wbatch.Delete(key)
 	// Track the key for cache invalidation after commit
-	w.keys = append(w.keys, key)
+	w.keys = append(w.keys, copyBytes(key))
 }
 
 func (w *WriteBatch) Commit() error {
@@ -27,15 +27,15 @@ func (w *WriteBatch) Commit() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Invalidate cache for all keys that were modified in this batch
 	for _, key := range w.keys {
-		w.db.cache.Del(key)
+		w.db.cache.Del(string(key))
 	}
-	
+
 	// Reset the keys tracker for potential reuse
 	w.keys = w.keys[:0]
-	
+
 	return nil
 }
 
@@ -44,15 +44,15 @@ func (w *WriteBatch) SyncCommit() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Invalidate cache for all keys that were modified in this batch
 	for _, key := range w.keys {
-		w.db.cache.Del(key)
+		w.db.cache.Del(string(key))
 	}
-	
+
 	// Reset the keys tracker for potential reuse
 	w.keys = w.keys[:0]
-	
+
 	return nil
 }
 
