@@ -601,3 +601,88 @@ func TestZsetErrorParams(t *testing.T) {
 	}
 
 }
+
+func TestZScoreReturnValue(t *testing.T) {
+	c := getTestConn()
+	ctx := context.Background()
+	key := "test_zscore_return_type"
+
+	// Add some members with scores
+	if _, err := c.Do(ctx, "zadd", key, 100, "member1").Result(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Do(ctx, "zadd", key, -50, "member2").Result(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Do(ctx, "zadd", key, 0, "member3").Result(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Test ZSCORE returns bulk string (string in go-redis), not SimpleInt
+	v, err := c.Do(ctx, "zscore", key, "member1").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify() return type is string (bulk string in RESP)
+	scoreStr, ok := v.(string)
+	if !ok {
+		t.Fatalf("ZSCORE should return string type, got %T", v)
+	}
+
+	if scoreStr != "100" {
+		t.Fatalf("Expected '100', got '%s'", scoreStr)
+	}
+
+	// Test negative score
+	v, err = c.Do(ctx, "zscore", key, "member2").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scoreStr, ok = v.(string)
+	if !ok {
+		t.Fatalf("ZSCORE should return string type for negative score, got %T", v)
+	}
+
+	if scoreStr != "-50" {
+		t.Fatalf("Expected '-50', got '%s'", scoreStr)
+	}
+
+	// Test zero score
+	v, err = c.Do(ctx, "zscore", key, "member3").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scoreStr, ok = v.(string)
+	if !ok {
+		t.Fatalf("ZSCORE should return string type for zero score, got %T", v)
+	}
+
+	if scoreStr != "0" {
+		t.Fatalf("Expected '0', got '%s'", scoreStr)
+	}
+
+	// Test getting non-existent member returns nil (or redis.Nil error from client)
+	v, err = c.Do(ctx, "zscore", key, "nonexistent").Result()
+	if err != nil && err != redis.Nil {
+		t.Fatal(err)
+	}
+
+	// Redis protocol: Bulk String Nil is returned as nil value
+	// The go-redis client may convert this to redis.Nil error
+	if err != nil && err != redis.Nil {
+		t.Fatal(err)
+	}
+
+	// Either redis.Nil with nil value, or just nil value
+	if err != redis.Nil && err != nil {
+		t.Fatalf("Expected redis.Nil or nil error for non-existent member, got err=%v, val=%v", err, v)
+	}
+
+	// Value should be nil
+	if v != nil {
+		t.Fatalf("Expected nil value for non-existent member, got val=%v", v)
+	}
+}

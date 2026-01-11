@@ -321,10 +321,13 @@ func cmdZSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 
 	n, err := ldb.ZScore([]byte(args[1]), []byte(args[2]))
 	if err != nil {
+		if err.Error() == "zset score miss" {
+			return nil, nil
+		}
 		return nil, err
 	}
 
-	return redcon.SimpleInt(n), nil
+	return []byte(strconv.FormatInt(n, 10)), nil
 }
 
 func cmdZINCRBY(m uhaha.Machine, args []string) (interface{}, error) {
