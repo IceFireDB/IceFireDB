@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/ledisdb/ledisdb/ledis"
@@ -27,6 +28,9 @@ func init() {
 	conf.AddReadCommand("STTL", cmdSTTL)
 	conf.AddWriteCommand("SPERSIST", cmdSPERSIST)
 	conf.AddReadCommand("SKEYEXISTS", cmdSKEYEXISTS)
+	conf.AddWriteCommand("SMOVE", cmdSMOVE)
+	conf.AddWriteCommand("SPOP", cmdSPOP)
+	conf.AddReadCommand("SRANDMEMBER", cmdSRANDMEMBER)
 }
 
 func cmdSADD(m uhaha.Machine, args []string) (interface{}, error) {
@@ -224,6 +228,134 @@ func cmdSKEYEXISTS(m uhaha.Machine, args []string) (interface{}, error) {
 
 	n, err := ldb.SKeyExists([]byte(args[1]))
 	return redcon.SimpleInt(n), err
+}
+
+func cmdSMOVE(m uhaha.Machine, args []string) (interface{}, error) {
+	if len(args) != 4 {
+		return nil, uhaha.ErrWrongNumArgs
+	}
+
+	source := []byte(args[1])
+	destination := []byte(args[2])
+	member := []byte(args[3])
+
+	n, err := ldb.SIsMember(source, member)
+	if err != nil {
+		return nil, err
+	}
+
+	if n == 0 {
+		return redcon.SimpleInt(0), nil
+	}
+
+	if _, err := ldb.SRem(source, member); err != nil {
+		return nil, err
+	}
+
+	n, err = ldb.SAdd(destination, member)
+	if err != nil {
+		return nil, err
+	}
+
+	return redcon.SimpleInt(n), nil
+}
+
+func cmdSPOP(m uhaha.Machine, args []string) (interface{}, error) {
+	if len(args) < 2 || len(args) > 3 {
+		return nil, uhaha.ErrWrongNumArgs
+	}
+
+	key := []byte(args[1])
+	count := int64(1)
+
+	if len(args) == 3 {
+		var err error
+		count, err = ledis.StrInt64([]byte(args[2]), nil)
+		if err != nil {
+			return nil, uhaha.ErrInvalid
+		}
+		if count <= 0 {
+			return nil, uhaha.ErrInvalid
+		}
+	}
+
+	members, err := ldb.SMembers(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(members) == 0 {
+		return nil, nil
+	}
+
+	rand.Shuffle(len(members), func(i, j int) {
+		members[i], members[j] = members[j], members[i]
+	})
+
+	var result [][]byte
+	if count > int64(len(members)) {
+		count = int64(len(members))
+	}
+	result = members[:count]
+
+	membersToRemove := make([][]byte, len(result))
+	for i := 0; i < len(result); i++ {
+		membersToRemove[i] = result[i]
+	}
+
+	if _, err := ldb.SRem(key, membersToRemove...); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func cmdSRANDMEMBER(m uhaha.Machine, args []string) (interface{}, error) {
+	if len(args) < 2 || len(args) > 3 {
+		return nil, uhaha.ErrWrongNumArgs
+	}
+
+	key := []byte(args[1])
+	count := int64(1)
+
+	if len(args) == 3 {
+		var err error
+		count, err = ledis.StrInt64([]byte(args[2]), nil)
+		if err != nil {
+			return nil, uhaha.ErrInvalid
+		}
+	}
+
+	members, err := ldb.SMembers(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(members) == 0 {
+		if count == 1 {
+			return nil, nil
+		}
+		return members, nil
+	}
+
+	if count >= 1 {
+		rand.Shuffle(len(members), func(i, j int) {
+			members[i], members[j] = members[j], members[i]
+		})
+		if count > int64(len(members)) {
+			return members, nil
+		}
+		return members[:count], nil
+	}
+
+	if -count >= int64(len(members)) {
+		return members, nil
+	}
+
+	rand.Shuffle(len(members), func(i, j int) {
+		members[i], members[j] = members[j], members[i]
+	})
+	return members[:(-count)], nil
 }
 
 func stringSliceToBytes(args []string) [][]byte {

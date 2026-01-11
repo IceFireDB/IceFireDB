@@ -308,3 +308,48 @@ func TestHashErrorParams(t *testing.T) {
 		t.Fatalf("invalid err of %v", err)
 	}
 }
+
+func TestHashEnhancedHGET(t *testing.T) {
+	c := getTestConn()
+	ctx := context.Background()
+	key := "enhanced_hash_test"
+
+	// Test HGET with empty value
+	if _, err := c.Do(ctx, "hset", key, "empty_field", "").Result(); err != nil {
+		t.Fatal(err)
+	}
+
+	v, err := c.Do(ctx, "hget", key, "empty_field").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	valStr, ok := v.(string)
+	if !ok {
+		t.Fatalf("HGET should return string type for empty value, got %T", v)
+	}
+
+	if valStr != "" {
+		t.Fatalf("Expected empty string, got '%s'", valStr)
+	}
+
+	// Test HGET with special characters
+	specialValue := "hello\tworld\n"
+	if _, err := c.Do(ctx, "hset", key, "special", specialValue).Result(); err != nil {
+		t.Fatal(err)
+	}
+
+	v, err = c.Do(ctx, "hget", key, "special").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	valStr, ok = v.(string)
+	if !ok {
+		t.Fatalf("HGET should return string type for special chars, got %T", v)
+	}
+
+	if valStr != specialValue {
+		t.Fatalf("Expected '%s', got '%s'", specialValue, valStr)
+	}
+}

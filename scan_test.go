@@ -207,11 +207,102 @@ func TestZSetScan(t *testing.T) {
 	key := "scan_zset"
 	c.Do(ctx, "ZADD", key, 1, "a", 2, "b")
 
-	if ay, err := c.Do(ctx, "XZSCAN", key, "0").Result(); err != nil {
+	if ay, err := c.Do(ctx, "ZSCAN", key, "0").Result(); err != nil {
 		t.Fatal(err)
 	} else if ay, ok := ay.([]interface{}); !ok || len(ay) != 2 {
 		t.Fatal(len(ay))
 	} else {
 		checkScanValues(t, ay[1], "a", "1", "b", "2")
+	}
+}
+
+func TestStandardSCAN(t *testing.T) {
+	c := getTestConn()
+	ctx := context.Background()
+
+	c.FlushAll(ctx)
+
+	// Setup test data
+	for i := 0; i < 10; i++ {
+		if err := c.Set(ctx, fmt.Sprintf("test_key_%d", i), "value", 0).Err(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer c.FlushAll(ctx)
+
+	// Test basic SCAN
+	ay, err := c.Do(ctx, "SCAN", "0").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Result format: [cursor, [key1, key2, ...]]
+	if result, ok := ay.([]interface{}); !ok || len(result) < 1 {
+		t.Fatal("Expected array with at least cursor")
+	} else if cursor, ok := result[0].(string); !ok {
+		t.Fatal("Expected string cursor")
+	} else if cursor == "" {
+		t.Fatal("Expected non-empty cursor initially")
+	} else if cursor == "0" && len(result) < 2 {
+		t.Fatal("Expected at least one key when cursor is 0")
+	}
+
+	// Test SCAN with MATCH
+	ay, err = c.Do(ctx, "SCAN", "0", "MATCH", "test_key_[01]").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, ok := ay.([]interface{})
+	if !ok || len(result) < 2 {
+		t.Fatal("Expected array with cursor and at least one key")
+	}
+
+	// Get keys array from result[1]
+	keys, ok := result[1].([]interface{})
+	if !ok {
+		t.Fatal("Expected array of keys as second element")
+	}
+
+	// Verify matched keys
+	foundKeys := 0
+	for _, keyIntf := range keys {
+		if key, ok := keyIntf.(string); ok {
+			t.Logf("Found key: %s", key)
+			// Pattern "test_key_[01]" should match keys starting with "test_key_"
+			// followed by '0' or '1' as the last character
+			if len(key) == 10 && key[:9] == "test_key_" && (key[9] == '0' || key[9] == '1') {
+				foundKeys++
+			}
+		}
+	}
+
+	if foundKeys < 1 {
+		t.Fatal("Expected to find matched keys")
+	}
+
+	// Test SCAN with COUNT
+	ay, err = c.Do(ctx, "SCAN", "0", "COUNT", "2").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result = ay.([]interface{})
+	if len(result) >= 2 {
+		keys, ok = result[1].([]interface{})
+		if ok && len(keys) > 2 { // max 2 keys
+			t.Fatalf("Expected at most 2 keys, got %d", len(keys))
+		}
+	}
+
+	// Test SCAN with TYPE
+	ay, err = c.Do(ctx, "SCAN", "0", "TYPE", "STRING").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result = ay.([]interface{})
+	if len(result) < 1 {
+		t.Fatal("Expected at least cursor")
 	}
 }

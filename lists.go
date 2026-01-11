@@ -51,6 +51,8 @@ func init() {
 	conf.AddReadCommand("LKEYEXISTS", cmdLKEYEXISTS)
 
 	conf.AddWriteCommand("LTRIM", cmdLTRIM)
+	conf.AddWriteCommand("LINSERT", cmdLINSERT)
+	conf.AddWriteCommand("LREM", cmdLREM)
 }
 
 func cmdLTRIM(m uhaha.Machine, args []string) (interface{}, error) {
@@ -464,4 +466,137 @@ func lParseBPopArgs(argsOrigin []string) (keys [][]byte, timeout time.Duration, 
 
 	keys = args[0 : len(args)-1]
 	return
+}
+
+func cmdLINSERT(m uhaha.Machine, args []string) (interface{}, error) {
+	if len(args) != 5 {
+		return nil, uhaha.ErrWrongNumArgs
+	}
+
+	position := args[2]
+	if position != "BEFORE" && position != "AFTER" {
+		return nil, uhaha.ErrInvalid
+	}
+
+	key := []byte(args[1])
+	pivot := []byte(args[3])
+	value := []byte(args[4])
+
+	members, err := ldb.LRange(key, 0, -1)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(members) == 0 {
+		return redcon.SimpleInt(0), nil
+	}
+
+	var pivotIndex int = -1
+	for i := 0; i < len(members); i++ {
+		if bytes.Equal(members[i], pivot) {
+			pivotIndex = i
+			break
+		}
+	}
+
+	if pivotIndex == -1 {
+		return redcon.SimpleInt(-1), nil
+	}
+
+	newMembers := make([][]byte, 0, len(members)+1)
+	if position == "BEFORE" {
+		newMembers = append(newMembers, members[:pivotIndex]...)
+		newMembers = append(newMembers, value)
+		newMembers = append(newMembers, members[pivotIndex:]...)
+	} else {
+		newMembers = append(newMembers, members[:pivotIndex+1]...)
+		newMembers = append(newMembers, value)
+		newMembers = append(newMembers, members[pivotIndex+1:]...)
+	}
+
+	if _, err := ldb.LClear(key); err != nil {
+		return nil, err
+	}
+
+	if len(newMembers) > 0 {
+		if _, err := ldb.LPush(key, newMembers...); err != nil {
+			return nil, err
+		}
+	}
+
+	return redcon.SimpleInt(len(members)), nil
+}
+
+func cmdLREM(m uhaha.Machine, args []string) (interface{}, error) {
+	if len(args) != 4 {
+		return nil, uhaha.ErrWrongNumArgs
+	}
+
+	key := []byte(args[1])
+	count, err := ledis.StrInt64([]byte(args[2]), nil)
+	if err != nil {
+		return nil, uhaha.ErrInvalid
+	}
+	value := []byte(args[3])
+
+	members, err := ldb.LRange(key, 0, -1)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(members) == 0 {
+		return redcon.SimpleInt(0), nil
+	}
+
+	var newMembers [][]byte
+	var removed int64 = 0
+
+	if count == 0 {
+		newMembers = make([][]byte, 0)
+		for i := 0; i < len(members); i++ {
+			if bytes.Equal(members[i], value) {
+				removed++
+			} else {
+				newMembers = append(newMembers, members[i])
+			}
+		}
+	} else if count > 0 {
+		var toRemove int64 = count
+		for i := 0; i < len(members); i++ {
+			if toRemove > 0 && bytes.Equal(members[i], value) {
+				removed++
+				toRemove--
+			} else {
+				newMembers = append(newMembers, members[i])
+			}
+		}
+	} else {
+		var toRemove int64 = -count
+		for i := len(members) - 1; i >= 0; i-- {
+			if toRemove > 0 && bytes.Equal(members[i], value) {
+				removed++
+				toRemove--
+			}
+		}
+		for i := 0; i < len(members); i++ {
+			if bytes.Equal(members[i], value) && removed > 0 {
+				removed--
+			} else {
+				newMembers = append(newMembers, members[i])
+			}
+		}
+		removed = -count - removed
+	}
+
+	if _, err := ldb.LClear(key); err != nil {
+		return nil, err
+	}
+
+	if len(newMembers) > 0 {
+		if _, err := ldb.LPush(key, newMembers...); err != nil {
+			return nil, err
+		}
+	}
+
+	return redcon.SimpleInt(removed), nil
 }

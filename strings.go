@@ -57,7 +57,7 @@ func handleExpiration(key []byte, timestamp int64) (interface{}, error) {
 		}
 		return redcon.SimpleInt(1), nil
 	}
-	
+
 	v, err := ldb.ExpireAt(key, timestamp)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, fmt.Errorf("ERR invalid duration: %v", err)
 	}
 
-	return handleExpiration([]byte(args[1]), m.Now().Unix() + duration)
+	return handleExpiration([]byte(args[1]), m.Now().Unix()+duration)
 }
 
 // cmdSTRLEN returns the length of the string value stored at key.
@@ -658,14 +658,86 @@ func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-// This is different from the RESP standard. It needs to enrich the algorithm to support more atomic instructions.
+// Enhanced SET command supporting Redis standard options
+// Syntax: SET key value [EX seconds | PX milliseconds | NX | XX | KEEPTTL]
+// Note: EXAT/PXAT not yet implemented
 func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) != 3 {
+	if len(args) < 3 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	if err := ldb.Set([]byte(args[1]), []byte(args[2])); err != nil {
+	key := []byte(args[1])
+	value := []byte(args[2])
+
+	var exSeconds int64 = -1
+	var pxMilliseconds int64 = -1
+	var nx, xx, keepttl bool = false, false, false
+
+	for i := 3; i < len(args); {
+		switch strings.ToUpper(args[i]) {
+		case "NX":
+			nx = true
+			i++
+		case "XX":
+			xx = true
+			i++
+		case "KEEPTTL":
+			keepttl = true
+			i++
+		case "EX":
+			if i+1 >= len(args) {
+				return nil, uhaha.ErrWrongNumArgs
+			}
+			sec, err := ledis.StrInt64([]byte(args[i+1]), nil)
+			if err != nil {
+				return nil, fmt.Errorf("ERR invalid expire time in SET")
+			}
+			exSeconds = sec
+			i += 2
+		case "PX":
+			if i+1 >= len(args) {
+				return nil, uhaha.ErrWrongNumArgs
+			}
+			ms, err := ledis.StrInt64([]byte(args[i+1]), nil)
+			if err != nil {
+				return nil, fmt.Errorf("ERR invalid expire time in SET")
+			}
+			pxMilliseconds = ms
+			i += 2
+		default:
+			return nil, fmt.Errorf("ERR syntax error")
+		}
+	}
+
+	if nx && xx {
+		return nil, errors.New("ERR syntax error")
+	}
+	if keepttl && (exSeconds >= 0 || pxMilliseconds >= 0) {
+		return nil, errors.New("ERR syntax error")
+	}
+
+	exists, _ := ldb.Exists(key)
+	if nx && exists > 0 {
+		return nil, nil
+	}
+	if xx && exists == 0 {
+		return redcon.SimpleString(""), nil
+	}
+
+	if err := ldb.Set(key, value); err != nil {
 		return nil, err
+	}
+
+	if exSeconds >= 0 {
+		timestamp := m.Now().Unix() + exSeconds
+		if _, err := ldb.ExpireAt(key, timestamp); err != nil {
+			return nil, err
+		}
+	} else if pxMilliseconds >= 0 {
+		timestamp := m.Now().Unix() + pxMilliseconds/1000
+		if _, err := ldb.ExpireAt(key, timestamp); err != nil {
+			return nil, err
+		}
 	}
 
 	return redcon.SimpleString("OK"), nil
