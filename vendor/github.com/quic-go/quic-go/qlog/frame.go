@@ -1,250 +1,481 @@
 package qlog
 
 import (
-	"fmt"
+	"encoding/hex"
 
 	"github.com/quic-go/quic-go/internal/wire"
-	"github.com/quic-go/quic-go/logging"
-
-	"github.com/francoispqt/gojay"
+	"github.com/quic-go/quic-go/qlogwriter/jsontext"
 )
 
-type frame struct {
-	Frame logging.Frame
+type Frame struct {
+	Frame any
 }
 
-var _ gojay.MarshalerJSONObject = frame{}
+type frames []Frame
 
-var _ gojay.MarshalerJSONArray = frames{}
+type (
+	// An AckFrame is an ACK frame.
+	AckFrame = wire.AckFrame
+	// A ConnectionCloseFrame is a CONNECTION_CLOSE frame.
+	ConnectionCloseFrame = wire.ConnectionCloseFrame
+	// A DataBlockedFrame is a DATA_BLOCKED frame.
+	DataBlockedFrame = wire.DataBlockedFrame
+	// A HandshakeDoneFrame is a HANDSHAKE_DONE frame.
+	HandshakeDoneFrame = wire.HandshakeDoneFrame
+	// A MaxDataFrame is a MAX_DATA frame.
+	MaxDataFrame = wire.MaxDataFrame
+	// A MaxStreamDataFrame is a MAX_STREAM_DATA frame.
+	MaxStreamDataFrame = wire.MaxStreamDataFrame
+	// A MaxStreamsFrame is a MAX_STREAMS_FRAME.
+	MaxStreamsFrame = wire.MaxStreamsFrame
+	// A NewConnectionIDFrame is a NEW_CONNECTION_ID frame.
+	NewConnectionIDFrame = wire.NewConnectionIDFrame
+	// A NewTokenFrame is a NEW_TOKEN frame.
+	NewTokenFrame = wire.NewTokenFrame
+	// A PathChallengeFrame is a PATH_CHALLENGE frame.
+	PathChallengeFrame = wire.PathChallengeFrame
+	// A PathResponseFrame is a PATH_RESPONSE frame.
+	PathResponseFrame = wire.PathResponseFrame
+	// A PingFrame is a PING frame.
+	PingFrame = wire.PingFrame
+	// A ResetStreamFrame is a RESET_STREAM frame.
+	ResetStreamFrame = wire.ResetStreamFrame
+	// A RetireConnectionIDFrame is a RETIRE_CONNECTION_ID frame.
+	RetireConnectionIDFrame = wire.RetireConnectionIDFrame
+	// A StopSendingFrame is a STOP_SENDING frame.
+	StopSendingFrame = wire.StopSendingFrame
+	// A StreamsBlockedFrame is a STREAMS_BLOCKED frame.
+	StreamsBlockedFrame = wire.StreamsBlockedFrame
+	// A StreamDataBlockedFrame is a STREAM_DATA_BLOCKED frame.
+	StreamDataBlockedFrame = wire.StreamDataBlockedFrame
+	// An AckFrequencyFrame is an ACK_FREQUENCY frame.
+	AckFrequencyFrame = wire.AckFrequencyFrame
+	// An ImmediateAckFrame is an IMMEDIATE_ACK frame.
+	ImmediateAckFrame = wire.ImmediateAckFrame
+)
 
-func (f frame) MarshalJSONObject(enc *gojay.Encoder) {
+type AckRange = wire.AckRange
+
+// A CryptoFrame is a CRYPTO frame.
+type CryptoFrame struct {
+	Offset int64
+	Length int64
+}
+
+// A StreamFrame is a STREAM frame.
+type StreamFrame struct {
+	StreamID StreamID
+	Offset   int64
+	Length   int64
+	Fin      bool
+}
+
+// A DatagramFrame is a DATAGRAM frame.
+type DatagramFrame struct {
+	Length int64
+}
+
+func (fs frames) encode(enc *jsontext.Encoder) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginArray)
+	for _, f := range fs {
+		if err := f.Encode(enc); err != nil {
+			return err
+		}
+	}
+	h.WriteToken(jsontext.EndArray)
+	return h.err
+}
+
+func (f Frame) Encode(enc *jsontext.Encoder) error {
 	switch frame := f.Frame.(type) {
-	case *logging.PingFrame:
-		marshalPingFrame(enc, frame)
-	case *logging.AckFrame:
-		marshalAckFrame(enc, frame)
-	case *logging.ResetStreamFrame:
-		marshalResetStreamFrame(enc, frame)
-	case *logging.StopSendingFrame:
-		marshalStopSendingFrame(enc, frame)
-	case *logging.CryptoFrame:
-		marshalCryptoFrame(enc, frame)
-	case *logging.NewTokenFrame:
-		marshalNewTokenFrame(enc, frame)
-	case *logging.StreamFrame:
-		marshalStreamFrame(enc, frame)
-	case *logging.MaxDataFrame:
-		marshalMaxDataFrame(enc, frame)
-	case *logging.MaxStreamDataFrame:
-		marshalMaxStreamDataFrame(enc, frame)
-	case *logging.MaxStreamsFrame:
-		marshalMaxStreamsFrame(enc, frame)
-	case *logging.DataBlockedFrame:
-		marshalDataBlockedFrame(enc, frame)
-	case *logging.StreamDataBlockedFrame:
-		marshalStreamDataBlockedFrame(enc, frame)
-	case *logging.StreamsBlockedFrame:
-		marshalStreamsBlockedFrame(enc, frame)
-	case *logging.NewConnectionIDFrame:
-		marshalNewConnectionIDFrame(enc, frame)
-	case *logging.RetireConnectionIDFrame:
-		marshalRetireConnectionIDFrame(enc, frame)
-	case *logging.PathChallengeFrame:
-		marshalPathChallengeFrame(enc, frame)
-	case *logging.PathResponseFrame:
-		marshalPathResponseFrame(enc, frame)
-	case *logging.ConnectionCloseFrame:
-		marshalConnectionCloseFrame(enc, frame)
-	case *logging.HandshakeDoneFrame:
-		marshalHandshakeDoneFrame(enc, frame)
-	case *logging.DatagramFrame:
-		marshalDatagramFrame(enc, frame)
-	case *logging.AckFrequencyFrame:
-		marshalAckFrequencyFrame(enc, frame)
-	case *logging.ImmediateAckFrame:
-		marshalImmediateAckFrame(enc, frame)
+	case *PingFrame:
+		return encodePingFrame(enc, frame)
+	case *AckFrame:
+		return encodeAckFrame(enc, frame)
+	case *ResetStreamFrame:
+		return encodeResetStreamFrame(enc, frame)
+	case *StopSendingFrame:
+		return encodeStopSendingFrame(enc, frame)
+	case *CryptoFrame:
+		return encodeCryptoFrame(enc, frame)
+	case *NewTokenFrame:
+		return encodeNewTokenFrame(enc, frame)
+	case *StreamFrame:
+		return encodeStreamFrame(enc, frame)
+	case *MaxDataFrame:
+		return encodeMaxDataFrame(enc, frame)
+	case *MaxStreamDataFrame:
+		return encodeMaxStreamDataFrame(enc, frame)
+	case *MaxStreamsFrame:
+		return encodeMaxStreamsFrame(enc, frame)
+	case *DataBlockedFrame:
+		return encodeDataBlockedFrame(enc, frame)
+	case *StreamDataBlockedFrame:
+		return encodeStreamDataBlockedFrame(enc, frame)
+	case *StreamsBlockedFrame:
+		return encodeStreamsBlockedFrame(enc, frame)
+	case *NewConnectionIDFrame:
+		return encodeNewConnectionIDFrame(enc, frame)
+	case *RetireConnectionIDFrame:
+		return encodeRetireConnectionIDFrame(enc, frame)
+	case *PathChallengeFrame:
+		return encodePathChallengeFrame(enc, frame)
+	case *PathResponseFrame:
+		return encodePathResponseFrame(enc, frame)
+	case *ConnectionCloseFrame:
+		return encodeConnectionCloseFrame(enc, frame)
+	case *HandshakeDoneFrame:
+		return encodeHandshakeDoneFrame(enc, frame)
+	case *DatagramFrame:
+		return encodeDatagramFrame(enc, frame)
+	case *AckFrequencyFrame:
+		return encodeAckFrequencyFrame(enc, frame)
+	case *ImmediateAckFrame:
+		return encodeImmediateAckFrame(enc, frame)
 	default:
 		panic("unknown frame type")
 	}
 }
 
-func (f frame) IsNil() bool { return false }
-
-type frames []frame
-
-func (fs frames) IsNil() bool { return fs == nil }
-func (fs frames) MarshalJSONArray(enc *gojay.Encoder) {
-	for _, f := range fs {
-		enc.Object(f)
-	}
-}
-
-func marshalPingFrame(enc *gojay.Encoder, _ *wire.PingFrame) {
-	enc.StringKey("frame_type", "ping")
+func encodePingFrame(enc *jsontext.Encoder, _ *PingFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("ping"))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
 type ackRanges []wire.AckRange
 
-func (ars ackRanges) MarshalJSONArray(enc *gojay.Encoder) {
+func (ars ackRanges) encode(enc *jsontext.Encoder) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginArray)
 	for _, r := range ars {
-		enc.Array(ackRange(r))
+		if err := ackRange(r).encode(enc); err != nil {
+			return err
+		}
 	}
+	h.WriteToken(jsontext.EndArray)
+	return h.err
 }
-
-func (ars ackRanges) IsNil() bool { return false }
 
 type ackRange wire.AckRange
 
-func (ar ackRange) MarshalJSONArray(enc *gojay.Encoder) {
-	enc.AddInt64(int64(ar.Smallest))
+func (ar ackRange) encode(enc *jsontext.Encoder) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginArray)
+	h.WriteToken(jsontext.Int(int64(ar.Smallest)))
 	if ar.Smallest != ar.Largest {
-		enc.AddInt64(int64(ar.Largest))
+		h.WriteToken(jsontext.Int(int64(ar.Largest)))
 	}
+	h.WriteToken(jsontext.EndArray)
+	return h.err
 }
 
-func (ar ackRange) IsNil() bool { return false }
-
-func marshalAckFrame(enc *gojay.Encoder, f *logging.AckFrame) {
-	enc.StringKey("frame_type", "ack")
-	enc.FloatKeyOmitEmpty("ack_delay", milliseconds(f.DelayTime))
-	enc.ArrayKey("acked_ranges", ackRanges(f.AckRanges))
-	if hasECN := f.ECT0 > 0 || f.ECT1 > 0 || f.ECNCE > 0; hasECN {
-		enc.Uint64Key("ect0", f.ECT0)
-		enc.Uint64Key("ect1", f.ECT1)
-		enc.Uint64Key("ce", f.ECNCE)
+func encodeAckFrame(enc *jsontext.Encoder, f *AckFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("ack"))
+	if f.DelayTime > 0 {
+		h.WriteToken(jsontext.String("ack_delay"))
+		h.WriteToken(jsontext.Float(milliseconds(f.DelayTime)))
 	}
+	h.WriteToken(jsontext.String("acked_ranges"))
+	if err := ackRanges(f.AckRanges).encode(enc); err != nil {
+		return err
+	}
+	hasECN := f.ECT0 > 0 || f.ECT1 > 0 || f.ECNCE > 0
+	if hasECN {
+		h.WriteToken(jsontext.String("ect0"))
+		h.WriteToken(jsontext.Uint(f.ECT0))
+		h.WriteToken(jsontext.String("ect1"))
+		h.WriteToken(jsontext.Uint(f.ECT1))
+		h.WriteToken(jsontext.String("ce"))
+		h.WriteToken(jsontext.Uint(f.ECNCE))
+	}
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalResetStreamFrame(enc *gojay.Encoder, f *logging.ResetStreamFrame) {
+func encodeResetStreamFrame(enc *jsontext.Encoder, f *ResetStreamFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
 	if f.ReliableSize > 0 {
-		enc.StringKey("frame_type", "reset_stream_at")
+		h.WriteToken(jsontext.String("reset_stream_at"))
 	} else {
-		enc.StringKey("frame_type", "reset_stream")
+		h.WriteToken(jsontext.String("reset_stream"))
 	}
-	enc.Int64Key("stream_id", int64(f.StreamID))
-	enc.Int64Key("error_code", int64(f.ErrorCode))
-	enc.Int64Key("final_size", int64(f.FinalSize))
+	h.WriteToken(jsontext.String("stream_id"))
+	h.WriteToken(jsontext.Int(int64(f.StreamID)))
+	h.WriteToken(jsontext.String("error_code"))
+	h.WriteToken(jsontext.Int(int64(f.ErrorCode)))
+	h.WriteToken(jsontext.String("final_size"))
+	h.WriteToken(jsontext.Int(int64(f.FinalSize)))
 	if f.ReliableSize > 0 {
-		enc.Int64Key("reliable_size", int64(f.ReliableSize))
+		h.WriteToken(jsontext.String("reliable_size"))
+		h.WriteToken(jsontext.Int(int64(f.ReliableSize)))
 	}
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalStopSendingFrame(enc *gojay.Encoder, f *logging.StopSendingFrame) {
-	enc.StringKey("frame_type", "stop_sending")
-	enc.Int64Key("stream_id", int64(f.StreamID))
-	enc.Int64Key("error_code", int64(f.ErrorCode))
+func encodeStopSendingFrame(enc *jsontext.Encoder, f *StopSendingFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("stop_sending"))
+	h.WriteToken(jsontext.String("stream_id"))
+	h.WriteToken(jsontext.Int(int64(f.StreamID)))
+	h.WriteToken(jsontext.String("error_code"))
+	h.WriteToken(jsontext.Int(int64(f.ErrorCode)))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalCryptoFrame(enc *gojay.Encoder, f *logging.CryptoFrame) {
-	enc.StringKey("frame_type", "crypto")
-	enc.Int64Key("offset", int64(f.Offset))
-	enc.Int64Key("length", int64(f.Length))
+func encodeCryptoFrame(enc *jsontext.Encoder, f *CryptoFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("crypto"))
+	h.WriteToken(jsontext.String("offset"))
+	h.WriteToken(jsontext.Int(f.Offset))
+	h.WriteToken(jsontext.String("length"))
+	h.WriteToken(jsontext.Int(f.Length))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalNewTokenFrame(enc *gojay.Encoder, f *logging.NewTokenFrame) {
-	enc.StringKey("frame_type", "new_token")
-	enc.ObjectKey("token", &token{Raw: f.Token})
+func encodeNewTokenFrame(enc *jsontext.Encoder, f *NewTokenFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("new_token"))
+	h.WriteToken(jsontext.String("token"))
+	if err := (Token{Raw: f.Token}).encode(enc); err != nil {
+		return err
+	}
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalStreamFrame(enc *gojay.Encoder, f *logging.StreamFrame) {
-	enc.StringKey("frame_type", "stream")
-	enc.Int64Key("stream_id", int64(f.StreamID))
-	enc.Int64Key("offset", int64(f.Offset))
-	enc.IntKey("length", int(f.Length))
-	enc.BoolKeyOmitEmpty("fin", f.Fin)
+func encodeStreamFrame(enc *jsontext.Encoder, f *StreamFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("stream"))
+	h.WriteToken(jsontext.String("stream_id"))
+	h.WriteToken(jsontext.Int(int64(f.StreamID)))
+	h.WriteToken(jsontext.String("offset"))
+	h.WriteToken(jsontext.Int(f.Offset))
+	h.WriteToken(jsontext.String("length"))
+	h.WriteToken(jsontext.Int(f.Length))
+	if f.Fin {
+		h.WriteToken(jsontext.String("fin"))
+		h.WriteToken(jsontext.True)
+	}
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalMaxDataFrame(enc *gojay.Encoder, f *logging.MaxDataFrame) {
-	enc.StringKey("frame_type", "max_data")
-	enc.Int64Key("maximum", int64(f.MaximumData))
+func encodeMaxDataFrame(enc *jsontext.Encoder, f *MaxDataFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("max_data"))
+	h.WriteToken(jsontext.String("maximum"))
+	h.WriteToken(jsontext.Int(int64(f.MaximumData)))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalMaxStreamDataFrame(enc *gojay.Encoder, f *logging.MaxStreamDataFrame) {
-	enc.StringKey("frame_type", "max_stream_data")
-	enc.Int64Key("stream_id", int64(f.StreamID))
-	enc.Int64Key("maximum", int64(f.MaximumStreamData))
+func encodeMaxStreamDataFrame(enc *jsontext.Encoder, f *MaxStreamDataFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("max_stream_data"))
+	h.WriteToken(jsontext.String("stream_id"))
+	h.WriteToken(jsontext.Int(int64(f.StreamID)))
+	h.WriteToken(jsontext.String("maximum"))
+	h.WriteToken(jsontext.Int(int64(f.MaximumStreamData)))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalMaxStreamsFrame(enc *gojay.Encoder, f *logging.MaxStreamsFrame) {
-	enc.StringKey("frame_type", "max_streams")
-	enc.StringKey("stream_type", streamType(f.Type).String())
-	enc.Int64Key("maximum", int64(f.MaxStreamNum))
+func encodeMaxStreamsFrame(enc *jsontext.Encoder, f *MaxStreamsFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("max_streams"))
+	h.WriteToken(jsontext.String("stream_type"))
+	h.WriteToken(jsontext.String(streamType(f.Type).String()))
+	h.WriteToken(jsontext.String("maximum"))
+	h.WriteToken(jsontext.Int(int64(f.MaxStreamNum)))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalDataBlockedFrame(enc *gojay.Encoder, f *logging.DataBlockedFrame) {
-	enc.StringKey("frame_type", "data_blocked")
-	enc.Int64Key("limit", int64(f.MaximumData))
+func encodeDataBlockedFrame(enc *jsontext.Encoder, f *DataBlockedFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("data_blocked"))
+	h.WriteToken(jsontext.String("limit"))
+	h.WriteToken(jsontext.Int(int64(f.MaximumData)))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalStreamDataBlockedFrame(enc *gojay.Encoder, f *logging.StreamDataBlockedFrame) {
-	enc.StringKey("frame_type", "stream_data_blocked")
-	enc.Int64Key("stream_id", int64(f.StreamID))
-	enc.Int64Key("limit", int64(f.MaximumStreamData))
+func encodeStreamDataBlockedFrame(enc *jsontext.Encoder, f *StreamDataBlockedFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("stream_data_blocked"))
+	h.WriteToken(jsontext.String("stream_id"))
+	h.WriteToken(jsontext.Int(int64(f.StreamID)))
+	h.WriteToken(jsontext.String("limit"))
+	h.WriteToken(jsontext.Int(int64(f.MaximumStreamData)))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalStreamsBlockedFrame(enc *gojay.Encoder, f *logging.StreamsBlockedFrame) {
-	enc.StringKey("frame_type", "streams_blocked")
-	enc.StringKey("stream_type", streamType(f.Type).String())
-	enc.Int64Key("limit", int64(f.StreamLimit))
+func encodeStreamsBlockedFrame(enc *jsontext.Encoder, f *StreamsBlockedFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("streams_blocked"))
+	h.WriteToken(jsontext.String("stream_type"))
+	h.WriteToken(jsontext.String(streamType(f.Type).String()))
+	h.WriteToken(jsontext.String("limit"))
+	h.WriteToken(jsontext.Int(int64(f.StreamLimit)))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalNewConnectionIDFrame(enc *gojay.Encoder, f *logging.NewConnectionIDFrame) {
-	enc.StringKey("frame_type", "new_connection_id")
-	enc.Int64Key("sequence_number", int64(f.SequenceNumber))
-	enc.Int64Key("retire_prior_to", int64(f.RetirePriorTo))
-	enc.IntKey("length", f.ConnectionID.Len())
-	enc.StringKey("connection_id", f.ConnectionID.String())
-	enc.StringKey("stateless_reset_token", fmt.Sprintf("%x", f.StatelessResetToken))
+func encodeNewConnectionIDFrame(enc *jsontext.Encoder, f *NewConnectionIDFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("new_connection_id"))
+	h.WriteToken(jsontext.String("sequence_number"))
+	h.WriteToken(jsontext.Uint(f.SequenceNumber))
+	h.WriteToken(jsontext.String("retire_prior_to"))
+	h.WriteToken(jsontext.Uint(f.RetirePriorTo))
+	h.WriteToken(jsontext.String("length"))
+	h.WriteToken(jsontext.Int(int64(f.ConnectionID.Len())))
+	h.WriteToken(jsontext.String("connection_id"))
+	h.WriteToken(jsontext.String(f.ConnectionID.String()))
+	h.WriteToken(jsontext.String("stateless_reset_token"))
+	h.WriteToken(jsontext.String(hex.EncodeToString(f.StatelessResetToken[:])))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalRetireConnectionIDFrame(enc *gojay.Encoder, f *logging.RetireConnectionIDFrame) {
-	enc.StringKey("frame_type", "retire_connection_id")
-	enc.Int64Key("sequence_number", int64(f.SequenceNumber))
+func encodeRetireConnectionIDFrame(enc *jsontext.Encoder, f *RetireConnectionIDFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("retire_connection_id"))
+	h.WriteToken(jsontext.String("sequence_number"))
+	h.WriteToken(jsontext.Uint(f.SequenceNumber))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalPathChallengeFrame(enc *gojay.Encoder, f *logging.PathChallengeFrame) {
-	enc.StringKey("frame_type", "path_challenge")
-	enc.StringKey("data", fmt.Sprintf("%x", f.Data[:]))
+func encodePathChallengeFrame(enc *jsontext.Encoder, f *PathChallengeFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("path_challenge"))
+	h.WriteToken(jsontext.String("data"))
+	h.WriteToken(jsontext.String(hex.EncodeToString(f.Data[:])))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalPathResponseFrame(enc *gojay.Encoder, f *logging.PathResponseFrame) {
-	enc.StringKey("frame_type", "path_response")
-	enc.StringKey("data", fmt.Sprintf("%x", f.Data[:]))
+func encodePathResponseFrame(enc *jsontext.Encoder, f *PathResponseFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("path_response"))
+	h.WriteToken(jsontext.String("data"))
+	h.WriteToken(jsontext.String(hex.EncodeToString(f.Data[:])))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalConnectionCloseFrame(enc *gojay.Encoder, f *logging.ConnectionCloseFrame) {
+func encodeConnectionCloseFrame(enc *jsontext.Encoder, f *ConnectionCloseFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("connection_close"))
+	h.WriteToken(jsontext.String("error_space"))
 	errorSpace := "transport"
 	if f.IsApplicationError {
 		errorSpace = "application"
 	}
-	enc.StringKey("frame_type", "connection_close")
-	enc.StringKey("error_space", errorSpace)
-	if errName := transportError(f.ErrorCode).String(); len(errName) > 0 {
-		enc.StringKey("error_code", errName)
+	h.WriteToken(jsontext.String(errorSpace))
+	errName := transportError(f.ErrorCode).String()
+	if len(errName) > 0 {
+		h.WriteToken(jsontext.String("error_code"))
+		h.WriteToken(jsontext.String(errName))
 	} else {
-		enc.Uint64Key("error_code", f.ErrorCode)
+		h.WriteToken(jsontext.String("error_code"))
+		h.WriteToken(jsontext.Uint(f.ErrorCode))
 	}
-	enc.Uint64Key("raw_error_code", f.ErrorCode)
-	enc.StringKey("reason", f.ReasonPhrase)
+	h.WriteToken(jsontext.String("raw_error_code"))
+	h.WriteToken(jsontext.Uint(f.ErrorCode))
+	h.WriteToken(jsontext.String("reason"))
+	h.WriteToken(jsontext.String(f.ReasonPhrase))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalHandshakeDoneFrame(enc *gojay.Encoder, _ *logging.HandshakeDoneFrame) {
-	enc.StringKey("frame_type", "handshake_done")
+func encodeHandshakeDoneFrame(enc *jsontext.Encoder, _ *HandshakeDoneFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("handshake_done"))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalDatagramFrame(enc *gojay.Encoder, f *logging.DatagramFrame) {
-	enc.StringKey("frame_type", "datagram")
-	enc.Int64Key("length", int64(f.Length))
+func encodeDatagramFrame(enc *jsontext.Encoder, f *DatagramFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("datagram"))
+	h.WriteToken(jsontext.String("length"))
+	h.WriteToken(jsontext.Int(f.Length))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalAckFrequencyFrame(enc *gojay.Encoder, f *logging.AckFrequencyFrame) {
-	enc.StringKey("frame_type", "ack_frequency")
-	enc.Uint64Key("sequence_number", f.SequenceNumber)
-	enc.Uint64Key("ack_eliciting_threshold", f.AckElicitingThreshold)
-	enc.Float64Key("request_max_ack_delay", milliseconds(f.RequestMaxAckDelay))
-	enc.Uint64Key("reordering_threshold", uint64(f.ReorderingThreshold))
+func encodeAckFrequencyFrame(enc *jsontext.Encoder, f *AckFrequencyFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("ack_frequency"))
+	h.WriteToken(jsontext.String("sequence_number"))
+	h.WriteToken(jsontext.Uint(f.SequenceNumber))
+	h.WriteToken(jsontext.String("ack_eliciting_threshold"))
+	h.WriteToken(jsontext.Uint(f.AckElicitingThreshold))
+	h.WriteToken(jsontext.String("request_max_ack_delay"))
+	h.WriteToken(jsontext.Float(milliseconds(f.RequestMaxAckDelay)))
+	h.WriteToken(jsontext.String("reordering_threshold"))
+	h.WriteToken(jsontext.Int(int64(f.ReorderingThreshold)))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
-func marshalImmediateAckFrame(enc *gojay.Encoder, _ *logging.ImmediateAckFrame) {
-	enc.StringKey("frame_type", "immediate_ack")
+func encodeImmediateAckFrame(enc *jsontext.Encoder, _ *ImmediateAckFrame) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("frame_type"))
+	h.WriteToken(jsontext.String("immediate_ack"))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
