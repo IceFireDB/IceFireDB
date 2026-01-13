@@ -2,26 +2,28 @@
 // for reusing QUIC transports for various purposes, like listening & dialing, having
 // multiple QUIC listeners on the same address with different ALPNs, and sharing the
 // same address with non QUIC transports like WebRTC.
+
 package quicreuse
 
 import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"sync"
 
+	"github.com/libp2p/go-libp2p/gologshim"
 	"github.com/libp2p/go-netroute"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/quic-go/quic-go"
-	quiclogging "github.com/quic-go/quic-go/logging"
-	quicmetrics "github.com/quic-go/quic-go/metrics"
+	"github.com/quic-go/quic-go/qlog"
 	"golang.org/x/time/rate"
 )
+
+var log = gologshim.Logger("quicreuse")
 
 type QUICListener interface {
 	Accept(ctx context.Context) (*quic.Conn, error)
@@ -68,6 +70,8 @@ type ConnManager struct {
 	connContext connContextFunc
 
 	verifySourceAddress func(addr net.Addr) bool
+
+	qlogTracerDir string
 }
 
 type quicListenerEntry struct {
@@ -107,7 +111,8 @@ func NewConnManager(statelessResetKey quic.StatelessResetKey, tokenKey quic.Toke
 	}
 
 	quicConf := quicConfig.Clone()
-	quicConf.Tracer = cm.getTracer()
+	// quic-go takes care of disabling this if QLOGDIR Environment variable isn't present
+	quicConf.Tracer = qlog.DefaultConnectionTracer
 	serverConfig := quicConf.Clone()
 
 	cm.clientConfig = quicConf
@@ -132,31 +137,6 @@ func NewConnManager(statelessResetKey quic.StatelessResetKey, tokenKey quic.Toke
 		cm.reuseUDP6 = newReuse(&statelessResetKey, &tokenKey, cm.listenUDP, cm.sourceIPSelectorFn, cm.connContext, cm.verifySourceAddress)
 	}
 	return cm, nil
-}
-
-func (c *ConnManager) getTracer() func(context.Context, quiclogging.Perspective, quic.ConnectionID) *quiclogging.ConnectionTracer {
-	return func(_ context.Context, p quiclogging.Perspective, ci quic.ConnectionID) *quiclogging.ConnectionTracer {
-		var promTracer *quiclogging.ConnectionTracer
-		if c.enableMetrics {
-			switch p {
-			case quiclogging.PerspectiveClient:
-				promTracer = quicmetrics.NewClientConnectionTracerWithRegisterer(c.registerer)
-			case quiclogging.PerspectiveServer:
-				promTracer = quicmetrics.NewServerConnectionTracerWithRegisterer(c.registerer)
-			default:
-				log.Error("invalid logging perspective: %s", p)
-			}
-		}
-		var tracer *quiclogging.ConnectionTracer
-		if qlogTracerDir != "" {
-			tracer = qloggerForDir(qlogTracerDir, p, ci)
-			if promTracer != nil {
-				tracer = quiclogging.NewMultiplexedConnectionTracer(promTracer,
-					tracer)
-			}
-		}
-		return tracer
-	}
 }
 
 func (c *ConnManager) getReuse(network string) (*reuse, error) {
@@ -224,7 +204,7 @@ func (c *ConnManager) ListenQUICAndAssociate(association any, addr ma.Multiaddr,
 	key := laddr.String()
 	entry, ok := c.quicListeners[key]
 	if !ok {
-		tr, err := c.transportForListen(association, netw, laddr)
+		tr, err := c.transportForListen(netw, laddr)
 		if err != nil {
 			return nil, err
 		}
@@ -234,20 +214,15 @@ func (c *ConnManager) ListenQUICAndAssociate(association any, addr ma.Multiaddr,
 		}
 		key = tr.LocalAddr().String()
 		entry = quicListenerEntry{ln: ln}
-	} else if c.enableReuseport && association != nil {
-		reuse, err := c.getReuse(netw)
-		if err != nil {
-			return nil, fmt.Errorf("reuse error: %w", err)
-		}
-		err = reuse.AssertTransportExists(entry.ln.transport)
-		if err != nil {
-			return nil, fmt.Errorf("reuse assert transport failed: %w", err)
-		}
-		if tr, ok := entry.ln.transport.(*refcountedTransport); ok {
-			tr.associate(association)
+	}
+	if c.enableReuseport && association != nil {
+		if _, ok := entry.ln.transport.(*refcountedTransport); !ok {
+			log.Warn("reuseport is enabled, association is non-nil, but the transport is not a refcountedTransport.")
 		}
 	}
-	l, err := entry.ln.Add(tlsConf, allowWindowIncrease, func() { c.onListenerClosed(key) })
+	l, err := entry.ln.Add(association, tlsConf, allowWindowIncrease, func() {
+		c.onListenerClosed(key)
+	})
 	if err != nil {
 		if entry.refCount <= 0 {
 			entry.ln.Close()
@@ -296,7 +271,7 @@ func (c *ConnManager) SharedNonQUICPacketConn(_ string, laddr *net.UDPAddr) (net
 	return nil, errors.New("expected to be able to share with a QUIC listener, but the QUIC listener is not using a refcountedTransport. `DisableReuseport` should not be set")
 }
 
-func (c *ConnManager) transportForListen(association any, network string, laddr *net.UDPAddr) (RefCountedQUICTransport, error) {
+func (c *ConnManager) transportForListen(network string, laddr *net.UDPAddr) (RefCountedQUICTransport, error) {
 	if c.enableReuseport {
 		reuse, err := c.getReuse(network)
 		if err != nil {
@@ -306,7 +281,6 @@ func (c *ConnManager) transportForListen(association any, network string, laddr 
 		if err != nil {
 			return nil, err
 		}
-		tr.associate(association)
 		return tr, nil
 	}
 

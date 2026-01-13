@@ -21,13 +21,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/sec"
-	"github.com/libp2p/go-libp2p/core/sec/insecure"
 	"github.com/libp2p/go-libp2p/core/transport"
+	logging "github.com/libp2p/go-libp2p/gologshim"
 	"github.com/libp2p/go-libp2p/p2p/host/autonat"
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	blankhost "github.com/libp2p/go-libp2p/p2p/host/blank"
 	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
+	"github.com/libp2p/go-libp2p/p2p/host/observedaddrs"
 	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	routed "github.com/libp2p/go-libp2p/p2p/host/routed"
@@ -38,6 +39,7 @@ import (
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
+	"github.com/libp2p/go-libp2p/p2p/security/insecure"
 	"github.com/libp2p/go-libp2p/p2p/transport/quicreuse"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcpreuse"
 	libp2pwebrtc "github.com/libp2p/go-libp2p/p2p/transport/webrtc"
@@ -49,6 +51,8 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 )
+
+var log = logging.Logger("p2p-config")
 
 // AddrsFactory is a function that takes a set of multiaddrs we're listening on and
 // returns the set of multiaddrs we should advertise to the network.
@@ -158,9 +162,7 @@ func (cfg *Config) makeSwarm(eventBus event.Bus, enableMetrics bool) (*swarm.Swa
 
 	// Check this early. Prevents us from even *starting* without verifying this.
 	if pnet.ForcePrivateNetwork && len(cfg.PSK) == 0 {
-		log.Error("tried to create a libp2p node with no Private" +
-			" Network Protector but usage of Private Networks" +
-			" is forced by the environment")
+		log.Error("tried to create a libp2p node with no Private Network Protector but usage of Private Networks is forced by the environment")
 		// Note: This is *also* checked the upgrader itself, so it'll be
 		// enforced even *if* you don't use the libp2p constructor.
 		return nil, pnet.ErrNotInPrivateNetwork
@@ -287,7 +289,11 @@ func (cfg *Config) makeAutoNATV2Host() (host.Host, error) {
 
 func (cfg *Config) addTransports() ([]fx.Option, error) {
 	fxopts := []fx.Option{
-		fx.WithLogger(func() fxevent.Logger { return getFXLogger() }),
+		fx.WithLogger(func() fxevent.Logger {
+			return &fxevent.SlogLogger{
+				Logger: log.With("system", "fx"),
+			}
+		}),
 		fx.Provide(fx.Annotate(tptu.New, fx.ParamTags(`name:"security"`))),
 		fx.Supply(cfg.Muxers),
 		fx.Provide(func() connmgr.ConnectionGater { return cfg.ConnectionGater }),
@@ -434,23 +440,23 @@ func (cfg *Config) addTransports() ([]fx.Option, error) {
 	return fxopts, nil
 }
 
-func (cfg *Config) newBasicHost(swrm *swarm.Swarm, eventBus event.Bus, an *autonatv2.AutoNAT) (*bhost.BasicHost, error) {
+func (cfg *Config) newBasicHost(swrm *swarm.Swarm, eventBus event.Bus, an *autonatv2.AutoNAT, o bhost.ObservedAddrsManager) (*bhost.BasicHost, error) {
 	h, err := bhost.NewHost(swrm, &bhost.HostOpts{
-		EventBus:                        eventBus,
-		ConnManager:                     cfg.ConnManager,
-		AddrsFactory:                    cfg.AddrsFactory,
-		NATManager:                      cfg.NATManager,
-		EnablePing:                      !cfg.DisablePing,
-		UserAgent:                       cfg.UserAgent,
-		ProtocolVersion:                 cfg.ProtocolVersion,
-		EnableHolePunching:              cfg.EnableHolePunching,
-		HolePunchingOptions:             cfg.HolePunchingOptions,
-		EnableRelayService:              cfg.EnableRelayService,
-		RelayServiceOpts:                cfg.RelayServiceOpts,
-		EnableMetrics:                   !cfg.DisableMetrics,
-		PrometheusRegisterer:            cfg.PrometheusRegisterer,
-		DisableIdentifyAddressDiscovery: cfg.DisableIdentifyAddressDiscovery,
-		AutoNATv2:                       an,
+		EventBus:             eventBus,
+		ConnManager:          cfg.ConnManager,
+		AddrsFactory:         cfg.AddrsFactory,
+		NATManager:           cfg.NATManager,
+		EnablePing:           !cfg.DisablePing,
+		UserAgent:            cfg.UserAgent,
+		ProtocolVersion:      cfg.ProtocolVersion,
+		EnableHolePunching:   cfg.EnableHolePunching,
+		HolePunchingOptions:  cfg.HolePunchingOptions,
+		EnableRelayService:   cfg.EnableRelayService,
+		RelayServiceOpts:     cfg.RelayServiceOpts,
+		EnableMetrics:        !cfg.DisableMetrics,
+		PrometheusRegisterer: cfg.PrometheusRegisterer,
+		AutoNATv2:            an,
+		ObservedAddrsManager: o,
 	})
 	if err != nil {
 		return nil, err
@@ -467,7 +473,7 @@ func (cfg *Config) validate() error {
 	if l, ok := cfg.ResourceManager.(connmgr.GetConnLimiter); ok {
 		err := cfg.ConnManager.CheckLimit(l)
 		if err != nil {
-			log.Warn(fmt.Sprintf("rcmgr limit conflicts with connmgr limit: %v", err))
+			log.Warn("rcmgr limit conflicts with connmgr limit", "err", err)
 		}
 	}
 
@@ -528,6 +534,25 @@ func (cfg *Config) NewNode() (host.Host, error) {
 				},
 			})
 			return sw, nil
+		}),
+		fx.Provide(func(eventBus event.Bus, s *swarm.Swarm, lifecycle fx.Lifecycle) (bhost.ObservedAddrsManager, error) {
+			if cfg.DisableIdentifyAddressDiscovery {
+				return nil, nil
+			}
+			o, err := observedaddrs.NewManager(eventBus, s)
+			if err != nil {
+				return nil, err
+			}
+			lifecycle.Append(fx.Hook{
+				OnStart: func(context.Context) error {
+					o.Start(s)
+					return nil
+				},
+				OnStop: func(context.Context) error {
+					return o.Close()
+				},
+			})
+			return o, nil
 		}),
 		fx.Provide(func() (*autonatv2.AutoNAT, error) {
 			if !cfg.EnableAutoNATv2 {

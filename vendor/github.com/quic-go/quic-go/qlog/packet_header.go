@@ -1,161 +1,96 @@
 package qlog
 
 import (
-	"fmt"
+	"encoding/hex"
 
 	"github.com/quic-go/quic-go/internal/protocol"
-	"github.com/quic-go/quic-go/logging"
-
-	"github.com/francoispqt/gojay"
+	"github.com/quic-go/quic-go/qlogwriter/jsontext"
 )
 
-func getPacketTypeFromEncryptionLevel(encLevel protocol.EncryptionLevel) logging.PacketType {
-	switch encLevel {
-	case protocol.EncryptionInitial:
-		return logging.PacketTypeInitial
-	case protocol.EncryptionHandshake:
-		return logging.PacketTypeHandshake
-	case protocol.Encryption0RTT:
-		return logging.PacketType0RTT
-	case protocol.Encryption1RTT:
-		return logging.PacketType1RTT
-	default:
-		panic("unknown encryption level")
-	}
-}
-
-type token struct {
+type Token struct {
 	Raw []byte
 }
 
-var _ gojay.MarshalerJSONObject = &token{}
-
-func (t token) IsNil() bool { return false }
-func (t token) MarshalJSONObject(enc *gojay.Encoder) {
-	enc.StringKey("data", fmt.Sprintf("%x", t.Raw))
+func (t Token) encode(enc *jsontext.Encoder) error {
+	h := encoderHelper{enc: enc}
+	h.WriteToken(jsontext.BeginObject)
+	h.WriteToken(jsontext.String("data"))
+	h.WriteToken(jsontext.String(hex.EncodeToString(t.Raw)))
+	h.WriteToken(jsontext.EndObject)
+	return h.err
 }
 
 // PacketHeader is a QUIC packet header.
-// TODO: make this a long header
-type packetHeader struct {
-	PacketType logging.PacketType
-
-	KeyPhaseBit  logging.KeyPhaseBit
-	PacketNumber logging.PacketNumber
-
-	Version          logging.Version
-	SrcConnectionID  logging.ConnectionID
-	DestConnectionID logging.ConnectionID
-
-	Token *token
+type PacketHeader struct {
+	PacketType       PacketType
+	KeyPhaseBit      KeyPhaseBit
+	PacketNumber     PacketNumber
+	Version          Version
+	SrcConnectionID  ConnectionID
+	DestConnectionID ConnectionID
+	Token            *Token
 }
 
-func transformHeader(hdr *logging.Header) *packetHeader {
-	h := &packetHeader{
-		PacketType:       logging.PacketTypeFromHeader(hdr),
-		SrcConnectionID:  hdr.SrcConnectionID,
-		DestConnectionID: hdr.DestConnectionID,
-		Version:          hdr.Version,
-	}
-	if len(hdr.Token) > 0 {
-		h.Token = &token{Raw: hdr.Token}
-	}
-	return h
-}
-
-func transformLongHeader(hdr *logging.ExtendedHeader) *packetHeader {
-	h := transformHeader(&hdr.Header)
-	h.PacketNumber = hdr.PacketNumber
-	h.KeyPhaseBit = hdr.KeyPhase
-	return h
-}
-
-func (h packetHeader) MarshalJSONObject(enc *gojay.Encoder) {
-	enc.StringKey("packet_type", packetType(h.PacketType).String())
-	if h.PacketType != logging.PacketTypeRetry {
-		enc.Int64Key("packet_number", int64(h.PacketNumber))
+func (h PacketHeader) encode(enc *jsontext.Encoder) error {
+	helper := encoderHelper{enc: enc}
+	helper.WriteToken(jsontext.BeginObject)
+	helper.WriteToken(jsontext.String("packet_type"))
+	helper.WriteToken(jsontext.String(string(h.PacketType)))
+	if h.PacketType != PacketTypeRetry && h.PacketType != PacketTypeVersionNegotiation && h.PacketType != "" &&
+		h.PacketNumber != protocol.InvalidPacketNumber {
+		helper.WriteToken(jsontext.String("packet_number"))
+		helper.WriteToken(jsontext.Int(int64(h.PacketNumber)))
 	}
 	if h.Version != 0 {
-		enc.StringKey("version", version(h.Version).String())
+		helper.WriteToken(jsontext.String("version"))
+		helper.WriteToken(jsontext.String(version(h.Version).String()))
 	}
-	if h.PacketType != logging.PacketType1RTT {
-		enc.IntKey("scil", h.SrcConnectionID.Len())
+	if h.PacketType != PacketType1RTT {
+		helper.WriteToken(jsontext.String("scil"))
+		helper.WriteToken(jsontext.Int(int64(h.SrcConnectionID.Len())))
 		if h.SrcConnectionID.Len() > 0 {
-			enc.StringKey("scid", h.SrcConnectionID.String())
+			helper.WriteToken(jsontext.String("scid"))
+			helper.WriteToken(jsontext.String(h.SrcConnectionID.String()))
 		}
 	}
-	enc.IntKey("dcil", h.DestConnectionID.Len())
+	helper.WriteToken(jsontext.String("dcil"))
+	helper.WriteToken(jsontext.Int(int64(h.DestConnectionID.Len())))
 	if h.DestConnectionID.Len() > 0 {
-		enc.StringKey("dcid", h.DestConnectionID.String())
+		helper.WriteToken(jsontext.String("dcid"))
+		helper.WriteToken(jsontext.String(h.DestConnectionID.String()))
 	}
-	if h.KeyPhaseBit == logging.KeyPhaseZero || h.KeyPhaseBit == logging.KeyPhaseOne {
-		enc.StringKey("key_phase_bit", h.KeyPhaseBit.String())
+	if h.KeyPhaseBit == KeyPhaseZero || h.KeyPhaseBit == KeyPhaseOne {
+		helper.WriteToken(jsontext.String("key_phase_bit"))
+		helper.WriteToken(jsontext.String(h.KeyPhaseBit.String()))
 	}
 	if h.Token != nil {
-		enc.ObjectKey("token", h.Token)
+		helper.WriteToken(jsontext.String("token"))
+		if err := h.Token.encode(enc); err != nil {
+			return err
+		}
 	}
+	helper.WriteToken(jsontext.EndObject)
+	return helper.err
 }
 
-type packetHeaderVersionNegotiation struct {
-	SrcConnectionID  logging.ArbitraryLenConnectionID
-	DestConnectionID logging.ArbitraryLenConnectionID
+type PacketHeaderVersionNegotiation struct {
+	SrcConnectionID  ArbitraryLenConnectionID
+	DestConnectionID ArbitraryLenConnectionID
 }
 
-func (h packetHeaderVersionNegotiation) IsNil() bool { return false }
-func (h packetHeaderVersionNegotiation) MarshalJSONObject(enc *gojay.Encoder) {
-	enc.StringKey("packet_type", "version_negotiation")
-	enc.IntKey("scil", h.SrcConnectionID.Len())
-	enc.StringKey("scid", h.SrcConnectionID.String())
-	enc.IntKey("dcil", h.DestConnectionID.Len())
-	enc.StringKey("dcid", h.DestConnectionID.String())
-}
-
-// a minimal header that only outputs the packet type, and potentially a packet number
-type packetHeaderWithType struct {
-	PacketType   logging.PacketType
-	PacketNumber logging.PacketNumber
-}
-
-func (h packetHeaderWithType) IsNil() bool { return false }
-func (h packetHeaderWithType) MarshalJSONObject(enc *gojay.Encoder) {
-	enc.StringKey("packet_type", packetType(h.PacketType).String())
-	if h.PacketNumber != protocol.InvalidPacketNumber {
-		enc.Int64Key("packet_number", int64(h.PacketNumber))
-	}
-}
-
-// a minimal header that only outputs the packet type
-type packetHeaderWithTypeAndPacketNumber struct {
-	PacketType   logging.PacketType
-	PacketNumber logging.PacketNumber
-}
-
-func (h packetHeaderWithTypeAndPacketNumber) IsNil() bool { return false }
-func (h packetHeaderWithTypeAndPacketNumber) MarshalJSONObject(enc *gojay.Encoder) {
-	enc.StringKey("packet_type", packetType(h.PacketType).String())
-	enc.Int64Key("packet_number", int64(h.PacketNumber))
-}
-
-type shortHeader struct {
-	DestConnectionID logging.ConnectionID
-	PacketNumber     logging.PacketNumber
-	KeyPhaseBit      logging.KeyPhaseBit
-}
-
-func transformShortHeader(hdr *logging.ShortHeader) *shortHeader {
-	return &shortHeader{
-		DestConnectionID: hdr.DestConnectionID,
-		PacketNumber:     hdr.PacketNumber,
-		KeyPhaseBit:      hdr.KeyPhase,
-	}
-}
-
-func (h shortHeader) IsNil() bool { return false }
-func (h shortHeader) MarshalJSONObject(enc *gojay.Encoder) {
-	enc.StringKey("packet_type", packetType(logging.PacketType1RTT).String())
-	if h.DestConnectionID.Len() > 0 {
-		enc.StringKey("dcid", h.DestConnectionID.String())
-	}
-	enc.Int64Key("packet_number", int64(h.PacketNumber))
-	enc.StringKey("key_phase_bit", h.KeyPhaseBit.String())
+func (h PacketHeaderVersionNegotiation) encode(enc *jsontext.Encoder) error {
+	helper := encoderHelper{enc: enc}
+	helper.WriteToken(jsontext.BeginObject)
+	helper.WriteToken(jsontext.String("packet_type"))
+	helper.WriteToken(jsontext.String("version_negotiation"))
+	helper.WriteToken(jsontext.String("scil"))
+	helper.WriteToken(jsontext.Int(int64(h.SrcConnectionID.Len())))
+	helper.WriteToken(jsontext.String("scid"))
+	helper.WriteToken(jsontext.String(h.SrcConnectionID.String()))
+	helper.WriteToken(jsontext.String("dcil"))
+	helper.WriteToken(jsontext.Int(int64(h.DestConnectionID.Len())))
+	helper.WriteToken(jsontext.String("dcid"))
+	helper.WriteToken(jsontext.String(h.DestConnectionID.String()))
+	helper.WriteToken(jsontext.EndObject)
+	return helper.err
 }
