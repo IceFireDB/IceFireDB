@@ -1,3 +1,5 @@
+// Package keyspace provides utilities for Kademlia keyspace operations,
+// including keys, prefixes, and trie operations.
 package keyspace
 
 import (
@@ -21,15 +23,13 @@ const KeyLen = bit256.KeyLen * 8 // 256
 // MhToBit256 converts a multihash to a its 256-bit kademlia identifier by
 // hashing it with SHA-256.
 func MhToBit256(h mh.Multihash) bit256.Key {
-	hash := sha256.Sum256(h)
-	return bit256.NewKey(hash[:])
+	return bit256.NewKeyFromArray(sha256.Sum256(h))
 }
 
 // PeerIDToBit256 converts a peer.ID to a its 256-bit kademlia identifier by
 // hashing it with SHA-256.
 func PeerIDToBit256(id peer.ID) bit256.Key {
-	hash := sha256.Sum256([]byte(id))
-	return bit256.NewKey(hash[:])
+	return bit256.NewKeyFromArray(sha256.Sum256([]byte(id)))
 }
 
 // FlipLastBit flips the last bit of the given key.
@@ -111,10 +111,22 @@ func KeyToBytes[K kad.Key[K]](k K) []byte {
 // If every peer shares the same CPL to `target`, then no deeper zone is
 // covered, we learn that the adjacent sibling branch is empty. In this case we
 // return the prefix one bit deeper (`minCPL+1`) and an empty peer list.
+//
+// If a single peer is supplied and matches the target, the covered prefix is the
+// full key of the peer. If it does not match, the covered prefix is empty and
+// no peers are returned.
 func ShortestCoveredPrefix(target bitstr.Key, peers []peer.ID) (bitstr.Key, []peer.ID) {
 	if len(peers) == 0 {
-		return target, peers
+		return "", peers
 	}
+	if len(peers) == 1 {
+		b256 := PeerIDToBit256(peers[0])
+		if IsPrefix(target, b256) {
+			return bitstr.Key(key.BitString(b256)), peers
+		}
+		return "", nil
+	}
+
 	// Sort the peers by their distance to the requested key.
 	peers = kb.SortClosestPeers(peers, KeyToBytes(target))
 

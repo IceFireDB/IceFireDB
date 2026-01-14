@@ -2,7 +2,11 @@
 // and processes them in batches for improved performance.
 package buffered
 
-import "time"
+import (
+	"time"
+
+	"github.com/libp2p/go-libp2p-kad-dht/provider"
+)
 
 const (
 	// DefaultDsName is the default datastore namespace for the buffered provider.
@@ -11,11 +15,15 @@ const (
 	DefaultBatchSize = 1 << 10
 	// DefaultIdleWriteTime is the default duration to wait before flushing pending operations.
 	DefaultIdleWriteTime = time.Minute
+	// DefaultLoggerName is the default logger name for the buffered provider. It
+	// is recommended to use the same name as the underlying provider.
+	DefaultLoggerName = provider.DefaultLoggerName
 )
 
 // config contains all options for the buffered provider.
 type config struct {
 	dsName        string
+	loggerName    string
 	batchSize     int
 	idleWriteTime time.Duration
 }
@@ -27,6 +35,7 @@ type Option func(*config)
 func getOpts(opts []Option) config {
 	cfg := config{
 		dsName:        DefaultDsName,
+		loggerName:    DefaultLoggerName,
 		batchSize:     DefaultBatchSize,
 		idleWriteTime: DefaultIdleWriteTime,
 	}
@@ -43,6 +52,15 @@ func WithDsName(name string) Option {
 	return func(c *config) {
 		if len(name) > 0 {
 			c.dsName = name
+		}
+	}
+}
+
+// WithLoggerName sets the go-log logger name for the buffered provider.
+func WithLoggerName(name string) Option {
+	return func(c *config) {
+		if len(name) > 0 {
+			c.loggerName = name
 		}
 	}
 }

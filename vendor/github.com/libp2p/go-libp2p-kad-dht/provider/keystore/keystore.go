@@ -1,8 +1,14 @@
+// Package keystore provides persistent storage for multihashes used by the DHT
+// provider system. It maintains an indexed datastore of multihashes with their
+// Kademlia 256-bit keys, enabling efficient content routing operations. It
+// allows prefix-based queries to retrieve all multihashes that share a common
+// Kademlia prefix.
 package keystore
 
 import (
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,6 +16,7 @@ import (
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipfs/go-datastore/query"
+	"github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-kad-dht/provider/internal/keyspace"
 	mh "github.com/multiformats/go-multihash"
 
@@ -18,7 +25,16 @@ import (
 	"github.com/probe-lab/go-libdht/kad/key/bitstr"
 )
 
-var ErrClosed = errors.New("keystore is closed")
+var (
+	// ErrClosed is returned when an operation is attempted on a closed Keystore.
+	ErrClosed = errors.New("keystore is closed")
+
+	// sizeKey is the datastore key used to store the keystore size as a startup
+	// optimization. The key is ephemeral: it only exists between Close() and the
+	// next startup, when it is immediately deleted. This avoids stale size data
+	// and ensures the key doesn't count toward the size calculation.
+	sizeKey = ds.NewKey("size")
+)
 
 // Keystore provides thread-safe storage and retrieval of multihashes, indexed
 // by their kademlia 256-bit identifier.
@@ -29,6 +45,7 @@ type Keystore interface {
 	Delete(context.Context, ...mh.Multihash) error
 	Empty(context.Context) error
 	Size(context.Context) (int, error)
+	BatchSize() int
 	Close() error
 }
 
@@ -65,6 +82,7 @@ type operationResponse struct {
 // keystore indexes multihashes by their kademlia identifier.
 type keystore struct {
 	ds         ds.Batching
+	size       int // no mutex required, accessed only in worker goroutine
 	prefixBits int
 	batchSize  int
 
@@ -72,6 +90,8 @@ type keystore struct {
 	requests chan operation
 	close    chan struct{}
 	done     chan struct{}
+
+	logger *log.ZapEventLogger
 }
 
 // NewKeystore creates a new Keystore backed by the provided datastore.
@@ -87,6 +107,7 @@ func NewKeystore(d ds.Batching, opts ...Option) (Keystore, error) {
 		requests:   make(chan operation),
 		close:      make(chan struct{}),
 		done:       make(chan struct{}),
+		logger:     log.Logger(cfg.loggerName),
 	}
 	go ks.worker()
 
@@ -137,7 +158,7 @@ func dsKey[K kad.Key[K]](k K, prefixBits int) ds.Key {
 //
 // Returns the reconstructed 256-bit key or an error if base64URL decoding fails.
 func (s *keystore) decodeKey(dsk string) (bit256.Key, error) {
-	bs := make([]byte, 32)
+	var bs [bit256.KeyLen]byte
 	// Extract individual bits from odd positions (skip '/' separators)
 	for i := range s.prefixBits {
 		if dsk[2*i+1] == '1' {
@@ -149,13 +170,17 @@ func (s *keystore) decodeKey(dsk string) (bit256.Key, error) {
 	if err != nil {
 		return bit256.Key{}, err
 	}
+	if len(decoded) != bit256.KeyLen-(s.prefixBits/8) {
+		return bit256.Key{}, fmt.Errorf("invalid decoded length: expected %d, got %d", keyspace.KeyLen-(s.prefixBits/8), len(decoded))
+	}
 	copy(bs[s.prefixBits/8:], decoded)
-	return bit256.NewKey(bs), nil
+	return bit256.NewKeyFromArray(bs), nil
 }
 
 // worker processes operations sequentially in a single goroutine
 func (s *keystore) worker() {
 	defer close(s.done)
+	s.loadSize()
 
 	for {
 		select {
@@ -166,6 +191,13 @@ func (s *keystore) worker() {
 			case opPut:
 				newKeys, err := s.put(op.ctx, op.keys)
 				op.response <- operationResponse{multihashes: newKeys, err: err}
+				if err != nil {
+					if size, err := refreshSize(op.ctx, s.ds); err == nil {
+						s.size = size
+					} else {
+						s.logger.Error("keystore: failed to refresh size after put: ", err)
+					}
+				}
 
 			case opGet:
 				keys, err := s.get(op.ctx, op.prefix)
@@ -178,14 +210,29 @@ func (s *keystore) worker() {
 			case opDelete:
 				err := s.delete(op.ctx, op.keys)
 				op.response <- operationResponse{err: err}
+				if err != nil {
+					if size, err := refreshSize(op.ctx, s.ds); err == nil {
+						s.size = size
+					} else {
+						s.logger.Error("keystore: failed to refresh size after delete: ", err)
+					}
+				}
 
 			case opEmpty:
-				err := empty(op.ctx, s.ds, s.batchSize)
+				err := s.empty(op.ctx, s.ds)
 				op.response <- operationResponse{err: err}
+				if err == nil {
+					s.size = 0
+				} else {
+					if size, err := refreshSize(op.ctx, s.ds); err == nil {
+						s.size = size
+					} else {
+						s.logger.Error("keystore: failed to refresh size after empty: ", err)
+					}
+				}
 
 			case opSize:
-				size, err := s.size(op.ctx)
-				op.response <- operationResponse{size: size, err: err}
+				op.response <- operationResponse{size: s.size}
 
 			default:
 				op.response <- operationResponse{err: fmt.Errorf("unknown operation %d", op.op)}
@@ -194,8 +241,42 @@ func (s *keystore) worker() {
 	}
 }
 
-// put stores the provided keys while assuming s.lk is already held, and
-// returns the keys that weren't present already in the keystore.
+// loadSize initializes the in-memory size counter during startup. It attempts
+// to read the persisted size from the previous session, falling back to a full
+// datastore scan if unavailable or corrupt. The size key is immediately deleted
+// after reading to ensure it remains ephemeral: only existing between clean
+// shutdown and startup. This prevents stale data if the process crashes while
+// running, and ensures the metadata key itself doesn't count toward the size.
+func (s *keystore) loadSize() {
+	sizeBytes, err := s.ds.Get(context.Background(), sizeKey)
+	if err != nil || len(sizeBytes) != 8 {
+		// Size unavailable or corrupt, delete any stale metadata and perform full refresh.
+		s.ds.Delete(context.Background(), sizeKey)
+		if size, err := refreshSize(context.Background(), s.ds); err == nil {
+			s.size = size
+		} else {
+			s.logger.Error("keystore: failed to refresh size during load: ", err)
+		}
+		return
+	}
+
+	s.size = int(binary.BigEndian.Uint64(sizeBytes))
+	// Delete immediately to keep the key ephemeral.
+	s.ds.Delete(context.Background(), sizeKey)
+}
+
+// persistSize saves the current size to the datastore as a startup optimization.
+// This is only called during clean shutdown (in Close(), after the worker exits),
+// allowing the next startup to avoid a full datastore scan. If the process crashes,
+// the size key won't exist and loadSize() will fall back to refreshSize().
+func (s *keystore) persistSize() error {
+	sizeBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(sizeBytes, uint64(s.size))
+	return s.ds.Put(context.Background(), sizeKey, sizeBytes)
+}
+
+// put stores the provided keys and returns the keys that weren't present
+// already in the keystore.
 func (s *keystore) put(ctx context.Context, keys []mh.Multihash) ([]mh.Multihash, error) {
 	seen := make(map[bit256.Key]struct{}, len(keys))
 	b, err := s.ds.Batch(ctx)
@@ -217,13 +298,17 @@ func (s *keystore) put(ctx context.Context, keys []mh.Multihash) ([]mh.Multihash
 		}
 		if !ok {
 			if err := b.Put(ctx, dsk, h); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("cannot put to batch: %w", err)
 			}
 			newKeys = append(newKeys, h)
 		}
 	}
 	if err := b.Commit(ctx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot commit keystore updates: %w", err)
+	}
+	s.size += len(newKeys)
+	if err = s.ds.Sync(ctx, ds.NewKey("")); err != nil {
+		s.logger.Warnf("keystore: cannot sync datastore after put: %v", err)
 	}
 	return newKeys, nil
 }
@@ -285,9 +370,8 @@ func (s *keystore) containsPrefix(ctx context.Context, prefix bitstr.Key) (bool,
 	return false, nil
 }
 
-// empty deletes all entries under the datastore prefix, assuming s.lk is
-// already held.
-func empty(ctx context.Context, d ds.Batching, batchSize int) error {
+// empty deletes all entries in the supplied datastore.
+func (s *keystore) empty(ctx context.Context, d ds.Batching) error {
 	batch, err := d.Batch(ctx)
 	if err != nil {
 		return err
@@ -298,7 +382,7 @@ func empty(ctx context.Context, d ds.Batching, batchSize int) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if writeCount >= batchSize {
+		if writeCount >= s.batchSize {
 			writeCount = 0
 			if err = batch.Commit(ctx); err != nil {
 				return fmt.Errorf("cannot commit keystore updates: %w", err)
@@ -323,7 +407,7 @@ func empty(ctx context.Context, d ds.Batching, batchSize int) error {
 		}
 	}
 	if err = d.Sync(ctx, ds.NewKey("")); err != nil {
-		return fmt.Errorf("cannot sync datastore: %w", err)
+		s.logger.Warnf("keystore: cannot sync datastore after put: %v", err)
 	}
 	return nil
 }
@@ -334,26 +418,47 @@ func (s *keystore) delete(ctx context.Context, keys []mh.Multihash) error {
 	if err != nil {
 		return err
 	}
+	seen := make(map[bit256.Key]struct{}, len(keys))
+	removedCount := 0
 	for _, h := range keys {
-		dsk := dsKey(keyspace.MhToBit256(h), s.prefixBits)
-		err := b.Delete(ctx, dsk)
+		k := keyspace.MhToBit256(h)
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = struct{}{}
+		dsk := dsKey(k, s.prefixBits)
+		ok, err := s.ds.Has(ctx, dsk)
 		if err != nil {
 			return err
 		}
+		if ok {
+			if err := b.Delete(ctx, dsk); err != nil {
+				return err
+			}
+			removedCount++
+		}
 	}
-	return b.Commit(ctx)
+	if err := b.Commit(ctx); err != nil {
+		return fmt.Errorf("cannot commit keystore updates: %w", err)
+	}
+	s.size -= removedCount
+	if err = s.ds.Sync(ctx, ds.NewKey("")); err != nil {
+		s.logger.Warnf("keystore: cannot sync datastore after delete: %v", err)
+	}
+	return nil
 }
 
-// size returns the number of keys currently stored in the Keystore.
-func (s *keystore) size(ctx context.Context) (size int, err error) {
+// refreshSize iterates over all keys in the supplied datastore to count the
+// total number of stored keys.
+func refreshSize(ctx context.Context, d ds.Datastore) (size int, err error) {
 	q := query.Query{KeysOnly: true}
-	for _, err = range ds.QueryIter(ctx, s.ds, q) {
+	for _, err = range ds.QueryIter(ctx, d, q) {
 		if err != nil {
-			return
+			return size, err
 		}
 		size++
 	}
-	return
+	return size, err
 }
 
 // executeOperation sends an operation request to the worker goroutine and
@@ -381,6 +486,11 @@ func (s *keystore) executeOperation(op opType, ctx context.Context, keys []mh.Mu
 	case <-ctx.Done():
 		return nil, 0, false, ctx.Err()
 	}
+}
+
+// BatchSize returns the configured batch size for datastore operations.
+func (s *keystore) BatchSize() int {
+	return s.batchSize
 }
 
 // Put stores the provided keys in the underlying datastore, grouping them by
@@ -433,15 +543,24 @@ func (s *keystore) Size(ctx context.Context) (int, error) {
 	return size, err
 }
 
-// Close shuts down the worker goroutine and releases resources.
+// Close shuts down the worker goroutine and releases resources. It persists
+// the current size to the datastore after the worker exits, enabling fast
+// startup on the next run. The ordering is critical: persistSize() must be
+// called after <-s.done to avoid race conditions with the worker goroutine.
 func (s *keystore) Close() error {
+	var err error
 	select {
 	case <-s.close:
 		// Already closed
-		return nil
 	default:
 		close(s.close)
-		<-s.done
+		<-s.done // Wait for worker to exit
+		if err = s.persistSize(); err != nil {
+			return fmt.Errorf("error persisting size on close: %w", err)
+		}
+		if err = s.ds.Sync(context.Background(), sizeKey); err != nil {
+			return fmt.Errorf("error syncing size on close: %w", err)
+		}
 	}
-	return nil
+	return err
 }

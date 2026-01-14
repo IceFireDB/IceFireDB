@@ -200,7 +200,7 @@ github.com/cockroachdb/errors/withstack
 # github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b
 ## explicit; go 1.16
 github.com/cockroachdb/logtags
-# github.com/cockroachdb/pebble/v2 v2.1.0
+# github.com/cockroachdb/pebble/v2 v2.1.2
 ## explicit; go 1.23
 github.com/cockroachdb/pebble/v2
 github.com/cockroachdb/pebble/v2/batchrepr
@@ -371,7 +371,7 @@ github.com/gabriel-vasile/mimetype/internal/scan
 # github.com/gammazero/chanqueue v1.1.1
 ## explicit; go 1.22
 github.com/gammazero/chanqueue
-# github.com/gammazero/deque v1.1.0
+# github.com/gammazero/deque v1.2.0
 ## explicit; go 1.23
 github.com/gammazero/deque
 # github.com/getsentry/sentry-go v0.27.0
@@ -487,7 +487,7 @@ github.com/ipfs-shipyard/nopfs/ipfs
 # github.com/ipfs/bbloom v0.0.4
 ## explicit; go 1.12
 github.com/ipfs/bbloom
-# github.com/ipfs/boxo v0.35.1
+# github.com/ipfs/boxo v0.35.2
 ## explicit; go 1.24.6
 github.com/ipfs/boxo/autoconf
 github.com/ipfs/boxo/bitswap
@@ -615,10 +615,10 @@ github.com/ipfs/go-ds-leveldb
 # github.com/ipfs/go-ds-measure v0.2.2
 ## explicit; go 1.23
 github.com/ipfs/go-ds-measure
-# github.com/ipfs/go-ds-pebble v0.5.3
+# github.com/ipfs/go-ds-pebble v0.5.7
 ## explicit; go 1.24
 github.com/ipfs/go-ds-pebble
-# github.com/ipfs/go-dsqueue v0.1.0
+# github.com/ipfs/go-dsqueue v0.1.1
 ## explicit; go 1.24.0
 github.com/ipfs/go-dsqueue
 # github.com/ipfs/go-fs-lock v0.1.1
@@ -653,7 +653,7 @@ github.com/ipfs/go-ipld-git
 # github.com/ipfs/go-ipld-legacy v0.2.2
 ## explicit; go 1.23.10
 github.com/ipfs/go-ipld-legacy
-# github.com/ipfs/go-log/v2 v2.8.2
+# github.com/ipfs/go-log/v2 v2.9.0
 ## explicit; go 1.24
 github.com/ipfs/go-log/v2
 # github.com/ipfs/go-metrics-interface v0.3.0
@@ -917,8 +917,8 @@ github.com/libp2p/go-libp2p/x/rate
 # github.com/libp2p/go-libp2p-asn-util v0.4.1
 ## explicit; go 1.19
 github.com/libp2p/go-libp2p-asn-util
-# github.com/libp2p/go-libp2p-kad-dht v0.35.1
-## explicit; go 1.24.0
+# github.com/libp2p/go-libp2p-kad-dht v0.37.0
+## explicit; go 1.24.6
 github.com/libp2p/go-libp2p-kad-dht
 github.com/libp2p/go-libp2p-kad-dht/amino
 github.com/libp2p/go-libp2p-kad-dht/crawler
@@ -937,7 +937,9 @@ github.com/libp2p/go-libp2p-kad-dht/provider/internal
 github.com/libp2p/go-libp2p-kad-dht/provider/internal/connectivity
 github.com/libp2p/go-libp2p-kad-dht/provider/internal/keyspace
 github.com/libp2p/go-libp2p-kad-dht/provider/internal/queue
+github.com/libp2p/go-libp2p-kad-dht/provider/internal/timeseries
 github.com/libp2p/go-libp2p-kad-dht/provider/keystore
+github.com/libp2p/go-libp2p-kad-dht/provider/stats
 github.com/libp2p/go-libp2p-kad-dht/qpeerset
 github.com/libp2p/go-libp2p-kad-dht/records
 github.com/libp2p/go-libp2p-kad-dht/rtrefresh
@@ -1265,7 +1267,7 @@ github.com/polydawn/refmt/obj/atlas
 github.com/polydawn/refmt/pretty
 github.com/polydawn/refmt/shared
 github.com/polydawn/refmt/tok
-# github.com/probe-lab/go-libdht v0.3.0
+# github.com/probe-lab/go-libdht v0.4.0
 ## explicit; go 1.23
 github.com/probe-lab/go-libdht/kad
 github.com/probe-lab/go-libdht/kad/key
@@ -1643,7 +1645,7 @@ golang.org/x/crypto/salsa20
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/sha3
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/exp v0.0.0-20251009144603-d2f985daa21b
+# golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546
 ## explicit; go 1.24.0
 golang.org/x/exp/constraints
 golang.org/x/exp/mmap
