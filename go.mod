@@ -19,7 +19,7 @@ require (
 	github.com/philippgille/gokv/test v0.7.0
 	github.com/philippgille/gokv/util v0.6.0
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726
-	github.com/sirupsen/logrus v1.9.3
+	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cast v1.10.0
 	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d
