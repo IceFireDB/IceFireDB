@@ -25,6 +25,7 @@ const (
 	defaultCacheTTL            = 5 * time.Minute
 	maxKeySize                 = 1024 * 1024      // 1MB max key size
 	maxValueSize               = 64 * 1024 * 1024 // 64MB max value size
+	LMetaType                  = 1                // LedisDB list metadata key type suffix
 )
 
 // cacheItem is a struct that holds both the key and value.
@@ -186,6 +187,25 @@ func copyBytes(b []byte) []byte {
 	return c
 }
 
+// InvalidateListCache invalidates cache entries for list metadata
+// List metadata keys in ledisdb use a specific encoding with type byte suffix
+func (db *DB) InvalidateListCache(key []byte) {
+	if key == nil || len(key) == 0 {
+		return
+	}
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	db.invalidateListCacheWithLockHeld(key)
+}
+
+func (db *DB) invalidateListCacheWithLockHeld(key []byte) {
+	if key == nil || len(key) == 0 {
+		return
+	}
+	db.cache.Del(string(key))
+	db.cache.Del(string(append(append([]byte{}, key...), LMetaType)))
+}
+
 func (db *DB) initOpts() {
 	db.opts = newOptions(db.cfg)
 
@@ -254,6 +274,8 @@ func (db *DB) Put(key, value []byte) error {
 	db.stats.WriteOps++
 	db.stats.BytesWritten += int64(len(key) + len(value))
 
+	db.invalidateListCacheWithLockHeld(key)
+
 	// Then update the cache to ensure consistency
 	item := &cacheItem{
 		key:      copyBytes(key),
@@ -262,6 +284,7 @@ func (db *DB) Put(key, value []byte) error {
 		accesses: 1,
 	}
 	db.cache.Set(string(key), item, int64(len(value)))
+
 	return nil
 }
 
@@ -340,8 +363,8 @@ func (db *DB) Delete(key []byte) error {
 
 	db.stats.DeleteOps++
 
-	// Then remove from cache to ensure consistency
-	db.cache.Del(string(key))
+	db.invalidateListCacheWithLockHeld(key)
+
 	return nil
 }
 
@@ -351,9 +374,12 @@ func (db *DB) SyncPut(key, value []byte) error {
 		return err
 	}
 
+	db.invalidateListCacheWithLockHeld(key)
+
 	// Then update the cache to ensure consistency
 	item := &cacheItem{key: copyBytes(key), value: copyBytes(value)}
 	db.cache.Set(string(key), item, int64(len(value)))
+
 	return nil
 }
 
@@ -363,8 +389,8 @@ func (db *DB) SyncDelete(key []byte) error {
 		return err
 	}
 
-	// Then remove from cache to ensure consistency
-	db.cache.Del(string(key))
+	db.invalidateListCacheWithLockHeld(key)
+
 	return nil
 }
 

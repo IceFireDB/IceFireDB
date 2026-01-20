@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/libp2p/go-libp2p-kad-dht/internal"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
-	peerstoreImpl "github.com/libp2p/go-libp2p/p2p/host/peerstore"
 	"github.com/multiformats/go-base32"
 )
 
@@ -315,7 +315,15 @@ func (pm *ProviderManager) GetProviders(ctx context.Context, k []byte) ([]peer.A
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case peers := <-gp.resp:
-		return peerstoreImpl.PeerInfos(pm.pstore, peers), nil
+		infos := make([]peer.AddrInfo, len(peers))
+		for i, pid := range peers {
+			ai := pm.pstore.PeerInfo(pid)
+			infos[i] = peer.AddrInfo{
+				ID:    ai.ID,
+				Addrs: slices.Clone(ai.Addrs),
+			}
+		}
+		return infos, nil
 	}
 }
 

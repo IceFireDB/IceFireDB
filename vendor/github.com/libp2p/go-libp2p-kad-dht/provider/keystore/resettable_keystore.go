@@ -3,12 +3,17 @@ package keystore
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync/atomic"
 
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
+	"github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-kad-dht/provider/internal/keyspace"
 	mh "github.com/multiformats/go-multihash"
+
+	"github.com/probe-lab/go-libdht/kad/key/bit256"
 )
 
 var ErrResetInProgress = errors.New("reset already in progress")
@@ -17,6 +22,9 @@ const (
 	opStart opType = iota
 	opCleanup
 )
+
+// activeNamespaceKey is the key used to persist which namespace (0 or 1) is currently active
+var activeNamespaceKey = ds.NewKey("active")
 
 type resetOp struct {
 	op       opType
@@ -34,13 +42,15 @@ type resetOp struct {
 //   - Primary datastore: Currently active storage for all read/write operations
 //   - Alternate datastore: Standby storage used during reset operations
 //   - The datastores use "/0" and "/1" namespace suffixes and can be swapped
+//   - Active namespace is persisted to survive restarts
 //
 // Reset Operation Flow:
 //  1. New keys from reset are written to the alternate (inactive) datastore
 //  2. Concurrent Put operations are automatically duplicated to both datastores
 //     to maintain consistency during the transition
 //  3. Once all reset keys are written, the datastores are atomically swapped
-//  4. The old datastore (now alternate) is cleaned up
+//  4. The active namespace marker is updated to persist the swap
+//  5. The old datastore (now alternate) is cleaned up
 //
 // Thread Safety:
 //   - All operations are processed sequentially by a single worker goroutine
@@ -53,9 +63,13 @@ type resetOp struct {
 type ResettableKeystore struct {
 	keystore
 
+	baseDs          ds.Batching // Unwrapped datastore for storing active namespace marker
 	altDs           ds.Batching
+	altSize         atomic.Int64
 	resetInProgress bool
-	resetOps        chan resetOp // reset operations that must be run in main go routine
+	activeNamespace byte
+	resetOps        chan resetOp  // reset operations that must be run in main go routine
+	altPutSem       chan struct{} // binary semaphore: empty when altPut running, has token when idle
 }
 
 var _ Keystore = (*ResettableKeystore)(nil)
@@ -64,24 +78,64 @@ var _ Keystore = (*ResettableKeystore)(nil)
 // provided datastore. It automatically adds "/0" and "/1" suffixes to the
 // configured datastore path to create two alternate storage locations for
 // atomic reset operations.
+//
+// On initialization, it checks for a persisted active namespace marker to
+// determine which namespace was active during the previous session. This
+// ensures keystore data persists correctly across restarts.
 func NewResettableKeystore(d ds.Batching, opts ...Option) (*ResettableKeystore, error) {
 	cfg, err := getOpts(opts)
 	if err != nil {
 		return nil, err
 	}
 
+	// Create namespaced datastores
+	baseDs := namespace.Wrap(d, ds.NewKey(cfg.path))
+	datastores := []ds.Batching{
+		namespace.Wrap(d, ds.NewKey(cfg.path+"/0")),
+		namespace.Wrap(d, ds.NewKey(cfg.path+"/1")),
+	}
+
+	// Check if there's a persisted active namespace marker
+	ctx := context.Background()
+	activeDs, err := baseDs.Get(ctx, activeNamespaceKey)
+	var primaryDs, altDs ds.Batching
+	var activeIdx byte
+	if err != nil {
+		if err != ds.ErrNotFound {
+			return nil, err
+		}
+		// No marker found, default to namespace 0 as primary
+		primaryDs = datastores[0]
+		altDs = datastores[1]
+		activeIdx = 0
+	} else {
+		// Marker found, use it to determine active namespace
+		if len(activeDs) != 1 {
+			return nil, fmt.Errorf("invalid active namespace marker length: %d", len(activeDs))
+		}
+		activeIdx = activeDs[0]
+		primaryDs = datastores[activeIdx]
+		altDs = datastores[1-activeIdx]
+	}
+
 	rks := &ResettableKeystore{
 		keystore: keystore{
-			ds:         namespace.Wrap(d, ds.NewKey(cfg.path+"/0")),
+			ds:         primaryDs,
 			prefixBits: cfg.prefixBits,
 			batchSize:  cfg.batchSize,
 			requests:   make(chan operation),
 			close:      make(chan struct{}),
 			done:       make(chan struct{}),
+			logger:     log.Logger(cfg.loggerName),
 		},
-		altDs:    namespace.Wrap(d, ds.NewKey(cfg.path+"/1")),
-		resetOps: make(chan resetOp),
+		baseDs:          baseDs,
+		altDs:           altDs,
+		activeNamespace: activeIdx,
+		resetOps:        make(chan resetOp),
+		altPutSem:       make(chan struct{}, 1),
 	}
+	// Initialize semaphore with token (altPut not running)
+	rks.altPutSem <- struct{}{}
 
 	// start worker goroutine
 	go rks.worker()
@@ -92,6 +146,7 @@ func NewResettableKeystore(d ds.Batching, opts ...Option) (*ResettableKeystore, 
 // worker processes operations sequentially in a single goroutine for ResettableKeystore
 func (s *ResettableKeystore) worker() {
 	defer close(s.done)
+	s.loadSize()
 
 	for {
 		select {
@@ -102,6 +157,13 @@ func (s *ResettableKeystore) worker() {
 			case opPut:
 				newKeys, err := s.put(op.ctx, op.keys)
 				op.response <- operationResponse{multihashes: newKeys, err: err}
+				if err != nil {
+					if size, err := refreshSize(op.ctx, s.ds); err == nil {
+						s.size = size
+					} else {
+						s.logger.Error("keystore: failed to refresh size after put: ", err)
+					}
+				}
 
 			case opGet:
 				keys, err := s.get(op.ctx, op.prefix)
@@ -114,14 +176,29 @@ func (s *ResettableKeystore) worker() {
 			case opDelete:
 				err := s.delete(op.ctx, op.keys)
 				op.response <- operationResponse{err: err}
+				if err != nil {
+					if size, err := refreshSize(op.ctx, s.ds); err == nil {
+						s.size = size
+					} else {
+						s.logger.Error("keystore: failed to refresh size after delete: ", err)
+					}
+				}
 
 			case opEmpty:
-				err := empty(op.ctx, s.ds, s.batchSize)
+				err := s.empty(op.ctx, s.ds)
 				op.response <- operationResponse{err: err}
+				if err == nil {
+					s.size = 0
+				} else {
+					if size, err := refreshSize(op.ctx, s.ds); err == nil {
+						s.size = size
+					} else {
+						s.logger.Error("keystore: failed to refresh size after empty: ", err)
+					}
+				}
 
 			case opSize:
-				size, err := s.size(op.ctx)
-				op.response <- operationResponse{size: size, err: err}
+				op.response <- operationResponse{size: s.size}
 			}
 		case op := <-s.resetOps:
 			s.handleResetOp(op)
@@ -135,7 +212,13 @@ func (s *ResettableKeystore) put(ctx context.Context, keys []mh.Multihash) ([]mh
 	if s.resetInProgress {
 		// Reset is in progress, write to alternate datastore in addition to
 		// current datastore
-		s.altPut(ctx, keys)
+		if err := s.altPut(ctx, keys); err != nil {
+			if size, err := refreshSize(ctx, s.altDs); err == nil {
+				s.altSize.Store(int64(size))
+			} else {
+				s.logger.Error("keystore: failed to refresh size after alt put: ", err)
+			}
+		}
 	}
 	return s.keystore.put(ctx, keys)
 }
@@ -146,23 +229,78 @@ func (s *ResettableKeystore) altPut(ctx context.Context, keys []mh.Multihash) er
 	if err != nil {
 		return err
 	}
+	seen := make(map[bit256.Key]struct{}, len(keys))
+	var added int64
 	for _, h := range keys {
-		dsk := dsKey(keyspace.MhToBit256(h), s.prefixBits)
-		if err := b.Put(ctx, dsk, h); err != nil {
+		k := keyspace.MhToBit256(h)
+		// Skip duplicates within this batch
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = struct{}{}
+
+		dsk := dsKey(k, s.prefixBits)
+		ok, err := s.altDs.Has(ctx, dsk)
+		if err != nil {
 			return err
 		}
+		if !ok {
+			if err := b.Put(ctx, dsk, h); err != nil {
+				return err
+			}
+			added++
+		}
 	}
-	return b.Commit(ctx)
+	s.altSize.Add(added)
+	if err := b.Commit(ctx); err != nil {
+		return fmt.Errorf("cannot commit keystore updates: %w", err)
+	}
+	if err = s.ds.Sync(ctx, ds.NewKey("")); err != nil {
+		s.logger.Warnf("keystore: failed to sync datastore after alt put: %v", err)
+	}
+	return nil
+}
+
+// tryAltPut is a concurrency-safe wrapper around altPut that coordinates with
+// Close() to prevent data races during reset operations.
+//
+// This method is called exclusively by ResetCids(), which runs outside the
+// worker goroutine. Since only one reset can be active at a time (enforced by
+// resetInProgress) and altPut calls within a reset are sequential, only one
+// tryAltPut executes at any given time. In contrast, regular Put operations
+// call altPut directly from within the worker goroutine, which Close() already
+// waits for via <-s.done.
+//
+// The binary semaphore (altPutSem) coordinates mutual exclusion with Close():
+//   - tryAltPut attempts a non-blocking acquire of the semaphore token
+//   - If successful, it proceeds with altPut and releases the token when done
+//   - If the token is unavailable, Close() must have acquired it, so this
+//     returns ErrClosed immediately
+//   - Close() blocks on acquiring the token until tryAltPut completes
+//
+// This prevents a TOCTOU race where Close() could begin persisting state
+// (via persistSize()) while altPut is concurrently accessing the datastore.
+func (s *ResettableKeystore) tryAltPut(ctx context.Context, keys []mh.Multihash) error {
+	select {
+	case <-s.altPutSem:
+	default: // Close took the token
+		return ErrClosed
+	}
+	err := s.altPut(ctx, keys)
+	s.altPutSem <- struct{}{}
+	return err
 }
 
 // handleResetOp processes reset operations that need to happen synchronously.
 func (s *ResettableKeystore) handleResetOp(op resetOp) {
+	ctx := context.Background()
 	if op.op == opStart {
 		if s.resetInProgress {
 			op.response <- ErrResetInProgress
 			return
 		}
-		if err := empty(context.Background(), s.altDs, s.batchSize); err != nil {
+		s.altSize.Store(0)
+		if err := s.empty(ctx, s.altDs); err != nil {
 			op.response <- err
 			return
 		}
@@ -177,10 +315,25 @@ func (s *ResettableKeystore) handleResetOp(op resetOp) {
 		oldDs := s.ds
 		s.ds = s.altDs
 		s.altDs = oldDs
+		s.size = int(s.altSize.Load())
+
+		// Toggle the active namespace index
+		s.activeNamespace = 1 - s.activeNamespace
+		// Persist the new active namespace
+		activeValue := []byte{s.activeNamespace}
+
+		// Write the active namespace marker
+		if err := s.baseDs.Put(ctx, activeNamespaceKey, activeValue); err != nil {
+			s.logger.Errorf("keystore: failed to persist active namespace marker: %v", err)
+		}
+		// Sync to ensure marker is persisted
+		if err := s.baseDs.Sync(ctx, activeNamespaceKey); err != nil {
+			s.logger.Warnf("keystore: failed to sync active namespace marker: %v", err)
+		}
 	}
 	// Empty the unused datastore.
 	s.resetInProgress = false
-	op.response <- empty(context.Background(), s.altDs, s.batchSize)
+	op.response <- s.empty(ctx, s.altDs)
 }
 
 // ResetCids atomically replaces all stored keys with the CIDs received from
@@ -227,9 +380,10 @@ func (s *ResettableKeystore) ResetCids(ctx context.Context, keysChan <-chan cid.
 		case s.resetOps <- resetOp{op: opCleanup, success: success, response: opsChan}:
 			<-opsChan
 		case <-s.done:
-			// Safe not to go through the worker since we are done, and we need to
-			// cleanup
-			empty(context.Background(), s.altDs, s.batchSize)
+			// Worker is done, which means the keystore is closing or has closed.
+			// The underlying datastore may already be closed, so attempting to
+			// empty it could cause a panic. Skip cleanup since the datastore
+			// will be cleaned up during normal shutdown.
 		}
 	}()
 
@@ -249,7 +403,7 @@ loop:
 			}
 			keys = append(keys, c.Hash())
 			if len(keys) >= s.batchSize {
-				if err := s.altPut(ctx, keys); err != nil {
+				if err := s.tryAltPut(ctx, keys); err != nil {
 					return err
 				}
 				keys = keys[:0]
@@ -257,10 +411,34 @@ loop:
 		}
 	}
 	// Put final batch
-	if err := s.altPut(ctx, keys); err != nil {
+	if err := s.tryAltPut(ctx, keys); err != nil {
 		return err
 	}
 	success = true
 
 	return nil
+}
+
+// Close shuts down the ResettableKeystore. It waits for any ongoing altPut
+// operations to complete before persisting state to avoid race conditions.
+func (s *ResettableKeystore) Close() error {
+	var err error
+	select {
+	case <-s.close:
+		// Already closed
+	default:
+		close(s.close)
+		<-s.done // Wait for worker to exit
+		// Wait for any ongoing altPut operations to complete by acquiring the
+		// semaphore token. This blocks if altPut is running, succeeds immediately
+		// if idle.
+		<-s.altPutSem
+		if err = s.persistSize(); err != nil {
+			return fmt.Errorf("error persisting size on close: %w", err)
+		}
+		if err = s.ds.Sync(context.Background(), sizeKey); err != nil {
+			return fmt.Errorf("error syncing size on close: %w", err)
+		}
+	}
+	return err
 }

@@ -14,7 +14,7 @@ type ReprovideQueue struct {
 	queue prefixQueue
 }
 
-// New creates a new ReprovideQueue instance.
+// NewReprovideQueue creates a new ReprovideQueue instance.
 func NewReprovideQueue() *ReprovideQueue {
 	return &ReprovideQueue{queue: prefixQueue{prefixes: trie.New[bitstr.Key, struct{}]()}}
 }
@@ -27,10 +27,10 @@ func NewReprovideQueue() *ReprovideQueue {
 // supplied prefix at the position of the first superstring in the queue, and
 // remove all superstrings from the queue. The prefixes are consolidated around
 // the shortest prefix.
-func (q *ReprovideQueue) Enqueue(prefix bitstr.Key) {
+func (q *ReprovideQueue) Enqueue(prefixes ...bitstr.Key) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	q.queue.Push(prefix)
+	q.queue.Push(prefixes...)
 }
 
 // Dequeue removes and returns the first prefix from the queue.

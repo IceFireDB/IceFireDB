@@ -200,7 +200,7 @@ github.com/cockroachdb/errors/withstack
 # github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b
 ## explicit; go 1.16
 github.com/cockroachdb/logtags
-# github.com/cockroachdb/pebble/v2 v2.1.0
+# github.com/cockroachdb/pebble/v2 v2.1.2
 ## explicit; go 1.23
 github.com/cockroachdb/pebble/v2
 github.com/cockroachdb/pebble/v2/batchrepr
@@ -355,9 +355,6 @@ github.com/filecoin-project/go-clock
 # github.com/flynn/noise v1.1.0
 ## explicit; go 1.16
 github.com/flynn/noise
-# github.com/francoispqt/gojay v1.2.13
-## explicit; go 1.12
-github.com/francoispqt/gojay
 # github.com/fsnotify/fsnotify v1.9.0
 ## explicit; go 1.17
 github.com/fsnotify/fsnotify
@@ -374,7 +371,7 @@ github.com/gabriel-vasile/mimetype/internal/scan
 # github.com/gammazero/chanqueue v1.1.1
 ## explicit; go 1.22
 github.com/gammazero/chanqueue
-# github.com/gammazero/deque v1.1.0
+# github.com/gammazero/deque v1.2.0
 ## explicit; go 1.23
 github.com/gammazero/deque
 # github.com/getsentry/sentry-go v0.27.0
@@ -490,7 +487,7 @@ github.com/ipfs-shipyard/nopfs/ipfs
 # github.com/ipfs/bbloom v0.0.4
 ## explicit; go 1.12
 github.com/ipfs/bbloom
-# github.com/ipfs/boxo v0.35.1
+# github.com/ipfs/boxo v0.35.2
 ## explicit; go 1.24.6
 github.com/ipfs/boxo/autoconf
 github.com/ipfs/boxo/bitswap
@@ -618,10 +615,10 @@ github.com/ipfs/go-ds-leveldb
 # github.com/ipfs/go-ds-measure v0.2.2
 ## explicit; go 1.23
 github.com/ipfs/go-ds-measure
-# github.com/ipfs/go-ds-pebble v0.5.3
+# github.com/ipfs/go-ds-pebble v0.5.7
 ## explicit; go 1.24
 github.com/ipfs/go-ds-pebble
-# github.com/ipfs/go-dsqueue v0.1.0
+# github.com/ipfs/go-dsqueue v0.1.1
 ## explicit; go 1.24.0
 github.com/ipfs/go-dsqueue
 # github.com/ipfs/go-fs-lock v0.1.1
@@ -656,7 +653,7 @@ github.com/ipfs/go-ipld-git
 # github.com/ipfs/go-ipld-legacy v0.2.2
 ## explicit; go 1.23.10
 github.com/ipfs/go-ipld-legacy
-# github.com/ipfs/go-log/v2 v2.8.2
+# github.com/ipfs/go-log/v2 v2.9.0
 ## explicit; go 1.24
 github.com/ipfs/go-log/v2
 # github.com/ipfs/go-metrics-interface v0.3.0
@@ -833,12 +830,11 @@ github.com/libp2p/go-doh-resolver
 # github.com/libp2p/go-flow-metrics v0.3.0
 ## explicit; go 1.23
 github.com/libp2p/go-flow-metrics
-# github.com/libp2p/go-libp2p v0.43.0
-## explicit; go 1.23.8
+# github.com/libp2p/go-libp2p v0.46.0
+## explicit; go 1.24.6
 github.com/libp2p/go-libp2p
 github.com/libp2p/go-libp2p/config
 github.com/libp2p/go-libp2p/core
-github.com/libp2p/go-libp2p/core/canonicallog
 github.com/libp2p/go-libp2p/core/connmgr
 github.com/libp2p/go-libp2p/core/control
 github.com/libp2p/go-libp2p/core/crypto
@@ -858,9 +854,9 @@ github.com/libp2p/go-libp2p/core/record
 github.com/libp2p/go-libp2p/core/record/pb
 github.com/libp2p/go-libp2p/core/routing
 github.com/libp2p/go-libp2p/core/sec
-github.com/libp2p/go-libp2p/core/sec/insecure
-github.com/libp2p/go-libp2p/core/sec/insecure/pb
 github.com/libp2p/go-libp2p/core/transport
+github.com/libp2p/go-libp2p/gologshim
+github.com/libp2p/go-libp2p/p2p/canonicallog
 github.com/libp2p/go-libp2p/p2p/discovery/backoff
 github.com/libp2p/go-libp2p/p2p/discovery/mdns
 github.com/libp2p/go-libp2p/p2p/discovery/routing
@@ -871,6 +867,7 @@ github.com/libp2p/go-libp2p/p2p/host/basic
 github.com/libp2p/go-libp2p/p2p/host/basic/internal/backoff
 github.com/libp2p/go-libp2p/p2p/host/blank
 github.com/libp2p/go-libp2p/p2p/host/eventbus
+github.com/libp2p/go-libp2p/p2p/host/observedaddrs
 github.com/libp2p/go-libp2p/p2p/host/peerstore
 github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem
 github.com/libp2p/go-libp2p/p2p/host/pstoremanager
@@ -901,6 +898,8 @@ github.com/libp2p/go-libp2p/p2p/protocol/identify
 github.com/libp2p/go-libp2p/p2p/protocol/identify/internal/user-agent
 github.com/libp2p/go-libp2p/p2p/protocol/identify/pb
 github.com/libp2p/go-libp2p/p2p/protocol/ping
+github.com/libp2p/go-libp2p/p2p/security/insecure
+github.com/libp2p/go-libp2p/p2p/security/insecure/pb
 github.com/libp2p/go-libp2p/p2p/security/noise
 github.com/libp2p/go-libp2p/p2p/security/noise/pb
 github.com/libp2p/go-libp2p/p2p/security/tls
@@ -918,8 +917,8 @@ github.com/libp2p/go-libp2p/x/rate
 # github.com/libp2p/go-libp2p-asn-util v0.4.1
 ## explicit; go 1.19
 github.com/libp2p/go-libp2p-asn-util
-# github.com/libp2p/go-libp2p-kad-dht v0.35.1
-## explicit; go 1.24.0
+# github.com/libp2p/go-libp2p-kad-dht v0.37.0
+## explicit; go 1.24.6
 github.com/libp2p/go-libp2p-kad-dht
 github.com/libp2p/go-libp2p-kad-dht/amino
 github.com/libp2p/go-libp2p-kad-dht/crawler
@@ -938,7 +937,9 @@ github.com/libp2p/go-libp2p-kad-dht/provider/internal
 github.com/libp2p/go-libp2p-kad-dht/provider/internal/connectivity
 github.com/libp2p/go-libp2p-kad-dht/provider/internal/keyspace
 github.com/libp2p/go-libp2p-kad-dht/provider/internal/queue
+github.com/libp2p/go-libp2p-kad-dht/provider/internal/timeseries
 github.com/libp2p/go-libp2p-kad-dht/provider/keystore
+github.com/libp2p/go-libp2p-kad-dht/provider/stats
 github.com/libp2p/go-libp2p-kad-dht/qpeerset
 github.com/libp2p/go-libp2p-kad-dht/records
 github.com/libp2p/go-libp2p-kad-dht/rtrefresh
@@ -1266,7 +1267,7 @@ github.com/polydawn/refmt/obj/atlas
 github.com/polydawn/refmt/pretty
 github.com/polydawn/refmt/shared
 github.com/polydawn/refmt/tok
-# github.com/probe-lab/go-libdht v0.3.0
+# github.com/probe-lab/go-libdht v0.4.0
 ## explicit; go 1.23
 github.com/probe-lab/go-libdht/kad
 github.com/probe-lab/go-libdht/kad/key
@@ -1289,13 +1290,14 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/quic-go/qpack v0.5.1
-## explicit; go 1.22
+# github.com/quic-go/qpack v0.6.0
+## explicit; go 1.24
 github.com/quic-go/qpack
-# github.com/quic-go/quic-go v0.55.0
+# github.com/quic-go/quic-go v0.57.1
 ## explicit; go 1.24
 github.com/quic-go/quic-go
 github.com/quic-go/quic-go/http3
+github.com/quic-go/quic-go/http3/qlog
 github.com/quic-go/quic-go/internal/ackhandler
 github.com/quic-go/quic-go/internal/congestion
 github.com/quic-go/quic-go/internal/flowcontrol
@@ -1307,9 +1309,9 @@ github.com/quic-go/quic-go/internal/utils
 github.com/quic-go/quic-go/internal/utils/linkedlist
 github.com/quic-go/quic-go/internal/utils/ringbuffer
 github.com/quic-go/quic-go/internal/wire
-github.com/quic-go/quic-go/logging
-github.com/quic-go/quic-go/metrics
 github.com/quic-go/quic-go/qlog
+github.com/quic-go/quic-go/qlogwriter
+github.com/quic-go/quic-go/qlogwriter/jsontext
 github.com/quic-go/quic-go/quicvarint
 # github.com/quic-go/webtransport-go v0.9.0
 ## explicit; go 1.23
@@ -1358,8 +1360,8 @@ github.com/siddontang/go-log/loggers
 # github.com/siddontang/rdb v0.0.0-20150307021120-fc89ed2e418d
 ## explicit
 github.com/siddontang/rdb
-# github.com/sirupsen/logrus v1.9.3
-## explicit; go 1.13
+# github.com/sirupsen/logrus v1.9.4
+## explicit; go 1.17
 github.com/sirupsen/logrus
 # github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8
 ## explicit; go 1.20
@@ -1625,7 +1627,7 @@ go.yaml.in/yaml/v3
 # go4.org v0.0.0-20230225012048-214862532bf5
 ## explicit; go 1.13
 go4.org/lock
-# golang.org/x/crypto v0.45.0
+# golang.org/x/crypto v0.47.0
 ## explicit; go 1.24.0
 golang.org/x/crypto/blake2b
 golang.org/x/crypto/blake2s
@@ -1643,18 +1645,18 @@ golang.org/x/crypto/salsa20
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/sha3
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/exp v0.0.0-20251009144603-d2f985daa21b
+# golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546
 ## explicit; go 1.24.0
 golang.org/x/exp/constraints
 golang.org/x/exp/mmap
 golang.org/x/exp/slices
-# golang.org/x/mod v0.29.0
+# golang.org/x/mod v0.31.0
 ## explicit; go 1.24.0
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/modfile
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.47.0
+# golang.org/x/net v0.49.0
 ## explicit; go 1.24.0
 golang.org/x/net/bpf
 golang.org/x/net/context
@@ -1673,11 +1675,11 @@ golang.org/x/net/ipv6
 golang.org/x/net/proxy
 golang.org/x/net/route
 golang.org/x/net/trace
-# golang.org/x/sync v0.18.0
+# golang.org/x/sync v0.19.0
 ## explicit; go 1.24.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.38.0
+# golang.org/x/sys v0.40.0
 ## explicit; go 1.24.0
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
@@ -1685,16 +1687,16 @@ golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/telemetry v0.0.0-20251008203120-078029d740a8
+# golang.org/x/telemetry v0.0.0-20251203150158-8fff8a5912fc
 ## explicit; go 1.24.0
 golang.org/x/telemetry/counter
 golang.org/x/telemetry/internal/counter
 golang.org/x/telemetry/internal/mmap
 golang.org/x/telemetry/internal/telemetry
-# golang.org/x/term v0.37.0
+# golang.org/x/term v0.39.0
 ## explicit; go 1.24.0
 golang.org/x/term
-# golang.org/x/text v0.31.0
+# golang.org/x/text v0.33.0
 ## explicit; go 1.24.0
 golang.org/x/text/cases
 golang.org/x/text/encoding
@@ -1715,7 +1717,7 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.12.0
 ## explicit; go 1.23.0
 golang.org/x/time/rate
-# golang.org/x/tools v0.38.0
+# golang.org/x/tools v0.40.0
 ## explicit; go 1.24.0
 golang.org/x/tools/cmd/goimports
 golang.org/x/tools/go/ast/astutil

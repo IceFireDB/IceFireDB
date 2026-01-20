@@ -1,3 +1,5 @@
+// Package queue provides queues for batching DHT provide operations by
+// Kademlia prefix, with optional datastore persistence.
 package queue
 
 import (
@@ -9,6 +11,8 @@ import (
 	"github.com/probe-lab/go-libdht/kad/key/bitstr"
 	"github.com/probe-lab/go-libdht/kad/trie"
 )
+
+var zeroKey = bit256.ZeroKey()
 
 // prefixQueue is a non-thread safe queue storing non overlapping, unique
 // prefixes of kademlia keys, in the order they were enqueued.
@@ -25,17 +29,19 @@ type prefixQueue struct {
 // supplied prefix at the position of the first superstring in the queue, and
 // remove all superstrings from the queue. The prefixes are consolidated around
 // the shortest prefix.
-func (q *prefixQueue) Push(prefix bitstr.Key) {
-	if firstRemovedIndex := q.removeSuperstrings(prefix); firstRemovedIndex >= 0 {
-		// `prefix` has superstrings in the queue. Remove them all and insert
-		// `prefix` in the queue at the location of the first removed superstring.
-		q.queue.Insert(firstRemovedIndex, prefix)
-		// Add `prefix` to prefixes trie.
-		q.prefixes.Add(prefix, struct{}{})
-	} else if _, ok := keyspace.FindPrefixOfKey(q.prefixes, prefix); !ok {
-		// No prefixes nor superstrings of `prefix` found in the queue.
-		q.queue.PushBack(prefix)
-		q.prefixes.Add(prefix, struct{}{})
+func (q *prefixQueue) Push(prefixes ...bitstr.Key) {
+	for _, prefix := range prefixes {
+		if firstRemovedIndex := q.removeSuperstrings(prefix); firstRemovedIndex >= 0 {
+			// `prefix` has superstrings in the queue. Remove them all and insert
+			// `prefix` in the queue at the location of the first removed superstring.
+			q.queue.Insert(firstRemovedIndex, prefix)
+			// Add `prefix` to prefixes trie.
+			q.prefixes.Add(prefix, struct{}{})
+		} else if _, ok := keyspace.FindPrefixOfKey(q.prefixes, prefix); !ok {
+			// No prefixes nor superstrings of `prefix` found in the queue.
+			q.queue.PushBack(prefix)
+			q.prefixes.Add(prefix, struct{}{})
+		}
 	}
 }
 
@@ -81,12 +87,7 @@ func (q *prefixQueue) removeSuperstrings(prefix bitstr.Key) int {
 	if !ok {
 		return -1
 	}
-	entries := keyspace.AllEntries(subtrie, bit256.ZeroKey())
-	toRemove := make([]bitstr.Key, len(entries))
-	for i, e := range entries {
-		toRemove[i] = e.Key
-	}
-	return q.removePrefixesFromQueue(toRemove)
+	return q.removePrefixesFromQueue(keyspace.AllKeys(subtrie, zeroKey))
 }
 
 // removeSubtrieFromQueue removes all keys in the provided subtrie from q.queue
