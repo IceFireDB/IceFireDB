@@ -1,6 +1,3 @@
-//go:build alltest
-// +build alltest
-
 package main
 
 import (
@@ -304,5 +301,159 @@ func TestStandardSCAN(t *testing.T) {
 	result = ay.([]interface{})
 	if len(result) < 1 {
 		t.Fatal("Expected at least cursor")
+	}
+}
+
+func TestScanArgsParsing(t *testing.T) {
+	c := getTestConn()
+	ctx := context.Background()
+
+	c.FlushAll(ctx)
+	defer c.FlushAll(ctx)
+
+	// Setup test data
+	for i := 0; i < 5; i++ {
+		if err := c.Set(ctx, fmt.Sprintf("arg_test_key_%d", i), "value", 0).Err(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Test SCAN with multiple options
+	ay, err := c.Do(ctx, "SCAN", "0", "MATCH", "arg_test_key_*", "COUNT", "5", "TYPE", "STRING").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, ok := ay.([]interface{})
+	if !ok || len(result) < 2 {
+		t.Fatal("Expected array with cursor and keys")
+	}
+
+	// Test SCAN with zero cursor (should work)
+	ay, err = c.Do(ctx, "SCAN", "0").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test SCAN with non-zero cursor
+	if result, ok := ay.([]interface{}); ok && len(result) >= 2 {
+		if cursor, ok := result[0].(string); ok && cursor != "" {
+			ay, err = c.Do(ctx, "SCAN", cursor).Result()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// Test HSCAN with MATCH and COUNT
+	key := "hscan_test_key"
+	c.Do(ctx, "HMSET", key, "field1", "value1", "field2", "value2")
+	ay, err = c.Do(ctx, "HSCAN", key, "0", "MATCH", "field*", "COUNT", "10").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, ok = ay.([]interface{})
+	if !ok || len(result) < 2 {
+		t.Fatal("HSCAN should return array with cursor and field-value pairs")
+	}
+
+	// Test SSCAN with MATCH and COUNT
+	skey := "sscan_test_key"
+	c.Do(ctx, "SADD", skey, "member1", "member2")
+	ay, err = c.Do(ctx, "SSCAN", skey, "0", "MATCH", "member*", "COUNT", "10").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, ok = ay.([]interface{})
+	if !ok || len(result) < 2 {
+		t.Fatal("SSCAN should return array with cursor and members")
+	}
+
+	// Test ZSCAN with MATCH and COUNT
+	zkey := "zscan_test_key"
+	c.Do(ctx, "ZADD", zkey, 1, "member1", 2, "member2")
+	ay, err = c.Do(ctx, "ZSCAN", zkey, "0", "MATCH", "member*", "COUNT", "10").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, ok = ay.([]interface{})
+	if !ok || len(result) < 2 {
+		t.Fatal("ZSCAN should return array with cursor and member-score pairs")
+	}
+
+	// Test XSCAN with DESC option
+	keyType := "KV"
+	ay, err = c.Do(ctx, "XSCAN", keyType, "", "COUNT", "3", "DESC").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, ok = ay.([]interface{})
+	if !ok || len(result) < 2 {
+		t.Fatal("XSCAN with DESC should return array")
+	}
+
+	// Test XSCAN with ASC option
+	ay, err = c.Do(ctx, "XSCAN", keyType, "", "COUNT", "3", "ASC").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, ok = ay.([]interface{})
+	if !ok || len(result) < 2 {
+		t.Fatal("XSCAN with ASC should return array")
+	}
+
+	// Test XHSCAN with DESC
+	hxKey := "xhscan_test"
+	c.Do(ctx, "HMSET", hxKey, "f1", "v1", "f2", "v2")
+	ay, err = c.Do(ctx, "XHSCAN", hxKey, "", "COUNT", "5", "DESC").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, ok = ay.([]interface{})
+	if !ok || len(result) < 2 {
+		t.Fatal("XHSCAN with DESC should return array")
+	}
+
+	// Test XSSCAN with DESC
+	sxKey := "xsscan_test"
+	c.Do(ctx, "SADD", sxKey, "m1", "m2", "m3")
+	ay, err = c.Do(ctx, "XSSCAN", sxKey, "", "COUNT", "5", "DESC").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, ok = ay.([]interface{})
+	if !ok || len(result) < 2 {
+		t.Fatal("XSSCAN with DESC should return array")
+	}
+
+	// Test XZSCAN with DESC
+	zxKey := "xzscan_test"
+	c.Do(ctx, "ZADD", zxKey, 1, "m1", 2, "m2", 3, "m3")
+	ay, err = c.Do(ctx, "XZSCAN", zxKey, "", "COUNT", "5", "DESC").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, ok = ay.([]interface{})
+	if !ok || len(result) < 2 {
+		t.Fatal("XZSCAN with DESC should return array")
+	}
+
+	// Test XSCAN with empty MATCH (should match all)
+	ay, err = c.Do(ctx, "XSCAN", keyType, "", "MATCH", "", "COUNT", "5").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, ok = ay.([]interface{})
+	if !ok {
+		t.Fatal("XSCAN with empty MATCH should return array")
 	}
 }

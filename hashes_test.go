@@ -1,12 +1,10 @@
-//go:build alltest
-// +build alltest
-
 package main
 
 import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/spf13/cast"
 )
@@ -351,5 +349,175 @@ func TestHashEnhancedHGET(t *testing.T) {
 
 	if valStr != specialValue {
 		t.Fatalf("Expected '%s', got '%s'", specialValue, valStr)
+	}
+}
+
+func TestHashExpirationCommands(t *testing.T) {
+	c := getTestConn()
+	ctx := context.Background()
+	key := "hash_expire_test"
+
+	// Setup hash with fields
+	if _, err := c.Do(ctx, "hmset", key, "field1", "value1", "field2", "value2").Result(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Test HEXPIRE (relative expiration)
+	if n, err := c.Do(ctx, "hexpire", key, 100).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 1 {
+		t.Fatalf("HEXPIRE should return 1, got %d", n)
+	}
+
+	// Test HTTL
+	if ttl, err := c.Do(ctx, "httl", key).Int64(); err != nil {
+		t.Fatal(err)
+	} else if ttl <= 0 || ttl > 100 {
+		t.Logf("TTL value: %d (may vary)", ttl)
+	}
+
+	// Test HEXPIREAT (absolute expiration)
+	key2 := "hash_expireat_test"
+	c.Do(ctx, "hmset", key2, "f1", "v1")
+	futureTime := time.Now().Unix() + 200
+	if n, err := c.Do(ctx, "hexpireat", key2, futureTime).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 1 {
+		t.Fatalf("HEXPIREAT should return 1, got %d", n)
+	}
+
+	// Verify TTL
+	if ttl, err := c.Do(ctx, "httl", key2).Int64(); err != nil {
+		t.Fatal(err)
+	} else if ttl <= 190 || ttl > 201 {
+		t.Fatalf("Expected TTL between 190-201, got %d", ttl)
+	}
+
+	// Test HEXPIRE with past time (should delete key)
+	key3 := "hash_expire_past"
+	c.Do(ctx, "hmset", key3, "f1", "v1")
+	if n, err := c.Do(ctx, "hexpire", key3, -100).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatalf("HEXPIRE with past time should return 0, got %d", n)
+	}
+
+	// Key should not exist
+	if n, err := c.Do(ctx, "hkeyexists", key3).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatal("Key should not exist after expiration")
+	}
+
+	// Test HEXPIREAT with past timestamp
+	key4 := "hash_expireat_past"
+	c.Do(ctx, "hmset", key4, "f1", "v1")
+	pastTime := time.Now().Unix() - 100
+	if n, err := c.Do(ctx, "hexpireat", key4, pastTime).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatalf("HEXPIREAT with past time should return 0, got %d", n)
+	}
+
+	// Key should not exist
+	if n, err := c.Do(ctx, "hkeyexists", key4).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatal("Key should not exist after expiration")
+	}
+}
+
+func TestHashClearCommands(t *testing.T) {
+	c := getTestConn()
+	ctx := context.Background()
+
+	// Test HCLEAR
+	key := "hash_clear_test"
+	if _, err := c.Do(ctx, "hmset", key, "f1", "v1", "f2", "v2", "f3", "v3").Result(); err != nil {
+		t.Fatal(err)
+	}
+
+	if n, err := c.Do(ctx, "hlen", key).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 3 {
+		t.Fatalf("Expected 3 fields, got %d", n)
+	}
+
+	if n, err := c.Do(ctx, "hclear", key).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 3 {
+		t.Fatalf("HCLEAR should return 3, got %d", n)
+	}
+
+	if n, err := c.Do(ctx, "hlen", key).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatalf("Expected 0 fields after HCLEAR, got %d", n)
+	}
+
+	// Test HMCLEAR
+	key1 := "hmclear_test1"
+	key2 := "hmclear_test2"
+	c.Do(ctx, "hmset", key1, "f1", "v1")
+	c.Do(ctx, "hmset", key2, "f1", "v1", "f2", "v2")
+
+	if n, err := c.Do(ctx, "hmclear", key1, key2).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 2 {
+		t.Fatalf("HMCLEAR should return 2, got %d", n)
+	}
+
+	// Both keys should not exist
+	if n, err := c.Do(ctx, "hkeyexists", key1).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatalf("Key1 should not exist after HMCLEAR, got %d", n)
+	}
+
+	if n, err := c.Do(ctx, "hkeyexists", key2).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatalf("Key2 should not exist after HMCLEAR, got %d", n)
+	}
+}
+
+func TestHashHSETNX(t *testing.T) {
+	c := getTestConn()
+	ctx := context.Background()
+	key := "hash_setnx_test"
+
+	// First HSETNX should succeed
+	if n, err := c.Do(ctx, "hsetnx", key, "field1", "value1").Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 1 {
+		t.Fatalf("HSETNX on new field should return 1, got %d", n)
+	}
+
+	// Verify value
+	if v, err := c.Do(ctx, "hget", key, "field1").Result(); err != nil {
+		t.Fatal(err)
+	} else if v != "value1" {
+		t.Fatalf("Expected 'value1', got %v", v)
+	}
+
+	// Second HSETNX on existing field should fail
+	if n, err := c.Do(ctx, "hsetnx", key, "field1", "value2").Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatalf("HSETNX on existing field should return 0, got %d", n)
+	}
+
+	// Value should be unchanged
+	if v, err := c.Do(ctx, "hget", key, "field1").Result(); err != nil {
+		t.Fatal(err)
+	} else if v != "value1" {
+		t.Fatalf("Value should be unchanged, got %v", v)
+	}
+
+	// HSETNX on new field should succeed
+	if n, err := c.Do(ctx, "hsetnx", key, "field2", "value2").Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 1 {
+		t.Fatalf("HSETNX on new field should return 1, got %d", n)
 	}
 }
