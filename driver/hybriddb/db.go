@@ -365,6 +365,8 @@ func (db *DB) Delete(key []byte) error {
 
 	db.invalidateListCacheWithLockHeld(key)
 
+	db.cache.Del(string(key))
+
 	return nil
 }
 
@@ -390,6 +392,8 @@ func (db *DB) SyncDelete(key []byte) error {
 	}
 
 	db.invalidateListCacheWithLockHeld(key)
+
+	db.cache.Del(string(key))
 
 	return nil
 }
