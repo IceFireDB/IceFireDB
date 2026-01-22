@@ -31,7 +31,7 @@ require (
 require (
 	berty.tech/go-ipfs-log v1.10.2 // indirect
 	github.com/IceFireDB/components-go v1.2.0
-	github.com/alicebob/miniredis/v2 v2.35.0
+	github.com/alicebob/miniredis/v2 v2.36.0
 	github.com/chasex/redis-go-cluster v1.0.0
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/ipfs/go-cid v0.6.0
