@@ -326,8 +326,8 @@ github.com/dgraph-io/badger/v4/y
 github.com/dgraph-io/ristretto
 github.com/dgraph-io/ristretto/z
 github.com/dgraph-io/ristretto/z/simd
-# github.com/dgraph-io/ristretto/v2 v2.3.0
-## explicit; go 1.23.0
+# github.com/dgraph-io/ristretto/v2 v2.4.0
+## explicit; go 1.24.0
 github.com/dgraph-io/ristretto/v2
 github.com/dgraph-io/ristretto/v2/z
 github.com/dgraph-io/ristretto/v2/z/simd
