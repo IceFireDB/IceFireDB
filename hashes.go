@@ -63,11 +63,7 @@ func cmdHGET(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	if len(val) == 0 {
-		return nil, nil
-	}
-
-	return redcon.SimpleString(val), nil
+	return val, nil
 }
 
 // HDEL key field [field ...]

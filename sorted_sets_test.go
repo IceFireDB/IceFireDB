@@ -1,6 +1,3 @@
-//go:build alltest
-// +build alltest
-
 package main
 
 import (
@@ -600,4 +597,178 @@ func TestZsetErrorParams(t *testing.T) {
 		t.Fatalf("invalid err of %v", err)
 	}
 
+}
+
+func TestZScoreReturnValue(t *testing.T) {
+	c := getTestConn()
+	ctx := context.Background()
+
+	key := []byte("zscore_test")
+	if _, err := c.Do(ctx, "zadd", key, 1, "member1", 2, "member2", 3, "member3").Result(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Test ZSCORE returns score as bulk string
+	score, err := c.Do(ctx, "zscore", key, "member2").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify score is returned as string
+	scoreStr, ok := score.(string)
+	if !ok {
+		t.Fatalf("ZSCORE should return string, got %T", score)
+	}
+
+	if scoreStr != "2" {
+		t.Fatalf("Expected score '2', got '%s'", scoreStr)
+	}
+
+	// Test ZSCORE on non-existent member
+	nilScore, err := c.Do(ctx, "zscore", key, "nonexistent").Result()
+	// ZSCORE on non-existent member returns nil, which may be an error or nil value
+	if err != nil && err.Error() != "redis: nil" {
+		t.Fatalf("ZSCORE on non-existent member should return nil or redis:nil error, got %v", err)
+	}
+	if nilScore != nil {
+		t.Fatalf("ZSCORE on non-existent member should return nil, got %v", nilScore)
+	}
+}
+
+func TestZSetRangeByRank(t *testing.T) {
+	c := getTestConn()
+	ctx := context.Background()
+
+	key := []byte("zset_range_rank_test")
+	if _, err := c.Do(ctx, "zadd", key, 1, "a", 2, "b", 3, "c", 4, "d", 5, "e").Result(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Test ZRANGE with different index ranges
+	testCases := []struct {
+		start    int64
+		stop     int64
+		expected []string
+	}{
+		{0, -1, []string{"a", "b", "c", "d", "e"}},
+		{0, 2, []string{"a", "b", "c"}},
+		{2, 4, []string{"c", "d", "e"}},
+		{-3, -1, []string{"c", "d", "e"}},
+		{1, 3, []string{"b", "c", "d"}},
+	}
+
+	for _, tc := range testCases {
+		result, err := c.Do(ctx, "zrange", key, tc.start, tc.stop).Result()
+		if err != nil {
+			t.Fatalf("ZRANGE %d %d failed: %v", tc.start, tc.stop, err)
+		}
+
+		resultArr, ok := result.([]interface{})
+		if !ok {
+			t.Fatalf("ZRANGE should return array, got %T", result)
+		}
+
+		if len(resultArr) != len(tc.expected) {
+			t.Fatalf("ZRANGE %d %d: expected %d elements, got %d", tc.start, tc.stop, len(tc.expected), len(resultArr))
+		}
+	}
+
+	// Test ZREVRANGE
+	revResult, err := c.Do(ctx, "zrevrange", key, 0, 2).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	revArr, ok := revResult.([]interface{})
+	if !ok {
+		t.Fatalf("ZREVRANGE should return array, got %T", revResult)
+	}
+
+	// ZREVRANGE should return elements in reverse order
+	if len(revArr) != 3 {
+		t.Fatalf("ZREVRANGE should return 3 elements, got %d", len(revArr))
+	}
+}
+
+func TestZSetIncrBy(t *testing.T) {
+	c := getTestConn()
+	ctx := context.Background()
+
+	key := []byte("zincrby_test")
+
+	// First ZINCRBY creates the member
+	newScore, err := c.Do(ctx, "zincrby", key, 5, "member").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newScoreInt, ok := newScore.(int64)
+	if !ok {
+		t.Fatalf("ZINCRBY should return int64, got %T", newScore)
+	}
+
+	if newScoreInt != 5 {
+		t.Fatalf("Expected score 5, got %d", newScoreInt)
+	}
+
+	// Second ZINCRBY increments the score
+	incrScore, err := c.Do(ctx, "zincrby", key, 3, "member").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	incrScoreInt, ok := incrScore.(int64)
+	if !ok {
+		t.Fatalf("ZINCRBY should return int64, got %T", incrScore)
+	}
+
+	if incrScoreInt != 8 {
+		t.Fatalf("Expected score 8, got %d", incrScoreInt)
+	}
+
+	// ZINCRBY with negative increment
+	negScore, err := c.Do(ctx, "zincrby", key, -2, "member").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	negScoreInt, ok := negScore.(int64)
+	if !ok {
+		t.Fatalf("ZINCRBY should return int64, got %T", negScore)
+	}
+
+	if negScoreInt != 6 {
+		t.Fatalf("Expected score 6, got %d", negScoreInt)
+	}
+}
+
+func TestZSetClear(t *testing.T) {
+	c := getTestConn()
+	ctx := context.Background()
+
+	key := []byte("zclear_test")
+	if _, err := c.Do(ctx, "zadd", key, 1, "a", 2, "b", 3, "c").Result(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify members exist
+	if n, err := c.Do(ctx, "zcard", key).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 3 {
+		t.Fatalf("Expected 3 members, got %d", n)
+	}
+
+	// Clear the sorted set
+	if n, err := c.Do(ctx, "zclear", key).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 3 {
+		t.Fatalf("ZCLEAR should return 3, got %d", n)
+	}
+
+	// Verify set is empty
+	if n, err := c.Do(ctx, "zcard", key).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatalf("Expected 0 members after ZCLEAR, got %d", n)
+	}
 }

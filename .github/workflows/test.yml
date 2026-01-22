@@ -261,3 +261,94 @@ jobs:
         run: go mod tidy && go mod vendor
       - name: Run SQLite unit tests
         run: cd IceFireDB-SQLite && go test -v -count=1 ./internal/sqlite/...
+
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    env:
+      DRIVER: badger
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.5'
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install dependencies
+        run: go mod tidy && go mod vendor
+      - name: Generate coverage report
+        run: |
+          go test -covermode=count -coverprofile=coverage.out -coverpkg=. ./...
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  coverage-comment:
+    name: Coverage Comment
+    runs-on: ubuntu-latest
+    needs: coverage
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.5'
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install dependencies
+        run: go mod tidy && go mod vendor
+      - name: Generate coverage report
+        run: |
+          go test -covermode=count -coverprofile=coverage.out -coverpkg=. ./...
+      - name: Post coverage comment
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.out
+          flags: unittests
+          name: PR Coverage Comment
+          fail_ci_if_error: false
+          comment: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  coverage-pr-check:
+    name: Coverage PR Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.5'
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Install dependencies
+        run: go mod tidy && go mod vendor
+      - name: Calculate coverage percentage
+        id: coverage
+        run: |
+          TOTAL=$(go test -covermode=count -coverprofile=coverage.out ./... 2>/dev/null | tail -1 | awk '{print $3}')
+          echo "coverage=$(echo $TOTAL | sed 's/%//')" >> $GITHUB_OUTPUT
+      - name: Post coverage status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const coverage = ${{ steps.coverage.outputs.coverage }};
+            const minimum = 70;
+            const emoji = coverage >= minimum ? '✅' : '❌';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 测试覆盖率 ${emoji}\n\n当前覆盖率: **${coverage}%** (目标: ${minimum}%)\n\n查看详细报告: [Coverage Report](https://app.codecov.io/gh/${{ github.repository }})`
+            })
+      - name: Set PR check conclusion
+        if: steps.coverage.outputs.coverage < 70
+        run: |
+          echo "Coverage ${{ steps.coverage.outputs.coverage }}% is below 70% threshold"

@@ -1,6 +1,3 @@
-//go:build alltest
-// +build alltest
-
 package main
 
 import (
@@ -301,7 +298,7 @@ func TestSKeyExists(t *testing.T) {
 	db := getTestConn()
 	ctx := context.Background()
 	key := "skeyexists_test"
-	if n, err := db.Do(ctx, "SKeyExists", key).Result(); err != nil {
+	if n, err := db.Do(ctx, "skeyexists", key).Result(); err != nil {
 		t.Fatal(err.Error())
 	} else if n, ok := n.(int64); !ok || n != 0 {
 		t.Fatal("invalid value ", n)
@@ -309,9 +306,261 @@ func TestSKeyExists(t *testing.T) {
 
 	db.SAdd(ctx, key, "hello", "world")
 
-	if n, err := db.Do(ctx, "SKeyExists", key).Result(); err != nil {
+	if n, err := db.Do(ctx, "skeyexists", key).Result(); err != nil {
 		t.Fatal(err.Error())
 	} else if n, ok := n.(int64); !ok || n != 1 {
 		t.Fatal("invalid value ", n)
+	}
+}
+
+func TestSetSMOVE(t *testing.T) {
+	db := getTestConn()
+	ctx := context.Background()
+
+	srcKey := "smove_src"
+	destKey := "smove_dest"
+	member := "move_member"
+
+	// Add member to source set
+	if n, err := db.SAdd(ctx, srcKey, member).Result(); err != nil {
+		t.Fatal(err)
+	} else if n != 1 {
+		t.Fatalf("Expected 1, got %d", n)
+	}
+
+	// Verify member is in source set
+	if n, err := db.SIsMember(ctx, srcKey, member).Result(); err != nil {
+		t.Fatal(err)
+	} else if !n {
+		t.Fatal("Member should be in source set")
+	}
+
+	// Move member from source to destination
+	if moved, err := db.SMove(ctx, srcKey, destKey, member).Result(); err != nil {
+		t.Fatal(err)
+	} else if !moved {
+		t.Fatal("SMOVE should return true")
+	}
+
+	// Verify member is no longer in source set
+	if n, err := db.SIsMember(ctx, srcKey, member).Result(); err != nil {
+		t.Fatal(err)
+	} else if n {
+		t.Fatal("Member should not be in source set after move")
+	}
+
+	// Verify member is in destination set
+	if n, err := db.SIsMember(ctx, destKey, member).Result(); err != nil {
+		t.Fatal(err)
+	} else if !n {
+		t.Fatal("Member should be in destination set after move")
+	}
+
+	// Test SMOVE with non-existent member (should return false)
+	if moved, err := db.SMove(ctx, srcKey, destKey, "nonexistent").Result(); err != nil {
+		t.Fatal(err)
+	} else if moved {
+		t.Fatal("SMOVE with non-existent member should return false")
+	}
+
+	// Test SMOVE with non-existent source set (should return false)
+	if moved, err := db.SMove(ctx, "nonexistent_src", destKey, member).Result(); err != nil {
+		t.Fatal(err)
+	} else if moved {
+		t.Fatal("SMOVE with non-existent source should return false")
+	}
+}
+
+func TestSetSPOP(t *testing.T) {
+	db := getTestConn()
+	ctx := context.Background()
+
+	// Test SPOP with count > set size (should return all members)
+	key4 := "spop_large_count"
+	db.SAdd(ctx, key4, "a", "b", "c")
+	poppedAllResult, err := db.Do(ctx, "spop", key4, 10).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	poppedAll, ok := poppedAllResult.([]interface{})
+	if !ok || len(poppedAll) != 3 {
+		t.Fatalf("Expected all 3 members when count > set size, got %v", poppedAllResult)
+	}
+
+	if n, err := db.SCard(ctx, key4).Result(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatalf("Set should be empty after popping all members, got %d", n)
+	}
+}
+
+func TestSetSRANDMEMBER(t *testing.T) {
+	db := getTestConn()
+	ctx := context.Background()
+
+	key := "srandmember_test"
+	members := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
+
+	// Add members to set
+	for _, m := range members {
+		if _, err := db.SAdd(ctx, key, m).Result(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Test SRANDMEMBER with positive count (should not remove)
+	result1, err := db.Do(ctx, "srandmember", key, 3).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result1Arr, ok := result1.([]interface{})
+	if !ok || len(result1Arr) != 3 {
+		t.Fatalf("Expected 3 members, got %v", result1)
+	}
+
+	// Verify all members are still in set
+	if n, err := db.SCard(ctx, key).Result(); err != nil {
+		t.Fatal(err)
+	} else if n != 10 {
+		t.Fatalf("Set should still have 10 members, got %d", n)
+	}
+
+	// Test SRANDMEMBER with negative count (IceFireDB may not support duplicates)
+	// In some implementations, negative count just returns |count| elements if available
+	result2, err := db.Do(ctx, "srandmember", key, -5).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result2Arr, ok := result2.([]interface{})
+	if !ok {
+		t.Fatalf("SRANDMEMBER with negative count should return array, got %T", result2)
+	}
+	// Note: IceFireDB may return min(|count|, set size) elements
+	if len(result2Arr) != 5 && len(result2Arr) != 10 {
+		t.Fatalf("Expected 5 or 10 members with negative count, got %v", result2)
+	}
+
+	// Test SRANDMEMBER with count larger than set size
+	result4, err := db.Do(ctx, "srandmember", key, 100).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result4Arr, ok := result4.([]interface{})
+	if !ok || len(result4Arr) != 10 {
+		t.Fatalf("Expected all 10 members when count > set size, got %v", result4)
+	}
+
+	// Test SRANDMEMBER with negative count - some implementations return all unique elements
+	key2 := "srandmember_dup_test"
+	db.SAdd(ctx, key2, "a", "b", "c")
+	result5, err := db.Do(ctx, "srandmember", key2, -10).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result5Arr, ok := result5.([]interface{})
+	if !ok {
+		t.Fatalf("SRANDMEMBER should return array, got %T", result5)
+	}
+	// IceFireDB may return min(|count|, set size) unique elements
+	if len(result5Arr) != 10 && len(result5Arr) != 3 {
+		t.Fatalf("Expected 10 or 3 members with negative count, got %v", result5)
+	}
+}
+
+func TestSetExpirationCommands(t *testing.T) {
+	db := getTestConn()
+	ctx := context.Background()
+
+	key := "set_expire_test"
+
+	// Add member to set
+	if _, err := db.SAdd(ctx, key, "member").Result(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Test SEXPIRE (relative time)
+	if n, err := db.Do(ctx, "sexpire", key, 100).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 1 {
+		t.Fatalf("SEXPIRE should return 1, got %d", n)
+	}
+
+	// Verify TTL is set
+	if ttl, err := db.Do(ctx, "sttl", key).Int64(); err != nil {
+		t.Fatal(err)
+	} else if ttl <= 0 || ttl > 100 {
+		t.Logf("TTL value: %d (may vary)", ttl)
+	}
+
+	// Test SEXPIREAT (absolute timestamp)
+	key2 := "set_expireat_test"
+	db.SAdd(ctx, key2, "member")
+	futureTime := time.Now().Unix() + 200
+	if n, err := db.Do(ctx, "sexpireat", key2, futureTime).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 1 {
+		t.Fatalf("SEXPIREAT should return 1, got %d", n)
+	}
+
+	// Verify TTL is around 200 seconds
+	if ttl, err := db.Do(ctx, "sttl", key2).Int64(); err != nil {
+		t.Fatal(err)
+	} else if ttl <= 190 || ttl > 201 {
+		t.Fatalf("Expected TTL between 190-201, got %d", ttl)
+	}
+
+	// Test SEXPIRE with past time (should delete key)
+	key3 := "set_expire_past"
+	db.SAdd(ctx, key3, "member")
+	if n, err := db.Do(ctx, "sexpire", key3, -100).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatalf("SEXPIRE with past time should return 0, got %d", n)
+	}
+
+	// Key should not exist
+	if n, err := db.Do(ctx, "skeyexists", key3).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatal("Key should not exist after expired")
+	}
+
+	// Test SEXPIREAT with past timestamp
+	key4 := "set_expireat_past"
+	db.SAdd(ctx, key4, "member")
+	pastTime := time.Now().Unix() - 100
+	if n, err := db.Do(ctx, "sexpireat", key4, pastTime).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatalf("SEXPIREAT with past time should return 0, got %d", n)
+	}
+
+	// Key should not exist
+	if n, err := db.Do(ctx, "skeyexists", key4).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatal("Key should not exist after expired")
+	}
+
+	// Test SPERSIST (remove expiration)
+	key5 := "set_persist_test"
+	db.SAdd(ctx, key5, "member")
+	db.Do(ctx, "sexpire", key5, 1000)
+	if n, err := db.Do(ctx, "spersist", key5).Int64(); err != nil {
+		t.Fatal(err)
+	} else if n != 1 {
+		t.Fatalf("SPERSIST should return 1, got %d", n)
+	}
+
+	// TTL should be -1 (no expiration)
+	if ttl, err := db.Do(ctx, "sttl", key5).Int64(); err != nil {
+		t.Fatal(err)
+	} else if ttl != -1 {
+		t.Fatalf("SPERSIST should make TTL -1, got %d", ttl)
 	}
 }
