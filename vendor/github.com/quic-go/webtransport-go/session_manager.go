@@ -2,195 +2,178 @@ package webtransport
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/quic-go/quic-go"
-	"github.com/quic-go/quic-go/http3"
-	"github.com/quic-go/quic-go/quicvarint"
 )
 
-// session is the map value in the conns map
-type session struct {
-	created chan struct{} // is closed once the session map has been initialized
-	counter int           // how many streams are waiting for this session to be established
-	conn    *Session
+type unestablishedSession struct {
+	Streams    []*quic.Stream
+	UniStreams []*quic.ReceiveStream
+
+	Timer *time.Timer
 }
 
-type sessionManager struct {
-	refCount  sync.WaitGroup
-	ctx       context.Context
-	ctxCancel context.CancelFunc
+type sessionEntry struct {
+	// at any point in time, only one of these will be non-nil
+	Unestablished *unestablishedSession
+	Session       *Session
+}
 
+const maxRecentlyClosedSessions = 16
+
+type sessionManager struct {
 	timeout time.Duration
 
-	mx    sync.Mutex
-	conns map[quic.ConnectionTracingID]map[sessionID]*session
+	mx                     sync.Mutex
+	sessions               map[sessionID]sessionEntry
+	recentlyClosedSessions []sessionID
 }
 
 func newSessionManager(timeout time.Duration) *sessionManager {
-	m := &sessionManager{
-		timeout: timeout,
-		conns:   make(map[quic.ConnectionTracingID]map[sessionID]*session),
+	return &sessionManager{
+		timeout:  timeout,
+		sessions: make(map[sessionID]sessionEntry),
 	}
-	m.ctx, m.ctxCancel = context.WithCancel(context.Background())
-	return m
 }
 
 // AddStream adds a new bidirectional stream to a WebTransport session.
 // If the WebTransport session has not yet been established,
-// it starts a new go routine and waits for establishment of the session.
+// the stream is buffered until the session is established.
 // If that takes longer than timeout, the stream is reset.
-func (m *sessionManager) AddStream(connTracingID quic.ConnectionTracingID, str *quic.Stream, id sessionID) {
-	sess, isExisting := m.getOrCreateSession(connTracingID, id)
-	if isExisting {
-		sess.conn.addIncomingStream(str)
-		return
-	}
+func (m *sessionManager) AddStream(str *quic.Stream, id sessionID) {
+	m.mx.Lock()
+	defer m.mx.Unlock()
 
-	m.refCount.Add(1)
-	go func() {
-		defer m.refCount.Done()
-		m.handleStream(str, sess)
-
-		m.mx.Lock()
-		defer m.mx.Unlock()
-
-		sess.counter--
-		// Once no more streams are waiting for this session to be established,
-		// and this session is still outstanding, delete it from the map.
-		if sess.counter == 0 && sess.conn == nil {
-			m.maybeDelete(connTracingID, id)
+	entry, ok := m.sessions[id]
+	if !ok {
+		// Receiving a stream for an unknown session is expected to be rare,
+		// so the performance impact of searching through the slice is negligible.
+		if slices.Contains(m.recentlyClosedSessions, id) {
+			str.CancelRead(WTBufferedStreamRejectedErrorCode)
+			str.CancelWrite(WTBufferedStreamRejectedErrorCode)
+			return
 		}
-	}()
-}
-
-func (m *sessionManager) maybeDelete(connTracingID quic.ConnectionTracingID, id sessionID) {
-	sessions, ok := m.conns[connTracingID]
-	if !ok { // should never happen
+		entry = sessionEntry{Unestablished: &unestablishedSession{}}
+		m.sessions[id] = entry
+	}
+	if entry.Session != nil {
+		entry.Session.addIncomingStream(str)
 		return
 	}
-	delete(sessions, id)
-	if len(sessions) == 0 {
-		delete(m.conns, connTracingID)
-	}
+
+	entry.Unestablished.Streams = append(entry.Unestablished.Streams, str)
+	m.resetTimer(id)
 }
 
 // AddUniStream adds a new unidirectional stream to a WebTransport session.
 // If the WebTransport session has not yet been established,
-// it starts a new go routine and waits for establishment of the session.
+// the stream is buffered until the session is established.
 // If that takes longer than timeout, the stream is reset.
-func (m *sessionManager) AddUniStream(connTracingID quic.ConnectionTracingID, str *quic.ReceiveStream) {
-	idv, err := quicvarint.Read(quicvarint.NewReader(str))
-	if err != nil {
-		str.CancelRead(1337)
-	}
-	id := sessionID(idv)
+func (m *sessionManager) AddUniStream(str *quic.ReceiveStream, id sessionID) {
+	m.mx.Lock()
+	defer m.mx.Unlock()
 
-	sess, isExisting := m.getOrCreateSession(connTracingID, id)
-	if isExisting {
-		sess.conn.addIncomingUniStream(str)
+	entry, ok := m.sessions[id]
+	if !ok {
+		// Receiving a stream for an unknown session is expected to be rare,
+		// so the performance impact of searching through the slice is negligible.
+		if slices.Contains(m.recentlyClosedSessions, id) {
+			str.CancelRead(WTBufferedStreamRejectedErrorCode)
+			return
+		}
+		entry = sessionEntry{Unestablished: &unestablishedSession{}}
+		m.sessions[id] = entry
+	}
+	if entry.Session != nil {
+		entry.Session.addIncomingUniStream(str)
 		return
 	}
 
-	m.refCount.Add(1)
-	go func() {
-		defer m.refCount.Done()
-		m.handleUniStream(str, sess)
-
-		m.mx.Lock()
-		defer m.mx.Unlock()
-
-		sess.counter--
-		// Once no more streams are waiting for this session to be established,
-		// and this session is still outstanding, delete it from the map.
-		if sess.counter == 0 && sess.conn == nil {
-			m.maybeDelete(connTracingID, id)
-		}
-	}()
+	entry.Unestablished.UniStreams = append(entry.Unestablished.UniStreams, str)
+	m.resetTimer(id)
 }
 
-func (m *sessionManager) getOrCreateSession(connTracingID quic.ConnectionTracingID, id sessionID) (sess *session, existed bool) {
+func (m *sessionManager) resetTimer(id sessionID) {
+	entry := m.sessions[id]
+	if entry.Unestablished.Timer != nil {
+		entry.Unestablished.Timer.Reset(m.timeout)
+		return
+	}
+	entry.Unestablished.Timer = time.AfterFunc(m.timeout, func() { m.onTimer(id) })
+}
+
+func (m *sessionManager) onTimer(id sessionID) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 
-	sessions, ok := m.conns[connTracingID]
-	if !ok {
-		sessions = make(map[sessionID]*session)
-		m.conns[connTracingID] = sessions
+	sessionEntry, ok := m.sessions[id]
+	if !ok { // session already closed
+		return
 	}
-
-	sess, ok = sessions[id]
-	if ok && sess.conn != nil {
-		return sess, true
+	if sessionEntry.Session != nil { // session already established
+		return
 	}
-	if !ok {
-		sess = &session{created: make(chan struct{})}
-		sessions[id] = sess
+	for _, str := range sessionEntry.Unestablished.Streams {
+		str.CancelRead(WTBufferedStreamRejectedErrorCode)
+		str.CancelWrite(WTBufferedStreamRejectedErrorCode)
 	}
-	sess.counter++
-	return sess, false
-}
-
-func (m *sessionManager) handleStream(str *quic.Stream, sess *session) {
-	t := time.NewTimer(m.timeout)
-	defer t.Stop()
-
-	// When multiple streams are waiting for the same session to be established,
-	// the timeout is calculated for every stream separately.
-	select {
-	case <-sess.created:
-		sess.conn.addIncomingStream(str)
-	case <-t.C:
-		str.CancelRead(WebTransportBufferedStreamRejectedErrorCode)
-		str.CancelWrite(WebTransportBufferedStreamRejectedErrorCode)
-	case <-m.ctx.Done():
+	for _, uniStr := range sessionEntry.Unestablished.UniStreams {
+		uniStr.CancelRead(WTBufferedStreamRejectedErrorCode)
 	}
-}
-
-func (m *sessionManager) handleUniStream(str *quic.ReceiveStream, sess *session) {
-	t := time.NewTimer(m.timeout)
-	defer t.Stop()
-
-	// When multiple streams are waiting for the same session to be established,
-	// the timeout is calculated for every stream separately.
-	select {
-	case <-sess.created:
-		sess.conn.addIncomingUniStream(str)
-	case <-t.C:
-		str.CancelRead(WebTransportBufferedStreamRejectedErrorCode)
-	case <-m.ctx.Done():
-	}
+	delete(m.sessions, id)
 }
 
 // AddSession adds a new WebTransport session.
-func (m *sessionManager) AddSession(qconn *http3.Conn, id sessionID, str http3Stream) *Session {
-	conn := newSession(id, qconn, str)
-	connTracingID := qconn.Context().Value(quic.ConnectionTracingKey).(quic.ConnectionTracingID)
-
+func (m *sessionManager) AddSession(id sessionID, s *Session) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 
-	sessions, ok := m.conns[connTracingID]
-	if !ok {
-		sessions = make(map[sessionID]*session)
-		m.conns[connTracingID] = sessions
-	}
-	if sess, ok := sessions[id]; ok {
+	entry, ok := m.sessions[id]
+
+	if ok && entry.Unestablished != nil {
 		// We might already have an entry of this session.
-		// This can happen when we receive a stream for this WebTransport session before we complete the HTTP request
-		// that establishes the session.
-		sess.conn = conn
-		close(sess.created)
-		return conn
+		// This can happen when we receive streams for this WebTransport session before we complete
+		// the Extended CONNECT request.
+		for _, str := range entry.Unestablished.Streams {
+			s.addIncomingStream(str)
+		}
+		for _, uniStr := range entry.Unestablished.UniStreams {
+			s.addIncomingUniStream(uniStr)
+		}
+		if entry.Unestablished.Timer != nil {
+			entry.Unestablished.Timer.Stop()
+		}
+		entry.Unestablished = nil
 	}
-	c := make(chan struct{})
-	close(c)
-	sessions[id] = &session{created: c, conn: conn}
-	return conn
+	m.sessions[id] = sessionEntry{Session: s}
+
+	context.AfterFunc(s.Context(), func() {
+		m.deleteSession(id)
+	})
+}
+
+func (m *sessionManager) deleteSession(id sessionID) {
+	m.mx.Lock()
+	defer m.mx.Unlock()
+
+	delete(m.sessions, id)
+	m.recentlyClosedSessions = append(m.recentlyClosedSessions, id)
+	if len(m.recentlyClosedSessions) > maxRecentlyClosedSessions {
+		m.recentlyClosedSessions = m.recentlyClosedSessions[1:]
+	}
 }
 
 func (m *sessionManager) Close() {
-	m.ctxCancel()
-	m.refCount.Wait()
+	m.mx.Lock()
+	defer m.mx.Unlock()
+
+	for _, entry := range m.sessions {
+		if entry.Unestablished != nil && entry.Unestablished.Timer != nil {
+			entry.Unestablished.Timer.Stop()
+		}
+	}
+	clear(m.sessions)
 }

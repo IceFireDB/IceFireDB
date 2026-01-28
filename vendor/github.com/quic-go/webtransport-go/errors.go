@@ -33,24 +33,14 @@ func httpCodeToWebtransportCode(h quic.StreamErrorCode) (StreamErrorCode, error)
 	return StreamErrorCode(shifted - shifted/0x1f), nil
 }
 
-func isWebTransportError(e error) bool {
-	if e == nil {
-		return false
-	}
-	var strErr *quic.StreamError
-	if !errors.As(e, &strErr) {
-		return false
-	}
-	if strErr.ErrorCode == sessionCloseErrorCode {
-		return true
-	}
-	_, err := httpCodeToWebtransportCode(strErr.ErrorCode)
-	return err == nil
-}
+const (
+	// WTBufferedStreamRejectedErrorCode is the error code of the
+	// WT_BUFFERED_STREAM_REJECTED error.
+	WTBufferedStreamRejectedErrorCode quic.StreamErrorCode = 0x3994bd84
 
-// WebTransportBufferedStreamRejectedErrorCode is the error code of the
-// H3_WEBTRANSPORT_BUFFERED_STREAM_REJECTED error.
-const WebTransportBufferedStreamRejectedErrorCode quic.StreamErrorCode = 0x3994bd84
+	// WTSessionGoneErrorCode is the error code of the WT_SESSION_GONE error.
+	WTSessionGoneErrorCode quic.StreamErrorCode = 0x170d7b68
+)
 
 // StreamError is the error that is returned from stream operations (Read, Write) when the stream is canceled.
 type StreamError struct {
@@ -58,13 +48,15 @@ type StreamError struct {
 	Remote    bool
 }
 
-func (e *StreamError) Is(target error) bool {
-	_, ok := target.(*StreamError)
-	return ok
-}
+var _ error = &StreamError{}
 
 func (e *StreamError) Error() string {
 	return fmt.Sprintf("stream canceled with error code %d", e.ErrorCode)
+}
+
+func (e *StreamError) Is(target error) bool {
+	t, ok := target.(*StreamError)
+	return ok && t.Remote == e.Remote && t.ErrorCode == e.ErrorCode
 }
 
 // SessionError is a WebTransport connection error.
@@ -77,3 +69,8 @@ type SessionError struct {
 var _ error = &SessionError{}
 
 func (e *SessionError) Error() string { return e.Message }
+
+func (e *SessionError) Is(target error) bool {
+	t, ok := target.(*SessionError)
+	return ok && e.ErrorCode == t.ErrorCode && e.Remote == t.Remote
+}

@@ -6,7 +6,7 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
-type closeFunc func()
+type closeFunc func(error)
 
 // The streamsMap manages the streams of a single QUIC connection.
 // Note that several WebTransport sessions can share one QUIC connection.
@@ -31,12 +31,12 @@ func (s *streamsMap) RemoveStream(id quic.StreamID) {
 	s.mx.Unlock()
 }
 
-func (s *streamsMap) CloseSession() {
+func (s *streamsMap) CloseSession(err error) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
 	for _, cl := range s.m {
-		cl()
+		cl(err)
 	}
 	s.m = nil
 }

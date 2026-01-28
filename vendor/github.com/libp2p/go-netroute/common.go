@@ -18,6 +18,8 @@ import (
 	"strings"
 )
 
+//lint:file-ignore U1000 structs here used by different build tags
+
 // rtInfo contains information on a single route.
 type rtInfo struct {
 	Src, Dst         *net.IPNet
@@ -60,23 +62,10 @@ func (rt rtInfo) IsMoreSpecThan(mostSpecificRt *rtInfo) bool {
 	return mostSpecificRt.Priority >= rt.Priority
 }
 
-// routeSlice implements sort.Interface to sort routes by Priority.
-type routeSlice []*rtInfo
-
-func (r routeSlice) Len() int {
-	return len(r)
-}
-func (r routeSlice) Less(i, j int) bool {
-	return r[i].Priority < r[j].Priority
-}
-func (r routeSlice) Swap(i, j int) {
-	r[i], r[j] = r[j], r[i]
-}
-
 type router struct {
 	ifaces map[int]net.Interface
 	addrs  map[int]ipAddrs
-	v4, v6 routeSlice
+	v4, v6 []*rtInfo
 }
 
 func (r *router) String() string {
@@ -132,7 +121,7 @@ func (r *router) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface *n
 	return
 }
 
-func (r *router) route(routes routeSlice, input net.HardwareAddr, src, dst net.IP) (iface int, gateway, preferredSrc net.IP, err error) {
+func (r *router) route(routes []*rtInfo, input net.HardwareAddr, src, dst net.IP) (iface int, gateway, preferredSrc net.IP, err error) {
 	var inputIndex uint32
 	if input != nil {
 		for i, iface := range r.ifaces {

@@ -14,7 +14,7 @@ func New() (Router, error) {
 	rtr.ifaces[0] = net.Interface{}
 	rtr.addrs = make(map[int]ipAddrs)
 	rtr.addrs[0] = ipAddrs{}
-	rtr.v4 = routeSlice{&rtInfo{}}
-	rtr.v6 = routeSlice{&rtInfo{}}
+	rtr.v4 = []*rtInfo{{}}
+	rtr.v6 = []*rtInfo{{}}
 	return rtr, nil
 }

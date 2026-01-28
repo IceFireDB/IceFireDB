@@ -2,6 +2,7 @@ package rtrefresh
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -16,7 +17,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/multierr"
 )
 
 var logger = logging.Logger("dht/RtRefreshManager")
@@ -241,10 +241,10 @@ func (r *RtRefreshManager) doRefresh(ctx context.Context, forceRefresh bool) err
 	ctx, span := internal.StartSpan(ctx, "RefreshManager.doRefresh")
 	defer span.End()
 
-	var merr error
+	var errs []error
 
 	if err := r.queryForSelf(ctx); err != nil {
-		merr = multierr.Append(merr, err)
+		errs = append(errs, err)
 	}
 
 	refreshCpls := r.rt.GetTrackedCplsForRefresh()
@@ -261,7 +261,7 @@ func (r *RtRefreshManager) doRefresh(ctx context.Context, forceRefresh bool) err
 	for c := range refreshCpls {
 		cpl := uint(c)
 		if err := rfnc(cpl); err != nil {
-			merr = multierr.Append(merr, err)
+			errs = append(errs, err)
 		} else {
 			// If we see a gap at a Cpl in the Routing table, we ONLY refresh up until the maximum cpl we
 			// have in the Routing Table OR (2 * (Cpl+ 1) with the gap), whichever is smaller.
@@ -274,10 +274,10 @@ func (r *RtRefreshManager) doRefresh(ctx context.Context, forceRefresh bool) err
 				lastCpl := min(2*(c+1), len(refreshCpls)-1)
 				for i := c + 1; i < lastCpl+1; i++ {
 					if err := rfnc(uint(i)); err != nil {
-						merr = multierr.Append(merr, err)
+						errs = append(errs, err)
 					}
 				}
-				return merr
+				return errors.Join(errs...)
 			}
 		}
 	}
@@ -288,7 +288,7 @@ func (r *RtRefreshManager) doRefresh(ctx context.Context, forceRefresh bool) err
 		return ctx.Err()
 	}
 
-	return merr
+	return errors.Join(errs...)
 }
 
 func min(a int, b int) int {
