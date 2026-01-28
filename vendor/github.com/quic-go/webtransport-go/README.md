@@ -8,17 +8,18 @@ webtransport-go is an implementation of the WebTransport protocol, based on [qui
 
 Detailed documentation can be found on [quic-go.net](https://quic-go.net/docs/).
 
-## webtransport-go is currently unfunded.
 
-### What does this mean?
+## Projects using webtransport-go
 
-webtransport-go has been unfunded since the beginning of 2024. For the first half of the year, I have been maintaining the project in my spare time.  Maintaining high-quality open-source software requires significant time and effort. This situation is becoming unsustainable, and as of June 2024, I will be ceasing maintenance work on the project.
+| Project | Description | Stars |
+| --- | --- | --- |
+| [Centrifugo](https://github.com/centrifugal/centrifugo) | Scalable real-time messaging server in a language-agnostic way. Self-hosted alternative to Pubnub, Pusher, Ably, socket.io, Phoenix.PubSub, SignalR. | ![GitHub Repo stars](https://img.shields.io/github/stars/centrifugal/centrifugo?style=flat-square) |
+| [go-libp2p](https://github.com/libp2p/go-libp2p) | libp2p implementation in Go, powering [Kubo](https://github.com/ipfs/kubo) (IPFS) and [Lotus](https://github.com/filecoin-project/lotus) (Filecoin), among others | ![GitHub Repo stars](https://img.shields.io/github/stars/libp2p/go-libp2p?style=flat-square) |
+| [signalr](https://github.com/philippseith/signalr) | SignalR server and client in Go | ![GitHub Repo stars](https://img.shields.io/github/stars/philippseith/signalr?style=flat-square) |
 
-Specifically, this means:
-* I will no longer respond to issues or review PRs.
-* I will not keep the API in sync with quic-go.
-* Since WebTransport is still an IETF draft, browser compatibility will break as soon as the interoperability target changes.
+If you'd like to see your project added to this list, please send us a PR.
 
-### If your project relies on WebTransport support, what can you do?
 
-I’m glad you asked. First, I would like to hear about your use case. Second, please consider sponsoring the maintenance and future development of the project. It’s best to reach out to me via email.
+## Release Policy
+
+webtransport-go always aims to support the latest two Go releases.

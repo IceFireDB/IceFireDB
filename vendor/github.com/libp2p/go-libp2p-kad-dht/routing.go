@@ -25,6 +25,9 @@ import (
 
 // This file implements the Routing interface for the IpfsDHT struct.
 
+// putOperationTimeout is the per-peer timeout for PUT_VALUE and ADD_PROVIDER operations.
+const putOperationTimeout = 30 * time.Second
+
 // Basic Put/Get
 
 // PutValue adds value corresponding to given Key.
@@ -78,7 +81,7 @@ func (dht *IpfsDHT) PutValue(ctx context.Context, key string, value []byte, opts
 	for _, p := range peers {
 		wg.Add(1)
 		go func(p peer.ID) {
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithTimeout(ctx, putOperationTimeout)
 			defer cancel()
 			defer wg.Done()
 			routing.PublishQueryEvent(ctx, &routing.QueryEvent{
@@ -271,7 +274,7 @@ func (dht *IpfsDHT) updatePeerValues(ctx context.Context, key string, val []byte
 				}
 				return
 			}
-			ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+			ctx, cancel := context.WithTimeout(ctx, putOperationTimeout)
 			defer cancel()
 			err := dht.protoMessenger.PutValue(ctx, p, fixupRec)
 			if err != nil {
@@ -454,6 +457,8 @@ func (dht *IpfsDHT) classicProvide(ctx context.Context, keyMH multihash.Multihas
 		wg.Add(1)
 		go func(p peer.ID) {
 			defer wg.Done()
+			ctx, cancel := context.WithTimeout(ctx, putOperationTimeout)
+			defer cancel()
 			logger.Debugf("putProvider(%s, %s)", internal.LoggableProviderRecordBytes(keyMH), p)
 			err := dht.protoMessenger.PutProviderAddrs(ctx, p, keyMH, peer.AddrInfo{
 				ID:    dht.self,

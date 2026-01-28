@@ -7,6 +7,8 @@ import (
 	"math/rand/v2"
 	"net"
 	"sync"
+	"time"
+	"unicode/utf8"
 
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
@@ -16,7 +18,9 @@ import (
 // sessionID is the WebTransport Session ID
 type sessionID uint64
 
-const closeWebtransportSessionCapsuleType http3.CapsuleType = 0x2843
+const closeSessionCapsuleType http3.CapsuleType = 0x2843
+
+const maxCloseCapsuleErrorMsgLen = 1024
 
 type acceptQueue[T any] struct {
 	mx sync.Mutex
@@ -64,6 +68,8 @@ type http3Stream interface {
 	ReceiveDatagram(context.Context) ([]byte, error)
 	SendDatagram([]byte) error
 	CancelRead(quic.StreamErrorCode)
+	CancelWrite(quic.StreamErrorCode)
+	SetWriteDeadline(time.Time) error
 }
 
 var (
@@ -71,25 +77,20 @@ var (
 	_ http3Stream = &http3.RequestStream{}
 )
 
-type http3Conn interface {
-	OpenStream() (*quic.Stream, error)
-	OpenUniStream() (*quic.SendStream, error)
-	OpenStreamSync(context.Context) (*quic.Stream, error)
-	OpenUniStreamSync(context.Context) (*quic.SendStream, error)
-	LocalAddr() net.Addr
-	RemoteAddr() net.Addr
-	ConnectionState() quic.ConnectionState
-	Context() context.Context
+// SessionState contains the state of a WebTransport session
+type SessionState struct {
+	// ConnectionState contains the QUIC connection state, including TLS handshake information
+	ConnectionState quic.ConnectionState
+
+	// ApplicationProtocol contains the application protocol negotiated for the session
+	ApplicationProtocol string
 }
 
-var _ http3Conn = &http3.Conn{}
-
-var _ http3Conn = &http3.Conn{}
-
 type Session struct {
-	sessionID sessionID
-	conn      http3Conn
-	str       http3Stream
+	sessionID           sessionID
+	conn                *quic.Conn
+	str                 http3Stream
+	applicationProtocol string
 
 	streamHdr    []byte
 	uniStreamHdr []byte
@@ -104,22 +105,21 @@ type Session struct {
 	bidiAcceptQueue acceptQueue[*Stream]
 	uniAcceptQueue  acceptQueue[*ReceiveStream]
 
-	// TODO: garbage collect streams from when they are closed
 	streams streamsMap
 }
 
-func newSession(sessionID sessionID, conn http3Conn, str http3Stream) *Session {
-	tracingID := conn.Context().Value(quic.ConnectionTracingKey).(quic.ConnectionTracingID)
-	ctx, ctxCancel := context.WithCancel(context.WithValue(context.Background(), quic.ConnectionTracingKey, tracingID))
+func newSession(ctx context.Context, sessionID sessionID, conn *quic.Conn, str http3Stream, applicationProtocol string) *Session {
+	ctx, ctxCancel := context.WithCancel(ctx)
 	c := &Session{
-		sessionID:       sessionID,
-		conn:            conn,
-		str:             str,
-		ctx:             ctx,
-		streamCtxs:      make(map[int]context.CancelFunc),
-		bidiAcceptQueue: *newAcceptQueue[*Stream](),
-		uniAcceptQueue:  *newAcceptQueue[*ReceiveStream](),
-		streams:         *newStreamsMap(),
+		sessionID:           sessionID,
+		conn:                conn,
+		str:                 str,
+		applicationProtocol: applicationProtocol,
+		ctx:                 ctx,
+		streamCtxs:          make(map[int]context.CancelFunc),
+		bidiAcceptQueue:     *newAcceptQueue[*Stream](),
+		uniAcceptQueue:      *newAcceptQueue[*ReceiveStream](),
+		streams:             *newStreamsMap(),
 	}
 	// precompute the headers for unidirectional streams
 	c.uniStreamHdr = make([]byte, 0, 2+quicvarint.Len(uint64(c.sessionID)))
@@ -143,22 +143,22 @@ func (s *Session) handleConn() {
 }
 
 // parseNextCapsule parses the next Capsule sent on the request stream.
-// It returns a SessionError, if the capsule received is a CLOSE_WEBTRANSPORT_SESSION Capsule.
+// It returns a SessionError, if the capsule received is a WT_CLOSE_SESSION Capsule.
 func (s *Session) parseNextCapsule() error {
 	for {
-		// TODO: enforce max size
 		typ, r, err := http3.ParseCapsule(quicvarint.NewReader(s.str))
 		if err != nil {
 			return err
 		}
 		switch typ {
-		case closeWebtransportSessionCapsuleType:
-			b := make([]byte, 4)
-			if _, err := io.ReadFull(r, b); err != nil {
+		case closeSessionCapsuleType:
+			var b [4]byte
+			if _, err := io.ReadFull(r, b[:]); err != nil {
 				return err
 			}
-			appErrCode := binary.BigEndian.Uint32(b)
-			appErrMsg, err := io.ReadAll(r)
+			appErrCode := binary.BigEndian.Uint32(b[:])
+			// the length of the error message is limited to 1024 bytes
+			appErrMsg, err := io.ReadAll(io.LimitReader(r, maxCloseCapsuleErrorMsgLen))
 			if err != nil {
 				return err
 			}
@@ -204,8 +204,8 @@ func (s *Session) addIncomingStream(qstr *quic.Stream) {
 	closeErr := s.closeErr
 	if closeErr != nil {
 		s.closeMx.Unlock()
-		qstr.CancelRead(sessionCloseErrorCode)
-		qstr.CancelWrite(sessionCloseErrorCode)
+		qstr.CancelRead(WTSessionGoneErrorCode)
+		qstr.CancelWrite(WTSessionGoneErrorCode)
 		return
 	}
 	str := s.addStream(qstr, false)
@@ -220,7 +220,7 @@ func (s *Session) addIncomingUniStream(qstr *quic.ReceiveStream) {
 	closeErr := s.closeErr
 	if closeErr != nil {
 		s.closeMx.Unlock()
-		qstr.CancelRead(sessionCloseErrorCode)
+		qstr.CancelRead(WTSessionGoneErrorCode)
 		return
 	}
 	str := s.addReceiveStream(qstr)
@@ -326,8 +326,8 @@ func (s *Session) OpenStreamSync(ctx context.Context) (*Stream, error) {
 
 	// the session might have been closed concurrently with OpenStreamSync returning
 	if qstr != nil && s.closeErr != nil {
-		qstr.CancelRead(sessionCloseErrorCode)
-		qstr.CancelWrite(sessionCloseErrorCode)
+		qstr.CancelRead(WTSessionGoneErrorCode)
+		qstr.CancelWrite(WTSessionGoneErrorCode)
 		return nil, s.closeErr
 	}
 	if err != nil {
@@ -372,7 +372,7 @@ func (s *Session) OpenUniStreamSync(ctx context.Context) (str *SendStream, err e
 
 	// the session might have been closed concurrently with OpenStreamSync returning
 	if qstr != nil && s.closeErr != nil {
-		qstr.CancelWrite(sessionCloseErrorCode)
+		qstr.CancelWrite(WTSessionGoneErrorCode)
 		return nil, s.closeErr
 	}
 	if err != nil {
@@ -398,18 +398,24 @@ func (s *Session) CloseWithError(code SessionErrorCode, msg string) error {
 		return err
 	}
 
+	// truncate the message if it's too long
+	if len(msg) > maxCloseCapsuleErrorMsgLen {
+		msg = truncateUTF8(msg, maxCloseCapsuleErrorMsgLen)
+	}
+
 	b := make([]byte, 4, 4+len(msg))
 	binary.BigEndian.PutUint32(b, uint32(code))
 	b = append(b, []byte(msg)...)
-	if err := http3.WriteCapsule(
-		quicvarint.NewWriter(s.str),
-		closeWebtransportSessionCapsuleType,
-		b,
-	); err != nil {
-		return err
+
+	// Optimistically send the WT_CLOSE_SESSION Capsule:
+	// If we're flow-control limited, we don't want to wait for the receiver to issue new flow control credits.
+	// There's no idiomatic way to do a non-blocking write in Go, so we set a short deadline.
+	s.str.SetWriteDeadline(time.Now().Add(10 * time.Millisecond))
+	if err := http3.WriteCapsule(quicvarint.NewWriter(s.str), closeSessionCapsuleType, b); err != nil {
+		s.str.CancelWrite(WTSessionGoneErrorCode)
 	}
 
-	s.str.CancelRead(1337)
+	s.str.CancelRead(WTSessionGoneErrorCode)
 	err = s.str.Close()
 	<-s.ctx.Done()
 	return err
@@ -435,11 +441,27 @@ func (s *Session) closeWithError(closeErr error) (bool /* first call to close se
 	for _, cancel := range s.streamCtxs {
 		cancel()
 	}
-	s.streams.CloseSession()
+	s.streams.CloseSession(closeErr)
 
 	return true, nil
 }
 
-func (s *Session) ConnectionState() quic.ConnectionState {
-	return s.conn.ConnectionState()
+// SessionState returns the current state of the session
+func (s *Session) SessionState() SessionState {
+	return SessionState{
+		ConnectionState:     s.conn.ConnectionState(),
+		ApplicationProtocol: s.applicationProtocol,
+	}
+}
+
+// truncateUTF8 cuts a string to max n bytes without breaking UTF-8 characters.
+func truncateUTF8(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
 }

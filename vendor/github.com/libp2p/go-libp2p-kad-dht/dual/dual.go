@@ -4,6 +4,7 @@ package dual
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -22,7 +23,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
-	"go.uber.org/multierr"
 )
 
 const (
@@ -311,10 +311,11 @@ func combineErrors(erra, errb error) error {
 	// table), return the other.
 	if erra == kb.ErrLookupFailure {
 		return errb
-	} else if errb == kb.ErrLookupFailure {
+	}
+	if errb == kb.ErrLookupFailure {
 		return erra
 	}
-	return multierr.Append(erra, errb)
+	return errors.Join(erra, errb)
 }
 
 // Bootstrap allows callers to hint to the routing system to get into a

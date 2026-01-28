@@ -2,6 +2,7 @@ package dht
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -34,7 +35,6 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/multiformats/go-base32"
 	ma "github.com/multiformats/go-multiaddr"
-	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
@@ -865,22 +865,26 @@ func (dht *IpfsDHT) Close() error {
 	dht.cancel()
 	dht.wg.Wait()
 
-	var wg sync.WaitGroup
+	errc := make(chan error)
 	closes := [...]func() error{
 		dht.rtRefreshManager.Close,
 		dht.providerStore.Close,
 	}
-	var errors [len(closes)]error
-	wg.Add(len(errors))
-	for i, c := range closes {
-		go func(i int, c func() error) {
-			defer wg.Done()
-			errors[i] = c()
-		}(i, c)
+	for _, c := range closes {
+		go func(c func() error) {
+			errc <- c()
+		}(c)
 	}
-	wg.Wait()
 
-	return multierr.Combine(errors[:]...)
+	var errs []error
+	for range len(closes) {
+		err := <-errc
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 func mkDsKey(s string) ds.Key {
