@@ -34,6 +34,10 @@ linters:
       - linters:
           - staticcheck
         text: 'SA1019:.+quic\.ConnectionTracing(ID|Key)'
+      - linters:
+          - staticcheck
+        path: _test\.go
+        text: 'SA1029:' # inappropriate key in call to context.WithValue
 formatters:
   enable:
     - gofmt

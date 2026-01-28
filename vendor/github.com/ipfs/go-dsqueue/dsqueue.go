@@ -249,14 +249,9 @@ func (q *DSQueue) worker(ctx context.Context, bufferSize, dedupCacheSize int, id
 						log.Errorw("error deleting queue entry, stopping dsqueue", "err", err, "key", head.Key, "qname", q.name)
 						return
 					}
-					parts := strings.SplitN(strings.TrimPrefix(head.Key, "/"), "/", 2)
-					if len(parts) != 2 {
-						log.Errorw("malformed queued item, removing it from queue", "err", err, "key", head.Key, "qname", q.name)
-						continue
-					}
-					item, err = base64.RawURLEncoding.DecodeString(parts[1])
+					item, err = decodeItem(head.Key)
 					if err != nil {
-						log.Errorw("error decoding queued item, removing it from queue", "err", err, "key", head.Key, "qname", q.name)
+						log.Errorw(err.Error(), "qname", q.name)
 						continue
 					}
 				} else {
@@ -514,14 +509,9 @@ func (q *DSQueue) readDatastore(ctx context.Context, n int, items [][]byte) ([][
 			return nil, fmt.Errorf("error deleting queue item: %w", err)
 		}
 
-		parts := strings.SplitN(strings.TrimPrefix(result.Key, "/"), "/", 2)
-		if len(parts) != 2 {
-			log.Errorw("malformed queued item, removing it from queue", "err", err, "key", result.Key, "qname", q.name)
-			continue
-		}
-		item, err := base64.RawURLEncoding.DecodeString(parts[1])
+		item, err := decodeItem(result.Key)
 		if err != nil {
-			log.Errorw("error decoding queued item, removing it from queue", "err", err, "key", result.Key, "qname", q.name)
+			log.Errorw(err.Error(), "qname", q.name)
 			continue
 		}
 		items = append(items, item)
@@ -535,4 +525,16 @@ func (q *DSQueue) readDatastore(ctx context.Context, n int, items [][]byte) ([][
 	}
 
 	return items, nil
+}
+
+func decodeItem(key string) ([]byte, error) {
+	parts := strings.SplitN(strings.TrimPrefix(key, "/"), "/", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("malformed queued item %q", key)
+	}
+	item, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("cannot decode queued item %q: %s", key, err)
+	}
+	return item, nil
 }

@@ -55,7 +55,7 @@ func New() (Router, error) {
 	return rtr, nil
 }
 
-func parseIPRoutes() (v4, v6 routeSlice, err error) {
+func parseIPRoutes() (v4, v6 []*rtInfo, err error) {
 	buf, err := os.ReadFile(netdir + "/iproute")
 	if err != nil {
 		return nil, nil, err

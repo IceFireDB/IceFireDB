@@ -1,6 +1,7 @@
 package pebbleds
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -90,19 +91,16 @@ func NewDatastore(path string, options ...Option) (*Datastore, error) {
 // error occurs, the size of the value is also returned.
 func (d *Datastore) get(key []byte, retval bool) ([]byte, int, error) {
 	val, closer, err := d.db.Get(key)
-	switch err {
-	case nil:
-		// do nothing
-	case pebble.ErrNotFound:
-		return nil, 0, ds.ErrNotFound
-	default:
+	if err != nil {
+		if errors.Is(err, pebble.ErrNotFound) {
+			return nil, 0, ds.ErrNotFound
+		}
 		return nil, -1, fmt.Errorf("pebble error during get: %w", err)
 	}
 
 	var cpy []byte
 	if retval {
-		cpy = make([]byte, len(val))
-		copy(cpy, val)
+		cpy = bytes.Clone(val)
 	}
 	size := len(val)
 	_ = closer.Close()
@@ -121,14 +119,13 @@ func (d *Datastore) Get(ctx context.Context, key ds.Key) (value []byte, err erro
 // read the key anyways.
 func (d *Datastore) Has(ctx context.Context, key ds.Key) (exists bool, _ error) {
 	_, _, err := d.get(key.Bytes(), false)
-	switch err {
-	case ds.ErrNotFound:
-		return false, nil
-	case nil:
-		return true, nil
-	default:
+	if err != nil {
+		if errors.Is(err, ds.ErrNotFound) {
+			return false, nil
+		}
 		return false, err
 	}
+	return true, nil
 }
 
 func (d *Datastore) GetSize(ctx context.Context, key ds.Key) (size int, _ error) {
@@ -232,10 +229,7 @@ func (d *Datastore) Query(ctx context.Context, q query.Query) (query.Results, er
 		}
 		return true
 	}
-	doFilter := false
-	if len(filters) > 0 {
-		doFilter = true
-	}
+	doFilter := len(filters) > 0
 
 	createEntry := func() query.Entry {
 		// iter.Key and iter.Value may change on the next call to iter.Next.
@@ -243,9 +237,7 @@ func (d *Datastore) Query(ctx context.Context, q query.Query) (query.Results, er
 		entry := query.Entry{Key: string(iter.Key())}
 		if !keysOnly {
 			// take a copy.
-			cpy := make([]byte, len(iter.Value()))
-			copy(cpy, iter.Value())
-			entry.Value = cpy
+			entry.Value = bytes.Clone(iter.Value())
 		}
 		if returnSizes {
 			entry.Size = len(iter.Value())
