@@ -13,7 +13,6 @@ import (
 
 	rafthub "github.com/tidwall/uhaha"
 
-	"github.com/IceFireDB/IceFireDB/driver/hybriddb"
 	"github.com/IceFireDB/IceFireDB/driver/ipfs"
 	ipfs_synckv "github.com/IceFireDB/IceFireDB/driver/ipfs-synckv"
 
@@ -127,7 +126,6 @@ func confInit(conf *rafthub.Config) {
 
 	flag.BoolVar(&conf.TryErrors, "try-errors", conf.TryErrors, "")
 	flag.BoolVar(&conf.InitRunQuit, "init-run-quit", conf.InitRunQuit, "")
-	flag.Int64Var(&hybriddb.DefaultConfig.HotCacheSize, "hot-cache-size", hybriddb.DefaultConfig.HotCacheSize, "")
 	flag.StringVar(&storageBackend, "storage-backend", "goleveldb", "Storage backend (e.g. goleveldb, hybriddb, ipfs, oss, ipfs-synckv)")
 	flag.StringVar(&pprofAddr, "pprof-addr", ":26063", "")
 	flag.BoolVar(&debug, "debug", false, "")

@@ -204,7 +204,7 @@ func TestDB_Iterator(t *testing.T) {
 	// Insert test data
 	testData := map[string]string{
 		"a": "1",
-		"b": "2", 
+		"b": "2",
 		"c": "3",
 	}
 
@@ -221,7 +221,7 @@ func TestDB_Iterator(t *testing.T) {
 	for iter.First(); iter.Valid(); iter.Next() {
 		key := string(iter.Key())
 		value := string(iter.Value())
-		
+
 		expectedValue, exists := testData[key]
 		assert.True(t, exists)
 		assert.Equal(t, expectedValue, value)
@@ -318,8 +318,8 @@ func TestDB_Metrics(t *testing.T) {
 	require.True(t, ok, "Expected *DB type")
 
 	title, metrics := db.Metrics()
-	
-	assert.Equal(t, "hybriddb cache", title)
+
+	assert.Equal(t, "hybriddb", title)
 	assert.NotNil(t, metrics)
 	// Metrics might be empty if cache is disabled, so we don't check length
 }
@@ -382,7 +382,7 @@ func TestDB_Repair(t *testing.T) {
 	// Create and close a database first
 	db, err := Store{}.Open(tempDir, cfg)
 	require.NoError(t, err)
-	
+
 	key := []byte("repair-key")
 	value := []byte("repair-value")
 	err = db.Put(key, value)
@@ -414,7 +414,7 @@ func TestDB_EdgeCases(t *testing.T) {
 	err = db.Put([]byte(""), []byte("empty-key"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "key cannot be empty")
-	
+
 	value, err := db.Get([]byte(""))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "key cannot be empty")
@@ -422,7 +422,7 @@ func TestDB_EdgeCases(t *testing.T) {
 	// Test nil value
 	err = db.Put([]byte("nil-value"), nil)
 	require.NoError(t, err)
-	
+
 	value, err = db.Get([]byte("nil-value"))
 	require.NoError(t, err)
 	// LevelDB stores empty values as empty byte slices, not nil
