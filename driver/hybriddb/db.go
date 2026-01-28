@@ -303,21 +303,22 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 
 	db.stats.ReadOps++
 
-	// 1. Check hot tier
 	if item, ok := db.cache.Get(string(key)); ok {
+		if item.value == nil {
+			db.stats.CacheHits++
+			return nil, nil
+		}
 		if !item.isExpired() {
 			item.accesses++
 			db.stats.CacheHits++
 			db.stats.BytesRead += int64(len(item.value))
 			return copyBytes(item.value), nil
 		}
-		// Remove expired item from cache
 		db.cache.Del(string(key))
 	}
 
 	db.stats.CacheMisses++
 
-	// 2. Check cold tier
 	v, err := db.db.Get(key, nil)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
@@ -355,7 +356,6 @@ func (db *DB) Delete(key []byte) error {
 		return fmt.Errorf("key cannot be empty")
 	}
 
-	// Write-through caching: delete from persistent storage first
 	if err := db.db.Delete(key, nil); err != nil {
 		db.stats.Errors++
 		return err
@@ -364,6 +364,8 @@ func (db *DB) Delete(key []byte) error {
 	db.stats.DeleteOps++
 
 	db.invalidateListCacheWithLockHeld(key)
+
+	db.cache.Set(string(key), &cacheItem{value: nil, key: copyBytes(key)}, 0)
 
 	return nil
 }
