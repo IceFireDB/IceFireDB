@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **hybriddb**: Fix cache invalidation after Delete operations
+  - Added tombstone marker (nil value cacheItem) in Delete to prevent cache repopulation
+  - Updated Get to detect nil values and return nil without repopulating cache
+  - Fixes TestSnapshot failure where deleted keys were returned from stale cache entries
+  - Fixes TestCacheConsistency_ConcurrentOverwrite race condition between cache and storage
 - **hybriddb**: Fix cache data corruption caused by storing byte slice references instead of copies
   - Cache now stores independent copies of keys and values to prevent external mutation
   - Changed Ristretto cache key type from `[]byte` to `string` for proper key comparison
