@@ -127,11 +127,11 @@ func (h *querySet) Swap(i, j int) {
 	h.heads[i], h.heads[j] = h.heads[j], h.heads[i]
 }
 
-func (h *querySet) Push(x interface{}) {
+func (h *querySet) Push(x any) {
 	h.heads = append(h.heads, x.(*queryResults))
 }
 
-func (h *querySet) Pop() interface{} {
+func (h *querySet) Pop() any {
 	i := len(h.heads) - 1
 	last := h.heads[i]
 	h.heads[i] = nil

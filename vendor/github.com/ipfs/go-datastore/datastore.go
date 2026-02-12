@@ -277,5 +277,9 @@ func GetBackedSize(ctx context.Context, ds Read, key Key) (int, error) {
 type Batch interface {
 	Write
 
+	// Commit applies the write operations to the datastore.
+	//
+	// A Batch should not be used after calling Commit. A new Batch must be
+	// created to perform additional batched operations.
 	Commit(ctx context.Context) error
 }

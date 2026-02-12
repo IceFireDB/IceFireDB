@@ -52,9 +52,9 @@ type TxnFeature interface {
 type Feature struct {
 	Name string
 	// Interface is the nil interface of the feature.
-	Interface interface{}
+	Interface any
 	// DatastoreInterface is the nil interface of the feature's corresponding datastore interface.
-	DatastoreInterface interface{}
+	DatastoreInterface any
 }
 
 var featuresByName map[string]Feature
