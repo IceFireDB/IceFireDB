@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 // Package hash provides TLS HashAlgorithm as defined in TLS 1.2
@@ -132,5 +132,26 @@ func Algorithms() map[Algorithm]struct{} {
 		SHA384:  {},
 		SHA512:  {},
 		Ed25519: {},
+	}
+}
+
+// ExtractHashFromPSS extracts the hash algorithm from an RSA-PSS SignatureScheme value.
+// This handles TLS 1.3 PSS schemes.
+// Returns None if the scheme is not a recognized PSS scheme.
+func ExtractHashFromPSS(pssScheme uint16) Algorithm {
+	// Note: We can't import signature package here due to circular dependency,
+	// so we use the raw values. These correspond to:
+	// 0x0804 = RSA_PSS_RSAE_SHA256, 0x0809 = RSA_PSS_PSS_SHA256
+	// 0x0805 = RSA_PSS_RSAE_SHA384, 0x080a = RSA_PSS_PSS_SHA384
+	// 0x0806 = RSA_PSS_RSAE_SHA512, 0x080b = RSA_PSS_PSS_SHA512
+	switch pssScheme {
+	case 0x0804, 0x0809:
+		return SHA256
+	case 0x0805, 0x080a:
+		return SHA384
+	case 0x0806, 0x080b:
+		return SHA512
+	default:
+		return None
 	}
 }

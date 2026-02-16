@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package extension
@@ -17,6 +17,9 @@ const (
 // what curves they both support
 //
 // https://tools.ietf.org/html/rfc8422#section-5.1.1
+//
+// In DTLS 1.3, this extension in renamed to "supported_groups".
+// https://datatracker.ietf.org/doc/html/rfc8446#section-4.2.7
 type SupportedEllipticCurves struct {
 	EllipticCurves []elliptic.Curve
 }

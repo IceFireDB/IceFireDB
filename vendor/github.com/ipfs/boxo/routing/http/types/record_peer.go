@@ -9,7 +9,7 @@ import (
 
 const SchemaPeer = "peer"
 
-var _ Record = &PeerRecord{}
+var _ Record = (*PeerRecord)(nil)
 
 type PeerRecord struct {
 	Schema    string
@@ -58,7 +58,7 @@ func (pr *PeerRecord) UnmarshalJSON(b []byte) error {
 }
 
 func (pr PeerRecord) MarshalJSON() ([]byte, error) {
-	m := map[string]interface{}{}
+	m := map[string]any{}
 	if pr.Extra != nil {
 		for key, val := range pr.Extra {
 			m[key] = val

@@ -20,9 +20,9 @@ import (
 	"github.com/libp2p/go-libp2p-kad-dht/provider/internal/keyspace"
 	mh "github.com/multiformats/go-multihash"
 
-	"github.com/probe-lab/go-libdht/kad"
-	"github.com/probe-lab/go-libdht/kad/key/bit256"
-	"github.com/probe-lab/go-libdht/kad/key/bitstr"
+	"github.com/ipfs/go-libdht/kad"
+	"github.com/ipfs/go-libdht/kad/key/bit256"
+	"github.com/ipfs/go-libdht/kad/key/bitstr"
 )
 
 var (

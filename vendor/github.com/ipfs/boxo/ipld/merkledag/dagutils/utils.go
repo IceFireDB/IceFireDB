@@ -74,11 +74,11 @@ func addLink(ctx context.Context, ds ipld.DAGService, root *dag.ProtoNode, child
 	// ensure no link with that name already exists
 	_ = root.RemoveNodeLink(childname) // ignore error, only option is ErrNotFound
 
-	if err := root.AddNodeLink(childname, childnd); err != nil {
+	if err = root.AddNodeLink(childname, childnd); err != nil {
 		return nil, err
 	}
 
-	if err := ds.Add(ctx, root); err != nil {
+	if err = ds.Add(ctx, root); err != nil {
 		return nil, err
 	}
 	return root, nil

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package dtls
@@ -97,6 +97,7 @@ type handshakeConfig struct {
 	localPSKIdentityHint         []byte
 	localCipherSuites            []CipherSuite             // Available CipherSuites
 	localSignatureSchemes        []signaturehash.Algorithm // Available signature schemes
+	localCertSignatureSchemes    []signaturehash.Algorithm // Available signature schemes for certificates
 	extendedMasterSecret         ExtendedMasterSecretType  // Policy for the Extended Master Support extension
 	localSRTPProtectionProfiles  []SRTPProtectionProfile   // Available SRTPProtectionProfiles, if empty no SRTP support
 	localSRTPMasterKeyIdentifier []byte
@@ -152,7 +153,7 @@ func (c *handshakeConfig) writeKeyLog(label string, clientRandom, secret []byte)
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	_, err := c.keyLogWriter.Write([]byte(fmt.Sprintf("%s %x %x\n", label, clientRandom, secret)))
+	_, err := fmt.Fprintf(c.keyLogWriter, "%s %x %x\n", label, clientRandom, secret)
 	if err != nil {
 		c.log.Debugf("failed to write key log file: %s", err)
 	}
@@ -290,8 +291,9 @@ func (s *handshakeFSM) wait(ctx context.Context, conn flightConn) (handshakeStat
 		case state := <-conn.recvHandshake():
 			if state.isRetransmit {
 				close(state.done)
-
-				return handshakeSending, nil
+				// ignore incoming retransmit hints, only rely on the timer-driven path below
+				// https://github.com/pion/dtls/issues/758
+				continue
 			}
 
 			nextFlight, alert, err := parse(ctx, conn, s.state, s.cache, s.cfg)

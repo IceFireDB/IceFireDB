@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package dtls
@@ -23,7 +23,10 @@ const keyLogLabelTLS12 = "CLIENT_RANDOM"
 
 // Config is used to configure a DTLS client or server.
 // After a Config is passed to a DTLS function it must not be modified.
-type Config struct {
+//
+// Deprecated: prefer the options-based APIs (`*WithOptions`) to construct immutable configs,
+// This will be removed in the next major version.
+type Config struct { //nolint:dupl
 	// Certificates contains certificate chain to present to the other side of the connection.
 	// Server MUST set this if PSK is non-nil
 	// client SHOULD sets this so CertificateRequests can be handled if PSK is non-nil
@@ -40,6 +43,12 @@ type Config struct {
 
 	// SignatureSchemes contains the signature and hash schemes that the peer requests to verify.
 	SignatureSchemes []tls.SignatureScheme
+
+	// CertificateSignatureSchemes contains the signature and hash schemes that may be used
+	// in digital signatures for X.509 certificates. If not set, the signature_algorithms_cert
+	// extension is not sent, and SignatureSchemes is used for both handshake signatures and
+	// certificate chain validation, as specified in RFC 8446 Section 4.2.3.
+	CertificateSignatureSchemes []tls.SignatureScheme
 
 	// SRTPProtectionProfiles are the supported protection profiles
 	// Clients will send this via use_srtp and assert that the server properly responds

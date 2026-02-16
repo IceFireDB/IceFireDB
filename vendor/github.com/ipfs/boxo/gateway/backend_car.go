@@ -433,7 +433,7 @@ func (api *CarBackend) Get(ctx context.Context, path path.ImmutablePath, byteRan
 }
 
 // loadTerminalEntity returns either a [*GetResponse], [*backpressuredFile], or [*backpressuredHAMTDirIterNoRecursion]
-func loadTerminalEntity(ctx context.Context, c cid.Cid, blk blocks.Block, lsys *ipld.LinkSystem, params CarParams, getLsys lsysGetter) (interface{}, error) {
+func loadTerminalEntity(ctx context.Context, c cid.Cid, blk blocks.Block, lsys *ipld.LinkSystem, params CarParams, getLsys lsysGetter) (any, error) {
 	var err error
 	if lsys == nil {
 		lsys, err = getLsys(ctx, c, params)

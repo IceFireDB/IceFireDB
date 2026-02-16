@@ -13,7 +13,7 @@ import (
 func Quorum(n int) routing.Option {
 	return func(opts *routing.Options) error {
 		if opts.Other == nil {
-			opts.Other = make(map[interface{}]interface{}, 1)
+			opts.Other = make(map[any]any, 1)
 		}
 		opts.Other[internalConfig.QuorumOptionKey{}] = n
 		return nil

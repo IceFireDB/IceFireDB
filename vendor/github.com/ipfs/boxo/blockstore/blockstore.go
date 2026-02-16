@@ -251,7 +251,7 @@ func (bs *blockstore) PutMany(ctx context.Context, blocks []blocks.Block) error 
 	}
 
 	if bs.provider != nil {
-		var hashes []multihash.Multihash
+		hashes := make([]multihash.Multihash, 0, len(blocks))
 		for _, block := range blocks {
 			hashes = append(hashes, block.Cid().Hash())
 		}

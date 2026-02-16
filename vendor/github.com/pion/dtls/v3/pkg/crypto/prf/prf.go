@@ -1,11 +1,11 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 // Package prf implements TLS 1.2 Pseudorandom functions
 package prf
 
 import ( //nolint:gci
-	ellipticStdlib "crypto/elliptic"
+	"crypto/ecdh"
 	"crypto/hmac"
 	"encoding/binary"
 	"errors"
@@ -15,7 +15,6 @@ import ( //nolint:gci
 
 	"github.com/pion/dtls/v3/pkg/crypto/elliptic"
 	"github.com/pion/dtls/v3/pkg/protocol"
-	"golang.org/x/crypto/curve25519"
 )
 
 const (
@@ -40,7 +39,7 @@ type EncryptionKeys struct {
 	ServerWriteIV  []byte
 }
 
-var errInvalidNamedCurve = &protocol.FatalError{Err: errors.New("invalid named curve")} //nolint:goerr113
+var errInvalidNamedCurve = &protocol.FatalError{Err: errors.New("invalid named curve")} //nolint:err113
 
 func (e *EncryptionKeys) String() string {
 	return fmt.Sprintf(`encryptionKeys:
@@ -108,30 +107,30 @@ func EcdhePSKPreMasterSecret(psk, publicKey, privateKey []byte, curve elliptic.C
 
 // PreMasterSecret implements TLS 1.2 Premaster Secret generation given a keypair and a curve.
 func PreMasterSecret(publicKey, privateKey []byte, curve elliptic.Curve) ([]byte, error) {
+	var ec ecdh.Curve
+
 	switch curve {
 	case elliptic.X25519:
-		return curve25519.X25519(privateKey, publicKey)
+		ec = ecdh.X25519()
 	case elliptic.P256:
-		return ellipticCurvePreMasterSecret(publicKey, privateKey, ellipticStdlib.P256(), ellipticStdlib.P256())
+		ec = ecdh.P256()
 	case elliptic.P384:
-		return ellipticCurvePreMasterSecret(publicKey, privateKey, ellipticStdlib.P384(), ellipticStdlib.P384())
+		ec = ecdh.P384()
 	default:
 		return nil, errInvalidNamedCurve
 	}
-}
 
-func ellipticCurvePreMasterSecret(publicKey, privateKey []byte, c1, c2 ellipticStdlib.Curve) ([]byte, error) {
-	x, y := ellipticStdlib.Unmarshal(c1, publicKey)
-	if x == nil || y == nil {
-		return nil, errInvalidNamedCurve
+	sk, err := ec.NewPrivateKey(privateKey)
+	if err != nil {
+		return nil, err
 	}
 
-	result, _ := c2.ScalarMult(x, y, privateKey)
-	preMasterSecret := make([]byte, (c2.Params().BitSize+7)>>3)
-	resultBytes := result.Bytes()
-	copy(preMasterSecret[len(preMasterSecret)-len(resultBytes):], resultBytes)
+	pk, err := ec.NewPublicKey(publicKey) // NIST: SEC1 uncompressed; X25519: 32-byte u
+	if err != nil {
+		return nil, err
+	}
 
-	return preMasterSecret, nil
+	return sk.ECDH(pk)
 }
 
 // PHash is PRF is the SHA-256 hash function is used for all cipher suites

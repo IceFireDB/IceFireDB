@@ -59,12 +59,13 @@ func NewConn(netConn net.Conn) Conn {
 		nextConn: netConn,
 		closed:   make(chan struct{}),
 	}
+
 	return c
 }
 
 // ReadContext reads data from the connection.
 // Unlike net.Conn.Read(), the provided context is used to control timeout.
-func (c *conn) ReadContext(ctx context.Context, b []byte) (int, error) {
+func (c *conn) ReadContext(ctx context.Context, b []byte) (int, error) { //nolint:cyclop
 	c.readMu.Lock()
 	defer c.readMu.Unlock()
 
@@ -85,6 +86,7 @@ func (c *conn) ReadContext(ctx context.Context, b []byte) (int, error) {
 			// context canceled
 			if err := c.nextConn.SetReadDeadline(veryOld); err != nil {
 				errSetDeadline.Store(err)
+
 				return
 			}
 			<-done
@@ -105,12 +107,13 @@ func (c *conn) ReadContext(ctx context.Context, b []byte) (int, error) {
 	if err2, ok := errSetDeadline.Load().(error); ok && err == nil && err2 != nil {
 		err = err2
 	}
+
 	return n, err
 }
 
 // WriteContext writes data to the connection.
 // Unlike net.Conn.Write(), the provided context is used to control timeout.
-func (c *conn) WriteContext(ctx context.Context, b []byte) (int, error) {
+func (c *conn) WriteContext(ctx context.Context, b []byte) (int, error) { //nolint:cyclop
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 
@@ -131,6 +134,7 @@ func (c *conn) WriteContext(ctx context.Context, b []byte) (int, error) {
 			// context canceled
 			if err := c.nextConn.SetWriteDeadline(veryOld); err != nil {
 				errSetDeadline.Store(err)
+
 				return
 			}
 			<-done
@@ -151,6 +155,7 @@ func (c *conn) WriteContext(ctx context.Context, b []byte) (int, error) {
 	if err2, ok := errSetDeadline.Load().(error); ok && err == nil && err2 != nil {
 		err = err2
 	}
+
 	return n, err
 }
 
@@ -166,6 +171,7 @@ func (c *conn) Close() error {
 		c.readMu.Unlock()
 		c.writeMu.Unlock()
 	})
+
 	return err
 }
 

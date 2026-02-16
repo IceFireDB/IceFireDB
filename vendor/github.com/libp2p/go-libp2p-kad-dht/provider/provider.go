@@ -47,10 +47,10 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	mh "github.com/multiformats/go-multihash"
 
-	"github.com/probe-lab/go-libdht/kad/key"
-	"github.com/probe-lab/go-libdht/kad/key/bit256"
-	"github.com/probe-lab/go-libdht/kad/key/bitstr"
-	"github.com/probe-lab/go-libdht/kad/trie"
+	"github.com/ipfs/go-libdht/kad/key"
+	"github.com/ipfs/go-libdht/kad/key/bit256"
+	"github.com/ipfs/go-libdht/kad/key/bitstr"
+	"github.com/ipfs/go-libdht/kad/trie"
 
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
 	"github.com/libp2p/go-libp2p-kad-dht/provider/internal"
@@ -1479,6 +1479,8 @@ func (s *SweepingProvider) loadRecentlyReprovidedRegions(now time.Time) (*trie.T
 	if err != nil {
 		return nil, err
 	}
+	defer res.Close()
+
 	regions := trie.New[bitstr.Key, struct{}]()
 	for r := range res.Next() {
 		if r.Error != nil {
@@ -1522,6 +1524,8 @@ func (s *SweepingProvider) gcReprovideHistoryIfNeeded(now time.Time) {
 		s.logger.Warnf("could not query reprovide history for gc: %s", err)
 		return
 	}
+	defer res.Close()
+
 	for r := range res.Next() {
 		if r.Error != nil {
 			s.logger.Warnf("could not query reprovide history for gc: %s", r.Error)

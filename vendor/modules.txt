@@ -362,7 +362,7 @@ github.com/flynn/noise
 ## explicit; go 1.17
 github.com/fsnotify/fsnotify
 github.com/fsnotify/fsnotify/internal
-# github.com/gabriel-vasile/mimetype v1.4.10
+# github.com/gabriel-vasile/mimetype v1.4.12
 ## explicit; go 1.21
 github.com/gabriel-vasile/mimetype
 github.com/gabriel-vasile/mimetype/internal/charset
@@ -374,8 +374,8 @@ github.com/gabriel-vasile/mimetype/internal/scan
 # github.com/gammazero/chanqueue v1.1.1
 ## explicit; go 1.22
 github.com/gammazero/chanqueue
-# github.com/gammazero/deque v1.2.0
-## explicit; go 1.23
+# github.com/gammazero/deque v1.2.1
+## explicit; go 1.24
 github.com/gammazero/deque
 # github.com/getsentry/sentry-go v0.27.0
 ## explicit; go 1.18
@@ -490,7 +490,7 @@ github.com/ipfs-shipyard/nopfs/ipfs
 # github.com/ipfs/bbloom v0.0.4
 ## explicit; go 1.12
 github.com/ipfs/bbloom
-# github.com/ipfs/boxo v0.35.2
+# github.com/ipfs/boxo v0.36.0
 ## explicit; go 1.24.6
 github.com/ipfs/boxo/autoconf
 github.com/ipfs/boxo/bitswap
@@ -621,8 +621,8 @@ github.com/ipfs/go-ds-measure
 # github.com/ipfs/go-ds-pebble v0.5.9
 ## explicit; go 1.24
 github.com/ipfs/go-ds-pebble
-# github.com/ipfs/go-dsqueue v0.1.2
-## explicit; go 1.24.0
+# github.com/ipfs/go-dsqueue v0.2.0
+## explicit; go 1.25
 github.com/ipfs/go-dsqueue
 # github.com/ipfs/go-fs-lock v0.1.1
 ## explicit; go 1.23.8
@@ -637,8 +637,8 @@ github.com/ipfs/go-ipfs-cmds
 # github.com/ipfs/go-ipfs-ds-help v1.1.1
 ## explicit; go 1.19
 github.com/ipfs/go-ipfs-ds-help
-# github.com/ipfs/go-ipfs-pq v0.0.3
-## explicit; go 1.19
+# github.com/ipfs/go-ipfs-pq v0.0.4
+## explicit; go 1.24
 github.com/ipfs/go-ipfs-pq
 # github.com/ipfs/go-ipfs-redirects-file v0.1.2
 ## explicit; go 1.22
@@ -656,14 +656,21 @@ github.com/ipfs/go-ipld-git
 # github.com/ipfs/go-ipld-legacy v0.2.2
 ## explicit; go 1.23.10
 github.com/ipfs/go-ipld-legacy
+# github.com/ipfs/go-libdht v0.5.0
+## explicit; go 1.23
+github.com/ipfs/go-libdht/kad
+github.com/ipfs/go-libdht/kad/key
+github.com/ipfs/go-libdht/kad/key/bit256
+github.com/ipfs/go-libdht/kad/key/bitstr
+github.com/ipfs/go-libdht/kad/trie
 # github.com/ipfs/go-log/v2 v2.9.1
 ## explicit; go 1.24
 github.com/ipfs/go-log/v2
 # github.com/ipfs/go-metrics-interface v0.3.0
 ## explicit; go 1.23
 github.com/ipfs/go-metrics-interface
-# github.com/ipfs/go-peertaskqueue v0.8.2
-## explicit; go 1.22.0
+# github.com/ipfs/go-peertaskqueue v0.8.3
+## explicit; go 1.24.6
 github.com/ipfs/go-peertaskqueue
 github.com/ipfs/go-peertaskqueue/peertask
 github.com/ipfs/go-peertaskqueue/peertracker
@@ -920,8 +927,8 @@ github.com/libp2p/go-libp2p/x/rate
 # github.com/libp2p/go-libp2p-asn-util v0.4.1
 ## explicit; go 1.19
 github.com/libp2p/go-libp2p-asn-util
-# github.com/libp2p/go-libp2p-kad-dht v0.37.1
-## explicit; go 1.24.6
+# github.com/libp2p/go-libp2p-kad-dht v0.38.0
+## explicit; go 1.25
 github.com/libp2p/go-libp2p-kad-dht
 github.com/libp2p/go-libp2p-kad-dht/amino
 github.com/libp2p/go-libp2p-kad-dht/crawler
@@ -1007,8 +1014,8 @@ github.com/mattn/go-sqlite3
 ## explicit; go 1.21.0
 github.com/mholt/acmez/v3
 github.com/mholt/acmez/v3/acme
-# github.com/miekg/dns v1.1.68
-## explicit; go 1.23.0
+# github.com/miekg/dns v1.1.72
+## explicit; go 1.24.0
 github.com/miekg/dns
 # github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b
 ## explicit
@@ -1140,8 +1147,8 @@ github.com/pion/dtls/v2/pkg/protocol/alert
 github.com/pion/dtls/v2/pkg/protocol/extension
 github.com/pion/dtls/v2/pkg/protocol/handshake
 github.com/pion/dtls/v2/pkg/protocol/recordlayer
-# github.com/pion/dtls/v3 v3.0.6
-## explicit; go 1.20
+# github.com/pion/dtls/v3 v3.1.1
+## explicit; go 1.24.0
 github.com/pion/dtls/v3
 github.com/pion/dtls/v3/internal/ciphersuite
 github.com/pion/dtls/v3/internal/ciphersuite/types
@@ -1183,7 +1190,7 @@ github.com/pion/interceptor/pkg/nack
 github.com/pion/interceptor/pkg/report
 github.com/pion/interceptor/pkg/rfc8888
 github.com/pion/interceptor/pkg/twcc
-# github.com/pion/logging v0.2.3
+# github.com/pion/logging v0.2.4
 ## explicit; go 1.20
 github.com/pion/logging
 # github.com/pion/mdns/v2 v2.0.7
@@ -1232,12 +1239,16 @@ github.com/pion/transport/v2/utils/xor
 ## explicit; go 1.19
 github.com/pion/transport/v3
 github.com/pion/transport/v3/deadline
-github.com/pion/transport/v3/netctx
 github.com/pion/transport/v3/packetio
 github.com/pion/transport/v3/replaydetector
 github.com/pion/transport/v3/stdnet
 github.com/pion/transport/v3/utils/xor
 github.com/pion/transport/v3/vnet
+# github.com/pion/transport/v4 v4.0.1
+## explicit; go 1.21
+github.com/pion/transport/v4/deadline
+github.com/pion/transport/v4/netctx
+github.com/pion/transport/v4/replaydetector
 # github.com/pion/turn/v4 v4.0.2
 ## explicit; go 1.20
 github.com/pion/turn/v4
@@ -1270,13 +1281,6 @@ github.com/polydawn/refmt/obj/atlas
 github.com/polydawn/refmt/pretty
 github.com/polydawn/refmt/shared
 github.com/polydawn/refmt/tok
-# github.com/probe-lab/go-libdht v0.4.0
-## explicit; go 1.23
-github.com/probe-lab/go-libdht/kad
-github.com/probe-lab/go-libdht/kad/key
-github.com/probe-lab/go-libdht/kad/key/bit256
-github.com/probe-lab/go-libdht/kad/key/bitstr
-github.com/probe-lab/go-libdht/kad/trie
 # github.com/prometheus/client_golang v1.23.2
 ## explicit; go 1.23.0
 github.com/prometheus/client_golang/prometheus

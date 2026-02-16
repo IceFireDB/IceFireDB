@@ -1,8 +1,8 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 // Package types provides types for TLS Ciphers
-package types
+package types // nolint:revive
 
 // KeyExchangeAlgorithm controls what exchange algorithm was chosen.
 type KeyExchangeAlgorithm int

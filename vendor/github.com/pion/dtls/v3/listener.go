@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package dtls
@@ -13,6 +13,8 @@ import (
 )
 
 // Listen creates a DTLS listener.
+//
+// Deprecated: Use ListenWithOptions instead.
 func Listen(network string, laddr *net.UDPAddr, config *Config) (net.Listener, error) {
 	if err := validateConfig(config); err != nil {
 		return nil, err
@@ -49,7 +51,19 @@ func Listen(network string, laddr *net.UDPAddr, config *Config) (net.Listener, e
 	}, nil
 }
 
+// ListenWithOptions creates a DTLS listener.
+func ListenWithOptions(network string, laddr *net.UDPAddr, opts ...ServerOption) (net.Listener, error) {
+	config, err := buildServerConfig(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return Listen(network, laddr, config)
+}
+
 // NewListener creates a DTLS listener which accepts connections from an inner Listener.
+//
+// Deprecated: Use NewListenerWithOptions instead.
 func NewListener(inner dtlsnet.PacketListener, config *Config) (net.Listener, error) {
 	if err := validateConfig(config); err != nil {
 		return nil, err
@@ -59,6 +73,16 @@ func NewListener(inner dtlsnet.PacketListener, config *Config) (net.Listener, er
 		config: config,
 		parent: inner,
 	}, nil
+}
+
+// NewListenerWithOptions creates a DTLS listener which accepts connections from an inner Listener.
+func NewListenerWithOptions(inner dtlsnet.PacketListener, opts ...ServerOption) (net.Listener, error) {
+	config, err := buildServerConfig(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewListener(inner, config)
 }
 
 // listener represents a DTLS listener.
@@ -75,7 +99,7 @@ func (l *listener) Accept() (net.Conn, error) {
 		return nil, err
 	}
 
-	return Server(c, raddr, l.config)
+	return serverWithConfig(c, raddr, l.config)
 }
 
 // Close closes the listener.

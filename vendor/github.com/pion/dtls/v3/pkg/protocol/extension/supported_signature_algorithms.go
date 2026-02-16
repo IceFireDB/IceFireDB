@@ -1,18 +1,10 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package extension
 
 import (
-	"encoding/binary"
-
-	"github.com/pion/dtls/v3/pkg/crypto/hash"
-	"github.com/pion/dtls/v3/pkg/crypto/signature"
 	"github.com/pion/dtls/v3/pkg/crypto/signaturehash"
-)
-
-const (
-	supportedSignatureAlgorithmsHeaderSize = 6
 )
 
 // SupportedSignatureAlgorithms allows a Client/Server to
@@ -29,45 +21,17 @@ func (s SupportedSignatureAlgorithms) TypeValue() TypeValue {
 }
 
 // Marshal encodes the extension.
+// This supports hybrid encoding: TLS 1.3 PSS schemes are encoded as full uint16,
+// while TLS 1.2 schemes use hash (high byte) + signature (low byte) encoding.
 func (s *SupportedSignatureAlgorithms) Marshal() ([]byte, error) {
-	out := make([]byte, supportedSignatureAlgorithmsHeaderSize)
-
-	binary.BigEndian.PutUint16(out, uint16(s.TypeValue()))
-	binary.BigEndian.PutUint16(out[2:], uint16(2+(len(s.SignatureHashAlgorithms)*2))) //nolint:gosec // G115
-	binary.BigEndian.PutUint16(out[4:], uint16(len(s.SignatureHashAlgorithms)*2))     //nolint:gosec // G115
-	for _, v := range s.SignatureHashAlgorithms {
-		out = append(out, []byte{0x00, 0x00}...) //nolint:makezero // todo: fix
-		out[len(out)-2] = byte(v.Hash)
-		out[len(out)-1] = byte(v.Signature)
-	}
-
-	return out, nil
+	return marshalGenericSignatureHashAlgorithm(s.TypeValue(), s.SignatureHashAlgorithms)
 }
 
 // Unmarshal populates the extension from encoded data.
+// This supports hybrid encoding: detects TLS 1.3 PSS schemes
+// and handles them as full uint16, while TLS 1.2 schemes use byte-split encoding.
 func (s *SupportedSignatureAlgorithms) Unmarshal(data []byte) error {
-	if len(data) <= supportedSignatureAlgorithmsHeaderSize {
-		return errBufferTooSmall
-	} else if TypeValue(binary.BigEndian.Uint16(data)) != s.TypeValue() {
-		return errInvalidExtensionType
-	}
+	s.SignatureHashAlgorithms = []signaturehash.Algorithm{}
 
-	algorithmCount := int(binary.BigEndian.Uint16(data[4:]) / 2)
-	if supportedSignatureAlgorithmsHeaderSize+(algorithmCount*2) > len(data) {
-		return errLengthMismatch
-	}
-	for i := 0; i < algorithmCount; i++ {
-		supportedHashAlgorithm := hash.Algorithm(data[supportedSignatureAlgorithmsHeaderSize+(i*2)])
-		supportedSignatureAlgorithm := signature.Algorithm(data[supportedSignatureAlgorithmsHeaderSize+(i*2)+1])
-		if _, ok := hash.Algorithms()[supportedHashAlgorithm]; ok {
-			if _, ok := signature.Algorithms()[supportedSignatureAlgorithm]; ok {
-				s.SignatureHashAlgorithms = append(s.SignatureHashAlgorithms, signaturehash.Algorithm{
-					Hash:      supportedHashAlgorithm,
-					Signature: supportedSignatureAlgorithm,
-				})
-			}
-		}
-	}
-
-	return nil
+	return unmarshalGenericSignatureHashAlgorithm(s.TypeValue(), data, &s.SignatureHashAlgorithms)
 }

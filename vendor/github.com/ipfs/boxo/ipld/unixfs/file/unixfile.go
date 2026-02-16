@@ -13,6 +13,11 @@ import (
 	ipld "github.com/ipfs/go-ipld-format"
 )
 
+var (
+	_ files.Directory = (*ufsDirectory)(nil)
+	_ files.File      = (*ufsFile)(nil)
+)
+
 // Number to file to prefetch in directories
 // TODO: should we allow setting this via context hint?
 const prefetchFiles = 4
@@ -205,8 +210,3 @@ func NewUnixfsFile(ctx context.Context, dserv ipld.DAGService, nd ipld.Node) (fi
 		DagReader: dr,
 	}, nil
 }
-
-var (
-	_ files.Directory = &ufsDirectory{}
-	_ files.File      = &ufsFile{}
-)

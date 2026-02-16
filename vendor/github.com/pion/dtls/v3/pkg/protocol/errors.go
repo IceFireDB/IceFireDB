@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package protocol
@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	errBufferTooSmall    = &TemporaryError{Err: errors.New("buffer is too small")} //nolint:goerr113
-	errInvalidCipherSpec = &FatalError{Err: errors.New("cipher spec invalid")}     //nolint:goerr113
+	errBufferTooSmall    = &TemporaryError{Err: errors.New("buffer is too small")} //nolint:err113
+	errInvalidCipherSpec = &FatalError{Err: errors.New("cipher spec invalid")}     //nolint:err113
 )
 
 // FatalError indicates that the DTLS connection is no longer available.

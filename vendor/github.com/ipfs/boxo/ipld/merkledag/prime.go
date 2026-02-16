@@ -5,6 +5,8 @@ import (
 	"github.com/ipld/go-ipld-prime"
 )
 
+var _ ipld.Node = (*ProtoNode)(nil)
+
 // Protonode was originally implemented as a go-ipld-format node, and included
 // functionality that does not fit well into the model for go-ipld-prime, namely
 // the ability ot modify the node in place.
@@ -202,5 +204,3 @@ func (n *ProtoNode) AsLink() (ipld.Link, error) {
 func (n *ProtoNode) Prototype() ipld.NodePrototype {
 	return dagpb.Type.PBNode
 }
-
-var _ ipld.Node = &ProtoNode{}

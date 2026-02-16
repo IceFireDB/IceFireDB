@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 // Package ccm implements a CCM, Counter with CBC-MAC
@@ -146,8 +146,7 @@ func (c *ccm) tag(nonce, plaintext, adata []byte) ([]byte, error) {
 		if adataLength <= 0xfeff {
 			binary.BigEndian.PutUint16(block[:i], uint16(adataLength))
 		} else {
-			block[0] = 0xfe
-			block[1] = 0xff
+			binary.BigEndian.PutUint16(block[0:2], 0xfeff)
 			if adataLength < uint64(1<<32) {
 				i = 2 + 4
 				binary.BigEndian.PutUint32(block[2:i], uint32(adataLength)) //nolint:gosec // G115

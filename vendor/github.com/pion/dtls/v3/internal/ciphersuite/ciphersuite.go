@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 // Package ciphersuite provides TLS Ciphers as registered with the IANA
@@ -13,7 +13,7 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol"
 )
 
-//nolint:goerr113
+//nolint:err113
 var errCipherSuiteNotInit = &protocol.TemporaryError{Err: errors.New("CipherSuite has not been initialized")}
 
 // ID is an ID for our supported CipherSuites.
@@ -57,26 +57,26 @@ func (i ID) String() string { //nolint:cyclop
 // Supported Cipher Suites.
 const (
 	// AES-128-CCM.
-	TLS_ECDHE_ECDSA_WITH_AES_128_CCM   ID = 0xc0ac //nolint:revive,stylecheck
-	TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 ID = 0xc0ae //nolint:revive,stylecheck
+	TLS_ECDHE_ECDSA_WITH_AES_128_CCM   ID = 0xc0ac // nolint: revive,staticcheck
+	TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 ID = 0xc0ae // nolint: revive,staticcheck
 
 	// AES-128-GCM-SHA256.
-	TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 ID = 0xc02b //nolint:revive,stylecheck
-	TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256   ID = 0xc02f //nolint:revive,stylecheck
+	TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 ID = 0xc02b // nolint: revive,staticcheck
+	TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256   ID = 0xc02f // nolint: revive,staticcheck
 
-	TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 ID = 0xc02c //nolint:revive,stylecheck
-	TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384   ID = 0xc030 //nolint:revive,stylecheck
+	TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 ID = 0xc02c // nolint: revive,staticcheck
+	TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384   ID = 0xc030 // nolint: revive,staticcheck
 	// AES-256-CBC-SHA.
-	TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA ID = 0xc00a //nolint:revive,stylecheck
-	TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA   ID = 0xc014 //nolint:revive,stylecheck
+	TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA ID = 0xc00a // nolint: revive,staticcheck
+	TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA   ID = 0xc014 // nolint: revive,staticcheck
 
-	TLS_PSK_WITH_AES_128_CCM        ID = 0xc0a4 //nolint:revive,stylecheck
-	TLS_PSK_WITH_AES_128_CCM_8      ID = 0xc0a8 //nolint:revive,stylecheck
-	TLS_PSK_WITH_AES_256_CCM_8      ID = 0xc0a9 //nolint:revive,stylecheck
-	TLS_PSK_WITH_AES_128_GCM_SHA256 ID = 0x00a8 //nolint:revive,stylecheck
-	TLS_PSK_WITH_AES_128_CBC_SHA256 ID = 0x00ae //nolint:revive,stylecheck
+	TLS_PSK_WITH_AES_128_CCM        ID = 0xc0a4 // nolint: revive,staticcheck
+	TLS_PSK_WITH_AES_128_CCM_8      ID = 0xc0a8 // nolint: revive,staticcheck
+	TLS_PSK_WITH_AES_256_CCM_8      ID = 0xc0a9 // nolint: revive,staticcheck
+	TLS_PSK_WITH_AES_128_GCM_SHA256 ID = 0x00a8 // nolint: revive,staticcheck
+	TLS_PSK_WITH_AES_128_CBC_SHA256 ID = 0x00ae // nolint: revive,staticcheck
 
-	TLS_ECDHE_PSK_WITH_AES_128_CBC_SHA256 ID = 0xC037 //nolint:revive,stylecheck
+	TLS_ECDHE_PSK_WITH_AES_128_CBC_SHA256 ID = 0xC037 // nolint: revive,staticcheck
 )
 
 // AuthenticationType controls what authentication method is using during the handshake.

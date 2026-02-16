@@ -24,7 +24,7 @@ type RawNode struct {
 	ipld.Node
 }
 
-var _ legacy.UniversalNode = &RawNode{}
+var _ legacy.UniversalNode = (*RawNode)(nil)
 
 // NewRawNode creates a RawNode using the default sha2-256 hash function.
 func NewRawNode(data []byte) *RawNode {
@@ -71,7 +71,7 @@ func (rn *RawNode) ResolveLink(path []string) (*format.Link, []string, error) {
 }
 
 // Resolve returns an error.
-func (rn *RawNode) Resolve(path []string) (interface{}, []string, error) {
+func (rn *RawNode) Resolve(path []string) (any, []string, error) {
 	return nil, nil, ErrLinkNotFound
 }
 
@@ -121,5 +121,3 @@ func RawNodeConverter(b blocks.Block, nd ipld.Node) (legacy.UniversalNode, error
 	}
 	return &RawNode{b, nd}, nil
 }
-
-var _ legacy.UniversalNode = (*RawNode)(nil)

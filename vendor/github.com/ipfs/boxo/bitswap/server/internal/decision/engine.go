@@ -1044,14 +1044,6 @@ func (e *Engine) sendAsBlock(wantType pb.Message_Wantlist_WantType, blockSize in
 	return wantType == pb.Message_Wantlist_Block || blockSize <= e.wantHaveReplaceSize
 }
 
-func (e *Engine) numBytesSentTo(p peer.ID) uint64 {
-	return e.LedgerForPeer(p).Sent
-}
-
-func (e *Engine) numBytesReceivedFrom(p peer.ID) uint64 {
-	return e.LedgerForPeer(p).Recv
-}
-
 func (e *Engine) signalNewWork() {
 	// Signal task generation to restart (if stopped!)
 	select {

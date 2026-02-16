@@ -34,6 +34,10 @@ const (
 	// See the MaxConcurrentRequests field documentation for detailed tuning guidance.
 	DefaultMaxConcurrentRequests = 4096
 
+	// DefaultMaxRequestDuration is the default per-request timeout for the
+	// gateway handler.
+	DefaultMaxRequestDuration = time.Hour
+
 	// DefaultDiagnosticServiceURL is the default URL for CID diagnostic service
 	DefaultDiagnosticServiceURL = "https://check.ipfs.network"
 )
@@ -133,6 +137,12 @@ type Config struct {
 	// (e.g., Cloudflare's 5GB limit). A value of 0 disables this limit.
 	MaxRangeRequestFileSize int64
 
+	// MaxRequestDuration is the maximum total time a request can take.
+	// Unlike RetrievalTimeout (which resets on each data write and catches
+	// stalled transfers), this is an absolute deadline for the entire request.
+	// Zero or negative values will use DefaultMaxRequestDuration (1 hour).
+	MaxRequestDuration time.Duration
+
 	// MetricsRegistry is the Prometheus registry to use for metrics.
 	// If nil, prometheus.DefaultRegisterer will be used.
 	MetricsRegistry prometheus.Registerer
@@ -147,6 +157,13 @@ func validateConfig(c Config) Config {
 			log.Errorf("invalid DiagnosticServiceURL %q: %v, disabling diagnostic service", c.DiagnosticServiceURL, err)
 			c.DiagnosticServiceURL = ""
 		}
+	}
+
+	if c.MaxRequestDuration <= 0 {
+		if c.MaxRequestDuration < 0 {
+			log.Errorf("invalid MaxRequestDuration %s, using default %s", c.MaxRequestDuration.String(), DefaultMaxRequestDuration.String())
+		}
+		c.MaxRequestDuration = DefaultMaxRequestDuration
 	}
 
 	// Future validations can be added here

@@ -28,13 +28,14 @@ func NewTarWriter(w io.Writer) (*TarWriter, error) {
 }
 
 func (w *TarWriter) writeDir(f Directory, fpath string) error {
-	if err := w.writeHeader(f, fpath, 0); err != nil {
+	err := w.writeHeader(f, fpath, 0)
+	if err != nil {
 		return err
 	}
 
 	it := f.Entries()
 	for it.Next() {
-		if err := w.WriteFile(it.Node(), path.Join(fpath, it.Name())); err != nil {
+		if err = w.WriteFile(it.Node(), path.Join(fpath, it.Name())); err != nil {
 			return err
 		}
 	}
@@ -51,7 +52,7 @@ func (w *TarWriter) writeFile(f File, fpath string) error {
 		return err
 	}
 
-	if _, err := io.Copy(w.TarW, f); err != nil {
+	if _, err = io.Copy(w.TarW, f); err != nil {
 		return err
 	}
 	w.TarW.Flush()

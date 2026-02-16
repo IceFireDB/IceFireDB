@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/go-clock"
 	"github.com/gammazero/deque"
 	cid "github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
@@ -42,9 +41,6 @@ type DontHaveTimeoutConfig struct {
 	// timeoutsSignal used for testing -- caller-provided channel to signals
 	// when a dont have timeout was triggered.
 	timeoutsSignal chan<- struct{}
-
-	// clock is a mockable time api used for testing.
-	clock clock.Clock
 }
 
 func DefaultDontHaveTimeoutConfig() *DontHaveTimeoutConfig {
@@ -102,7 +98,7 @@ type dontHaveTimeoutMgr struct {
 	// ewma of message latency (time from message sent to response received)
 	messageLatency *latencyEwma
 	// timer used to wait until want at front of queue expires
-	checkForTimeoutsTimer *clock.Timer
+	checkForTimeoutsTimer *time.Timer
 }
 
 // newDontHaveTimeoutMgr creates a new dontHaveTimeoutMgr
@@ -116,9 +112,6 @@ func newDontHaveTimeoutMgr(pc PeerConnection, onDontHaveTimeout func([]cid.Cid, 
 	}
 	if cfg == nil {
 		cfg = DefaultDontHaveTimeoutConfig()
-	}
-	if cfg.clock == nil {
-		cfg.clock = clock.New()
 	}
 	ctx, shutdown := context.WithCancel(context.Background())
 	return &dontHaveTimeoutMgr{
@@ -231,7 +224,7 @@ func (dhtm *dontHaveTimeoutMgr) checkForTimeouts() {
 
 	// Figure out which of the blocks that were wanted were not received
 	// within the timeout
-	now := dhtm.config.clock.Now()
+	now := time.Now()
 	expired := make([]cid.Cid, 0, len(dhtm.activeWants))
 	for dhtm.wantQueue.Len() > 0 {
 		pw := dhtm.wantQueue.Front()
@@ -273,7 +266,7 @@ func (dhtm *dontHaveTimeoutMgr) checkForTimeouts() {
 	oldestStart := dhtm.wantQueue.Front().sent
 	until := oldestStart.Add(dhtm.timeout).Sub(now)
 	if dhtm.checkForTimeoutsTimer == nil {
-		dhtm.checkForTimeoutsTimer = dhtm.config.clock.Timer(until)
+		dhtm.checkForTimeoutsTimer = time.NewTimer(until)
 		go func() {
 			for {
 				select {
@@ -299,7 +292,7 @@ func (dhtm *dontHaveTimeoutMgr) AddPending(ks []cid.Cid) {
 		return
 	}
 
-	start := dhtm.config.clock.Now()
+	start := time.Now()
 
 	dhtm.lk.Lock()
 	defer dhtm.lk.Unlock()

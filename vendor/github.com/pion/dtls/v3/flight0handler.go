@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package dtls
@@ -14,7 +14,11 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 )
 
-//nolint:cyclop
+// renegotiationInfoSCSV is TLS_EMPTY_RENEGOTIATION_INFO_SCSV defined in RFC 5746.
+// https://datatracker.ietf.org/doc/html/rfc5746#section-3.3.
+const renegotiationInfoSCSV uint16 = 0x00ff
+
+//nolint:cyclop,gocognit
 func flight0Parse(
 	_ context.Context,
 	_ flightConn,
@@ -52,6 +56,11 @@ func flight0Parse(
 
 	cipherSuites := []CipherSuite{}
 	for _, id := range clientHello.CipherSuiteIDs {
+		if id == renegotiationInfoSCSV {
+			state.remoteSupportsRenegotiation = true
+
+			continue
+		}
 		if c := cipherSuiteForID(CipherSuiteID(id), cfg.customCipherSuites); c != nil {
 			cipherSuites = append(cipherSuites, c)
 		}
@@ -69,7 +78,7 @@ func flight0Parse(
 			}
 			state.namedCurve = ext.EllipticCurves[0]
 		case *extension.UseSRTP:
-			profile, ok := findMatchingSRTPProfile(ext.ProtectionProfiles, cfg.localSRTPProtectionProfiles)
+			profile, ok := findMatchingSRTPProfile(cfg.localSRTPProtectionProfiles, ext.ProtectionProfiles)
 			if !ok {
 				return 0, &alert.Alert{Level: alert.Fatal, Description: alert.InsufficientSecurity}, errServerNoMatchingSRTPProfile
 			}
@@ -81,6 +90,8 @@ func flight0Parse(
 			}
 		case *extension.ServerName:
 			state.serverName = ext.ServerName // remote server name
+		case *extension.RenegotiationInfo:
+			state.remoteSupportsRenegotiation = true
 		case *extension.ALPN:
 			state.peerSupportedProtocols = ext.ProtocolNameList
 		case *extension.ConnectionID:
@@ -89,6 +100,9 @@ func flight0Parse(
 			if cfg.connectionIDGenerator != nil {
 				state.remoteConnectionID = ext.CID
 			}
+		case *extension.SignatureAlgorithmsCert:
+			// Store the client's certificate signature schemes for later validation
+			state.remoteCertSignatureSchemes = ext.SignatureHashAlgorithms
 		}
 	}
 

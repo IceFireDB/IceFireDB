@@ -3,6 +3,8 @@ package keystore
 import (
 	"encoding/base32"
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,11 +48,10 @@ type FSKeystore struct {
 // NewFSKeystore returns a new filesystem-backed keystore.
 func NewFSKeystore(dir string) (*FSKeystore, error) {
 	err := os.Mkdir(dir, 0o700)
-	switch {
-	case os.IsExist(err):
-	case err == nil:
-	default:
-		return nil, err
+	if err != nil {
+		if !errors.Is(err, fs.ErrExist) {
+			return nil, fmt.Errorf("cannot create keystore directory %q: %w", dir, err)
+		}
 	}
 	return &FSKeystore{dir}, nil
 }
@@ -65,11 +66,13 @@ func (ks *FSKeystore) Has(name string) (bool, error) {
 	kp := filepath.Join(ks.dir, name)
 
 	_, err = os.Stat(kp)
-
-	if os.IsNotExist(err) {
-		return false, nil
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("cannot stat keystore file %q: %w", kp, err)
 	}
-	return err == nil, err
+	return true, nil
 }
 
 // Put stores a key in the Keystore, if a key with the same name already exists, returns ErrKeyExists
@@ -88,10 +91,10 @@ func (ks *FSKeystore) Put(name string, k ci.PrivKey) error {
 
 	fi, err := os.OpenFile(kp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o400)
 	if err != nil {
-		if os.IsExist(err) {
-			err = ErrKeyExists
+		if errors.Is(err, fs.ErrExist) {
+			return ErrKeyExists
 		}
-		return err
+		return fmt.Errorf("cannot create keystore file %q: %w", kp, err)
 	}
 	defer fi.Close()
 
@@ -112,13 +115,17 @@ func (ks *FSKeystore) Get(name string) (ci.PrivKey, error) {
 
 	data, err := os.ReadFile(kp)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil, ErrNoSuchKey
 		}
-		return nil, err
+		return nil, fmt.Errorf("cannot read keystore file %q: %w", kp, err)
 	}
 
-	return ci.UnmarshalPrivateKey(data)
+	privKey, err := ci.UnmarshalPrivateKey(data)
+	if err != nil {
+		return nil, fmt.Errorf("cannot deserialize private key file %q: %w", kp, err)
+	}
+	return privKey, nil
 }
 
 // Delete removes a key from the Keystore
@@ -150,11 +157,11 @@ func (ks *FSKeystore) List() ([]string, error) {
 
 	for _, name := range dirs {
 		decodedName, err := decode(name)
-		if err == nil {
-			list = append(list, decodedName)
-		} else {
+		if err != nil {
 			log.Errorf("Ignoring keyfile with invalid encoded filename: %s", name)
+			continue
 		}
+		list = append(list, decodedName)
 	}
 
 	return list, nil

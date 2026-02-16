@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 // Package alert implements TLS alert protocol https://tools.ietf.org/html/rfc5246#section-7.2
@@ -11,7 +11,7 @@ import (
 	"github.com/pion/dtls/v3/pkg/protocol"
 )
 
-var errBufferTooSmall = &protocol.TemporaryError{Err: errors.New("buffer is too small")} //nolint:goerr113
+var errBufferTooSmall = &protocol.TemporaryError{Err: errors.New("buffer is too small")} //nolint:err113
 
 // Level is the level of the TLS Alert.
 type Level byte

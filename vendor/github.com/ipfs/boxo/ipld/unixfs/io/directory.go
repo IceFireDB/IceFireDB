@@ -511,10 +511,10 @@ func (d *BasicDirectory) Links(ctx context.Context) ([]*ipld.Link, error) {
 // Find implements the `Directory` interface.
 func (d *BasicDirectory) Find(ctx context.Context, name string) (ipld.Node, error) {
 	lnk, err := d.node.GetNodeLink(name)
-	if err == mdag.ErrLinkNotFound {
-		err = os.ErrNotExist
-	}
 	if err != nil {
+		if errors.Is(err, mdag.ErrLinkNotFound) {
+			err = os.ErrNotExist
+		}
 		return nil, err
 	}
 
@@ -528,10 +528,10 @@ func (d *BasicDirectory) RemoveChild(ctx context.Context, name string) error {
 	// becomes a problem, a factor of 2 isn't going to make much of a difference.
 	// We'd likely need to cache a link resolution map in that case.
 	link, err := d.node.GetNodeLink(name)
-	if err == mdag.ErrLinkNotFound {
-		return os.ErrNotExist
-	}
 	if err != nil {
+		if errors.Is(err, mdag.ErrLinkNotFound) {
+			return os.ErrNotExist
+		}
 		return err // at the moment there is no other error besides ErrLinkNotFound
 	}
 
@@ -741,7 +741,7 @@ func (d *HAMTDirectory) needsToSwitchToBasicDir(ctx context.Context, name string
 	// Find if there is an old entry under that name that will be overwritten
 	// (AddEntry) or flat out removed (RemoveEntry).
 	entryToRemove, err := d.shard.Find(ctx, name)
-	if err != os.ErrNotExist {
+	if !errors.Is(err, os.ErrNotExist) {
 		if err != nil {
 			return false, err
 		}

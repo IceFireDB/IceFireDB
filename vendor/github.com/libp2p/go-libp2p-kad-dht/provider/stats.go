@@ -6,10 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ipfs/go-libdht/kad/trie"
 	"github.com/libp2p/go-libp2p-kad-dht/provider/internal/keyspace"
 	"github.com/libp2p/go-libp2p-kad-dht/provider/internal/timeseries"
 	"github.com/libp2p/go-libp2p-kad-dht/provider/stats"
-	"github.com/probe-lab/go-libdht/kad/trie"
 )
 
 func (s *SweepingProvider) Stats() stats.Stats {

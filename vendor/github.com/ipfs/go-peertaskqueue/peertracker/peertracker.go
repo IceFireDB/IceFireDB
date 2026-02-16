@@ -4,14 +4,12 @@ import (
 	"math"
 	"math/bits"
 	"sync"
+	"time"
 
-	"github.com/filecoin-project/go-clock"
 	pq "github.com/ipfs/go-ipfs-pq"
 	"github.com/ipfs/go-peertaskqueue/peertask"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
-
-var clockInstance = clock.New()
 
 // TaskMerger is an interface that is used to merge new tasks into the active
 // and pending queues
@@ -214,7 +212,7 @@ func (p *PeerTracker) PushTasks(tasks ...peertask.Task) {
 // When truncation happen we will keep older tasks in the queue to avoid some infinite
 // tasks rotations if we are continously receiving work faster than we process it.
 func (p *PeerTracker) PushTasksTruncated(n uint, tasks ...peertask.Task) {
-	now := clockInstance.Now()
+	now := time.Now()
 
 	p.activelk.Lock()
 	defer p.activelk.Unlock()
@@ -346,9 +344,7 @@ func (p *PeerTracker) TaskDone(task *peertask.Task) {
 		delete(p.activeTasks, task.Topic)
 	} else {
 		// Garbage collection.
-		for i := len(newTasks); i < len(activeTasks); i++ {
-			activeTasks[i] = nil
-		}
+		clear(activeTasks[len(newTasks):])
 
 		p.activeTasks[task.Topic] = newTasks
 	}

@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/go-clock"
 	ipns "github.com/ipfs/boxo/ipns"
 	"github.com/ipfs/boxo/routing/http/contentrouter"
 	"github.com/ipfs/boxo/routing/http/filters"
@@ -68,7 +67,6 @@ const (
 type Client struct {
 	baseURL    string
 	httpClient httpClient
-	clock      clock.Clock
 	accepts    string
 
 	peerID   peer.ID
@@ -207,7 +205,6 @@ func New(baseURL string, opts ...Option) (*Client, error) {
 	client := &Client{
 		baseURL:        normalizedURL,
 		httpClient:     newDefaultHTTPClient(defaultUserAgent),
-		clock:          clock.New(),
 		accepts:        strings.Join([]string{mediaTypeNDJSON, mediaTypeJSON}, ","),
 		protocolFilter: DefaultProtocolFilter, // can be customized via WithProtocolFilter
 	}
@@ -271,11 +268,11 @@ func (c *Client) FindProviders(ctx context.Context, key cid.Cid) (providers iter
 
 	m.host = req.Host
 
-	start := c.clock.Now()
+	start := time.Now()
 	resp, err := c.httpClient.Do(req)
 
 	m.err = err
-	m.latency = c.clock.Since(start)
+	m.latency = time.Since(start)
 
 	if err != nil {
 		m.record(ctx)
@@ -339,9 +336,9 @@ func (c *Client) FindProviders(ctx context.Context, key cid.Cid) (providers iter
 	return &measuringIter[iter.Result[types.Record]]{Iter: it, ctx: ctx, m: m}, nil
 }
 
-// Deprecated: protocol-agnostic provide is being worked on in [IPIP-378]:
+// Deprecated: historic API from [IPIP-526], may be removed in a future version.
 //
-// [IPIP-378]: https://github.com/ipfs/specs/pull/378
+// [IPIP-526]: https://specs.ipfs.tech/ipips/ipip-0526/
 func (c *Client) ProvideBitswap(ctx context.Context, keys []cid.Cid, ttl time.Duration) (time.Duration, error) {
 	if c.identity == nil {
 		return 0, errors.New("cannot provide Bitswap records without an identity")
@@ -355,7 +352,7 @@ func (c *Client) ProvideBitswap(ctx context.Context, keys []cid.Cid, ttl time.Du
 		ks[i] = types.CID{Cid: c}
 	}
 
-	now := c.clock.Now()
+	now := time.Now()
 
 	req := types.WriteBitswapRecord{
 		Protocol: "transport-bitswap",
@@ -457,11 +454,11 @@ func (c *Client) FindPeers(ctx context.Context, pid peer.ID) (peers iter.ResultI
 
 	m.host = req.Host
 
-	start := c.clock.Now()
+	start := time.Now()
 	resp, err := c.httpClient.Do(req)
 
 	m.err = err
-	m.latency = c.clock.Since(start)
+	m.latency = time.Since(start)
 
 	if err != nil {
 		m.record(ctx)
@@ -637,4 +634,79 @@ func (c *Client) PutIPNS(ctx context.Context, name ipns.Name, record *ipns.Recor
 	}
 
 	return nil
+}
+
+// GetClosestPeers obtains the closest peers to the given key (CID or Peer ID).
+func (c *Client) GetClosestPeers(ctx context.Context, key cid.Cid) (peers iter.ResultIter[*types.PeerRecord], err error) {
+	m := newMeasurement("GetClosestPeers")
+
+	// Build the base URL path
+	u, err := gourl.JoinPath(c.baseURL, "routing/v1/dht/closest/peers", key.String())
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the HTTP request
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", c.accepts)
+
+	m.host = req.Host
+	start := time.Now()
+	resp, err := c.httpClient.Do(req)
+	m.latency = time.Since(start)
+	m.err = err
+
+	if err != nil {
+		m.record(ctx)
+		return nil, err
+	}
+
+	var skipBodyClose bool
+	defer func() {
+		if !skipBodyClose {
+			resp.Body.Close()
+		}
+	}()
+
+	m.statusCode = resp.StatusCode
+	if resp.StatusCode == http.StatusNotFound {
+		m.record(ctx)
+		return iter.FromSlice[iter.Result[*types.PeerRecord]](nil), nil
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		err := httpError(resp.StatusCode, resp.Body)
+		m.record(ctx)
+		return nil, err
+	}
+
+	respContentType := resp.Header.Get("Content-Type")
+	mediaType, _, err := mime.ParseMediaType(respContentType)
+	if err != nil {
+		m.err = err
+		m.record(ctx)
+		return nil, fmt.Errorf("parsing Content-Type: %w", err)
+	}
+
+	m.mediaType = mediaType
+
+	var it iter.ResultIter[*types.PeerRecord]
+	switch mediaType {
+	case mediaTypeJSON:
+		parsedResp := &jsontypes.PeersResponse{}
+		err = json.NewDecoder(resp.Body).Decode(parsedResp)
+		var sliceIt iter.Iter[*types.PeerRecord] = iter.FromSlice(parsedResp.Peers)
+		it = iter.ToResultIter(sliceIt)
+	case mediaTypeNDJSON:
+		skipBodyClose = true
+		it = ndjson.NewPeerRecordsIter(resp.Body)
+	default:
+		logger.Errorw("unknown media type", "MediaType", mediaType, "ContentType", respContentType)
+		return nil, errors.New("unknown content type")
+	}
+
+	return &measuringIter[iter.Result[*types.PeerRecord]]{Iter: it, ctx: ctx, m: m}, nil
 }

@@ -6,9 +6,9 @@ import (
 	"github.com/ipfs/boxo/routing/http/types"
 )
 
-// Deprecated: protocol-agnostic provide is being worked on in [IPIP-378]:
+// Deprecated: historic API from [IPIP-526], may be removed in a future version.
 //
-// [IPIP-378]: https://github.com/ipfs/specs/pull/378
+// [IPIP-526]: https://specs.ipfs.tech/ipips/ipip-0526/
 type WriteProvidersRequest struct {
 	Providers []types.Record
 }

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/probe-lab/go-libdht/kad"
+	"github.com/ipfs/go-libdht/kad"
 )
 
 // ErrInvalidDataLength is the error returned when attempting to construct a key from binary data of the wrong length.

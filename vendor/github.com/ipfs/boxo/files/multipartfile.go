@@ -25,6 +25,8 @@ const (
 	contentDispositionHeader = "Content-Disposition"
 )
 
+var _ Directory = (*multipartDirectory)(nil)
+
 // multiPartFileInfo implements the `fs.FileInfo` interface for a file or
 // directory received in a `multipart.part`.
 type multiPartFileInfo struct {
@@ -37,7 +39,7 @@ func (fi *multiPartFileInfo) Name() string       { return fi.name }
 func (fi *multiPartFileInfo) Mode() os.FileMode  { return fi.mode }
 func (fi *multiPartFileInfo) ModTime() time.Time { return fi.mtime }
 func (fi *multiPartFileInfo) IsDir() bool        { return fi.mode.IsDir() }
-func (fi *multiPartFileInfo) Sys() interface{}   { return nil }
+func (fi *multiPartFileInfo) Sys() any           { return nil }
 func (fi *multiPartFileInfo) Size() int64        { panic("size for multipart file info is not supported") }
 
 type multipartDirectory struct {
@@ -315,5 +317,3 @@ func (f *multipartDirectory) Close() error {
 func (f *multipartDirectory) Size() (int64, error) {
 	return 0, ErrNotSupported
 }
-
-var _ Directory = &multipartDirectory{}

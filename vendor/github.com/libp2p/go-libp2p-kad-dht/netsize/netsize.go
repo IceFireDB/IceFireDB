@@ -47,7 +47,7 @@ type Estimator struct {
 func NewEstimator(localID peer.ID, rt *kbucket.RoutingTable, bucketSize int) *Estimator {
 	// initialize map to hold measurement observations
 	measurements := map[int][]measurement{}
-	for i := 0; i < bucketSize; i++ {
+	for i := range bucketSize {
 		measurements[i] = []measurement{}
 	}
 

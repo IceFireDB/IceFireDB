@@ -320,7 +320,7 @@ func (q *Deque[T]) Copy(src Deque[T]) int {
 	q.Grow(src.Len())
 	n := src.CopyOutSlice(q.buf)
 	q.count = n
-	q.tail = n
+	q.tail = n & (len(q.buf) - 1) // bitwise modulus
 	q.head = 0
 	return n
 }
@@ -380,7 +380,7 @@ func (q *Deque[T]) CopyInSlice(in []T) {
 	}
 	n := copy(q.buf, in)
 	q.count = n
-	q.tail = n
+	q.tail = n & (len(q.buf) - 1) // bitwise modulus
 	q.head = 0
 }
 
@@ -522,7 +522,7 @@ func (q *Deque[T]) Insert(at int, item T) {
 	if at*2 < q.count {
 		q.PushFront(item)
 		front := q.head
-		for i := 0; i < at; i++ {
+		for range at {
 			next := q.next(front)
 			q.buf[front], q.buf[next] = q.buf[next], q.buf[front]
 			front = next
@@ -532,7 +532,7 @@ func (q *Deque[T]) Insert(at int, item T) {
 	swaps := q.count - at
 	q.PushBack(item)
 	back := q.prev(q.tail)
-	for i := 0; i < swaps; i++ {
+	for range swaps {
 		prev := q.prev(back)
 		q.buf[back], q.buf[prev] = q.buf[prev], q.buf[back]
 		back = prev
@@ -552,7 +552,7 @@ func (q *Deque[T]) Remove(at int) T {
 	q.checkRange(at)
 	rm := (q.head + at) & (len(q.buf) - 1)
 	if at*2 < q.count {
-		for i := 0; i < at; i++ {
+		for range at {
 			prev := q.prev(rm)
 			q.buf[prev], q.buf[rm] = q.buf[rm], q.buf[prev]
 			rm = prev
@@ -560,7 +560,7 @@ func (q *Deque[T]) Remove(at int) T {
 		return q.PopFront()
 	}
 	swaps := q.count - at - 1
-	for i := 0; i < swaps; i++ {
+	for range swaps {
 		next := q.next(rm)
 		q.buf[rm], q.buf[next] = q.buf[next], q.buf[rm]
 		rm = next
@@ -660,6 +660,6 @@ func (q *Deque[T]) resize(newSize int) {
 	}
 
 	q.head = 0
-	q.tail = q.count
+	q.tail = q.count & (newSize - 1) // bitwise modulus, in case buffer is exactly full
 	q.buf = newBuf
 }

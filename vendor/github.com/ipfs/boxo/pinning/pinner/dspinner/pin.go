@@ -107,7 +107,7 @@ var _ ipfspinner.Pinner = (*pinner)(nil)
 type pin struct {
 	Id       string
 	Cid      cid.Cid
-	Metadata map[string]interface{}
+	Metadata map[string]any
 	Mode     ipfspinner.Mode
 	Name     string
 }

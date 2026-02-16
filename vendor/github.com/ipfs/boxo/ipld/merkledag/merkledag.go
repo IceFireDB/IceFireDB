@@ -18,6 +18,13 @@ import (
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 )
 
+var (
+	_ format.LinkGetter = &dagService{}
+	_ format.NodeGetter = &dagService{}
+	_ format.NodeGetter = &sesGetter{}
+	_ format.DAGService = &dagService{}
+)
+
 var ipldLegacyDecoder *legacy.Decoder
 
 // TODO: Don't require global registries
@@ -58,7 +65,6 @@ func (n *dagService) Add(ctx context.Context, nd format.Node) error {
 	if n == nil { // FIXME remove this assertion. protect with constructor invariant
 		return errors.New("dagService is nil")
 	}
-
 	return n.Blocks.AddBlock(ctx, nd)
 }
 
@@ -128,6 +134,20 @@ func GetLinksDirect(serv format.NodeGetter) GetLinks {
 		if err != nil {
 			return nil, err
 		}
+		return nd.Links(), nil
+	}
+}
+
+// GetLinksDirectWithProgressTracker creates a function as GetLinksDirect, but
+// updates the ProgressTracker with the raw block data size of the retrieved node.
+func GetLinksDirectWithProgressTracker(serv format.NodeGetter, tracker *ProgressTracker) GetLinks {
+	return func(ctx context.Context, c cid.Cid) ([]*format.Link, error) {
+		nd, err := serv.Get(ctx, c)
+		if err != nil {
+			return nil, err
+		}
+		// We don't use Size() as it returns cumulative size including linked nodes.
+		tracker.Update(uint64(len(nd.RawData())))
 		return nd.Links(), nil
 	}
 }
@@ -208,20 +228,13 @@ func FetchGraphWithDepthLimit(ctx context.Context, root cid.Cid, depthLim int, s
 	// We default to Concurrent() walk.
 	opts = append([]WalkOption{Concurrent()}, opts...)
 
-	// If we have a ProgressTracker, we wrap the visit function to handle it.
+	// If we have a ProgressTracker, we wrap the get links function to handle it.
 	v, _ := ctx.Value(progressContextKey).(*ProgressTracker)
 	if v == nil {
 		return WalkDepth(ctx, GetLinksDirect(ng), root, visit, opts...)
 	}
 
-	visitProgress := func(c cid.Cid, depth int) bool {
-		if visit(c, depth) {
-			v.Increment()
-			return true
-		}
-		return false
-	}
-	return WalkDepth(ctx, GetLinksDirect(ng), root, visitProgress, opts...)
+	return WalkDepth(ctx, GetLinksDirectWithProgressTracker(ng, v), root, visit, opts...)
 }
 
 // GetMany gets many nodes from the DAG at once.
@@ -406,7 +419,6 @@ func Walk(ctx context.Context, getLinks GetLinks, c cid.Cid, visit func(cid.Cid)
 	visitDepth := func(c cid.Cid, depth int) bool {
 		return visit(c)
 	}
-
 	return WalkDepth(ctx, getLinks, c, visitDepth, options...)
 }
 
@@ -421,9 +433,8 @@ func WalkDepth(ctx context.Context, getLinks GetLinks, c cid.Cid, visit func(cid
 
 	if opts.Concurrency > 1 {
 		return parallelWalkDepth(ctx, getLinks, c, visit, opts)
-	} else {
-		return sequentialWalkDepth(ctx, getLinks, c, 0, visit, opts)
 	}
+	return sequentialWalkDepth(ctx, getLinks, c, 0, visit, opts)
 }
 
 func sequentialWalkDepth(ctx context.Context, getLinks GetLinks, root cid.Cid, depth int, visit func(cid.Cid, int) bool, options *walkOptions) error {
@@ -444,23 +455,31 @@ func sequentialWalkDepth(ctx context.Context, getLinks GetLinks, root cid.Cid, d
 	// Successfully fetched "root". Provide it when needed.
 	if prov := options.Provider; prov != nil {
 		log.Debugf("merkledag: provide %s", root)
-		if err := prov.StartProviding(false, root.Hash()); err != nil {
+		if err = prov.StartProviding(false, root.Hash()); err != nil {
 			log.Warnf("merkledag: error while providing %s: %s", root, err)
 		}
 	}
 
 	for _, lnk := range links {
-		if err := sequentialWalkDepth(ctx, getLinks, lnk.Cid, depth+1, visit, options); err != nil {
+		if err = sequentialWalkDepth(ctx, getLinks, lnk.Cid, depth+1, visit, options); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+// ProgressStat represents the progress of a fetch operation.
+type ProgressStat struct {
+	// Nodes is the total number of nodes fetched.
+	Nodes int
+	// Bytes is the total bytes of raw block data.
+	Bytes uint64
+}
+
 // ProgressTracker is used to show progress when fetching nodes.
 type ProgressTracker struct {
-	Total int
-	lk    sync.Mutex
+	stat ProgressStat
+	lk   sync.Mutex
 }
 
 // DeriveContext returns a new context with value "progress" derived from the
@@ -469,18 +488,26 @@ func (p *ProgressTracker) DeriveContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, progressContextKey, p)
 }
 
-// Increment adds one to the total progress.
-func (p *ProgressTracker) Increment() {
+// Update adds one to the total nodes and updates the total bytes.
+func (p *ProgressTracker) Update(bytes uint64) {
 	p.lk.Lock()
 	defer p.lk.Unlock()
-	p.Total++
+	p.stat.Nodes++
+	p.stat.Bytes += bytes
 }
 
 // Value returns the current progress.
 func (p *ProgressTracker) Value() int {
 	p.lk.Lock()
 	defer p.lk.Unlock()
-	return p.Total
+	return p.stat.Nodes
+}
+
+// ProgressStat returns the current progress stat.
+func (p *ProgressTracker) ProgressStat() ProgressStat {
+	p.lk.Lock()
+	defer p.lk.Unlock()
+	return p.stat
 }
 
 func parallelWalkDepth(ctx context.Context, getLinks GetLinks, root cid.Cid, visit func(cid.Cid, int) bool, options *walkOptions) error {
@@ -505,7 +532,7 @@ func parallelWalkDepth(ctx context.Context, getLinks GetLinks, root cid.Cid, vis
 	fetchersCtx, cancel := context.WithCancel(ctx)
 	defer wg.Wait()
 	defer cancel()
-	for i := 0; i < options.Concurrency; i++ {
+	for range options.Concurrency {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -610,10 +637,3 @@ func parallelWalkDepth(ctx context.Context, getLinks GetLinks, root cid.Cid, vis
 		}
 	}
 }
-
-var (
-	_ format.LinkGetter = &dagService{}
-	_ format.NodeGetter = &dagService{}
-	_ format.NodeGetter = &sesGetter{}
-	_ format.DAGService = &dagService{}
-)

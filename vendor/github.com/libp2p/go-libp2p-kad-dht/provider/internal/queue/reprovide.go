@@ -3,8 +3,8 @@ package queue
 import (
 	"sync"
 
-	"github.com/probe-lab/go-libdht/kad/key/bitstr"
-	"github.com/probe-lab/go-libdht/kad/trie"
+	"github.com/ipfs/go-libdht/kad/key/bitstr"
+	"github.com/ipfs/go-libdht/kad/trie"
 )
 
 // ReprovideQueue is a thread-safe queue storing non-overlapping, unique

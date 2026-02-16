@@ -291,14 +291,6 @@ func (r *RtRefreshManager) doRefresh(ctx context.Context, forceRefresh bool) err
 	return errors.Join(errs...)
 }
 
-func min(a int, b int) int {
-	if a <= b {
-		return a
-	}
-
-	return b
-}
-
 func (r *RtRefreshManager) refreshCplIfEligible(ctx context.Context, cpl uint, lastRefreshedAt time.Time) error {
 	if time.Since(lastRefreshedAt) <= r.refreshInterval {
 		logger.Debugf("not running refresh for cpl %d as time since last refresh not above interval", cpl)

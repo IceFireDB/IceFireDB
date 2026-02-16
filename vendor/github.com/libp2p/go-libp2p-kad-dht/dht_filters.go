@@ -62,7 +62,7 @@ func isPrivateAddr(a ma.Multiaddr) bool {
 }
 
 // PublicQueryFilter returns true if the peer is suspected of being publicly accessible
-func PublicQueryFilter(_ interface{}, ai peer.AddrInfo) bool {
+func PublicQueryFilter(_ any, ai peer.AddrInfo) bool {
 	if len(ai.Addrs) == 0 {
 		return false
 	}
@@ -84,7 +84,7 @@ var _ QueryFilterFunc = PublicQueryFilter
 
 // PublicRoutingTableFilter allows a peer to be added to the routing table if the connections to that peer indicate
 // that it is on a public network
-func PublicRoutingTableFilter(dht interface{}, p peer.ID) bool {
+func PublicRoutingTableFilter(dht any, p peer.ID) bool {
 	d := dht.(hasHost)
 
 	conns := d.Host().Network().ConnsToPeer(p)
@@ -107,7 +107,7 @@ func PublicRoutingTableFilter(dht interface{}, p peer.ID) bool {
 var _ RouteTableFilterFunc = PublicRoutingTableFilter
 
 // PrivateQueryFilter doens't currently restrict which peers we are willing to query from the local DHT.
-func PrivateQueryFilter(_ interface{}, ai peer.AddrInfo) bool {
+func PrivateQueryFilter(_ any, ai peer.AddrInfo) bool {
 	return len(ai.Addrs) > 0
 }
 
@@ -147,13 +147,13 @@ func getCachedRouter() routing.Router {
 
 // PrivateRoutingTableFilter allows a peer to be added to the routing table if the connections to that peer indicate
 // that it is on a private network
-func PrivateRoutingTableFilter(dht interface{}, p peer.ID) bool {
+func PrivateRoutingTableFilter(dht any, p peer.ID) bool {
 	d := dht.(hasHost)
 	conns := d.Host().Network().ConnsToPeer(p)
 	return privRTFilter(d, conns)
 }
 
-func privRTFilter(dht interface{}, conns []network.Conn) bool {
+func privRTFilter(dht any, conns []network.Conn) bool {
 	d := dht.(hasHost)
 	h := d.Host()
 

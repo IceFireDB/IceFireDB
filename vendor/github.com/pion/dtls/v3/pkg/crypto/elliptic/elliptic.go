@@ -1,16 +1,14 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 // Package elliptic provides elliptic curve cryptography for DTLS
 package elliptic
 
 import (
-	"crypto/elliptic"
+	"crypto/ecdh"
 	"crypto/rand"
 	"errors"
 	"fmt"
-
-	"golang.org/x/crypto/curve25519"
 )
 
 var errInvalidNamedCurve = errors.New("invalid named curve")
@@ -59,6 +57,10 @@ const (
 	P256   Curve = 0x0017
 	P384   Curve = 0x0018
 	X25519 Curve = 0x001d
+	// X25519MLKEM768
+	// https://pkg.go.dev/crypto/internal/fips140/mlkem
+	// https://datatracker.ietf.org/doc/draft-ietf-tls-hybrid-design/
+	// https://datatracker.ietf.org/doc/draft-ietf-tls-ecdhe-mlkem/
 )
 
 func (c Curve) String() string {
@@ -84,34 +86,36 @@ func Curves() map[Curve]bool {
 }
 
 // GenerateKeypair generates a keypair for the given Curve.
-func GenerateKeypair(c Curve) (*Keypair, error) {
-	switch c { //nolint:revive
-	case X25519:
-		tmp := make([]byte, 32)
-		if _, err := rand.Read(tmp); err != nil {
-			return nil, err
-		}
-
-		var public, private [32]byte
-		copy(private[:], tmp)
-
-		curve25519.ScalarBaseMult(&public, &private)
-
-		return &Keypair{X25519, public[:], private[:]}, nil
-	case P256:
-		return ellipticCurveKeypair(P256, elliptic.P256(), elliptic.P256())
-	case P384:
-		return ellipticCurveKeypair(P384, elliptic.P384(), elliptic.P384())
-	default:
-		return nil, errInvalidNamedCurve
-	}
-}
-
-func ellipticCurveKeypair(nc Curve, c1, c2 elliptic.Curve) (*Keypair, error) {
-	privateKey, x, y, err := elliptic.GenerateKey(c1, rand.Reader)
+func GenerateKeypair(curve Curve) (*Keypair, error) {
+	ec, err := curve.toECDH()
 	if err != nil {
 		return nil, err
 	}
 
-	return &Keypair{nc, elliptic.Marshal(c2, x, y), privateKey}, nil
+	sk, err := ec.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	pk := sk.PublicKey()
+
+	return &Keypair{
+		Curve:      curve,
+		PublicKey:  pk.Bytes(), // NIST: SEC1 uncompressed (04||X||Y); X25519: 32 bytes
+		PrivateKey: sk.Bytes(), // Scalar suitable for ecdh.NewPrivateKey
+	}, nil
+}
+
+// toECDH returns the crypto/ecdh curve for our enum.
+func (c Curve) toECDH() (ecdh.Curve, error) {
+	switch c {
+	case X25519:
+		return ecdh.X25519(), nil
+	case P256:
+		return ecdh.P256(), nil
+	case P384:
+		return ecdh.P384(), nil
+	default:
+		return nil, errInvalidNamedCurve
+	}
 }

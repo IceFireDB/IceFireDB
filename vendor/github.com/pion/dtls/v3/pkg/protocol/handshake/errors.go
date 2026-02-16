@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package handshake
@@ -52,5 +52,23 @@ var (
 	}
 	errNotImplemented = &protocol.InternalError{
 		Err: errors.New("feature has not been implemented yet"), //nolint:err113
+	}
+	errInvalidCertificateRequestContext = &protocol.FatalError{
+		Err: errors.New("invalid certificate request context"), //nolint:err113
+	}
+	errInvalidCertificateEntry = &protocol.FatalError{
+		Err: errors.New("invalid certificate entry"), //nolint:err113
+	}
+	errCertificateRequestContextTooLong = &protocol.FatalError{
+		Err: errors.New("certificate request context must not be longer than 255 bytes"), //nolint:err113
+	}
+	errCertificateListTooLong = &protocol.FatalError{
+		Err: errors.New("certificate list must not be longer than 2^24-1 bytes"), //nolint:err113
+	}
+	errInvalidExtensionsLength = &protocol.FatalError{
+		Err: errors.New("extensions data must be between 2 and 2^16-1 bytes"), //nolint:err113
+	}
+	errMissingSignatureAlgorithmsExtension = &protocol.FatalError{
+		Err: errors.New("signature_algorithms extension is required in CertificateRequest"), //nolint:err113
 	}
 )

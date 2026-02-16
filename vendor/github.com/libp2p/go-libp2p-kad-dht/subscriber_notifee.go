@@ -12,7 +12,7 @@ import (
 func (dht *IpfsDHT) startNetworkSubscriber() error {
 	bufSize := eventbus.BufSize(256)
 
-	evts := []interface{}{
+	evts := []any{
 		// register for event bus notifications of when peers successfully complete identification in order to update
 		// the routing table
 		new(event.EvtPeerIdentificationCompleted),

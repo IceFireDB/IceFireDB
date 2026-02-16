@@ -221,13 +221,13 @@ func (dr *dagReader) CtxReadFull(ctx context.Context, out []byte) (n int, err er
 
 		return nil
 	})
-
-	if err == ipld.EndOfDag {
-		return n, io.EOF
-		// Reached the end of the (DAG) file, no more data to read.
-	} else if err != nil {
-		return n, err
+	if err != nil {
+		if errors.Is(err, ipld.EndOfDag) {
+			// Reached the end of the (DAG) file, no more data to read.
+			return n, io.EOF
+		}
 		// Pass along any other errors from the `Visitor`.
+		return n, err
 	}
 
 	return n, nil
@@ -340,7 +340,7 @@ func (dr *dagReader) WriteTo(w io.Writer) (n int64, err error) {
 		return nil
 	})
 
-	if err == ipld.EndOfDag {
+	if errors.Is(err, ipld.EndOfDag) {
 		return n, nil
 	}
 
@@ -433,15 +433,16 @@ func (dr *dagReader) Seek(offset int64, whence int) (int64, error) {
 					// Else, skip this child.
 					left -= int64(childSize)
 					err := dr.dagWalker.NextChild()
-					if err == ipld.ErrNextNoChild {
-						// No more child nodes available, nothing to do,
-						// the `Seek` will stop on its own.
-						return nil
-					} else if err != nil {
-						return err
+					if err != nil {
+						if errors.Is(err, ipld.ErrNextNoChild) {
+							// No more child nodes available, nothing to do,
+							// the `Seek` will stop on its own.
+							return nil
+						}
 						// Pass along any other errors (that may in future
 						// implementations be returned by `Next`) to stop
 						// the search.
+						return err
 					}
 				}
 
@@ -452,10 +453,6 @@ func (dr *dagReader) Seek(offset int64, whence int) (int64, error) {
 					return err
 				}
 
-				_, err = dr.currentNodeData.Seek(left, io.SeekStart)
-				if err != nil {
-					return err
-				}
 				// The corner case of a DAG consisting only of a single (leaf)
 				// node should make no difference here. In that case, where the
 				// node doesn't have a parent UnixFS node with size hints, this
@@ -465,9 +462,13 @@ func (dr *dagReader) Seek(offset int64, whence int) (int64, error) {
 				// hint) but that would just mean that a future `CtxReadFull`
 				// call would read no data from the `currentNodeData` buffer.
 				// TODO: Re-check this reasoning.
+				_, err = dr.currentNodeData.Seek(left, io.SeekStart)
+				if err != nil {
+					return err
+				}
 
-				return nil
 				// In the leaf node case the search will stop here.
+				return nil
 			}
 		})
 		if err != nil {

@@ -25,7 +25,7 @@ func iconFromExt(filename string) string {
 }
 
 // args is a helper function to allow sending more than one object to a template.
-func args(args ...interface{}) []interface{} {
+func args(args ...interface{}) []any {
 	return args
 }
 

@@ -390,6 +390,14 @@ func (bsnet *impl) SendMessage(
 		return err
 	}
 
+	// Set a read deadline to prevent Close() from blocking indefinitely
+	// when the remote peer is slow or unresponsive during multistream
+	// handshake completion.
+	// See: https://github.com/multiformats/go-multistream/issues/47
+	// See: https://github.com/ipshipyard/waterworks-infra/issues/860
+	if err := s.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		log.Debugf("error setting read deadline: %s", err)
+	}
 	return s.Close()
 }
 

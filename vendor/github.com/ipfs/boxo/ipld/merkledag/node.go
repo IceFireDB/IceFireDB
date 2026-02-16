@@ -371,8 +371,8 @@ func (n *ProtoNode) Stat() (*format.NodeStat, error) {
 }
 
 // Loggable implements the ipfs/go-log.Loggable interface.
-func (n *ProtoNode) Loggable() map[string]interface{} {
-	return map[string]interface{}{
+func (n *ProtoNode) Loggable() map[string]any {
+	return map[string]any{
 		"node": n.String(),
 	}
 }
@@ -423,7 +423,7 @@ func (n *ProtoNode) MarshalJSON() ([]byte, error) {
 		n.encoded = nil
 	}
 
-	out := map[string]interface{}{
+	out := map[string]any{
 		"data":  n.data,
 		"links": n.links,
 	}
@@ -505,7 +505,7 @@ func (n *ProtoNode) SetLinks(links []*format.Link) error {
 }
 
 // Resolve is an alias for ResolveLink.
-func (n *ProtoNode) Resolve(path []string) (interface{}, []string, error) {
+func (n *ProtoNode) Resolve(path []string) (any, []string, error) {
 	return n.ResolveLink(path)
 }
 

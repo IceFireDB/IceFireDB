@@ -45,6 +45,7 @@ func NewPacketConn(pconn net.PacketConn) PacketConn {
 		nextConn: pconn,
 		closed:   make(chan struct{}),
 	}
+
 	return p
 }
 
@@ -57,7 +58,7 @@ func NewPacketConn(pconn net.PacketConn) PacketConn {
 // the n > 0 bytes returned before considering the error err.
 // Unlike net.PacketConn.ReadFrom(), the provided context is
 // used to control timeout.
-func (p *packetConn) ReadFromContext(ctx context.Context, b []byte) (int, net.Addr, error) {
+func (p *packetConn) ReadFromContext(ctx context.Context, b []byte) (int, net.Addr, error) { //nolint:cyclop
 	p.readMu.Lock()
 	defer p.readMu.Unlock()
 
@@ -78,6 +79,7 @@ func (p *packetConn) ReadFromContext(ctx context.Context, b []byte) (int, net.Ad
 			// context canceled
 			if err := p.nextConn.SetReadDeadline(veryOld); err != nil {
 				errSetDeadline.Store(err)
+
 				return
 			}
 			<-done
@@ -98,6 +100,7 @@ func (p *packetConn) ReadFromContext(ctx context.Context, b []byte) (int, net.Ad
 	if err2, ok := errSetDeadline.Load().(error); ok && err == nil && err2 != nil {
 		err = err2
 	}
+
 	return n, raddr, err
 }
 
@@ -105,7 +108,7 @@ func (p *packetConn) ReadFromContext(ctx context.Context, b []byte) (int, net.Ad
 // Unlike net.PacketConn.WriteTo(), the provided context
 // is used to control timeout.
 // On packet-oriented connections, write timeouts are rare.
-func (p *packetConn) WriteToContext(ctx context.Context, b []byte, raddr net.Addr) (int, error) {
+func (p *packetConn) WriteToContext(ctx context.Context, b []byte, raddr net.Addr) (int, error) { //nolint:cyclop
 	p.writeMu.Lock()
 	defer p.writeMu.Unlock()
 
@@ -126,6 +129,7 @@ func (p *packetConn) WriteToContext(ctx context.Context, b []byte, raddr net.Add
 			// context canceled
 			if err := p.nextConn.SetWriteDeadline(veryOld); err != nil {
 				errSetDeadline.Store(err)
+
 				return
 			}
 			<-done
@@ -146,6 +150,7 @@ func (p *packetConn) WriteToContext(ctx context.Context, b []byte, raddr net.Add
 	if err2, ok := errSetDeadline.Load().(error); ok && err == nil && err2 != nil {
 		err = err2
 	}
+
 	return n, err
 }
 
@@ -161,6 +166,7 @@ func (p *packetConn) Close() error {
 		p.readMu.Unlock()
 		p.writeMu.Unlock()
 	})
+
 	return err
 }
 

@@ -1,12 +1,13 @@
 package types
 
 import (
+	"bytes"
 	"encoding/json"
 
 	"github.com/ipfs/boxo/routing/http/internal/drjson"
 )
 
-var _ Record = &UnknownRecord{}
+var _ Record = (*UnknownRecord)(nil)
 
 type UnknownRecord struct {
 	Schema string
@@ -30,12 +31,12 @@ func (ur *UnknownRecord) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	ur.Schema = v.Schema
-	ur.Bytes = b
+	ur.Bytes = bytes.Clone(b)
 	return nil
 }
 
 func (ur UnknownRecord) MarshalJSON() ([]byte, error) {
-	m := map[string]interface{}{}
+	m := map[string]any{}
 	if ur.Bytes != nil {
 		err := json.Unmarshal(ur.Bytes, &m)
 		if err != nil {

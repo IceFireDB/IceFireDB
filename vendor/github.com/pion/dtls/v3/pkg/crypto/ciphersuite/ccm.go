@@ -1,16 +1,12 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package ciphersuite
 
 import (
 	"crypto/aes"
-	"crypto/rand"
-	"encoding/binary"
-	"fmt"
 
 	"github.com/pion/dtls/v3/pkg/crypto/ccm"
-	"github.com/pion/dtls/v3/pkg/protocol"
 	"github.com/pion/dtls/v3/pkg/protocol/recordlayer"
 )
 
@@ -26,9 +22,7 @@ const (
 
 // CCM Provides an API to Encrypt/Decrypt DTLS 1.2 Packets.
 type CCM struct {
-	localCCM, remoteCCM         ccm.CCM
-	localWriteIV, remoteWriteIV []byte
-	tagLen                      CCMTagLen
+	aead *aead
 }
 
 // NewCCM creates a DTLS GCM Cipher.
@@ -52,68 +46,23 @@ func NewCCM(tagLen CCMTagLen, localKey, localWriteIV, remoteKey, remoteWriteIV [
 	}
 
 	return &CCM{
-		localCCM:      localCCM,
-		localWriteIV:  localWriteIV,
-		remoteCCM:     remoteCCM,
-		remoteWriteIV: remoteWriteIV,
-		tagLen:        tagLen,
+		aead: newAEAD(
+			localCCM,
+			localWriteIV,
+			remoteCCM,
+			remoteWriteIV,
+			ccmNonceLength,
+			int(tagLen),
+		),
 	}, nil
 }
 
 // Encrypt encrypt a DTLS RecordLayer message.
 func (c *CCM) Encrypt(pkt *recordlayer.RecordLayer, raw []byte) ([]byte, error) {
-	payload := raw[pkt.Header.Size():]
-	raw = raw[:pkt.Header.Size()]
-
-	nonce := append(append([]byte{}, c.localWriteIV[:4]...), make([]byte, 8)...)
-	if _, err := rand.Read(nonce[4:]); err != nil {
-		return nil, err
-	}
-
-	var additionalData []byte
-	if pkt.Header.ContentType == protocol.ContentTypeConnectionID {
-		additionalData = generateAEADAdditionalDataCID(&pkt.Header, len(payload))
-	} else {
-		additionalData = generateAEADAdditionalData(&pkt.Header, len(payload))
-	}
-	encryptedPayload := c.localCCM.Seal(nil, nonce, payload, additionalData)
-
-	encryptedPayload = append(nonce[4:], encryptedPayload...)
-	raw = append(raw, encryptedPayload...)
-
-	// Update recordLayer size to include explicit nonce
-	binary.BigEndian.PutUint16(raw[pkt.Header.Size()-2:], uint16(len(raw)-pkt.Header.Size())) //nolint:gosec //G115
-
-	return raw, nil
+	return c.aead.encrypt(pkt, raw)
 }
 
 // Decrypt decrypts a DTLS RecordLayer message.
 func (c *CCM) Decrypt(header recordlayer.Header, in []byte) ([]byte, error) {
-	if err := header.Unmarshal(in); err != nil {
-		return nil, err
-	}
-	switch {
-	case header.ContentType == protocol.ContentTypeChangeCipherSpec:
-		// Nothing to encrypt with ChangeCipherSpec
-		return in, nil
-	case len(in) <= (8 + header.Size()):
-		return nil, errNotEnoughRoomForNonce
-	}
-
-	nonce := append(append([]byte{}, c.remoteWriteIV[:4]...), in[header.Size():header.Size()+8]...)
-	out := in[header.Size()+8:]
-
-	var additionalData []byte
-	if header.ContentType == protocol.ContentTypeConnectionID {
-		additionalData = generateAEADAdditionalDataCID(&header, len(out)-int(c.tagLen))
-	} else {
-		additionalData = generateAEADAdditionalData(&header, len(out)-int(c.tagLen))
-	}
-	var err error
-	out, err = c.remoteCCM.Open(out[:0], nonce, out, additionalData)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errDecryptPacket, err) //nolint:errorlint
-	}
-
-	return append(in[:header.Size()], out...), nil
+	return c.aead.decrypt(header, in)
 }

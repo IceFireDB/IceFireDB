@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 // Package net implements DTLS specific networking primitives.
@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pion/transport/v3/deadline"
+	"github.com/pion/transport/v4/deadline"
 )
 
 // ErrTimeout indicates that deadline was reached before operation could be
@@ -105,8 +105,8 @@ func (b *PacketBuffer) WriteTo(pkt []byte, addr net.Addr) (int, error) {
 
 		b.packets = newBuf
 
-		// Update write pointer to point to new location and mark buffer as not
-		// full.
+		// Update read/write pointers and mark buffer as not full.
+		b.read = 0
 		b.write = n
 		b.full = false
 	}

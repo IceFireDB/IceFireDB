@@ -10,9 +10,9 @@ import (
 	"github.com/ipfs/go-datastore/query"
 	mh "github.com/multiformats/go-multihash"
 
-	"github.com/probe-lab/go-libdht/kad/key/bit256"
-	"github.com/probe-lab/go-libdht/kad/key/bitstr"
-	"github.com/probe-lab/go-libdht/kad/trie"
+	"github.com/ipfs/go-libdht/kad/key/bit256"
+	"github.com/ipfs/go-libdht/kad/key/bitstr"
+	"github.com/ipfs/go-libdht/kad/trie"
 
 	"github.com/libp2p/go-libp2p-kad-dht/provider/internal/keyspace"
 )
@@ -334,6 +334,7 @@ func (q *ProvideQueue) DrainDatastore(ctx context.Context, d ds.Batching) error 
 	if err != nil {
 		return fmt.Errorf("failed to query datastore: %w", err)
 	}
+	defer results.Close()
 
 	// Create a batch for deletes
 	batch, err := d.Batch(ctx)
@@ -367,10 +368,6 @@ func (q *ProvideQueue) DrainDatastore(ctx context.Context, d ds.Batching) error 
 
 		// Delete key from datastore
 		batch.Delete(ctx, ds.NewKey(result.Key))
-	}
-
-	if err := results.Close(); err != nil {
-		return fmt.Errorf("failed to close query results: %w", err)
 	}
 
 	// Commit deletions

@@ -69,7 +69,7 @@ type BitSwapMessage interface {
 	SetPendingBytes(int32)
 	Exportable
 
-	Loggable() map[string]interface{}
+	Loggable() map[string]any
 
 	// Reset the values in the message back to defaults, so it can be reused
 	Reset(bool)
@@ -501,12 +501,12 @@ func write(w io.Writer, m *pb.Message) error {
 	return err
 }
 
-func (m *impl) Loggable() map[string]interface{} {
+func (m *impl) Loggable() map[string]any {
 	blocks := make([]string, 0, len(m.blocks))
 	for _, v := range m.blocks {
 		blocks = append(blocks, v.Cid().String())
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"blocks": blocks,
 		"wants":  m.Wantlist(),
 	}

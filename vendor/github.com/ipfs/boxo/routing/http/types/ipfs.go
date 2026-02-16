@@ -27,6 +27,16 @@ func (c *CID) UnmarshalJSON(b []byte) error {
 
 type Multiaddr struct{ multiaddr.Multiaddr }
 
+// MarshalJSON returns null for nil Multiaddr as a defensive measure.
+// This prevents panics if corrupted data contains nil addresses.
+// See: https://github.com/ipfs/kubo/issues/11116
+func (m Multiaddr) MarshalJSON() ([]byte, error) {
+	if m.Multiaddr == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(m.Multiaddr.String())
+}
+
 func (m *Multiaddr) UnmarshalJSON(b []byte) error {
 	var s string
 	err := json.Unmarshal(b, &s)

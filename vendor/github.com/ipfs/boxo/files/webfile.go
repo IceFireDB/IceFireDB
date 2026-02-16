@@ -17,6 +17,11 @@ const LastModifiedHeaderName = "Last-Modified"
 // the HTTP Response header that provides the unix file mode
 const FileModeHeaderName = "File-Mode"
 
+var (
+	_ File     = (*WebFile)(nil)
+	_ FileInfo = (*WebFile)(nil)
+)
+
 // WebFile is an implementation of File which reads it
 // from a Web URL (http). A GET request will be performed
 // against the source when calling Read().
@@ -118,8 +123,3 @@ func (wf *WebFile) AbsPath() string {
 func (wf *WebFile) Stat() os.FileInfo {
 	return nil
 }
-
-var (
-	_ File     = &WebFile{}
-	_ FileInfo = &WebFile{}
-)

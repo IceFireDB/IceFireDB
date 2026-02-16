@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/filecoin-project/go-clock"
 	bswl "github.com/ipfs/boxo/bitswap/client/wantlist"
 	bsmsg "github.com/ipfs/boxo/bitswap/message"
 	pb "github.com/ipfs/boxo/bitswap/message/pb"
@@ -98,9 +97,6 @@ type MessageQueue struct {
 	// For performance reasons we just clear out the fields of the message
 	// instead of creating a new one every time.
 	msg bsmsg.BitSwapMessage
-
-	// For simulating time -- uses mock in test
-	clock clock.Clock
 
 	// Used to track things that happen asynchronously -- used only in test
 	events chan<- messageEvent
@@ -276,7 +272,7 @@ func New(ctx context.Context, p peer.ID, network MessageNetwork, onDontHaveTimeo
 		}
 		dhTimeoutMgr = newDontHaveTimeoutMgr(newPeerConnection(p, network), onTimeout, opts.dhtConfig)
 	}
-	mq := newMessageQueue(ctx, p, network, maxMessageSize, sendErrorBackoff, maxValidLatency, dhTimeoutMgr, nil, nil)
+	mq := newMessageQueue(ctx, p, network, maxMessageSize, sendErrorBackoff, maxValidLatency, dhTimeoutMgr, nil)
 	mq.perPeerDelay = opts.perPeerDelay
 	return mq
 }
@@ -298,12 +294,8 @@ func newMessageQueue(
 	sendErrorBackoff time.Duration,
 	maxValidLatency time.Duration,
 	dhTimeoutMgr DontHaveTimeoutManager,
-	clk clock.Clock,
 	events chan<- messageEvent,
 ) *MessageQueue {
-	if clk == nil {
-		clk = clock.New()
-	}
 	ctx, cancel := context.WithCancel(ctx)
 	return &MessageQueue{
 		ctx:              ctx,
@@ -324,7 +316,6 @@ func newMessageQueue(
 		// For performance reasons we just clear out the fields of the message
 		// after using it, instead of creating a new one every time.
 		msg:    bsmsg.New(false),
-		clock:  clk,
 		events: events,
 	}
 }
@@ -486,7 +477,7 @@ func (mq *MessageQueue) runQueue() {
 	defer mq.onShutdown()
 
 	// Create a timer for debouncing scheduled work.
-	scheduleWork := mq.clock.Timer(0)
+	scheduleWork := time.NewTimer(0)
 	if !scheduleWork.Stop() {
 		// Need to drain the timer if Stop() returns false
 		// See: https://golang.org/pkg/time/#Timer.Stop
@@ -496,7 +487,7 @@ func (mq *MessageQueue) runQueue() {
 	perPeerDelay := mq.perPeerDelay
 	hasWorkChan := mq.outgoingWork
 
-	rebroadcastTimer := mq.clock.Timer(runRebroadcastsInterval)
+	rebroadcastTimer := time.NewTimer(runRebroadcastsInterval)
 	defer rebroadcastTimer.Stop()
 
 	for {
@@ -506,7 +497,7 @@ func (mq *MessageQueue) runQueue() {
 			rebroadcastTimer.Reset(runRebroadcastsInterval)
 
 		case <-mq.rebroadcastNow:
-			mq.rebroadcastWantlist(mq.clock.Now(), 0)
+			mq.rebroadcastWantlist(time.Now(), 0)
 
 		case <-hasWorkChan:
 			if mq.events != nil {
@@ -650,7 +641,7 @@ func (mq *MessageQueue) simulateDontHaveWithTimeout(wantlist []bsmsg.Entry) {
 // handleResponse is called when a response is received from the peer,
 // with the CIDs of received blocks / HAVEs / DONT_HAVEs
 func (mq *MessageQueue) handleResponse(ks []cid.Cid) {
-	now := mq.clock.Now()
+	now := time.Now()
 	earliest := time.Time{}
 
 	mq.wllock.Lock()
@@ -857,7 +848,7 @@ FINISH:
 	// When the message has been sent, record the time at which each want was
 	// sent so we can calculate message latency
 	onSent := func() {
-		now := mq.clock.Now()
+		now := time.Now()
 
 		mq.wllock.Lock()
 

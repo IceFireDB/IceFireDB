@@ -60,7 +60,7 @@ func (dht *IpfsDHT) GetPublicKey(ctx context.Context, p peer.ID) (ci.PubKey, err
 	// Wait for one of the two go routines to return
 	// a public key (or for both to error out)
 	var err error
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		r := <-resp
 		if r.err == nil {
 			// Found the public key

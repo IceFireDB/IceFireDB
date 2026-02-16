@@ -158,8 +158,9 @@ func (w *errRecordingResponseWriter) ReadFrom(r io.Reader) (n int64, err error) 
 func (i *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer panicHandler(w)
 
-	// the hour is a hard fallback, we don't expect it to happen, but just in case
-	ctx, cancel := context.WithTimeout(r.Context(), time.Hour)
+	// MaxRequestDuration is an absolute deadline for the entire request.
+	// This context deadline propagates to all backend operations.
+	ctx, cancel := context.WithTimeout(r.Context(), i.config.MaxRequestDuration)
 	defer cancel()
 
 	if withCtxWrap, ok := i.backend.(WithContextHint); ok {

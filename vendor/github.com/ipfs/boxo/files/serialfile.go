@@ -29,6 +29,11 @@ type serialIterator struct {
 	err error
 }
 
+var (
+	_ Directory   = (*serialFile)(nil)
+	_ DirIterator = (*serialIterator)(nil)
+)
+
 // NewSerialFile takes a filepath, a bool specifying if hidden files should be included,
 // and a fileInfo and returns a Node representing file, directory or special file.
 func NewSerialFile(path string, includeHidden bool, stat os.FileInfo) (Node, error) {
@@ -172,8 +177,3 @@ func (f *serialFile) Mode() os.FileMode {
 func (f *serialFile) ModTime() time.Time {
 	return f.stat.ModTime()
 }
-
-var (
-	_ Directory   = &serialFile{}
-	_ DirIterator = &serialIterator{}
-)

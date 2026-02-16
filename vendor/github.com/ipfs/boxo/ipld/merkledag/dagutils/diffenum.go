@@ -39,12 +39,12 @@ func DiffEnumerate(ctx context.Context, dserv ipld.NodeGetter, from, to cid.Cid)
 			if sset.Has(c.aft) {
 				continue
 			}
-			err := mdag.Walk(ctx, mdag.GetLinksDirect(dserv), c.aft, sset.Visit, mdag.Concurrent())
+			err = mdag.Walk(ctx, mdag.GetLinksDirect(dserv), c.aft, sset.Visit, mdag.Concurrent())
 			if err != nil {
 				return err
 			}
 		} else {
-			err := DiffEnumerate(ctx, dserv, c.bef, c.aft)
+			err = DiffEnumerate(ctx, dserv, c.bef, c.aft)
 			if err != nil {
 				return err
 			}

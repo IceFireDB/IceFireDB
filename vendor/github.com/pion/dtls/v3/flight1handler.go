@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package dtls
@@ -81,6 +81,12 @@ func flight1Generate(
 		&extension.RenegotiationInfo{
 			RenegotiatedConnection: 0,
 		},
+	}
+
+	if len(cfg.localCertSignatureSchemes) > 0 {
+		extensions = append(extensions, &extension.SignatureAlgorithmsCert{
+			SignatureHashAlgorithms: cfg.localCertSignatureSchemes,
+		})
 	}
 
 	var setEllipticCurveCryptographyClientHelloExtensions bool
