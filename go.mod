@@ -44,7 +44,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/pingcap/check v0.0.0-20211026125417-57bd13f7b5f0
 	github.com/pingcap/errors v0.11.4
-	github.com/redis/go-redis/v9 v9.17.3
+	github.com/redis/go-redis/v9 v9.18.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed
 	github.com/spf13/viper v1.21.0
