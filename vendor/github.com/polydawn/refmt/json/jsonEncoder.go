@@ -205,6 +205,10 @@ func (d *Encoder) flushValue(tok *Token) error {
 		b := strconv.AppendInt(d.scratch[:0], tok.Int, 10)
 		d.wr.Write(b)
 		return nil
+	case TUint:
+		b := strconv.AppendUint(d.scratch[:0], tok.Uint, 10)
+		d.wr.Write(b)
+		return nil
 	case TFloat64:
 		return d.emitFloat(tok.Float64)
 	case TNull:

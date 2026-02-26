@@ -23,9 +23,9 @@
       <p>You can download this block as:</p>
 
       <ul>
-        <li><a href="?format=raw" rel="nofollow">Raw Block</a> (no conversion)</li>
-        <li><a href="?format=dag-json" rel="nofollow">Valid DAG-JSON</a> (specs at <a href="https://ipld.io/specs/codecs/dag-json/spec/" target="_blank" rel="noopener noreferrer">IPLD</a> and <a href="https://www.iana.org/assignments/media-types/application/vnd.ipld.dag-json" target="_blank" rel="noopener noreferrer">IANA</a>)</li>
-        <li><a href="?format=dag-cbor" rel="nofollow">Valid DAG-CBOR</a> (specs at <a href="https://ipld.io/specs/codecs/dag-cbor/spec/" target="_blank" rel="noopener noreferrer">IPLD</a> and <a href="https://www.iana.org/assignments/media-types/application/vnd.ipld.dag-cbor" target="_blank" rel="noopener noreferrer">IANA</a>)</li>
+        <li><a href="?format=raw" rel="nofollow">Raw Block</a></li>
+        {{ if or (eq .CodecName "dag-json") .AllowCodecConversion }}<li><a href="?format=dag-json" rel="nofollow">DAG-JSON</a> (specs at <a href="https://ipld.io/specs/codecs/dag-json/spec/" target="_blank" rel="noopener noreferrer">IPLD</a> and <a href="https://www.iana.org/assignments/media-types/application/vnd.ipld.dag-json" target="_blank" rel="noopener noreferrer">IANA</a>)</li>{{ end }}
+        {{ if or (eq .CodecName "dag-cbor") .AllowCodecConversion }}<li><a href="?format=dag-cbor" rel="nofollow">DAG-CBOR</a> (specs at <a href="https://ipld.io/specs/codecs/dag-cbor/spec/" target="_blank" rel="noopener noreferrer">IPLD</a> and <a href="https://www.iana.org/assignments/media-types/application/vnd.ipld.dag-cbor" target="_blank" rel="noopener noreferrer">IANA</a>)</li>{{ end }}
       </ul>
     </section>
     {{ with .Node }}

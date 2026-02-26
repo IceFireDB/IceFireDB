@@ -27,37 +27,14 @@ import (
 // It supports several validations for logical coherency of schemas,
 // but may not yet successfully reject all invalid schemas.
 func Compile(ts *schema.TypeSystem, node *Schema) error {
-	// Prelude; probably belongs elsewhere.
-	{
-		ts.Accumulate(schema.SpawnBool("Bool"))
-		ts.Accumulate(schema.SpawnInt("Int"))
-		ts.Accumulate(schema.SpawnFloat("Float"))
-		ts.Accumulate(schema.SpawnString("String"))
-		ts.Accumulate(schema.SpawnBytes("Bytes"))
+	// Add basic types
+	schema.SpawnDefaultBasicTypes(ts)
 
-		ts.Accumulate(schema.SpawnAny("Any"))
-
-		ts.Accumulate(schema.SpawnMap("Map", "String", "Any", false))
-		ts.Accumulate(schema.SpawnList("List", "Any", false))
-
-		// Should be &Any, really.
-		ts.Accumulate(schema.SpawnLink("Link"))
-
-		// TODO: schema package lacks support?
-		// ts.Accumulate(schema.SpawnUnit("Null", NullRepr))
+	// Add the schema types
+	err := SpawnSchemaTypes(ts, node)
+	if err != nil {
+		return err
 	}
-
-	for _, name := range node.Types.Keys {
-		defn := node.Types.Values[name]
-
-		// TODO: once ./schema supports anonymous/inline types, remove the ts argument.
-		typ, err := spawnType(ts, name, defn)
-		if err != nil {
-			return err
-		}
-		ts.Accumulate(typ)
-	}
-
 	// TODO: if this fails and the user forgot to check Compile's returned error,
 	// we can leave the TypeSystem in an unfortunate broken state:
 	// they can obtain types out of the TypeSystem and they are non-nil,
@@ -70,6 +47,24 @@ func Compile(ts *schema.TypeSystem, node *Schema) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// SpawnSchemaTypes is a lighter verion of compile that doesn't add basic types and doesn't validate the graph --
+// for use when you want to build a type system from multiple sources and validate later
+func SpawnSchemaTypes(ts *schema.TypeSystem, node *Schema) error {
+
+	for _, name := range node.Types.Keys {
+		defn := node.Types.Values[name]
+
+		// TODO: once ./schema supports anonymous/inline types, remove the ts argument.
+		typ, err := spawnType(ts, name, defn)
+		if err != nil {
+			return err
+		}
+		ts.Accumulate(typ)
+	}
+
 	return nil
 }
 

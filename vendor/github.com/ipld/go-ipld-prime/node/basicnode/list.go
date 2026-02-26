@@ -31,6 +31,9 @@ func (plainList) LookupByNode(datamodel.Node) (datamodel.Node, error) {
 	return mixins.List{TypeName: "list"}.LookupByNode(nil)
 }
 func (n *plainList) LookupByIndex(idx int64) (datamodel.Node, error) {
+	if idx < 0 {
+		return nil, datamodel.ErrNotExists{Segment: datamodel.PathSegmentOfInt(idx)}
+	}
 	if n.Length() <= idx {
 		return nil, datamodel.ErrNotExists{Segment: datamodel.PathSegmentOfInt(idx)}
 	}

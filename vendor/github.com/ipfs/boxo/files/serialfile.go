@@ -9,19 +9,37 @@ import (
 	"time"
 )
 
+// SerialFileOptions configures file traversal behavior for NewSerialFileWithOptions.
+type SerialFileOptions struct {
+	// Filter determines which files to include or exclude during traversal.
+	// If nil, all files are included.
+	Filter *Filter
+
+	// DereferenceSymlinks controls symlink handling during file traversal.
+	// When false (default), symlinks are stored as UnixFS nodes with
+	// Data.Type=symlink (4) containing the target path as specified in
+	// https://specs.ipfs.tech/unixfs/
+	// When true, symlinks are dereferenced and replaced with their target:
+	// symlinks to files become regular file nodes, symlinks to directories
+	// are traversed recursively.
+	DereferenceSymlinks bool
+}
+
 // serialFile implements Node, and reads from a path on the OS filesystem.
 // No more than one file will be opened at a time.
 type serialFile struct {
-	path   string
-	files  []os.FileInfo
-	stat   os.FileInfo
-	filter *Filter
+	path                string
+	files               []os.FileInfo
+	stat                os.FileInfo
+	filter              *Filter
+	dereferenceSymlinks bool
 }
 
 type serialIterator struct {
-	files  []os.FileInfo
-	path   string
-	filter *Filter
+	files               []os.FileInfo
+	path                string
+	filter              *Filter
+	dereferenceSymlinks bool
 
 	curName string
 	curFile Node
@@ -44,10 +62,25 @@ func NewSerialFile(path string, includeHidden bool, stat os.FileInfo) (Node, err
 	return NewSerialFileWithFilter(path, filter, stat)
 }
 
-// NewSerialFileWith takes a filepath, a filter for determining which files should be
+// NewSerialFileWithFilter takes a filepath, a filter for determining which files should be
 // operated upon if the filepath is a directory, and a fileInfo and returns a
 // Node representing file, directory or special file.
 func NewSerialFileWithFilter(path string, filter *Filter, stat os.FileInfo) (Node, error) {
+	return NewSerialFileWithOptions(path, stat, SerialFileOptions{Filter: filter})
+}
+
+// NewSerialFileWithOptions creates a Node from a filesystem path with configurable options.
+// The stat parameter should be obtained via os.Lstat (not os.Stat) to correctly detect symlinks.
+func NewSerialFileWithOptions(path string, stat os.FileInfo, opts SerialFileOptions) (Node, error) {
+	// If dereferencing symlinks and this is a symlink, stat the target instead
+	if opts.DereferenceSymlinks && stat.Mode()&os.ModeSymlink != 0 {
+		targetStat, err := os.Stat(path) // follows symlink
+		if err != nil {
+			return nil, err
+		}
+		stat = targetStat
+	}
+
 	switch mode := stat.Mode(); {
 	case mode.IsRegular():
 		file, err := os.Open(path)
@@ -70,8 +103,15 @@ func NewSerialFileWithFilter(path string, filter *Filter, stat os.FileInfo) (Nod
 			}
 			contents = append(contents, content)
 		}
-		return &serialFile{path, contents, stat, filter}, nil
+		return &serialFile{
+			path:                path,
+			files:               contents,
+			stat:                stat,
+			filter:              opts.Filter,
+			dereferenceSymlinks: opts.DereferenceSymlinks,
+		}, nil
 	case mode&os.ModeSymlink != 0:
+		// Only reached if DereferenceSymlinks is false
 		target, err := os.Readlink(path)
 		if err != nil {
 			return nil, err
@@ -98,7 +138,7 @@ func (it *serialIterator) Next() bool {
 
 	stat := it.files[0]
 	it.files = it.files[1:]
-	for it.filter.ShouldExclude(stat) {
+	for it.filter != nil && it.filter.ShouldExclude(stat) {
 		if len(it.files) == 0 {
 			return false
 		}
@@ -113,7 +153,10 @@ func (it *serialIterator) Next() bool {
 	// recursively call the constructor on the next file
 	// if it's a regular file, we will open it as a ReaderFile
 	// if it's a directory, files in it will be opened serially
-	sf, err := NewSerialFileWithFilter(filePath, it.filter, stat)
+	sf, err := NewSerialFileWithOptions(filePath, stat, SerialFileOptions{
+		Filter:              it.filter,
+		DereferenceSymlinks: it.dereferenceSymlinks,
+	})
 	if err != nil {
 		it.err = err
 		return false
@@ -130,9 +173,10 @@ func (it *serialIterator) Err() error {
 
 func (f *serialFile) Entries() DirIterator {
 	return &serialIterator{
-		path:   f.path,
-		files:  f.files,
-		filter: f.filter,
+		path:                f.path,
+		files:               f.files,
+		filter:              f.filter,
+		dereferenceSymlinks: f.dereferenceSymlinks,
 	}
 }
 
@@ -156,7 +200,7 @@ func (f *serialFile) Size() (int64, error) {
 			return err
 		}
 
-		if f.filter.ShouldExclude(fi) {
+		if f.filter != nil && f.filter.ShouldExclude(fi) {
 			if fi.Mode().IsDir() {
 				return filepath.SkipDir
 			}

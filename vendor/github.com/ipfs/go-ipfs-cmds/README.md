@@ -4,14 +4,11 @@
 [![](https://img.shields.io/badge/project-IPFS-blue.svg?style=flat-square)](http://ipfs.io/)
 [![](https://img.shields.io/badge/freenode-%23ipfs-blue.svg?style=flat-square)](http://webchat.freenode.net/?channels=%23ipfs)
 [![standard-readme compliant](https://img.shields.io/badge/standard--readme-OK-green.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
+[![GoDoc](https://pkg.go.dev/badge/github.com/ipfs/go-ipfs-cmds)](https://pkg.go.dev/github.com/ipfs/go-ipfs-cmds)
 
 > ipfs commands library
 
 cmds offers tools for describing and calling commands both locally and remotely, as well as encoding, formatting and transferring the result. It is the successor of go-ipfs/commands and contains a legacy layer such that it can handle previously defined commands.
-
-## Lead Maintainer
-
-[Steven Allen](https://github.com/Stebalien)
 
 ## Documentation
 

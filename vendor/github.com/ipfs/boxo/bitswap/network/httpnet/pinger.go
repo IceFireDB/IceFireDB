@@ -66,7 +66,7 @@ func (pngr *pinger) ping(ctx context.Context, p peer.ID) ping.Result {
 
 	var result ping.Result
 	var errs []error
-	for i := 0; i < len(urls); i++ {
+	for range urls {
 		r := <-results
 		if r.Error != nil {
 			errs = append(errs, r.Error)

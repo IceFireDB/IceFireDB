@@ -8,33 +8,36 @@ import (
 	. "github.com/polydawn/refmt/tok"
 )
 
+type stackFrame struct {
+	step decoderStep
+	some bool // Set to true after first value in any context; use to decide if a comma must precede the next value.
+}
+
 type Decoder struct {
 	r shared.SlickReader
 
-	stack []decoderStep // When empty, and step returns done, all done.
-	step  decoderStep   // Shortcut to end of stack.
-	some  bool          // Set to true after first value in any context; use to decide if a comma must precede the next value.
+	stack []stackFrame // When empty, and step returns done, all done.
+	frame stackFrame   // Shortcut to end of stack.
 }
 
 func NewDecoder(r io.Reader) (d *Decoder) {
 	d = &Decoder{
 		r:     shared.NewReader(r),
-		stack: make([]decoderStep, 0, 10),
+		stack: make([]stackFrame, 0, 10),
 	}
-	d.step = d.step_acceptValue
+	d.frame = stackFrame{d.step_acceptValue, false}
 	return
 }
 
 func (d *Decoder) Reset() {
 	d.stack = d.stack[0:0]
-	d.step = d.step_acceptValue
-	d.some = false
+	d.frame = stackFrame{d.step_acceptValue, false}
 }
 
 type decoderStep func(tokenSlot *Token) (done bool, err error)
 
 func (d *Decoder) Step(tokenSlot *Token) (done bool, err error) {
-	done, err = d.step(tokenSlot)
+	done, err = d.frame.step(tokenSlot)
 	// If the step errored: out, entirely.
 	if err != nil {
 		return true, err
@@ -49,16 +52,14 @@ func (d *Decoder) Step(tokenSlot *Token) (done bool, err error) {
 		return true, nil // that's all folks
 	}
 	// Pop the stack.  Reset "some" to true.
-	d.step = d.stack[nSteps]
+	d.frame = d.stack[nSteps]
 	d.stack = d.stack[0:nSteps]
-	d.some = true
 	return false, nil
 }
 
 func (d *Decoder) pushPhase(newPhase decoderStep) {
-	d.stack = append(d.stack, d.step)
-	d.step = newPhase
-	d.some = false
+	d.stack = append(d.stack, d.frame)
+	d.frame = stackFrame{newPhase, false}
 }
 
 func readn1skippingWhitespace(r shared.SlickReader) (majorByte byte, err error) {
@@ -88,7 +89,7 @@ func (d *Decoder) step_acceptArrValueOrBreak(tokenSlot *Token) (done bool, err e
 	if err != nil {
 		return true, err
 	}
-	if d.some {
+	if d.frame.some {
 		switch majorByte {
 		case ']':
 			tokenSlot.Type = TArrClose
@@ -99,6 +100,8 @@ func (d *Decoder) step_acceptArrValueOrBreak(tokenSlot *Token) (done bool, err e
 				return true, err
 			}
 			// and now fall through to the next switch
+		default:
+			return true, fmt.Errorf("expected comma or array close after array value; got %s", byteToString(majorByte))
 		}
 	}
 	switch majorByte {
@@ -106,8 +109,8 @@ func (d *Decoder) step_acceptArrValueOrBreak(tokenSlot *Token) (done bool, err e
 		tokenSlot.Type = TArrClose
 		return true, nil
 	default:
+		d.frame = stackFrame{d.frame.step, true}
 		_, err := d.stepHelper_acceptValue(majorByte, tokenSlot)
-		d.some = true
 		return false, err
 	}
 }
@@ -118,7 +121,7 @@ func (d *Decoder) step_acceptMapKeyOrBreak(tokenSlot *Token) (done bool, err err
 	if err != nil {
 		return true, err
 	}
-	if d.some {
+	if d.frame.some {
 		switch majorByte {
 		case '}':
 			tokenSlot.Type = TMapClose
@@ -129,6 +132,8 @@ func (d *Decoder) step_acceptMapKeyOrBreak(tokenSlot *Token) (done bool, err err
 				return true, err
 			}
 			// and now fall through to the next switch
+		default:
+			return true, fmt.Errorf("expected comma or map close after map value; got %s", byteToString(majorByte))
 		}
 	}
 	switch majorByte {
@@ -136,19 +141,22 @@ func (d *Decoder) step_acceptMapKeyOrBreak(tokenSlot *Token) (done bool, err err
 		tokenSlot.Type = TMapClose
 		return true, nil
 	default:
+		d.frame.some = true
 		// Consume a string for key.
-		_, err := d.stepHelper_acceptValue(majorByte, tokenSlot) // FIXME surely not *any* value?  not composites, at least?
+		_, err := d.stepHelper_acceptKey(majorByte, tokenSlot) // FIXME surely not *any* value?  not composites, at least?
+		if err != nil {
+			return true, err
+		}
 		// Now scan up to consume the colon as well, which is required next.
 		majorByte, err = readn1skippingWhitespace(d.r)
 		if err != nil {
 			return true, err
 		}
 		if majorByte != ':' {
-			return true, fmt.Errorf("expected colon after map key; got 0x%x", majorByte)
+			return true, fmt.Errorf("expected colon after map key; got %s", byteToString(majorByte))
 		}
 		// Next up: expect a value.
-		d.step = d.step_acceptMapValue
-		d.some = true
+		d.frame = stackFrame{d.step_acceptMapValue, false}
 		return false, err
 	}
 }
@@ -159,12 +167,20 @@ func (d *Decoder) step_acceptMapValue(tokenSlot *Token) (done bool, err error) {
 	if err != nil {
 		return true, err
 	}
-	d.step = d.step_acceptMapKeyOrBreak
+	d.frame = stackFrame{d.step_acceptMapKeyOrBreak, true}
 	_, err = d.stepHelper_acceptValue(majorByte, tokenSlot)
 	return false, err
 }
 
 func (d *Decoder) stepHelper_acceptValue(majorByte byte, tokenSlot *Token) (done bool, err error) {
+	return d.stepHelper_acceptKV("value", majorByte, tokenSlot)
+}
+
+func (d *Decoder) stepHelper_acceptKey(majorByte byte, tokenSlot *Token) (done bool, err error) {
+	return d.stepHelper_acceptKV("key", majorByte, tokenSlot)
+}
+
+func (d *Decoder) stepHelper_acceptKV(t string, majorByte byte, tokenSlot *Token) (done bool, err error) {
 	switch majorByte {
 	case '{':
 		tokenSlot.Type = TMapOpen
@@ -202,6 +218,23 @@ func (d *Decoder) stepHelper_acceptValue(majorByte byte, tokenSlot *Token) (done
 		tokenSlot.Type, tokenSlot.Int, tokenSlot.Float64, err = d.decodeNumber(majorByte)
 		return true, err
 	default:
-		return true, fmt.Errorf("Invalid byte while expecting start of value: 0x%x", majorByte)
+		return true, fmt.Errorf("invalid char while expecting start of %s: %s", t, byteToString(majorByte))
 	}
+}
+
+var byteToStringMap = map[byte]string{
+	',': "comma",
+	':': "colon",
+	'{': "map open",
+	'}': "map close",
+	'[': "array open",
+	']': "array close",
+	'"': "quote",
+}
+
+func byteToString(b byte) string {
+	if s, ok := byteToStringMap[b]; ok {
+		return s
+	}
+	return fmt.Sprintf("0x%x", b)
 }

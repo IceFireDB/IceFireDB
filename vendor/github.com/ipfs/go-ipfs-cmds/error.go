@@ -52,7 +52,7 @@ type Error struct {
 }
 
 // Errorf returns an Error with the given code and format specification
-func Errorf(code ErrorType, format string, args ...interface{}) Error {
+func Errorf(code ErrorType, format string, args ...any) Error {
 	return Error{
 		Code:    code,
 		Message: fmt.Sprintf(format, args...),

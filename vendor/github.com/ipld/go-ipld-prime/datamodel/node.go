@@ -195,7 +195,7 @@ type LargeBytesNode interface {
 	// It is not guaranteed that all implementations will implement the full semantics of
 	// Seek, in particular, they may refuse to seek to the end of a large bytes node if
 	// it is not possible to do so efficiently.
-	// The io.ReadSeeker returned by AsLargeBytes must be a seperate instance from subsequent
+	// The io.ReadSeeker returned by AsLargeBytes must be a separate instance from subsequent
 	// calls to AsLargeBytes. Calls to read or seek on one returned instance should NOT
 	// affect the read position of other returned instances.
 	AsLargeBytes() (io.ReadSeeker, error)

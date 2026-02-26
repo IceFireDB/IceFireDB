@@ -14,7 +14,9 @@ import (
 	"github.com/ipfs/boxo/provider"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipfs/go-datastore/query"
+	log "github.com/ipfs/go-log/v2"
 	"github.com/ipfs/kubo/config"
 	"github.com/ipfs/kubo/repo"
 	irouting "github.com/ipfs/kubo/routing"
@@ -36,13 +38,32 @@ import (
 	"go.uber.org/fx"
 )
 
-// The size of a batch that will be used for calculating average announcement
-// time per CID, inside of boxo/provider.ThroughputReport
-// and in 'ipfs stats provide' report.
-const sampledBatchSize = 1000
+const (
+	// The size of a batch that will be used for calculating average announcement
+	// time per CID, inside of boxo/provider.ThroughputReport
+	// and in 'ipfs stats provide' report.
+	// Used when Provide.DHT.SweepEnabled=false
+	sampledBatchSize = 1000
 
-// Datastore key used to store previous reprovide strategy.
-const reprovideStrategyKey = "/reprovideStrategy"
+	// Datastore key used to store previous reprovide strategy.
+	reprovideStrategyKey = "/reprovideStrategy"
+
+	// Datastore namespace prefix for provider data.
+	providerDatastorePrefix = "provider"
+	// Datastore path for the provider keystore.
+	keystoreDatastorePath = "keystore"
+)
+
+var errAcceleratedDHTNotReady = errors.New("AcceleratedDHTClient: routing table not ready")
+
+// Interval between reprovide queue monitoring checks for slow reprovide alerts.
+// Used when Provide.DHT.SweepEnabled=true
+const reprovideAlertPollInterval = 15 * time.Minute
+
+// Number of consecutive polling intervals with sustained queue growth before
+// triggering a slow reprovide alert (3 intervals = 45 minutes).
+// Used when Provide.DHT.SweepEnabled=true
+const consecutiveAlertsThreshold = 3
 
 // DHTProvider is an interface for providing keys to a DHT swarm. It holds a
 // state of keys to be advertised, and is responsible for periodically
@@ -98,6 +119,7 @@ type DHTProvider interface {
 	// `OfflineDelay`). The schedule depends on the network size, hence recent
 	// network connectivity is essential.
 	RefreshSchedule() error
+	Close() error
 }
 
 var (
@@ -116,6 +138,7 @@ func (r *NoopProvider) StartProviding(bool, ...mh.Multihash) error { return nil 
 func (r *NoopProvider) ProvideOnce(...mh.Multihash) error          { return nil }
 func (r *NoopProvider) Clear() int                                 { return 0 }
 func (r *NoopProvider) RefreshSchedule() error                     { return nil }
+func (r *NoopProvider) Close() error                               { return nil }
 
 // LegacyProvider is a wrapper around the boxo/provider.System that implements
 // the DHTProvider interface. This provider manages reprovides using a burst
@@ -302,6 +325,46 @@ type dhtImpl interface {
 	Host() host.Host
 	MessageSender() dht_pb.MessageSender
 }
+
+type fullrtRouter struct {
+	*fullrt.FullRT
+	ready  bool
+	logger *log.ZapEventLogger
+}
+
+func newFullRTRouter(fr *fullrt.FullRT, loggerName string) *fullrtRouter {
+	return &fullrtRouter{
+		FullRT: fr,
+		ready:  true,
+		logger: log.Logger(loggerName),
+	}
+}
+
+// GetClosestPeers overrides fullrt.FullRT's GetClosestPeers and returns an
+// error if the fullrt's initial network crawl isn't complete yet.
+func (fr *fullrtRouter) GetClosestPeers(ctx context.Context, key string) ([]peer.ID, error) {
+	if fr.ready {
+		if !fr.Ready() {
+			fr.ready = false
+			fr.logger.Info("AcceleratedDHTClient: waiting for routing table initialization (5-10 min, depends on DHT size and network) to complete before providing")
+			return nil, errAcceleratedDHTNotReady
+		}
+	} else {
+		if fr.Ready() {
+			fr.ready = true
+			fr.logger.Info("AcceleratedDHTClient: routing table ready, providing can begin")
+		} else {
+			return nil, errAcceleratedDHTNotReady
+		}
+	}
+	return fr.FullRT.GetClosestPeers(ctx, key)
+}
+
+var (
+	_ dhtImpl = &dht.IpfsDHT{}
+	_ dhtImpl = &fullrtRouter{}
+)
+
 type addrsFilter interface {
 	FilteredAddrs() []ma.Multiaddr
 }
@@ -314,10 +377,10 @@ func SweepingProviderOpt(cfg *config.Config) fx.Option {
 		Repo repo.Repo
 	}
 	sweepingReprovider := fx.Provide(func(in providerInput) (DHTProvider, *keystore.ResettableKeystore, error) {
-		ds := in.Repo.Datastore()
+		ds := namespace.Wrap(in.Repo.Datastore(), datastore.NewKey(providerDatastorePrefix))
 		ks, err := keystore.NewResettableKeystore(ds,
 			keystore.WithPrefixBits(16),
-			keystore.WithDatastorePath("/provider/keystore"),
+			keystore.WithDatastorePath(keystoreDatastorePath),
 			keystore.WithBatchSize(int(cfg.Provide.DHT.KeystoreBatchSize.WithDefault(config.DefaultProvideDHTKeystoreBatchSize))),
 		)
 		if err != nil {
@@ -343,6 +406,9 @@ func SweepingProviderOpt(cfg *config.Config) fx.Option {
 			// provides happen as fast as possible via a dedicated worker that continuously
 			// processes the queue regardless of this timing.
 			bufferedIdleWriteTime = time.Minute
+
+			// loggerName is the name of the go-log logger used by the provider.
+			loggerName = dhtprovider.DefaultLoggerName
 		)
 
 		bufferedProviderOpts := []buffered.Option{
@@ -360,6 +426,8 @@ func SweepingProviderOpt(cfg *config.Config) fx.Option {
 			if inDht != nil {
 				prov, err := ddhtprovider.New(inDht,
 					ddhtprovider.WithKeystore(ks),
+					ddhtprovider.WithDatastore(ds),
+					ddhtprovider.WithResumeCycle(cfg.Provide.DHT.ResumeEnabled.WithDefault(config.DefaultProvideDHTResumeEnabled)),
 
 					ddhtprovider.WithReprovideInterval(reprovideInterval),
 					ddhtprovider.WithMaxReprovideDelay(time.Hour),
@@ -370,6 +438,8 @@ func SweepingProviderOpt(cfg *config.Config) fx.Option {
 					ddhtprovider.WithDedicatedPeriodicWorkers(int(cfg.Provide.DHT.DedicatedPeriodicWorkers.WithDefault(config.DefaultProvideDHTDedicatedPeriodicWorkers))),
 					ddhtprovider.WithDedicatedBurstWorkers(int(cfg.Provide.DHT.DedicatedBurstWorkers.WithDefault(config.DefaultProvideDHTDedicatedBurstWorkers))),
 					ddhtprovider.WithMaxProvideConnsPerWorker(int(cfg.Provide.DHT.MaxProvideConnsPerWorker.WithDefault(config.DefaultProvideDHTMaxProvideConnsPerWorker))),
+
+					ddhtprovider.WithLoggerName(loggerName),
 				)
 				if err != nil {
 					return nil, nil, err
@@ -378,7 +448,7 @@ func SweepingProviderOpt(cfg *config.Config) fx.Option {
 			}
 		case *fullrt.FullRT:
 			if inDht != nil {
-				impl = inDht
+				impl = newFullRTRouter(inDht, loggerName)
 			}
 		}
 		if impl == nil {
@@ -393,7 +463,9 @@ func SweepingProviderOpt(cfg *config.Config) fx.Option {
 		}
 		opts := []dhtprovider.Option{
 			dhtprovider.WithKeystore(ks),
-			dhtprovider.WithPeerID(impl.Host().ID()),
+			dhtprovider.WithDatastore(ds),
+			dhtprovider.WithResumeCycle(cfg.Provide.DHT.ResumeEnabled.WithDefault(config.DefaultProvideDHTResumeEnabled)),
+			dhtprovider.WithHost(impl.Host()),
 			dhtprovider.WithRouter(impl),
 			dhtprovider.WithMessageSender(impl.MessageSender()),
 			dhtprovider.WithSelfAddrs(selfAddrsFunc),
@@ -411,6 +483,8 @@ func SweepingProviderOpt(cfg *config.Config) fx.Option {
 			dhtprovider.WithDedicatedPeriodicWorkers(int(cfg.Provide.DHT.DedicatedPeriodicWorkers.WithDefault(config.DefaultProvideDHTDedicatedPeriodicWorkers))),
 			dhtprovider.WithDedicatedBurstWorkers(int(cfg.Provide.DHT.DedicatedBurstWorkers.WithDefault(config.DefaultProvideDHTDedicatedBurstWorkers))),
 			dhtprovider.WithMaxProvideConnsPerWorker(int(cfg.Provide.DHT.MaxProvideConnsPerWorker.WithDefault(config.DefaultProvideDHTMaxProvideConnsPerWorker))),
+
+			dhtprovider.WithLoggerName(loggerName),
 		}
 
 		prov, err := dhtprovider.New(opts...)
@@ -465,10 +539,14 @@ func SweepingProviderOpt(cfg *config.Config) fx.Option {
 					strategy := cfg.Provide.Strategy.WithDefault(config.DefaultProvideStrategy)
 					logger.Infow("provider keystore sync started", "strategy", strategy)
 					if err := syncKeystore(ctx); err != nil {
-						logger.Errorw("provider keystore sync failed", "err", err, "strategy", strategy)
-					} else {
-						logger.Infow("provider keystore sync completed", "strategy", strategy)
+						if ctx.Err() == nil {
+							logger.Errorw("provider keystore sync failed", "err", err, "strategy", strategy)
+						} else {
+							logger.Debugw("provider keystore sync interrupted by shutdown", "err", err, "strategy", strategy)
+						}
+						return
 					}
+					logger.Infow("provider keystore sync completed", "strategy", strategy)
 				}()
 
 				gcCtx, c := context.WithCancel(context.Background())
@@ -501,9 +579,159 @@ func SweepingProviderOpt(cfg *config.Config) fx.Option {
 				case <-ctx.Done():
 					return ctx.Err()
 				}
-				// Keystore data isn't purged, on close, but it will be overwritten
-				// when the node starts again.
+				// Keystore will be closed by ensureProviderClosesBeforeKeystore hook
+				// to guarantee provider closes before keystore.
+				return nil
+			},
+		})
+	})
+
+	// ensureProviderClosesBeforeKeystore manages the shutdown order between
+	// provider and keystore to prevent race conditions.
+	//
+	// The provider's worker goroutines may call keystore methods during their
+	// operation. If keystore closes while these operations are in-flight, we get
+	// "keystore is closed" errors. By closing the provider first, we ensure all
+	// worker goroutines exit and complete any pending keystore operations before
+	// the keystore itself closes.
+	type providerKeystoreShutdownInput struct {
+		fx.In
+		Provider DHTProvider
+		Keystore *keystore.ResettableKeystore
+	}
+	ensureProviderClosesBeforeKeystore := fx.Invoke(func(lc fx.Lifecycle, in providerKeystoreShutdownInput) {
+		// Skip for NoopProvider
+		if _, ok := in.Provider.(*NoopProvider); ok {
+			return
+		}
+
+		lc.Append(fx.Hook{
+			OnStop: func(ctx context.Context) error {
+				// Close provider first - waits for all worker goroutines to exit.
+				// This ensures no code can access keystore after this returns.
+				if err := in.Provider.Close(); err != nil {
+					logger.Errorw("error closing provider during shutdown", "error", err)
+				}
+
+				// Close keystore - safe now, provider is fully shut down
 				return in.Keystore.Close()
+			},
+		})
+	})
+
+	// extractSweepingProvider extracts a SweepingProvider from the given provider interface.
+	// It handles unwrapping buffered and dual providers, always selecting WAN for dual DHT.
+	// Returns nil if the provider is not a sweeping provider type.
+	var extractSweepingProvider func(prov any) *dhtprovider.SweepingProvider
+	extractSweepingProvider = func(prov any) *dhtprovider.SweepingProvider {
+		switch p := prov.(type) {
+		case *dhtprovider.SweepingProvider:
+			return p
+		case *ddhtprovider.SweepingProvider:
+			return p.WAN
+		case *buffered.SweepingProvider:
+			// Recursively extract from the inner provider
+			return extractSweepingProvider(p.Provider)
+		default:
+			return nil
+		}
+	}
+
+	type alertInput struct {
+		fx.In
+		Provider DHTProvider
+	}
+	reprovideAlert := fx.Invoke(func(lc fx.Lifecycle, in alertInput) {
+		prov := extractSweepingProvider(in.Provider)
+		if prov == nil {
+			return
+		}
+
+		var (
+			cancel context.CancelFunc
+			done   = make(chan struct{})
+		)
+
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				gcCtx, c := context.WithCancel(context.Background())
+				cancel = c
+				go func() {
+					defer close(done)
+
+					ticker := time.NewTicker(reprovideAlertPollInterval)
+					defer ticker.Stop()
+
+					var (
+						queueSize, prevQueueSize         int64
+						queuedWorkers, prevQueuedWorkers bool
+						count                            int
+					)
+
+					for {
+						select {
+						case <-gcCtx.Done():
+							return
+						case <-ticker.C:
+						}
+
+						stats := prov.Stats()
+						queuedWorkers = stats.Workers.QueuedPeriodic > 0
+						queueSize = int64(stats.Queues.PendingRegionReprovides)
+
+						// Alert if reprovide queue keeps growing and all periodic workers are busy.
+						// Requires consecutiveAlertsThreshold intervals of sustained growth.
+						if prevQueuedWorkers && queuedWorkers && queueSize > prevQueueSize {
+							count++
+							if count >= consecutiveAlertsThreshold {
+								logger.Errorf(`
+🔔🔔🔔 Reprovide Operations Too Slow 🔔🔔🔔
+
+Your node is falling behind on DHT reprovides, which will affect content availability.
+
+Keyspace regions enqueued for reprovide:
+  %s ago:\t%d
+  Now:\t%d
+
+All periodic workers are busy!
+  Active workers:\t%d / %d (max)
+  Active workers types:\t%d periodic, %d burst
+  Dedicated workers:\t%d periodic, %d burst
+
+Solutions (try in order):
+1. Increase Provide.DHT.MaxWorkers (current %d)
+2. Increase Provide.DHT.DedicatedPeriodicWorkers (current %d)
+3. Set Provide.DHT.SweepEnabled=false and Routing.AcceleratedDHTClient=true (last resort, not recommended)
+
+See how the reprovide queue is processed in real-time with 'watch ipfs provide stat --all --compact'
+
+See docs: https://github.com/ipfs/kubo/blob/master/docs/config.md#providedhtmaxworkers`,
+									reprovideAlertPollInterval.Truncate(time.Minute).String(), prevQueueSize, queueSize,
+									stats.Workers.Active, stats.Workers.Max,
+									stats.Workers.ActivePeriodic, stats.Workers.ActiveBurst,
+									stats.Workers.DedicatedPeriodic, stats.Workers.DedicatedBurst,
+									stats.Workers.Max, stats.Workers.DedicatedPeriodic)
+							}
+						} else if !queuedWorkers {
+							count = 0
+						}
+
+						prevQueueSize, prevQueuedWorkers = queueSize, queuedWorkers
+					}
+				}()
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				// Cancel the alert loop
+				if cancel != nil {
+					cancel()
+				}
+				select {
+				case <-done:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				return nil
 			},
 		})
 	})
@@ -511,10 +739,54 @@ func SweepingProviderOpt(cfg *config.Config) fx.Option {
 	return fx.Options(
 		sweepingReprovider,
 		initKeystore,
+		ensureProviderClosesBeforeKeystore,
+		reprovideAlert,
 	)
 }
 
 // ONLINE/OFFLINE
+
+// hasDHTRouting checks if the routing configuration includes a DHT component.
+// Returns false for HTTP-only custom routing configurations (e.g., Routing.Type="custom"
+// with only HTTP routers). This is used to determine whether SweepingProviderOpt
+// can be used, since it requires a DHT client.
+func hasDHTRouting(cfg *config.Config) bool {
+	routingType := cfg.Routing.Type.WithDefault(config.DefaultRoutingType)
+	switch routingType {
+	case "auto", "autoclient", "dht", "dhtclient", "dhtserver":
+		return true
+	case "custom":
+		// Check if any router in custom config is DHT-based
+		for _, router := range cfg.Routing.Routers {
+			if routerIncludesDHT(router, cfg) {
+				return true
+			}
+		}
+		return false
+	default: // "none", "delegated"
+		return false
+	}
+}
+
+// routerIncludesDHT recursively checks if a router configuration includes DHT.
+// Handles parallel and sequential composite routers by checking their children.
+func routerIncludesDHT(rp config.RouterParser, cfg *config.Config) bool {
+	switch rp.Type {
+	case config.RouterTypeDHT:
+		return true
+	case config.RouterTypeParallel, config.RouterTypeSequential:
+		if children, ok := rp.Parameters.(*config.ComposableRouterParams); ok {
+			for _, child := range children.Routers {
+				if childRouter, exists := cfg.Routing.Routers[child.RouterName]; exists {
+					if routerIncludesDHT(childRouter, cfg) {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
 
 // OnlineProviders groups units managing provide routing records online
 func OnlineProviders(provide bool, cfg *config.Config) fx.Option {
@@ -532,7 +804,15 @@ func OnlineProviders(provide bool, cfg *config.Config) fx.Option {
 	opts := []fx.Option{
 		fx.Provide(setReproviderKeyProvider(providerStrategy)),
 	}
-	if cfg.Provide.DHT.SweepEnabled.WithDefault(config.DefaultProvideDHTSweepEnabled) {
+
+	sweepEnabled := cfg.Provide.DHT.SweepEnabled.WithDefault(config.DefaultProvideDHTSweepEnabled)
+	dhtAvailable := hasDHTRouting(cfg)
+
+	// Use SweepingProvider only when both sweep is enabled AND DHT is available.
+	// For HTTP-only routing (e.g., Routing.Type="custom" with only HTTP routers),
+	// fall back to LegacyProvider which works with ProvideManyRouter.
+	// See https://github.com/ipfs/kubo/issues/11089
+	if sweepEnabled && dhtAvailable {
 		opts = append(opts, SweepingProviderOpt(cfg))
 	} else {
 		reprovideInterval := cfg.Provide.DHT.Interval.WithDefault(config.DefaultProvideDHTInterval)

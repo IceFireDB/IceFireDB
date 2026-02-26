@@ -318,7 +318,7 @@ func (prog Progress) reify(n datamodel.Node, s selector.Selector) (datamodel.Nod
 		}
 
 		// explore into the `InterpretAs` clause to the child selector.
-		s, err = s.Explore(n, datamodel.PathSegment{})
+		s, err = s.Explore(n, datamodel.EmptyPathSegment)
 		if err != nil {
 			return nil, nil, err
 		}

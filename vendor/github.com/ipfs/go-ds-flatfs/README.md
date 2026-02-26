@@ -4,21 +4,17 @@
 [![](https://img.shields.io/badge/project-IPFS-blue.svg?style=flat-square)](http://ipfs.io/)
 [![](https://img.shields.io/badge/freenode-%23ipfs-blue.svg?style=flat-square)](http://webchat.freenode.net/?channels=%23ipfs)
 [![standard-readme compliant](https://img.shields.io/badge/standard--readme-OK-green.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
-[![GoDoc](https://godoc.org/github.com/ipfs/go-ds-flatfs?status.svg)](https://godoc.org/github.com/ipfs/go-ds-flatfs)
-[![Build Status](https://travis-ci.org/ipfs/go-ds-flatfs.svg?branch=master)](https://travis-ci.org/ipfs/go-ds-flatfs)
 [![Coverage Status](https://img.shields.io/codecov/c/github/ipfs/go-ds-flatfs.svg)](https://codecov.io/gh/ipfs/go-ds-flatfs)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/ipfs/go-ds-flatfs/go-test.yml?branch=master)](https://github.com/ipfs/go-ds-flatfs/actions)
+[![GoDoc](https://pkg.go.dev/badge/github.com/ipfs/go-ds-flatfs)](https://pkg.go.dev/github.com/ipfs/go-ds-flatfs)
 
 
 > A datastore implementation using sharded directories and flat files to store data
 
-`go-ds-flatfs` is used by `go-ipfs` to store raw block contents on disk. It supports several sharding functions (prefix, suffix, next-to-last/*).
+`go-ds-flatfs` is used by `kubo` to store raw block contents on disk. It supports several sharding functions (prefix, suffix, next-to-last/*).
 
 It is _not_ a general-purpose datastore and has several important restrictions.
 See the restrictions section for details.
-
-## Lead Maintainer
-
-[Jakub Sztandera](https://github.com/kubuxu)
 
 ## Table of Contents
 
@@ -38,10 +34,36 @@ import "github.com/ipfs/go-ds-flatfs"
 
 ## Usage
 
-Check the [GoDoc module documentation](https://godoc.org/github.com/ipfs/go-ds-flatfs) for an overview of this module's
+Check the [GoDoc module documentation](https://pkg.go.dev/github.com/ipfs/go-ds-flatfs) for an overview of this module's
 functionality.
 
 ### Restrictions
+
+FlatFS is a special-purpose datastore designed exclusively for content-addressed
+storage (CID:block pairs). It is **not** a general-purpose key-value store.
+
+#### Content-Addressed Storage Only
+
+This datastore assumes that keys are content identifiers (CIDs) where the key
+is derived from a cryptographic hash of the value. This means:
+
+- The same key always maps to the same value (values are deterministic)
+- Multiple writes to the same key are idempotent (writing the same data twice is safe)
+
+**Write semantics**: When multiple writes target the same key (concurrently or
+within a batch), flatfs uses "first-successful-writer-wins" semantics. The first
+write to complete is persisted; subsequent writes to the same key are silently
+skipped. This is safe for content-addressed data because identical keys
+guarantee identical values.
+
+**If you need different semantics**: For data where the same key may have
+different values over time (e.g., mutable metadata, counters, queues), use a
+different datastore implementation such as
+[go-ds-leveldb](https://github.com/ipfs/go-ds-leveldb) or
+[go-ds-pebble](https://github.com/ipfs/go-ds-pebble), which provide
+last-writer-wins semantics.
+
+#### Key Format
 
 FlatFS keys are severely restricted. Only keys that match `/[0-9A-Z+-_=]\+` are
 allowed. That is, keys may only contain upper-case alpha-numeric characters,

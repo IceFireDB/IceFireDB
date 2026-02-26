@@ -64,6 +64,8 @@ func (ps *remoteCarFetcher) Fetch(ctx context.Context, path path.ImmutablePath, 
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
+	defer io.Copy(io.Discard, resp.Body) // read all body data so that connection can be reused
 
 	if resp.StatusCode != http.StatusOK {
 		errData, err := io.ReadAll(resp.Body)
@@ -75,12 +77,7 @@ func (ps *remoteCarFetcher) Fetch(ctx context.Context, path path.ImmutablePath, 
 		return fmt.Errorf("http error from car gateway: %s: %w", resp.Status, err)
 	}
 
-	err = cb(path, resp.Body)
-	if err != nil {
-		resp.Body.Close()
-		return err
-	}
-	return resp.Body.Close()
+	return cb(path, resp.Body)
 }
 
 func (ps *remoteCarFetcher) getRandomGatewayURL() string {

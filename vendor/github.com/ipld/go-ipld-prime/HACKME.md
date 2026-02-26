@@ -76,7 +76,7 @@ ways you can get it from existing data) is to enable the `traversal` package
 
 // work-in-progress warning: generic transformations are not fully implemented.
 
-When implementating a transformation that works over unknown data,
+When implementing a transformation that works over unknown data,
 the signiture of function a user provides is roughly:
 `func(oldValue Node, acceptableValues NodePrototype) (Node, error)`.
 (This signiture may vary by the strategy taken by the transformation -- this

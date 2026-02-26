@@ -22,9 +22,9 @@ high level rules of builders and assemblers
 	- The purpose of this is to prevent accidental mutation after any validations have been performed during the "finish" processing.
 
 - Many methods must be called in the right order, and the user must not hold onto references after calling "finish" methods on them.
-	- The reason this is important is to enable assembler systems to agressively reuse memory, thus increasing performance.
+	- The reason this is important is to enable assembler systems to aggressively reuse memory, thus increasing performance.
 	- Thus, if you hold onto NodeAssembler reference after being finished with it... you can't assume it'll explicitly error if you call further methods on it, because it might now be operating again... _on a different target_.
-		- In recursive structures, calling AssembleKey or AssembleValue might return pointer-identical assemblers (per warning in previous bullet), but the memory their assembly is targetted to should always advance -- it should never target already-assembled memory.
+		- In recursive structures, calling AssembleKey or AssembleValue might return pointer-identical assemblers (per warning in previous bullet), but the memory their assembly is targeted to should always advance -- it should never target already-assembled memory.
 	- (If you're thinking "the Rust memory model would be able to greatly enhance safety here!"... yes.  Yes it would.)
 	- When misuses of order are detected, these may cause panics (rather than error returns) (not all methods that can be so misused have error returns).
 
@@ -53,7 +53,7 @@ but the caller tries to continue anyway.
 	- is typically implemented by nil'ing the wip node they point to.
 		- this means you get nil pointer dereference panics when attempting to use an assembler after it's finished... which is not the greatest error message.
 		- but it does save us a lot of check code for a situation that the user certainly shouldn't get into in the first place.
-		- (worth review: can we add that check code without extra runtime cost?  possibly, because the compiler might then skip its own implicit check branches.  might still increase SLOC noticably in codegen output, though.)
+		- (worth review: can we add that check code without extra runtime cost?  possibly, because the compiler might then skip its own implicit check branches.  might still increase SLOC noticeably in codegen output, though.)
 		- worth noting there's a limit to how good this can be anyway: it's "best effort" error reporting: see the remarks on reuse of assembler memory in "overall rules" above.
 	- it's systemically critical to not yield an assembler _ever again in the future_ that refers to some memory already considered finished.
 		- even though we no longer return intermediate nodes, there's still many ways this could produce problems.  For example, complicating (if not outright breaking) COW sharing of segments of data.

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	chunker "github.com/ipfs/boxo/chunker"
 	dag "github.com/ipfs/boxo/ipld/merkledag"
 	ft "github.com/ipfs/boxo/ipld/unixfs"
 	uio "github.com/ipfs/boxo/ipld/unixfs/io"
@@ -42,7 +43,8 @@ type Directory struct {
 	// reading and editing directories.
 	unixfsDir uio.Directory
 
-	prov provider.MultihashProvider
+	prov    provider.MultihashProvider
+	chunker chunker.SplitterGen // inherited from parent, nil means default
 }
 
 // NewDirectory constructs a new MFS directory.
@@ -82,6 +84,7 @@ func NewDirectory(ctx context.Context, name string, node ipld.Node, parent paren
 		unixfsDir:    db,
 		prov:         prov,
 		entriesCache: make(map[string]FSNode),
+		chunker:      parent.getChunker(), // inherit from parent
 	}, nil
 }
 
@@ -89,14 +92,22 @@ func NewDirectory(ctx context.Context, name string, node ipld.Node, parent paren
 // The directory is added to the DAGService. To create a new MFS
 // root use NewEmptyRootFolder instead.
 func NewEmptyDirectory(ctx context.Context, name string, parent parent, dserv ipld.DAGService, prov provider.MultihashProvider, opts MkdirOpts) (*Directory, error) {
-	db, err := uio.NewDirectory(dserv,
+	dirOpts := []uio.DirectoryOption{
 		uio.WithMaxLinks(opts.MaxLinks),
 		uio.WithMaxHAMTFanout(opts.MaxHAMTFanout),
 		uio.WithStat(opts.Mode, opts.ModTime),
 		uio.WithCidBuilder(opts.CidBuilder),
-	)
+	}
+	if opts.SizeEstimationMode != nil {
+		dirOpts = append(dirOpts, uio.WithSizeEstimationMode(*opts.SizeEstimationMode))
+	}
+	db, err := uio.NewDirectory(dserv, dirOpts...)
 	if err != nil {
 		return nil, err
+	}
+	// Set HAMTShardingSize after creation (not a DirectoryOption)
+	if opts.HAMTShardingSize > 0 {
+		db.SetHAMTShardingSize(opts.HAMTShardingSize)
 	}
 
 	nd, err := db.GetNode()
@@ -111,6 +122,12 @@ func NewEmptyDirectory(ctx context.Context, name string, parent parent, dserv ip
 
 	// note: we don't provide the empty unixfs dir as it is always local.
 
+	// Use chunker from opts if set, otherwise inherit from parent
+	c := opts.Chunker
+	if c == nil {
+		c = parent.getChunker()
+	}
+
 	return &Directory{
 		inode: inode{
 			name:       name,
@@ -121,12 +138,18 @@ func NewEmptyDirectory(ctx context.Context, name string, parent parent, dserv ip
 		unixfsDir:    db,
 		prov:         prov,
 		entriesCache: make(map[string]FSNode),
+		chunker:      c,
 	}, nil
 }
 
 // GetCidBuilder gets the CID builder of the root node
 func (d *Directory) GetCidBuilder() cid.Builder {
 	return d.unixfsDir.GetCidBuilder()
+}
+
+// getChunker implements the parent interface.
+func (d *Directory) getChunker() chunker.SplitterGen {
+	return d.chunker
 }
 
 // SetCidBuilder sets the CID builder
@@ -214,8 +237,12 @@ func (d *Directory) cacheNode(name string, nd ipld.Node) (FSNode, error) {
 
 			// these options are not persisted so they need to be
 			// inherited from the parent.
-			ndir.unixfsDir.SetMaxLinks(d.unixfsDir.GetMaxLinks())
+			parentMaxLinks := d.unixfsDir.GetMaxLinks()
+			parentMode := d.unixfsDir.GetSizeEstimationMode()
+			ndir.unixfsDir.SetMaxLinks(parentMaxLinks)
 			ndir.unixfsDir.SetMaxHAMTFanout(d.unixfsDir.GetMaxHAMTFanout())
+			ndir.unixfsDir.SetHAMTShardingSize(d.unixfsDir.GetHAMTShardingSize())
+			ndir.unixfsDir.SetSizeEstimationMode(parentMode)
 			d.entriesCache[name] = ndir
 			return ndir, nil
 		case ft.TFile, ft.TRaw, ft.TSymlink:
@@ -343,8 +370,9 @@ func (d *Directory) ForEachEntry(ctx context.Context, f func(NodeListing) error)
 
 func (d *Directory) Mkdir(name string) (*Directory, error) {
 	return d.MkdirWithOpts(name, MkdirOpts{
-		MaxLinks:      d.unixfsDir.GetMaxLinks(),
-		MaxHAMTFanout: d.unixfsDir.GetMaxHAMTFanout(),
+		MaxLinks:         d.unixfsDir.GetMaxLinks(),
+		MaxHAMTFanout:    d.unixfsDir.GetMaxHAMTFanout(),
+		HAMTShardingSize: d.unixfsDir.GetHAMTShardingSize(),
 	})
 }
 
@@ -578,8 +606,10 @@ func (d *Directory) setNodeData(data []byte, links []*ipld.Link) error {
 	}
 
 	// We need to carry our desired settings.
+	// Note: SizeEstimationMode is set at creation time and cannot be changed.
 	db.SetMaxLinks(d.unixfsDir.GetMaxLinks())
 	db.SetMaxHAMTFanout(d.unixfsDir.GetMaxHAMTFanout())
+	db.SetHAMTShardingSize(d.unixfsDir.GetHAMTShardingSize())
 	d.unixfsDir = db
 
 	return nil

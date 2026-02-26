@@ -166,12 +166,30 @@ func SymlinkData(path string) ([]byte, error) {
 
 // HAMTShardData return a `Data_HAMTShard` protobuf message
 func HAMTShardData(data []byte, fanout uint64, hashType uint64) ([]byte, error) {
+	return HAMTShardDataWithStat(data, fanout, hashType, 0, time.Time{})
+}
+
+// HAMTShardDataWithStat return a `Data_HAMTShard` protobuf message with optional mode/mtime.
+// Pass mode=0 and zero mtime to omit those fields.
+func HAMTShardDataWithStat(data []byte, fanout uint64, hashType uint64, mode os.FileMode, mtime time.Time) ([]byte, error) {
 	pbdata := new(pb.Data)
 	typ := pb.Data_HAMTShard
 	pbdata.Type = &typ
 	pbdata.HashType = proto.Uint64(hashType)
 	pbdata.Data = data
 	pbdata.Fanout = proto.Uint64(fanout)
+
+	if mode != 0 {
+		pbdata.Mode = proto.Uint32(files.ModePermsToUnixPerms(mode))
+	}
+	if !mtime.IsZero() {
+		pbdata.Mtime = &pb.IPFSTimestamp{
+			Seconds: proto.Int64(mtime.Unix()),
+		}
+		if nanos := uint32(mtime.Nanosecond()); nanos > 0 {
+			pbdata.Mtime.Nanos = &nanos
+		}
+	}
 
 	out, err := proto.Marshal(pbdata)
 	if err != nil {

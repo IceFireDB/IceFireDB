@@ -1,6 +1,15 @@
 // Package flatfs is a Datastore implementation that stores all
 // objects in a two-level directory structure in the local file
 // system, regardless of the hierarchy of the keys.
+//
+// This is a special-purpose datastore designed exclusively for content-addressed
+// storage (CID:block pairs). It assumes keys are derived from cryptographic hashes
+// of values, meaning the same key always maps to the same value.
+//
+// Write semantics: flatfs uses "first-successful-writer-wins" for concurrent or
+// duplicate writes to the same key. This is safe for content-addressed data where
+// identical keys guarantee identical values. For mutable data requiring
+// last-writer-wins semantics, use go-ds-leveldb or go-ds-pebble instead.
 package flatfs
 
 import (
@@ -8,10 +17,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
+	"maps"
 	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -31,6 +43,17 @@ const (
 	diskUsageMessageTimeout    = 5 * time.Second
 	diskUsageCheckpointPercent = 1.0
 	diskUsageCheckpointTimeout = 2 * time.Second
+
+	// maxConcurrentPuts limits the number of parallel async writes during
+	// batch operations. Each Put spawns a goroutine that writes to a temp
+	// file; this constant bounds how many can run simultaneously.
+	//
+	// The value 16 balances several constraints:
+	//   - macOS default file descriptor limit is only 256, so we stay conservative
+	//   - provides good parallelism for SSDs (common case) without overwhelming HDDs
+	//   - keeps memory overhead bounded (~16-32 MiB with typical 1-2 MiB block sizes)
+	//   - matches typical "conservative concurrent I/O" defaults in other tools
+	maxConcurrentPuts = 16
 )
 
 var (
@@ -99,6 +122,8 @@ var _ datastore.Datastore = (*Datastore)(nil)
 var _ datastore.PersistentDatastore = (*Datastore)(nil)
 var _ datastore.Batching = (*Datastore)(nil)
 var _ datastore.Batch = (*flatfsBatch)(nil)
+var _ DiscardableBatch = (*flatfsBatch)(nil)
+var _ BatchReader = (*flatfsBatch)(nil)
 
 var (
 	ErrDatastoreExists       = errors.New("datastore already exists")
@@ -191,8 +216,15 @@ func (m *opMap) Begin(name string) *opResult {
 		}
 
 		op := opIface.(*opResult)
-		// someone else doing ops with this key, wait for
-		// the result
+		// someone else doing ops with this key, wait for the
+		// result Note: we are using `op.mu` as a syncing
+		// primitive to make several threads WAIT. The first
+		// operation will grab the write-lock. Everyone else
+		// tries to grab a read-lock as a way of waiting for
+		// the operation to be finished by the thead that
+		// grabbed the write-lock. The Read-lock does not need
+		// to be unlocked, as the operation is never used or
+		// re-used for anything else from that point.
 		op.mu.RLock()
 		if op.success {
 			return nil
@@ -244,7 +276,7 @@ func Create(path string, fun *ShardIdV1) error {
 
 func Open(path string, syncFiles bool) (*Datastore, error) {
 	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return nil, ErrDatastoreDoesNotExist
 	} else if err != nil {
 		return nil, err
@@ -252,7 +284,7 @@ func Open(path string, syncFiles bool) (*Datastore, error) {
 
 	tempPath := filepath.Join(path, ".temp")
 	err = os.RemoveAll(tempPath)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("failed to remove temporary directory: %v", err)
 	}
 
@@ -530,131 +562,6 @@ func (fs *Datastore) doPut(key datastore.Key, val []byte) error {
 			return err
 		}
 	}
-	return nil
-}
-
-func (fs *Datastore) putMany(data map[datastore.Key][]byte) error {
-	fs.shutdownLock.RLock()
-	defer fs.shutdownLock.RUnlock()
-	if fs.shutdown {
-		return ErrClosed
-	}
-
-	type putManyOp struct {
-		key     datastore.Key
-		file    *os.File
-		dstPath string
-		srcPath string
-	}
-
-	var (
-		dirsToSync = make(map[string]struct{}, len(data))
-		files      = make([]putManyOp, 0, len(data))
-		closed     int
-		removed    int
-	)
-
-	defer func() {
-		for closed < len(files) {
-			files[closed].file.Close()
-			closed++
-		}
-		for removed < len(files) {
-			_ = os.Remove(files[removed].srcPath)
-			removed++
-		}
-	}()
-
-	closer := func() error {
-		for closed < len(files) {
-			fi := files[closed].file
-			if fs.sync {
-				if err := syncFile(fi); err != nil {
-					return err
-				}
-			}
-			if err := fi.Close(); err != nil {
-				return err
-			}
-			closed++
-		}
-		return nil
-	}
-
-	// Start by writing all the data in temp files so that we can be sure that
-	// all the data is on disk before renaming to the final places.
-	for key, value := range data {
-		dir, path := fs.encode(key)
-		if _, err := fs.makeDirNoSync(dir); err != nil {
-			return err
-		}
-		dirsToSync[dir] = struct{}{}
-
-		tmp, err := fs.tempFileOnce()
-
-		// If we have too many files open, try closing some, then try
-		// again repeatedly.
-		if isTooManyFDError(err) {
-			if err = closer(); err != nil {
-				return err
-			}
-			tmp, err = fs.tempFile()
-		}
-
-		if err != nil {
-			return err
-		}
-
-		// Do this _first_ so we close it if writing fails.
-		files = append(files, putManyOp{
-			key:     key,
-			file:    tmp,
-			dstPath: path,
-			srcPath: tmp.Name(),
-		})
-
-		if _, err := tmp.Write(value); err != nil {
-			return err
-		}
-	}
-
-	// Now we sync everything
-	// sync and close files
-	err := closer()
-	if err != nil {
-		return err
-	}
-
-	// move files to their proper places
-	for _, pop := range files {
-		done, err := fs.doWriteOp(&op{
-			typ:  opRename,
-			key:  pop.key,
-			tmp:  pop.srcPath,
-			path: pop.dstPath,
-		})
-		if err != nil {
-			return err
-		} else if !done {
-			_ = os.Remove(pop.file.Name())
-		}
-		removed++
-	}
-
-	// now sync the dirs for those files
-	if fs.sync {
-		for dir := range dirsToSync {
-			if err := syncDir(dir); err != nil {
-				return err
-			}
-		}
-
-		// sync top flatfs dir
-		if err := syncDir(fs.path); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -1128,10 +1035,6 @@ func (fs *Datastore) tempFile() (*os.File, error) {
 	return file, err
 }
 
-func (fs *Datastore) tempFileOnce() (*os.File, error) {
-	return tempFileOnce(fs.tempPath, "temp-")
-}
-
 // only call this on directories.
 func (fs *Datastore) walk(ctx context.Context, q query.Query, path string, output chan<- query.Result) error {
 	dir, err := os.Open(path)
@@ -1210,45 +1113,565 @@ func (fs *Datastore) Close() error {
 	return nil
 }
 
+// DiscardableBatch is an optional interface for batches that support discarding changes
+type DiscardableBatch interface {
+	datastore.Batch
+	Discard(ctx context.Context) error
+}
+
+// BatchReader is an optional interface for batches that support read operations
+type BatchReader interface {
+	datastore.Batch
+	datastore.Read
+}
+
+// flatfsBatch implements atomic batch operations using a temporary directory.
+//
+// Design principles:
+//   - All Put operations write to a temp directory (no sharding)
+//   - Writes are done asynchronously in goroutines for performance
+//   - Commit atomically renames all files to their sharded destinations
+//   - On crash/discard, temp directory is cleaned (no partial writes)
+//
+// Duplicate key handling: Uses "first-successful-writer-wins" semantics.
+// If the same key is Put multiple times within a batch, only the first Put
+// is written; subsequent Puts to that key are silently skipped. This is safe
+// for content-addressed storage where identical keys guarantee identical values.
+// For mutable data requiring last-writer-wins, use a different datastore.
+//
+// Concurrency: Safe for concurrent calls to Put/Delete/Get/Has/GetSize/Query.
+// Not safe to call Commit or Discard concurrently with other operations.
+//
+// Transaction semantics: Read operations (Get/Has/GetSize/Query) see
+// uncommitted writes from the same batch, following standard database
+// transaction isolation.
+//
+// Performance characteristics:
+//   - Put: O(1) with async I/O, returns immediately
+//   - Get/Has/GetSize: O(1) lookup via putSet map
+//   - Commit: O(n) file renames, where n = number of Put operations
+//
+// IMPORTANT: Batch instances should not be reused after Commit or Discard.
+// This follows the go-datastore Batch interface contract which states that
+// calling Put/Delete after Commit/Discard has undefined behavior.
+// See: https://github.com/ipfs/go-datastore/blob/master/datastore.go
 type flatfsBatch struct {
-	puts    map[datastore.Key][]byte
+	mu      sync.Mutex
+	puts    []datastore.Key            // ordered list for iteration (Commit, Query)
+	putSet  map[datastore.Key]struct{} // O(1) lookup for Get/Has/GetSize
 	deletes map[datastore.Key]struct{}
 
-	ds *Datastore
+	ds      *Datastore
+	tempDir string
+
+	// Async write tracking
+	asyncWrites     sync.WaitGroup
+	asyncMu         sync.Mutex
+	asyncFirstError error
+	asyncPutGate    chan struct{}
 }
 
 func (fs *Datastore) Batch(_ context.Context) (datastore.Batch, error) {
+	// Create a unique temp directory for this batch
+	// Note: Temp files are not sharded (flat structure) for simplicity and speed.
+	// Files are only sharded when renamed to their final destination on Commit.
+	tempDir := filepath.Join(fs.tempPath, fmt.Sprintf("batch-%d-%d", time.Now().UnixNano(), rand.Int63()))
+	if err := os.Mkdir(tempDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create batch temp directory: %w", err)
+	}
+
 	return &flatfsBatch{
-		puts:    make(map[datastore.Key][]byte),
-		deletes: make(map[datastore.Key]struct{}),
-		ds:      fs,
+		putSet:       make(map[datastore.Key]struct{}),
+		deletes:      make(map[datastore.Key]struct{}),
+		ds:           fs,
+		tempDir:      tempDir,
+		asyncPutGate: make(chan struct{}, maxConcurrentPuts),
 	}, nil
 }
 
+// Put writes val for key to a temporary file asynchronously and returns immediately.
+//
+// Duplicate keys: If this key was already Put in this batch, the call returns
+// immediately without writing (first-successful-writer-wins). This is safe for
+// content-addressed data where identical keys have identical values.
+//
+// CRITICAL: The caller MUST NOT modify or reuse the val byte slice after calling Put.
+// The buffer is used asynchronously by a background goroutine. Violating this will
+// cause data corruption. This differs from typical Go semantics where buffers can
+// be reused after a function returns.
+//
+// If you need to reuse buffers, copy them before calling Put:
+//
+//	buf := make([]byte, len(data))
+//	copy(buf, data)
+//	batch.Put(ctx, key, buf)
+//
+// Error handling: If an async write fails, the error is captured and returned
+// on the next Put/Delete/Commit or any read operation (fail-fast behavior).
 func (bt *flatfsBatch) Put(ctx context.Context, key datastore.Key, val []byte) error {
 	if !keyIsValid(key) {
 		return fmt.Errorf("when putting '%q': %v", key, ErrInvalidKey)
 	}
-	bt.puts[key] = val
+
+	if err := bt.getAsyncError(); err != nil {
+		// If there was an error from a previous async write, return it fast
+		// This may be useful if, for example, we are out of disk space.
+		return err
+	}
+
+	// Acquire semaphore slot before starting another async put.
+	select {
+	case bt.asyncPutGate <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	bt.mu.Lock()
+
+	// Skip duplicate keys to prevent concurrent goroutines from writing to the
+	// same temp file. Without this check, two Put calls with the same key
+	// would spawn goroutines that race on os.Create/Write, potentially
+	// corrupting the file contents.
+	if _, exists := bt.putSet[key]; exists {
+		bt.mu.Unlock()
+		<-bt.asyncPutGate // Release semaphore slot acquired above
+		return nil
+	}
+	noslash := key.String()[1:]
+	fileName := noslash + extension
+	tempFile := filepath.Join(bt.tempDir, fileName)
+
+	// Track this key immediately
+	bt.puts = append(bt.puts, key)
+	bt.putSet[key] = struct{}{}
+
+	// Increment wait group for async write
+	bt.asyncWrites.Add(1)
+	bt.mu.Unlock()
+
+	// Write to temp file asynchronously in a goroutine
+	go func(val []byte) {
+		defer func() {
+			bt.asyncWrites.Done()
+			<-bt.asyncPutGate
+		}()
+
+		// Ensure temp directory exists (recreate if batch was reused after commit,
+		// which is unsupported but we handle it as a precaution)
+		if err := os.MkdirAll(filepath.Dir(tempFile), 0755); err != nil {
+			bt.setAsyncError(fmt.Errorf("failed to create temp directory: %w", err))
+			return
+		}
+
+		file, err := createFile(tempFile)
+		if err != nil {
+			bt.setAsyncError(fmt.Errorf("failed to create temp file: %w", err))
+			return
+		}
+		defer file.Close()
+
+		if _, err := file.Write(val); err != nil {
+			os.Remove(tempFile)
+			bt.setAsyncError(fmt.Errorf("failed to write to temp file: %w", err))
+			return
+		}
+
+		if bt.ds.sync {
+			if err := syncFile(file); err != nil {
+				os.Remove(tempFile)
+				bt.setAsyncError(fmt.Errorf("failed to sync temp file: %w", err))
+				return
+			}
+		}
+
+		if err := file.Close(); err != nil {
+			os.Remove(tempFile)
+			bt.setAsyncError(fmt.Errorf("failed to close temp file: %w", err))
+			return
+		}
+	}(val)
+
 	return nil
 }
 
+// setAsyncError saves the first error from an async write operation.
+// Only the first error is captured; subsequent errors are ignored.
+// This provides fail-fast behavior: once any write fails, subsequent
+// operations return that error immediately.
+func (bt *flatfsBatch) setAsyncError(err error) {
+	bt.asyncMu.Lock()
+	defer bt.asyncMu.Unlock()
+	if bt.asyncFirstError == nil {
+		bt.asyncFirstError = err
+	}
+}
+
+// getAsyncError returns the first error from an async write operation
+func (bt *flatfsBatch) getAsyncError() error {
+	bt.asyncMu.Lock()
+	defer bt.asyncMu.Unlock()
+
+	err := bt.asyncFirstError
+	return err
+}
+
 func (bt *flatfsBatch) Delete(ctx context.Context, key datastore.Key) error {
+	bt.mu.Lock()
+	defer bt.mu.Unlock()
+
+	if err := bt.getAsyncError(); err != nil {
+		return err
+	}
+
 	if keyIsValid(key) {
 		bt.deletes[key] = struct{}{}
 	} // otherwise, delete is a no-op anyways.
 	return nil
 }
 
+// Get retrieves a value from the batch or underlying datastore.
+//
+// Transaction semantics: Returns uncommitted data written to this batch via Put,
+// even before Commit. This allows building IPLD structures that reference blocks
+// added earlier in the same batch.
+//
+// Performance: O(1) lookup via putSet map, plus file read if key is in batch.
+func (bt *flatfsBatch) Get(ctx context.Context, key datastore.Key) ([]byte, error) {
+	// Wait for all async writes to complete before reading
+	bt.asyncWrites.Wait()
+	if err := bt.getAsyncError(); err != nil {
+		return nil, err
+	}
+	bt.mu.Lock()
+	// Check if key is marked for deletion
+	if _, deleted := bt.deletes[key]; deleted {
+		bt.mu.Unlock()
+		return nil, datastore.ErrNotFound
+	}
+
+	// Check if key was added in this batch
+	_, inBatch := bt.putSet[key]
+	bt.mu.Unlock()
+
+	// If in batch, read from temp directory
+	if inBatch {
+		noslash := key.String()[1:]
+		tempFile := filepath.Join(bt.tempDir, noslash+extension)
+		data, err := readFile(tempFile)
+		if err != nil {
+			return nil, err
+		}
+		return data, nil
+	}
+
+	// If not in batch, check main datastore
+	return bt.ds.Get(ctx, key)
+}
+
+func (bt *flatfsBatch) Has(ctx context.Context, key datastore.Key) (bool, error) {
+	// Wait for all async writes to complete before checking
+	bt.asyncWrites.Wait()
+	if err := bt.getAsyncError(); err != nil {
+		return false, err
+	}
+
+	bt.mu.Lock()
+	// Check if key is marked for deletion
+	if _, deleted := bt.deletes[key]; deleted {
+		bt.mu.Unlock()
+		return false, nil
+	}
+
+	// Check if key was added in this batch
+	_, inBatch := bt.putSet[key]
+	bt.mu.Unlock()
+
+	if inBatch {
+		return true, nil
+	}
+
+	// If not in batch, check main datastore
+	return bt.ds.Has(ctx, key)
+}
+
+func (bt *flatfsBatch) GetSize(ctx context.Context, key datastore.Key) (int, error) {
+	// Wait for all async writes to complete before checking size
+	bt.asyncWrites.Wait()
+
+	if err := bt.getAsyncError(); err != nil {
+		return 0, err
+	}
+	bt.mu.Lock()
+	// Check if key is marked for deletion
+	if _, deleted := bt.deletes[key]; deleted {
+		bt.mu.Unlock()
+		return -1, datastore.ErrNotFound
+	}
+
+	// Check if key was added in this batch
+	_, inBatch := bt.putSet[key]
+	bt.mu.Unlock()
+
+	// If in batch, get size from temp directory
+	if inBatch {
+		noslash := key.String()[1:]
+		tempFile := filepath.Join(bt.tempDir, noslash+extension)
+		stat, err := os.Stat(tempFile)
+		if err != nil {
+			return -1, err
+		}
+		return int(stat.Size()), nil
+	}
+
+	// If not in batch, check main datastore
+	return bt.ds.GetSize(ctx, key)
+}
+
+// Query returns all entries from both the batch and underlying datastore,
+// properly merging results to reflect the batch's uncommitted state.
+//
+// Merge logic:
+// - Keys written via Put appear in results (even if not committed)
+// - Keys marked for Delete do not appear in results
+// - Keys Put multiple times appear only once (last write wins)
+// - Main datastore results are excluded if overwritten or deleted in batch
+//
+// The implementation waits for all async writes to complete before querying.
+func (bt *flatfsBatch) Query(ctx context.Context, q query.Query) (query.Results, error) {
+	// Wait for all async writes to complete before querying
+	bt.asyncWrites.Wait()
+	if err := bt.getAsyncError(); err != nil {
+		return nil, err
+	}
+	prefix := datastore.NewKey(q.Prefix).String()
+	if prefix != "/" {
+		// This datastore can't include keys with multiple components.
+		// Therefore, it's always correct to return an empty result when
+		// the user requests a filter by prefix.
+		return query.ResultsWithEntries(q, nil), nil
+	}
+
+	// Get results from main datastore
+	mainResults, err := bt.ds.Query(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+
+	// Merge with temp directory results
+	results := query.ResultsWithContext(q, func(qctx context.Context, output chan<- query.Result) {
+		bt.mu.Lock()
+		// Clone deletes and puts to avoid holding lock during query execution
+		deletedOrSent := maps.Clone(bt.deletes)
+		puts := slices.Clone(bt.puts)
+		tempDir := bt.tempDir
+		bt.mu.Unlock()
+
+		// First, send results from temp directory (puts)
+		for _, key := range puts {
+			// Skip if deleted
+			if _, deleted := deletedOrSent[key]; deleted {
+				continue
+			}
+
+			noslash := key.String()[1:]
+			tempFile := filepath.Join(tempDir, noslash+extension)
+
+			var result query.Result
+			result.Key = key.String()
+
+			if !q.KeysOnly {
+				value, err := readFile(tempFile)
+				if err != nil {
+					if !errors.Is(err, fs.ErrNotExist) {
+						result.Error = err
+					} else {
+						continue // File doesn't exist, skip
+					}
+				} else {
+					result.Value = value
+					result.Size = len(value)
+				}
+			} else if q.ReturnsSizes {
+				stat, err := os.Stat(tempFile)
+				if err != nil {
+					if !errors.Is(err, fs.ErrNotExist) {
+						result.Error = err
+					} else {
+						continue // File doesn't exist, skip
+					}
+				} else {
+					result.Size = int(stat.Size())
+				}
+			}
+
+			select {
+			case output <- result:
+				// Mark this key as sent by adding it to deletedOrSent map
+				deletedOrSent[key] = struct{}{}
+			case <-qctx.Done():
+				return
+			}
+		}
+
+		// Then, send results from main datastore (excluding deleted and already sent)
+		mainChan := mainResults.Next()
+		for {
+			select {
+			case result, ok := <-mainChan:
+				if !ok {
+					return
+				}
+				if result.Error != nil {
+					select {
+					case output <- result:
+					case <-qctx.Done():
+						return
+					}
+					continue
+				}
+
+				key := datastore.NewKey(result.Key)
+
+				// Skip if deleted or already sent from temp
+				if _, skip := deletedOrSent[key]; skip {
+					continue
+				}
+
+				select {
+				case output <- result:
+				case <-qctx.Done():
+					return
+				}
+			case <-qctx.Done():
+				return
+			}
+		}
+	})
+
+	// Apply query filters
+	return query.NaiveQueryApply(q, results), nil
+}
+
+// Discard discards the batch operations without committing.
+// The batch should not be reused after Discard is called.
+func (bt *flatfsBatch) Discard(ctx context.Context) error {
+	// Wait for any pending async writes to complete
+	bt.asyncWrites.Wait()
+
+	bt.mu.Lock()
+	defer bt.mu.Unlock()
+
+	// Remove the batch temp directory and all its contents
+	if err := os.RemoveAll(bt.tempDir); err != nil {
+		log.Warnw("failed to remove batch temp directory on discard", "error", err, "path", bt.tempDir)
+	}
+
+	// Reset state as a precaution (batch should not be reused per go-datastore contract)
+	bt.puts = nil
+	bt.putSet = make(map[datastore.Key]struct{})
+	bt.asyncFirstError = nil
+	bt.deletes = make(map[datastore.Key]struct{})
+
+	return nil
+}
+
+// Commit atomically applies all batch operations to the datastore.
+//
+// Atomicity guarantee: All Put operations are moved to their final destinations
+// only after being written to temp files. If the process crashes before Commit
+// completes, the temp directory is cleaned on restart and no partial data remains.
+//
+// Order of operations:
+// 1. Wait for all async Put goroutines to complete
+// 2. Check for any async write errors (fail-fast)
+// 3. Create all destination shard directories
+// 4. Atomically rename temp files to final sharded paths
+// 5. Apply all Delete operations
+// 6. Sync directories (if sync is enabled)
+//
+// Concurrency: Uses doWriteOp to handle concurrent commits gracefully.
+// If another goroutine commits the same key, the operation succeeds.
 func (bt *flatfsBatch) Commit(ctx context.Context) error {
-	if err := bt.ds.putMany(bt.puts); err != nil {
+	// Wait for all async write operations to complete
+	bt.asyncWrites.Wait()
+
+	if err := bt.getAsyncError(); err != nil {
+		// If there was an error from a previous async write, return it fast
+		// This may be useful if, for example, we are out of disk space.
 		return err
 	}
 
+	bt.mu.Lock()
+	defer bt.mu.Unlock()
+
+	bt.ds.shutdownLock.RLock()
+	defer bt.ds.shutdownLock.RUnlock()
+	if bt.ds.shutdown {
+		return ErrClosed
+	}
+
+	dirsToSync := make(map[string]struct{})
+
+	// First, ensure all destination directories exist
+	for _, key := range bt.puts {
+		dir, _ := bt.ds.encode(key)
+		if _, err := bt.ds.makeDirNoSync(dir); err != nil {
+			return fmt.Errorf("failed to create directory: %w", err)
+		}
+		dirsToSync[dir] = struct{}{}
+	}
+
+	// Move all temp files to their final destinations
+	for _, key := range bt.puts {
+		noslash := key.String()[1:]
+		fileName := noslash + extension
+		tempFile := filepath.Join(bt.tempDir, fileName)
+		_, finalPath := bt.ds.encode(key)
+
+		// Use the doWriteOp to handle concurrent operations properly
+		_, err := bt.ds.doWriteOp(&op{
+			typ:  opRename,
+			key:  key,
+			tmp:  tempFile,
+			path: finalPath,
+		})
+		if err != nil {
+			// Clean up remaining temp files on error
+			_ = os.RemoveAll(bt.tempDir)
+			return fmt.Errorf("failed to rename temp file: %w", err)
+		}
+		// If doWriteOp returns without error, the operation succeeded
+		// (either by us or by a concurrent operation)
+	}
+
+	// Handle deletes
 	for k := range bt.deletes {
 		if err := bt.ds.Delete(ctx, k); err != nil {
 			return err
 		}
+	}
+
+	// Sync directories if needed
+	if bt.ds.sync {
+		for dir := range dirsToSync {
+			if err := syncDir(dir); err != nil {
+				return fmt.Errorf("failed to sync directory: %w", err)
+			}
+		}
+		// Sync root directory
+		if err := syncDir(bt.ds.path); err != nil {
+			return fmt.Errorf("failed to sync root directory: %w", err)
+		}
+	}
+
+	// Reset state as a precaution (batch should not be reused per go-datastore contract)
+	bt.puts = nil
+	bt.putSet = make(map[datastore.Key]struct{})
+	bt.deletes = make(map[datastore.Key]struct{})
+
+	// Clean up the batch temp directory after successful commit
+	if err := os.RemoveAll(bt.tempDir); err != nil {
+		log.Warnw("failed to remove batch temp directory after commit", "error", err, "path", bt.tempDir)
 	}
 
 	return nil

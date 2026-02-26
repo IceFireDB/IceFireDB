@@ -3,6 +3,7 @@ package cmds
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 
 	"github.com/ipfs/boxo/files"
@@ -80,12 +81,12 @@ func (req *Request) ParseBodyArgs() error {
 }
 
 // SetOption sets a request option.
-func (req *Request) SetOption(name string, value interface{}) {
+func (req *Request) SetOption(name string, value any) {
 	optDefs, err := req.Root.GetOptions(req.Path)
 	optDef, found := optDefs[name]
 
 	if req.Options == nil {
-		req.Options = map[string]interface{}{}
+		req.Options = map[string]any{}
 	}
 
 	// unknown option, simply set the value and return
@@ -106,9 +107,7 @@ func checkAndConvertOptions(root *Command, opts OptMap, path []string) (OptMap, 
 	if err != nil {
 		return options, err
 	}
-	for k, v := range opts {
-		options[k] = v
-	}
+	maps.Copy(options, opts)
 
 	for k, v := range opts {
 		opt, ok := optDefs[k]

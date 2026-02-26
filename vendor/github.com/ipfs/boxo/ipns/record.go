@@ -394,7 +394,7 @@ func recordDataForSignatureV1(e *ipns_pb.IpnsRecord) []byte {
 	return bytes.Join([][]byte{
 		e.Value,
 		e.Validity,
-		[]byte(fmt.Sprint(e.GetValidityType())),
+		fmt.Append(nil, e.GetValidityType()),
 	},
 		[]byte{})
 }

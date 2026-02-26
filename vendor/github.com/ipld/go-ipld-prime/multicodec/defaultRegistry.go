@@ -63,7 +63,7 @@ func LookupEncoder(indicator uint64) (codec.Encoder, error) {
 // its contents are not particularly stable.
 // In particular, it is not recommended to make any behaviors of your program conditional
 // based on information returned by this function -- if your program needs conditional
-// behavior based on registred codecs, you may want to consider taking more explicit control
+// behavior based on registered codecs, you may want to consider taking more explicit control
 // and using your own non-default registry.
 func ListEncoders() []uint64 {
 	return DefaultRegistry.ListEncoders()
@@ -110,7 +110,7 @@ func LookupDecoder(indicator uint64) (codec.Decoder, error) {
 // its contents are not particularly stable.
 // In particular, it is not recommended to make any behaviors of your program conditional
 // based on information returned by this function -- if your program needs conditional
-// behavior based on registred codecs, you may want to consider taking more explicit control
+// behavior based on registered codecs, you may want to consider taking more explicit control
 // and using your own non-default registry.
 func ListDecoders() []uint64 {
 	return DefaultRegistry.ListDecoders()
