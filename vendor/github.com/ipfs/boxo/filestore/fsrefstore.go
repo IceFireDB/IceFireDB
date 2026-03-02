@@ -2,6 +2,7 @@ package filestore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -249,6 +250,8 @@ func (f *FileManager) readURLDataObj(ctx context.Context, m mh.Multihash, d *pb.
 	if err != nil {
 		return nil, &CorruptReferenceError{StatusFileError, err}
 	}
+	defer res.Body.Close()
+
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusPartialContent {
 		return nil, &CorruptReferenceError{
 			StatusFileError,
@@ -258,12 +261,12 @@ func (f *FileManager) readURLDataObj(ctx context.Context, m mh.Multihash, d *pb.
 
 	outbuf := make([]byte, d.GetSize())
 	_, err = io.ReadFull(res.Body, outbuf)
-	if err == io.EOF || err == io.ErrUnexpectedEOF {
-		return nil, &CorruptReferenceError{StatusFileChanged, err}
-	} else if err != nil {
+	if err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return nil, &CorruptReferenceError{StatusFileChanged, err}
+		}
 		return nil, &CorruptReferenceError{StatusFileError, err}
 	}
-	res.Body.Close()
 
 	// Work with CIDs for this, as they are a nice wrapper and things
 	// will not break if multihashes underlying types change.

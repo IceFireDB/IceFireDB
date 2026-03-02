@@ -68,7 +68,7 @@ func ApplyFiltersToIter(recordsIter iter.ResultIter[types.Record], filterAddrs, 
 		case types.SchemaPeer:
 			record, ok := v.Val.(*types.PeerRecord)
 			if !ok {
-				logger.Errorw("problem casting find providers record", "Schema", v.Val.GetSchema(), "Type", reflect.TypeOf(v).String())
+				logger.Errorw("problem casting find providers record", "Schema", v.Val.GetSchema(), "Type", reflect.TypeFor[iter.Result[types.Record]]().String())
 				// drop failed type assertion
 				return iter.Result[types.Record]{}
 			}
@@ -85,7 +85,7 @@ func ApplyFiltersToIter(recordsIter iter.ResultIter[types.Record], filterAddrs, 
 			//lint:ignore SA1019 // ignore staticcheck
 			record, ok := v.Val.(*types.BitswapRecord)
 			if !ok {
-				logger.Errorw("problem casting find providers record", "Schema", v.Val.GetSchema(), "Type", reflect.TypeOf(v).String())
+				logger.Errorw("problem casting find providers record", "Schema", v.Val.GetSchema(), "Type", reflect.TypeFor[iter.Result[types.Record]]().String())
 				// drop failed type assertion
 				return iter.Result[types.Record]{}
 			}

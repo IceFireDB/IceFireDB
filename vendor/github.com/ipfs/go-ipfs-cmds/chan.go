@@ -9,7 +9,7 @@ import (
 func NewChanResponsePair(req *Request) (ResponseEmitter, Response) {
 	r := &chanResponse{
 		req:     req,
-		ch:      make(chan interface{}),
+		ch:      make(chan any),
 		waitLen: make(chan struct{}),
 		closeCh: make(chan struct{}),
 	}
@@ -27,7 +27,7 @@ type chanStream struct {
 
 	// ch is used to send values from emitter to response.
 	// When Emit received a channel close, it returns the error stored in err.
-	ch chan interface{}
+	ch chan any
 
 	// wl is a lock for writing calls, i.e. Emit, Close(WithError) and SetLength.
 	wl sync.Mutex
@@ -84,7 +84,7 @@ func (r *chanResponse) Length() uint64 {
 	return r.length
 }
 
-func (r *chanResponse) Next() (interface{}, error) {
+func (r *chanResponse) Next() (any, error) {
 	if r == nil {
 		return nil, io.EOF
 	}
@@ -119,12 +119,12 @@ func (r *chanResponse) Next() (interface{}, error) {
 
 type chanResponseEmitter chanResponse
 
-func (re *chanResponseEmitter) Emit(v interface{}) error {
+func (re *chanResponseEmitter) Emit(v any) error {
 	// channel emission iteration
-	if ch, ok := v.(chan interface{}); ok {
-		v = (<-chan interface{})(ch)
+	if ch, ok := v.(chan any); ok {
+		v = (<-chan any)(ch)
 	}
-	if ch, isChan := v.(<-chan interface{}); isChan {
+	if ch, isChan := v.(<-chan any); isChan {
 		return EmitChan(re, ch)
 	}
 
@@ -180,6 +180,14 @@ func (re *chanResponseEmitter) SetLength(l uint64) {
 		re.length = l
 	}
 }
+
+// SetEncodingType is a no-op for channel emitters.
+// Encoding type only affects HTTP Content-Type headers.
+func (re *chanResponseEmitter) SetEncodingType(encType EncodingType) {}
+
+// SetContentType is a no-op for channel emitters.
+// Content-Type only affects HTTP headers.
+func (re *chanResponseEmitter) SetContentType(contentType string) {}
 
 func (re *chanResponseEmitter) CloseWithError(err error) error {
 	re.wl.Lock()

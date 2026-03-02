@@ -216,12 +216,12 @@ func fileInfo(name string, part *multipart.Part) os.FileInfo {
 	fi := multiPartFileInfo{name: filepath.Base(name)}
 	formName := part.FormName()
 
-	i := strings.IndexByte(formName, '?')
-	if i == -1 {
+	_, after, ok := strings.Cut(formName, "?")
+	if !ok {
 		return &fi
 	}
 
-	params, err := url.ParseQuery(formName[i+1:])
+	params, err := url.ParseQuery(after)
 	if err != nil {
 		return nil
 	}
@@ -277,8 +277,8 @@ func (it *multipartIterator) Next() bool {
 
 		// Check if we need to create a fake directory (more than one
 		// path component).
-		if idx := strings.IndexByte(name, '/'); idx >= 0 {
-			it.curName = name[:idx]
+		if before, _, ok := strings.Cut(name, "/"); ok {
+			it.curName = before
 			it.curFile = &multipartDirectory{
 				path:   path.Join(it.f.path, it.curName),
 				walker: it.f.walker,

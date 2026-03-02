@@ -47,7 +47,7 @@ func fromImmutableNode(encoded *immutableProtoNode) *ProtoNode {
 	// as-serialized state
 	n.links = make([]*format.Link, numLinks)
 	linkAllocs := make([]format.Link, numLinks)
-	for i := int64(0); i < numLinks; i++ {
+	for i := range numLinks {
 		next := n.encoded.Links.Lookup(i)
 		name := ""
 		if next.FieldName().Exists() {

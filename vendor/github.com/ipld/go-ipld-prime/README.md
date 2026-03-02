@@ -127,7 +127,7 @@ Projects wishing to migrate can do so smoothly and at their leisure.
 
 We now consider many of the earlier golang IPLD libraries to be defacto deprecated,
 and you should expect new features *here*, rather than in those libraries.
-(Those libraries still won't be going away anytime soon, but we really don't recomend new construction on them.)
+(Those libraries still won't be going away anytime soon, but we really don't recommend new construction on them.)
 
 ### migrating
 

@@ -9,7 +9,7 @@ type Executor interface {
 }
 
 // Environment is the environment passed to commands.
-type Environment interface{}
+type Environment any
 
 // MakeEnvironment takes a context and the request to construct the environment
 // that is passed to the command's Run function.
@@ -20,7 +20,7 @@ type MakeEnvironment func(context.Context, *Request) (Environment, error)
 // executor that determines how to call the command - i.e. by calling Run or
 // making an API request to a daemon.
 // The user can define a function like this to pass it to cli.Run.
-type MakeExecutor func(*Request, interface{}) (Executor, error)
+type MakeExecutor func(*Request, any) (Executor, error)
 
 func NewExecutor(root *Command) Executor {
 	return &executor{

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"mime"
 	"net/http"
 	"net/textproto"
@@ -666,17 +667,38 @@ func init() {
 	}
 }
 
-// return explicit response format if specified in request as query parameter or via Accept HTTP header
+// customResponseFormat determines the response format and extracts any parameters
+// from the ?format= query parameter and Accept HTTP header.
+//
+// This function is format-agnostic: it handles generic HTTP content negotiation
+// and returns parameters embedded in the Accept header (e.g., "application/vnd.ipld.car;order=dfs").
+//
+// Format-specific URL query parameters (e.g., ?car-order=, ?car-dups= for CAR)
+// are intentionally NOT handled here. They are processed by format-specific
+// handlers which merge Accept header params with URL params, giving URL params
+// precedence per IPIP-523. See buildCarParams() for the CAR example. This
+// pattern can be extended for other formats that need URL-based parameters.
 func customResponseFormat(r *http.Request) (mediaType string, params map[string]string, err error) {
-	// First, inspect Accept header, as it may not only include content type, but also optional parameters.
+	// Check ?format= URL query parameter first (IPIP-523).
+	formatParam := r.URL.Query().Get("format")
+	var formatMediaType string
+	if formatParam != "" {
+		if responseFormat, ok := formatParamToResponseFormat[formatParam]; ok {
+			formatMediaType = responseFormat
+		}
+	}
+
+	// Inspect Accept header for vendor-specific content types and optional parameters
 	// such as CAR version or additional ones from IPIP-412.
 	//
 	// Browsers and other user agents will send Accept header with generic types like:
 	// Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
 	// We only care about explicit, vendor-specific content-types and respond to the first match (in order).
 	// TODO: make this RFC compliant and respect weights (eg. return CAR for Accept:application/vnd.ipld.dag-json;q=0.1,application/vnd.ipld.car;q=0.2)
+	var acceptMediaType string
+	var acceptParams map[string]string
 	for _, header := range r.Header.Values("Accept") {
-		for _, value := range strings.Split(header, ",") {
+		for value := range strings.SplitSeq(header, ",") {
 			accept := strings.TrimSpace(value)
 			// respond to the very first matching content type
 			if strings.HasPrefix(accept, "application/vnd.ipld") ||
@@ -688,16 +710,29 @@ func customResponseFormat(r *http.Request) (mediaType string, params map[string]
 				if err != nil {
 					return "", nil, err
 				}
-				return mediatype, params, nil
+				acceptMediaType = mediatype
+				acceptParams = params
+				break
 			}
+		}
+		if acceptMediaType != "" {
+			break
 		}
 	}
 
-	// If no Accept header, translate query param to a content type, if present.
-	if formatParam := r.URL.Query().Get("format"); formatParam != "" {
-		if responseFormat, ok := formatParamToResponseFormat[formatParam]; ok {
-			return responseFormat, nil, nil
+	// ?format takes precedence (IPIP-523), even when Accept header specifies a different format.
+	// This ensures deterministic HTTP caching and allows browsers to use ?format reliably.
+	if formatMediaType != "" {
+		// Use Accept params only if Accept matches ?format (e.g., for CAR version/order params)
+		if acceptMediaType == formatMediaType {
+			return formatMediaType, acceptParams, nil
 		}
+		return formatMediaType, nil, nil
+	}
+
+	// Fall back to Accept header if no ?format query param.
+	if acceptMediaType != "" {
+		return acceptMediaType, acceptParams, nil
 	}
 
 	// If none of special-cased content types is found, return empty string
@@ -717,10 +752,9 @@ func addContentLocation(r *http.Request, w http.ResponseWriter, rq *requestData)
 
 	format := responseFormatToFormatParam[rq.responseFormat]
 
-	// Skip Content-Location if there is no conflict between
-	// 'format' in URL and value in 'Accept' header.
-	// If both are present and don't match, we continue and generate
-	// Content-Location to ensure value from Accept overrides 'format' from URL.
+	// Skip Content-Location if ?format is already present in URL and matches
+	// the response format. Content-Location is only needed when format was
+	// requested via Accept header without ?format in URL.
 	if urlFormat := r.URL.Query().Get("format"); urlFormat != "" && urlFormat == format {
 		return
 	}
@@ -732,14 +766,16 @@ func addContentLocation(r *http.Request, w http.ResponseWriter, rq *requestData)
 
 	// Copy all existing query parameters.
 	query := url.Values{}
-	for k, v := range r.URL.Query() {
-		query[k] = v
-	}
+	maps.Copy(query, r.URL.Query())
 	query.Set("format", format)
 
-	// Set response params as query elements.
+	// Set response params as query elements, but only if URL doesn't already
+	// have them (URL query params take precedence per IPIP-523).
 	for k, v := range rq.responseParams {
-		query.Set(format+"-"+k, v)
+		paramKey := format + "-" + k
+		if !query.Has(paramKey) {
+			query.Set(paramKey, v)
+		}
 	}
 
 	w.Header().Set("Content-Location", path+"?"+query.Encode())

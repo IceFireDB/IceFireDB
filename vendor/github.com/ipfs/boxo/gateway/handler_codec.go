@@ -57,6 +57,10 @@ var contentTypeToExtension = map[string]string{
 	dagCborResponseFormat: ".cbor",
 }
 
+// errCodecConversionHint is the user-facing hint returned in 406 responses
+// when codec conversion is not allowed (IPIP-524).
+const errCodecConversionHint = "codec conversion is not supported, fetch raw block with ?format=raw and convert client-side"
+
 func (i *handler) serveCodec(ctx context.Context, w http.ResponseWriter, r *http.Request, rq *requestData) bool {
 	ctx, span := spanTrace(ctx, "Handler.ServeCodec", trace.WithAttributes(attribute.String("path", rq.immutablePath.String()), attribute.String("requestedContentType", rq.responseFormat)))
 	defer span.End()
@@ -148,7 +152,20 @@ func (i *handler) renderCodec(ctx context.Context, w http.ResponseWriter, r *htt
 		return false
 	}
 
-	// This handles DAG-* conversions and validations.
+	// IPIP-524: Check if codec conversion is allowed
+	if !i.config.AllowCodecConversion && toCodec != cidCodec {
+		// Conversion not allowed and codecs don't match - return 406
+		err := fmt.Errorf("format %q requested but block has codec %q: %s", rq.responseFormat, cidCodec.String(), errCodecConversionHint)
+		i.webError(w, r, err, http.StatusNotAcceptable)
+		return false
+	}
+
+	// If codecs match, serve raw (no conversion needed)
+	if toCodec == cidCodec {
+		return i.serveCodecRaw(ctx, w, r, blockSize, blockData, rq.contentPath, modtime, rq.begin)
+	}
+
+	// AllowCodecConversion is true - perform DAG-* conversion
 	return i.serveCodecConverted(ctx, w, r, blockCid, blockData, rq.contentPath, toCodec, modtime, rq.begin)
 }
 
@@ -197,12 +214,13 @@ func (i *handler) serveCodecHTML(ctx context.Context, w http.ResponseWriter, r *
 
 	cidCodec := mc.Code(resolvedPath.RootCid().Prefix().Codec)
 	err = assets.DagTemplate.Execute(w, assets.DagTemplateData{
-		GlobalData: i.getTemplateGlobalData(r, contentPath),
-		Path:       contentPath.String(),
-		CID:        resolvedPath.RootCid().String(),
-		CodecName:  cidCodec.String(),
-		CodecHex:   fmt.Sprintf("0x%x", uint64(cidCodec)),
-		Node:       parseNode(blockCid, blockData),
+		GlobalData:           i.getTemplateGlobalData(r, contentPath),
+		Path:                 contentPath.String(),
+		CID:                  resolvedPath.RootCid().String(),
+		CodecName:            cidCodec.String(),
+		CodecHex:             fmt.Sprintf("0x%x", uint64(cidCodec)),
+		Node:                 parseNode(blockCid, blockData),
+		AllowCodecConversion: i.config.AllowCodecConversion,
 	})
 	if err != nil {
 		_, _ = fmt.Fprintf(w, "error during body generation: %v", err)

@@ -33,7 +33,7 @@ contains a draft outline of what a revisited API could look like,
 but note that at the time of writing, it is not strongly ratified nor in any way committed to.
 
 At any rate, though, the operative question for this package is:
-if we do revisit go-cid, how are we going to make the transition managable?
+if we do revisit go-cid, how are we going to make the transition manageable?
 
 It seems unlikely we'd be able to make the transition manageable without some interface, somewhere.
 So we might as well draw that line at `ipld.Link`.

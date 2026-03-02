@@ -52,7 +52,7 @@ func (dg *DAGGenerator) generate(adder func(ctx context.Context, node format.Nod
 		return c, size, []cid.Cid{c}, nil
 	}
 	links := make([]*format.Link, fanout)
-	for i := uint(0); i < fanout; i++ {
+	for i := range fanout {
 		root, size, children, err := dg.generate(adder, fanout, depth-1)
 		if err != nil {
 			return cid.Undef, 0, nil, err

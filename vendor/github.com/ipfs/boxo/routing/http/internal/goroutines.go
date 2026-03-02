@@ -21,9 +21,7 @@ func DoBatch[A any](ctx context.Context, maxBatchSize, maxConcurrency int, items
 	errChan := make(chan error)
 	wg := sync.WaitGroup{}
 	for range min(maxConcurrency, len(batches)) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for {
 				select {
 				case batch, ok := <-batchChan:
@@ -42,7 +40,7 @@ func DoBatch[A any](ctx context.Context, maxBatchSize, maxConcurrency int, items
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	// work sender

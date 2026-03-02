@@ -533,9 +533,7 @@ func parallelWalkDepth(ctx context.Context, getLinks GetLinks, root cid.Cid, vis
 	defer wg.Wait()
 	defer cancel()
 	for range options.Concurrency {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for cdepth := range feed {
 				ci := cdepth.cid
 				depth := cdepth.depth
@@ -587,7 +585,7 @@ func parallelWalkDepth(ctx context.Context, getLinks GetLinks, root cid.Cid, vis
 				case <-fetchersCtx.Done():
 				}
 			}
-		}()
+		})
 	}
 	defer close(feed)
 

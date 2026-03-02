@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path"
+	"strings"
 
 	drclient "github.com/ipfs/boxo/routing/http/client"
 	"github.com/ipfs/boxo/routing/http/contentrouter"
@@ -24,10 +26,18 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.opencensus.io/stats/view"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 var log = logging.Logger("routing/delegated")
 
+// Parse creates a composed router from the custom routing configuration.
+//
+// EXPERIMENTAL: Custom routing (Routing.Type=custom with Routing.Routers and
+// Routing.Methods) is for research and testing only, not production use.
+// The configuration format and behavior may change without notice between
+// releases. HTTP-only configurations cannot reliably provide content.
+// See docs/delegated-routing.md for limitations.
 func Parse(routers config.Routers, methods config.Methods, extraDHT *ExtraDHTParams, extraHTTP *ExtraHTTPParams) (routing.Routing, error) {
 	if err := methods.Check(); err != nil {
 		return nil, err
@@ -187,8 +197,27 @@ func httpRoutingFromConfig(conf config.Router, extraHTTP *ExtraHTTPParams) (rout
 
 	delegateHTTPClient := &http.Client{
 		Transport: &drclient.ResponseBodyLimitedTransport{
-			RoundTripper: transport,
-			LimitBytes:   1 << 20,
+			RoundTripper: otelhttp.NewTransport(transport,
+				otelhttp.WithSpanNameFormatter(func(operation string, req *http.Request) string {
+					if req.Method == http.MethodGet {
+						switch {
+						case strings.HasPrefix(req.URL.Path, "/routing/v1/providers"):
+							return "DelegatedHTTPClient.FindProviders"
+						case strings.HasPrefix(req.URL.Path, "/routing/v1/peers"):
+							return "DelegatedHTTPClient.FindPeers"
+						case strings.HasPrefix(req.URL.Path, "/routing/v1/ipns"):
+							return "DelegatedHTTPClient.GetIPNS"
+						}
+					} else if req.Method == http.MethodPut {
+						switch {
+						case strings.HasPrefix(req.URL.Path, "/routing/v1/ipns"):
+							return "DelegatedHTTPClient.PutIPNS"
+						}
+					}
+					return "DelegatedHTTPClient." + path.Dir(req.URL.Path)
+				}),
+			),
+			LimitBytes: 1 << 20,
 		},
 	}
 

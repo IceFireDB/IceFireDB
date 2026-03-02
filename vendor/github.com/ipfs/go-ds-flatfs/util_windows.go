@@ -103,3 +103,7 @@ func readFileOnce(filename string) ([]byte, error) {
 
 	return buf.Bytes(), nil
 }
+
+func createFile(name string) (*os.File, error) {
+	return goissue34681.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+}

@@ -65,6 +65,9 @@ type Path struct {
 	segments []PathSegment
 }
 
+// EmptyPath is the Path with no segments.
+var EmptyPath = Path{}
+
 // NewPath returns a Path composed of the given segments.
 //
 // This constructor function does a defensive copy,
@@ -92,12 +95,12 @@ func NewPathNocopy(segments []PathSegment) Path {
 // E.g., `"foo///bar"` will be treated equivalently to `"foo/bar"`.
 // Prefixed and suffixed extraneous "/" characters are also discarded.
 // This makes this constructor incapable of handling some possible Path values
-// (specifically: paths with empty segements cannot be created with this constructor).
+// (specifically: paths with empty segments cannot be created with this constructor).
 //
 // There is no escaping mechanism used by this function.
 // This makes this constructor incapable of handling some possible Path values
 // (specifically, a path segment containing "/" cannot be created, because it
-// will always be intepreted as a segment separator).
+// will always be interpreted as a segment separator).
 //
 // No other "cleaning" of the path occurs.  See the documentation of the Path struct;
 // in particular, note that ".." does not mean "go up", nor does "." mean "stay here" --
@@ -195,7 +198,7 @@ func (p Path) AppendSegmentInt(ps int64) Path {
 // the zero path if it's already empty).
 func (p Path) Parent() Path {
 	if len(p.segments) == 0 {
-		return Path{}
+		return EmptyPath
 	}
 	return Path{p.segments[0 : len(p.segments)-1]}
 }
@@ -205,10 +208,11 @@ func (p Path) Truncate(i int) Path {
 	return Path{p.segments[0:i]}
 }
 
-// Last returns the trailing segment of the path.
+// Last returns the trailing segment of the path. Path length should be checked before making use of this value.
+// If the path is empty, EmptyPathSegment is returned which may not be useful.
 func (p Path) Last() PathSegment {
 	if len(p.segments) < 1 {
-		return PathSegment{}
+		return EmptyPathSegment
 	}
 	return p.segments[len(p.segments)-1]
 }
@@ -216,16 +220,17 @@ func (p Path) Last() PathSegment {
 // Pop returns a path with all segments except the last.
 func (p Path) Pop() Path {
 	if len(p.segments) < 1 {
-		return Path{}
+		return EmptyPath
 	}
 	return Path{p.segments[0 : len(p.segments)-1]}
 }
 
 // Shift returns the first segment of the path together with the remaining path after that first segment.
-// If applied to a zero-length path, it returns an empty segment and the same zero-length path.
+// If you intend to use the resulting PathSegment, you should check its length before doing so.
+// If applied to a zero-length path, it returns EmptyPathSegment and the same zero-length path.
 func (p Path) Shift() (PathSegment, Path) {
 	if len(p.segments) < 1 {
-		return PathSegment{}, Path{}
+		return EmptyPathSegment, EmptyPath
 	}
 	return p.segments[0], Path{p.segments[1:]}
 }

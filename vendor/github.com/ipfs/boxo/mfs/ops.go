@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	chunker "github.com/ipfs/boxo/chunker"
+	uio "github.com/ipfs/boxo/ipld/unixfs/io"
 	cid "github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
 )
@@ -120,13 +122,16 @@ func PutNode(r *Root, path string, nd ipld.Node) error {
 
 // MkdirOpts is used by Mkdir
 type MkdirOpts struct {
-	Mkparents     bool
-	Flush         bool
-	CidBuilder    cid.Builder
-	Mode          os.FileMode
-	ModTime       time.Time
-	MaxLinks      int
-	MaxHAMTFanout int
+	Mkparents          bool
+	Flush              bool
+	CidBuilder         cid.Builder
+	Mode               os.FileMode
+	ModTime            time.Time
+	MaxLinks           int
+	MaxHAMTFanout      int
+	HAMTShardingSize   int
+	SizeEstimationMode *uio.SizeEstimationMode
+	Chunker            chunker.SplitterGen // chunker factory for files created in this directory
 }
 
 // Mkdir creates a directory at 'path' under the directory 'd', creating
@@ -155,10 +160,26 @@ func Mkdir(r *Root, pth string, opts MkdirOpts) error {
 
 	cur := r.GetDirectory()
 
+	// Inherit unset values from the root directory's underlying unixfs settings.
+	// This ensures that root-level config (WithMaxLinks, WithHAMTShardingSize, etc.)
+	// propagates to subdirectories created via Mkdir.
+	if opts.MaxLinks == 0 {
+		opts.MaxLinks = cur.unixfsDir.GetMaxLinks()
+	}
+	if opts.MaxHAMTFanout == 0 {
+		opts.MaxHAMTFanout = cur.unixfsDir.GetMaxHAMTFanout()
+	}
+	if opts.HAMTShardingSize == 0 {
+		opts.HAMTShardingSize = cur.unixfsDir.GetHAMTShardingSize()
+	}
+
 	// opts to make the parents leave MkParents and Flush as false.
 	parentsOpts := MkdirOpts{
-		MaxLinks:      opts.MaxLinks,
-		MaxHAMTFanout: opts.MaxHAMTFanout,
+		MaxLinks:           opts.MaxLinks,
+		MaxHAMTFanout:      opts.MaxHAMTFanout,
+		HAMTShardingSize:   opts.HAMTShardingSize,
+		SizeEstimationMode: opts.SizeEstimationMode,
+		Chunker:            opts.Chunker,
 	}
 
 	for i, d := range parts[:len(parts)-1] {

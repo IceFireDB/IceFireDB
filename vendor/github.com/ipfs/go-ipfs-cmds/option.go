@@ -20,7 +20,7 @@ const (
 	Strings = reflect.Array
 )
 
-type OptMap map[string]interface{}
+type OptMap map[string]any
 
 // Option is used to specify a field that will be provided by a consumer
 type Option interface {
@@ -30,17 +30,17 @@ type Option interface {
 	Type() reflect.Kind  // value must be this type
 	Description() string // a short string that describes this option
 
-	WithDefault(interface{}) Option // sets the default value of the option
-	Default() interface{}
+	WithDefault(any) Option // sets the default value of the option
+	Default() any
 
-	Parse(str string) (interface{}, error)
+	Parse(str string) (any, error)
 }
 
 type option struct {
 	names       []string
 	kind        reflect.Kind
 	description string
-	defaultVal  interface{}
+	defaultVal  any
 }
 
 func (o *option) Name() string {
@@ -73,10 +73,10 @@ func (o *option) Description() string {
 	return o.description
 }
 
-type converter func(string) (interface{}, error)
+type converter func(string) (any, error)
 
 var converters = map[reflect.Kind]converter{
-	Bool: func(v string) (interface{}, error) {
+	Bool: func(v string) (any, error) {
 		if v == "" {
 			return true, nil
 		}
@@ -84,46 +84,46 @@ var converters = map[reflect.Kind]converter{
 
 		return strconv.ParseBool(v)
 	},
-	Int: func(v string) (interface{}, error) {
+	Int: func(v string) (any, error) {
 		val, err := strconv.ParseInt(v, 0, 32)
 		if err != nil {
 			return nil, err
 		}
 		return int(val), err
 	},
-	Uint: func(v string) (interface{}, error) {
+	Uint: func(v string) (any, error) {
 		val, err := strconv.ParseUint(v, 0, 32)
 		if err != nil {
 			return nil, err
 		}
 		return uint(val), err
 	},
-	Int64: func(v string) (interface{}, error) {
+	Int64: func(v string) (any, error) {
 		val, err := strconv.ParseInt(v, 0, 64)
 		if err != nil {
 			return nil, err
 		}
 		return val, err
 	},
-	Uint64: func(v string) (interface{}, error) {
+	Uint64: func(v string) (any, error) {
 		val, err := strconv.ParseUint(v, 0, 64)
 		if err != nil {
 			return nil, err
 		}
 		return val, err
 	},
-	Float: func(v string) (interface{}, error) {
+	Float: func(v string) (any, error) {
 		return strconv.ParseFloat(v, 64)
 	},
-	String: func(v string) (interface{}, error) {
+	String: func(v string) (any, error) {
 		return v, nil
 	},
-	Strings: func(v string) (interface{}, error) {
+	Strings: func(v string) (any, error) {
 		return v, nil
 	},
 }
 
-func (o *option) Parse(v string) (interface{}, error) {
+func (o *option) Parse(v string) (any, error) {
 	conv, ok := converters[o.Type()]
 	if !ok {
 		return nil, fmt.Errorf("option %q takes %s arguments, but was passed %q", o.Name(), o.Type(), v)
@@ -148,7 +148,7 @@ func NewOption(kind reflect.Kind, names ...string) Option {
 	}
 }
 
-func (o *option) WithDefault(v interface{}) Option {
+func (o *option) WithDefault(v any) Option {
 	if v == nil {
 		panic(fmt.Errorf("cannot use nil as a default"))
 	}
@@ -165,7 +165,7 @@ func (o *option) WithDefault(v interface{}) Option {
 	return o
 }
 
-func (o *option) Default() interface{} {
+func (o *option) Default() any {
 	return o.defaultVal
 }
 
@@ -226,7 +226,7 @@ type stringsOption struct {
 	delimiter string
 }
 
-func (s *stringsOption) WithDefault(v interface{}) Option {
+func (s *stringsOption) WithDefault(v any) Option {
 	if v == nil {
 		return s.Option.WithDefault(v)
 	}
@@ -236,7 +236,7 @@ func (s *stringsOption) WithDefault(v interface{}) Option {
 	return s
 }
 
-func (s *stringsOption) Parse(v string) (interface{}, error) {
+func (s *stringsOption) Parse(v string) (any, error) {
 	if s.delimiter == "" {
 		return []string{v}, nil
 	}

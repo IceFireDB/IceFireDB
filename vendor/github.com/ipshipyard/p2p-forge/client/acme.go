@@ -9,7 +9,6 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -759,47 +758,9 @@ OUTER:
 			continue
 		}
 
-		index := 0
-		var escapedIPStr string
-		var ipVersion string
-		var ipMaStr string
-		var tcpPortStr string
-		ma.ForEach(withoutForgeWSS, func(c ma.Component) bool {
-			switch index {
-			case 0:
-				switch c.Protocol().Code {
-				case ma.P_IP4:
-					ipVersion = "4"
-					ipMaStr = c.String()
-					ipAddr := c.Value()
-					escapedIPStr = strings.ReplaceAll(ipAddr, ".", "-")
-				case ma.P_IP6:
-					ipVersion = "6"
-					ipMaStr = c.String()
-					ipAddr := c.Value()
-					escapedIPStr = strings.ReplaceAll(ipAddr, ":", "-")
-					if escapedIPStr[0] == '-' {
-						escapedIPStr = "0" + escapedIPStr
-					}
-					if escapedIPStr[len(escapedIPStr)-1] == '-' {
-						escapedIPStr = escapedIPStr + "0"
-					}
-				default:
-					return false
-				}
-			case 1:
-				if c.Protocol().Code != ma.P_TCP {
-					return false
-				}
-				tcpPortStr = c.Value()
-			default:
-				index++
-				return false
-			}
-			index++
-			return true
-		})
-		if index != 2 || escapedIPStr == "" || tcpPortStr == "" {
+		// Extract forge address components using the utility function
+		forgeAddrInfo, err := ExtractForgeAddrInfo(withoutForgeWSS, peerID)
+		if err != nil {
 			retAddrs = append(retAddrs, a)
 			continue
 		}
@@ -821,13 +782,11 @@ OUTER:
 			}
 		}
 
-		b36PidStr := peer.ToCid(peerID).Encode(multibase.MustNewEncoder(multibase.Base36))
-
 		var newMaStr string
 		if produceShortAddrs {
-			newMaStr = fmt.Sprintf("/dns%s/%s.%s.%s/tcp/%s/tls/ws", ipVersion, escapedIPStr, b36PidStr, forgeDomain, tcpPortStr)
+			newMaStr = BuildShortForgeMultiaddr(forgeAddrInfo, forgeDomain)
 		} else {
-			newMaStr = fmt.Sprintf("%s/tcp/%s/tls/sni/%s.%s.%s/ws", ipMaStr, tcpPortStr, escapedIPStr, b36PidStr, forgeDomain)
+			newMaStr = BuildLongForgeMultiaddr(forgeAddrInfo, forgeDomain)
 		}
 		newMA, err := ma.NewMultiaddr(newMaStr)
 		if err != nil {
