@@ -104,7 +104,7 @@ type StreamingReadableStorage interface {
 // The PutStream function returns three parameters: an io.Writer (as you'd expect), another function, and an error.
 // The function returned is called a "WriteCommitter".
 // The final error value is as usual: it will contain an error value if the write could not be begun.
-// ("WriteCommitter" will be refered to as such throughout the docs, but we don't give it a named type --
+// ("WriteCommitter" will be referred to as such throughout the docs, but we don't give it a named type --
 // unfortunately, this is important, because we don't want to force implementers of storage systems to import this package just for a type name.)
 //
 // The WriteCommitter function should be called when you're done writing,

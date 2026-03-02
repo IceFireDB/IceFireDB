@@ -9,5 +9,5 @@ type Response interface {
 
 	// Next returns the next emitted value.
 	// The returned error can be a network or decoding error.
-	Next() (interface{}, error)
+	Next() (any, error)
 }

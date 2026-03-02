@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"maps"
 	"net/http"
 	"slices"
 )
@@ -85,9 +86,7 @@ func (h *Headers) ApplyCors() *Headers {
 // Wrap wraps the given [http.Handler] with the headers middleware.
 func (h *Headers) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		for k, v := range h.headers {
-			w.Header()[k] = v
-		}
+		maps.Copy(w.Header(), h.headers)
 
 		next.ServeHTTP(w, r)
 	})

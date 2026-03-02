@@ -1,24 +1,3 @@
-// Package mod provides DAG modification utilities to, for example,
-// insert additional nodes in a unixfs DAG or truncate them.
-//
-// Identity CID Handling:
-//
-// This package automatically handles identity CIDs (multihash code 0x00) which
-// inline data directly in the CID. When modifying nodes with identity CIDs,
-// the package ensures the [verifcid.MaxIdentityDigestSize] limit is respected by
-// automatically switching to a cryptographic hash function when the encoded
-// data would exceed this limit. The replacement hash function is chosen from
-// (in order): the configured Prefix if non-identity, or [util.DefaultIpfsHash]
-// as a fallback. This prevents creation of unacceptably big identity CIDs
-// while preserving them for small data that fits within the limit.
-//
-// RawNode Growth:
-//
-// When appending data to a RawNode that would require multiple blocks, the
-// node is automatically converted to a UnixFS file structure. This is necessary
-// because RawNodes cannot have child nodes. The original raw data remains
-// accessible via its original CID, while the new structure provides full
-// UnixFS capabilities.
 package mod
 
 import (
@@ -161,7 +140,13 @@ func (dm *DagModifier) expandSparse(size int64) error {
 		return err
 	}
 	err = dm.dagserv.Add(dm.ctx, nnode)
-	return err
+	if err != nil {
+		return err
+	}
+	// Update curNode so subsequent writes use the expanded node.
+	// Without this, writes after sparse expansion would go to the old node.
+	dm.curNode = nnode
+	return nil
 }
 
 // Write continues writing to the dag at the current offset
@@ -258,6 +243,11 @@ func (dm *DagModifier) Sync() error {
 			return err
 		}
 
+		// Ensure the final node doesn't exceed identity hash limits
+		if pn, ok := dm.curNode.(*mdag.ProtoNode); ok {
+			dm.ensureSafeProtoNodeHash(pn)
+		}
+
 		err = dm.dagserv.Add(dm.ctx, dm.curNode)
 		if err != nil {
 			return err
@@ -312,6 +302,53 @@ func (dm *DagModifier) ensureSafeProtoNodeHash(node *mdag.ProtoNode) {
 	}
 }
 
+// maybeCollapseToRawLeaf checks if the current node is a ProtoNode wrapper around
+// a single RawNode child with no metadata, and if RawLeaves is enabled, collapses
+// the structure to just the RawNode. This ensures CID compatibility with ipfs add
+// for single-block files. Returns (node, true) if collapsed, (nil, false) otherwise.
+func (dm *DagModifier) maybeCollapseToRawLeaf() (ipld.Node, bool) {
+	if !dm.RawLeaves {
+		return nil, false
+	}
+
+	protoNode, ok := dm.curNode.(*mdag.ProtoNode)
+	if !ok {
+		return nil, false
+	}
+
+	// Must have exactly one child link
+	links := protoNode.Links()
+	if len(links) != 1 {
+		return nil, false
+	}
+
+	// Parse UnixFS metadata to check for ModTime or other metadata
+	fsn, err := ft.FSNodeFromBytes(protoNode.Data())
+	if err != nil {
+		return nil, false // Not valid UnixFS, keep as is
+	}
+
+	// If there's metadata (like ModTime or Mode), keep as ProtoNode
+	if !fsn.ModTime().IsZero() || fsn.Mode() != 0 {
+		return nil, false
+	}
+
+	// Get the child node from DAGService (should be cached from appendData)
+	childNode, err := links[0].GetNode(dm.ctx, dm.dagserv)
+	if err != nil {
+		return nil, false // Can't fetch child, keep as is
+	}
+
+	// Child must be a RawNode
+	rawChild, ok := childNode.(*mdag.RawNode)
+	if !ok {
+		return nil, false
+	}
+
+	// Collapse to the RawNode child
+	return rawChild, true
+}
+
 // modifyDag writes the data in 'dm.wrBuf' over the data in 'node' starting at 'offset'
 // returns the new key of the passed in node.
 func (dm *DagModifier) modifyDag(n ipld.Node, offset uint64) (cid.Cid, error) {
@@ -331,7 +368,8 @@ func (dm *DagModifier) modifyDag(n ipld.Node, offset uint64) (cid.Cid, error) {
 				return cid.Cid{}, err
 			}
 
-			// Update newly written node..
+			// MFS semantics: update mtime on content modification (see doc.go).
+			// To preserve a specific mtime, set it explicitly after the operation.
 			if !fsn.ModTime().IsZero() {
 				fsn.SetModTime(time.Now())
 			}
@@ -466,12 +504,50 @@ func (dm *DagModifier) modifyDag(n ipld.Node, offset uint64) (cid.Cid, error) {
 // RawNode to ProtoNode. The original data remains accessible through the
 // direct CID of the original raw block, and the new dag-pb CID makes
 // post-append data accessible through the standard UnixFS APIs.
+
+// identitySafeDAGService wraps a DAGService to handle identity CID overflow.
+// When adding a node with identity hash that would exceed the size limit,
+// it automatically switches to a cryptographic hash.
+type identitySafeDAGService struct {
+	ipld.DAGService
+	fallbackPrefix cid.Prefix
+}
+
+func (s *identitySafeDAGService) Add(ctx context.Context, nd ipld.Node) error {
+	// Check if this is a ProtoNode with identity hash that's too large
+	if pn, ok := nd.(*mdag.ProtoNode); ok {
+		if prefix, ok := pn.CidBuilder().(cid.Prefix); ok && prefix.MhType == mh.IDENTITY {
+			encoded, _ := pn.EncodeProtobuf(false)
+			if len(encoded) > verifcid.DefaultMaxIdentityDigestSize {
+				// Switch to fallback hash
+				pn.SetCidBuilder(s.fallbackPrefix)
+			}
+		}
+	}
+	return s.DAGService.Add(ctx, nd)
+}
+
 func (dm *DagModifier) appendData(nd ipld.Node, spl chunker.Splitter) (ipld.Node, error) {
+	// Create a wrapper DAGService that handles identity overflow automatically.
+	// This allows small appends to preserve identity while preventing overflow errors.
+	dagserv := dm.dagserv
+	if dm.Prefix.MhType == mh.IDENTITY {
+		dagserv = &identitySafeDAGService{
+			DAGService: dm.dagserv,
+			fallbackPrefix: cid.Prefix{
+				Version:  dm.Prefix.Version,
+				Codec:    dm.Prefix.Codec,
+				MhType:   util.DefaultIpfsHash,
+				MhLength: -1,
+			},
+		}
+	}
+
 	switch nd := nd.(type) {
 	case *mdag.ProtoNode:
 		// ProtoNode can be directly passed to trickle.Append
 		dbp := &help.DagBuilderParams{
-			Dagserv:    dm.dagserv,
+			Dagserv:    dagserv,
 			Maxlinks:   dm.MaxLinks,
 			CidBuilder: dm.Prefix,
 			RawLeaves:  dm.RawLeaves,
@@ -509,7 +585,7 @@ func (dm *DagModifier) appendData(nd ipld.Node, spl chunker.Splitter) (ipld.Node
 
 		// Now we can append new data using trickle
 		dbp := &help.DagBuilderParams{
-			Dagserv:    dm.dagserv,
+			Dagserv:    dagserv,
 			Maxlinks:   dm.MaxLinks,
 			CidBuilder: dm.Prefix,
 			RawLeaves:  true, // Ensure future leaves are raw for consistency
@@ -586,6 +662,14 @@ func (dm *DagModifier) GetNode() (ipld.Node, error) {
 	err := dm.Sync()
 	if err != nil {
 		return nil, err
+	}
+
+	// If RawLeaves is enabled and the result is a ProtoNode with a single RawNode child
+	// and no metadata, collapse it to just the RawNode for CID compatibility with ipfs add.
+	// The collapsed RawNode is returned directly (no Copy needed - it's a different node
+	// fetched from DAGService, not dm.curNode, and RawNodes are immutable).
+	if collapsed, ok := dm.maybeCollapseToRawLeaf(); ok {
+		return collapsed, nil
 	}
 	return dm.curNode.Copy(), nil
 }
@@ -685,6 +769,7 @@ func (dm *DagModifier) dagTruncate(ctx context.Context, n ipld.Node, size uint64
 			}
 
 			fsn.SetData(fsn.Data()[:size])
+			// MFS semantics: update mtime on truncation (see doc.go)
 			if !fsn.ModTime().IsZero() {
 				fsn.SetModTime(time.Now())
 			}

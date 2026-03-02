@@ -56,6 +56,19 @@ type Config struct {
 	// [Trustless Gateway]: https://specs.ipfs.tech/http-gateways/trustless-gateway/
 	DeserializedResponses bool
 
+	// AllowCodecConversion enables automatic conversion between codecs when
+	// the requested format differs from the block's native codec. For example,
+	// converting dag-pb (UnixFS) to dag-json.
+	//
+	// When false (default), the gateway returns 406 Not Acceptable if the
+	// requested format doesn't match the block's codec. This follows the
+	// behavior specified in IPIP-524.
+	//
+	// When true, the gateway attempts to convert between legacy IPLD formats.
+	// This is provided for backwards compatibility but is not required by
+	// the gateway specification.
+	AllowCodecConversion bool
+
 	// NoDNSLink configures the gateway to _not_ perform DNS TXT record lookups in
 	// response to requests with values in `Host` HTTP header. This flag can be
 	// overridden per FQDN in PublicGateways. To be used with WithHostname.

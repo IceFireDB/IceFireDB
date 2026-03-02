@@ -8,12 +8,15 @@ const (
 	DefaultInlineDNSLink         = false
 	DefaultDeserializedResponses = true
 	DefaultDisableHTMLErrors     = false
-	DefaultExposeRoutingAPI      = false
+	DefaultExposeRoutingAPI      = true
 	DefaultDiagnosticServiceURL  = "https://check.ipfs.network"
+	DefaultAllowCodecConversion  = false
 
 	// Gateway limit defaults from boxo
-	DefaultRetrievalTimeout      = gateway.DefaultRetrievalTimeout
-	DefaultMaxConcurrentRequests = gateway.DefaultMaxConcurrentRequests
+	DefaultRetrievalTimeout        = gateway.DefaultRetrievalTimeout
+	DefaultMaxRequestDuration      = gateway.DefaultMaxRequestDuration
+	DefaultMaxConcurrentRequests   = gateway.DefaultMaxConcurrentRequests
+	DefaultMaxRangeRequestFileSize = 0 // 0 means no limit
 )
 
 type GatewaySpec struct {
@@ -71,6 +74,12 @@ type Gateway struct {
 	// be overridden per FQDN in PublicGateways.
 	DeserializedResponses Flag
 
+	// AllowCodecConversion enables automatic conversion between codecs when
+	// the requested format differs from the block's native codec (e.g.,
+	// converting dag-pb or dag-cbor to dag-json). When disabled, the gateway
+	// returns 406 Not Acceptable for codec mismatches per IPIP-524.
+	AllowCodecConversion Flag
+
 	// DisableHTMLErrors disables pretty HTML pages when an error occurs. Instead, a `text/plain`
 	// page will be sent with the raw error message.
 	DisableHTMLErrors Flag
@@ -95,10 +104,24 @@ type Gateway struct {
 	// A value of 0 disables this timeout.
 	RetrievalTimeout *OptionalDuration `json:",omitempty"`
 
+	// MaxRequestDuration is an absolute deadline for the entire request.
+	// Unlike RetrievalTimeout (which resets on each data write and catches
+	// stalled transfers), this is a hard limit on the total time a request
+	// can take. Returns 504 Gateway Timeout when exceeded.
+	// This protects the gateway from edge cases and slow client attacks.
+	// A value of 0 uses the default (1 hour).
+	MaxRequestDuration *OptionalDuration `json:",omitempty"`
+
 	// MaxConcurrentRequests limits concurrent HTTP requests handled by the gateway.
 	// Requests beyond this limit receive 429 Too Many Requests with Retry-After header.
 	// A value of 0 disables the limit.
 	MaxConcurrentRequests *OptionalInteger `json:",omitempty"`
+
+	// MaxRangeRequestFileSize limits the maximum file size for HTTP range requests.
+	// Range requests for files larger than this limit return 501 Not Implemented.
+	// This protects against CDN issues with large file range requests and prevents
+	// excessive bandwidth consumption. A value of 0 disables the limit.
+	MaxRangeRequestFileSize *OptionalBytes `json:",omitempty"`
 
 	// DiagnosticServiceURL is the URL for a service to diagnose CID retrievability issues.
 	// When the gateway returns a 504 Gateway Timeout error, an "Inspect retrievability of CID"

@@ -13,3 +13,7 @@ func tempFileOnce(dir, pattern string) (*os.File, error) {
 func readFileOnce(filename string) ([]byte, error) {
 	return os.ReadFile(filename)
 }
+
+func createFile(name string) (*os.File, error) {
+	return os.Create(name)
+}

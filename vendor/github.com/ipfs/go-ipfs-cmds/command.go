@@ -78,7 +78,7 @@ type Command struct {
 	// the Run Function.
 	//
 	// ie. If command Run returns &Block{}, then Command.Type == &Block{}
-	Type interface{}
+	Type any
 
 	// Subcommands allow attaching sub commands to a command.
 	//
@@ -119,21 +119,21 @@ const (
 
 // Extra is a set of tag information for a command
 type Extra struct {
-	m map[interface{}]interface{}
+	m map[any]any
 }
 
-func (e *Extra) SetValue(key, value interface{}) *Extra {
+func (e *Extra) SetValue(key, value any) *Extra {
 	if e == nil {
 		e = &Extra{}
 	}
 	if e.m == nil {
-		e.m = make(map[interface{}]interface{})
+		e.m = make(map[any]any)
 	}
 	e.m[key] = value
 	return e
 }
 
-func (e *Extra) GetValue(key interface{}) (interface{}, bool) {
+func (e *Extra) GetValue(key any) (any, bool) {
 	if e == nil || e.m == nil {
 		return nil, false
 	}

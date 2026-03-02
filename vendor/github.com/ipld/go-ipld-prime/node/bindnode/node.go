@@ -59,7 +59,7 @@ var (
 )
 
 type _prototype struct {
-	cfg        config
+	cfg        *config
 	schemaType schema.Type
 	goType     reflect.Type // non-pointer
 }
@@ -81,7 +81,7 @@ func (w *_prototype) Representation() datamodel.NodePrototype {
 }
 
 type _node struct {
-	cfg        config
+	cfg        *config
 	schemaType schema.Type
 
 	val reflect.Value // non-pointer
@@ -92,7 +92,7 @@ type _node struct {
 // 	_node
 // }
 
-func newNode(cfg config, schemaType schema.Type, val reflect.Value) schema.TypedNode {
+func newNode(cfg *config, schemaType schema.Type, val reflect.Value) schema.TypedNode {
 	if schemaType.TypeKind() == schema.TypeKind_Int && nonPtrVal(val).Kind() == reflect.Uint64 {
 		// special case for uint64 values so we can handle the >int64 range
 		// we give this treatment to all uint64s, regardless of current value
@@ -220,7 +220,7 @@ func (w *_node) LookupByString(key string) (datamodel.Node, error) {
 			}
 		}
 		if _, ok := field.Type().(*schema.TypeAny); ok {
-			if customConverter := w.cfg.converterFor(fval); customConverter != nil {
+			if customConverter := w.cfg.converterFor(field.Type().Name(), fval); customConverter != nil {
 				// field is an Any and we have a custom type converter for the type
 				return customConverter.customToAny(ptrVal(fval).Interface())
 			}
@@ -265,7 +265,7 @@ func (w *_node) LookupByString(key string) (datamodel.Node, error) {
 			fval = fval.Elem()
 		}
 		if _, ok := typ.ValueType().(*schema.TypeAny); ok {
-			if customConverter := w.cfg.converterFor(fval); customConverter != nil {
+			if customConverter := w.cfg.converterFor(typ.ValueType().Name(), fval); customConverter != nil {
 				// value is an Any and we have a custom type converter for the type
 				return customConverter.customToAny(ptrVal(fval).Interface())
 			}
@@ -340,7 +340,7 @@ func (w *_node) LookupByIndex(idx int64) (datamodel.Node, error) {
 		val = val.Index(int(idx))
 		_, isAny := typ.ValueType().(*schema.TypeAny)
 		if isAny {
-			if customConverter := w.cfg.converterFor(val); customConverter != nil {
+			if customConverter := w.cfg.converterFor(typ.ValueType().Name(), val); customConverter != nil {
 				// values are Any and we have a converter for this type that will give us
 				// a datamodel.Node
 				return customConverter.customToAny(ptrVal(val).Interface())
@@ -486,7 +486,7 @@ func (w *_node) AsBool() (bool, error) {
 	if err := compatibleKind(w.schemaType, datamodel.Kind_Bool); err != nil {
 		return false, err
 	}
-	if customConverter := w.cfg.converterFor(w.val); customConverter != nil {
+	if customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val); customConverter != nil {
 		// user has registered a converter that takes the underlying type and returns a bool
 		return customConverter.customToBool(ptrVal(w.val).Interface())
 	}
@@ -497,7 +497,7 @@ func (w *_node) AsInt() (int64, error) {
 	if err := compatibleKind(w.schemaType, datamodel.Kind_Int); err != nil {
 		return 0, err
 	}
-	if customConverter := w.cfg.converterFor(w.val); customConverter != nil {
+	if customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val); customConverter != nil {
 		// user has registered a converter that takes the underlying type and returns an int
 		return customConverter.customToInt(ptrVal(w.val).Interface())
 	}
@@ -516,7 +516,7 @@ func (w *_node) AsFloat() (float64, error) {
 	if err := compatibleKind(w.schemaType, datamodel.Kind_Float); err != nil {
 		return 0, err
 	}
-	if customConverter := w.cfg.converterFor(w.val); customConverter != nil {
+	if customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val); customConverter != nil {
 		// user has registered a converter that takes the underlying type and returns a float
 		return customConverter.customToFloat(ptrVal(w.val).Interface())
 	}
@@ -527,7 +527,7 @@ func (w *_node) AsString() (string, error) {
 	if err := compatibleKind(w.schemaType, datamodel.Kind_String); err != nil {
 		return "", err
 	}
-	if customConverter := w.cfg.converterFor(w.val); customConverter != nil {
+	if customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val); customConverter != nil {
 		// user has registered a converter that takes the underlying type and returns a string
 		return customConverter.customToString(ptrVal(w.val).Interface())
 	}
@@ -538,7 +538,7 @@ func (w *_node) AsBytes() ([]byte, error) {
 	if err := compatibleKind(w.schemaType, datamodel.Kind_Bytes); err != nil {
 		return nil, err
 	}
-	if customConverter := w.cfg.converterFor(w.val); customConverter != nil {
+	if customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val); customConverter != nil {
 		// user has registered a converter that takes the underlying type and returns a []byte
 		return customConverter.customToBytes(ptrVal(w.val).Interface())
 	}
@@ -549,7 +549,7 @@ func (w *_node) AsLink() (datamodel.Link, error) {
 	if err := compatibleKind(w.schemaType, datamodel.Kind_Link); err != nil {
 		return nil, err
 	}
-	if customConverter := w.cfg.converterFor(w.val); customConverter != nil {
+	if customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val); customConverter != nil {
 		// user has registered a converter that takes the underlying type and returns a cid.Cid
 		cid, err := customConverter.customToLink(ptrVal(w.val).Interface())
 		if err != nil {
@@ -585,7 +585,7 @@ func (w *_builder) Reset() {
 }
 
 type _assembler struct {
-	cfg        config
+	cfg        *config
 	schemaType schema.Type
 	val        reflect.Value // non-pointer
 
@@ -664,7 +664,7 @@ func (w *_assembler) BeginMap(sizeHint int64) (datamodel.MapAssembler, error) {
 		if err != nil {
 			return nil, err
 		}
-		converter := w.cfg.converterFor(w.val)
+		converter := w.cfg.converterFor(w.schemaType.Name(), w.val)
 		return &basicMapAssembler{MapAssembler: mapAsm, builder: basicBuilder, parent: w, converter: converter}, nil
 	case *schema.TypeStruct:
 		val := w.createNonPtrVal()
@@ -758,7 +758,7 @@ func (w *_assembler) BeginList(sizeHint int64) (datamodel.ListAssembler, error) 
 		if err != nil {
 			return nil, err
 		}
-		converter := w.cfg.converterFor(w.val)
+		converter := w.cfg.converterFor(w.schemaType.Name(), w.val)
 		return &basicListAssembler{ListAssembler: listAsm, builder: basicBuilder, parent: w, converter: converter}, nil
 	case *schema.TypeList:
 		// we should be able to safely assume we're dealing with a Go slice here,
@@ -781,7 +781,7 @@ func (w *_assembler) BeginList(sizeHint int64) (datamodel.ListAssembler, error) 
 
 func (w *_assembler) AssignNull() error {
 	_, isAny := w.schemaType.(*schema.TypeAny)
-	if customConverter := w.cfg.converterFor(w.val); customConverter != nil && isAny {
+	if customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val); customConverter != nil && isAny {
 		// an Any field that is being assigned a Null, we pass the Null directly to
 		// the converter, regardless of whether this field is nullable or not
 		typ, err := customConverter.customFromAny(datamodel.Null)
@@ -812,7 +812,7 @@ func (w *_assembler) AssignBool(b bool) error {
 	if err := compatibleKind(w.schemaType, datamodel.Kind_Bool); err != nil {
 		return err
 	}
-	customConverter := w.cfg.converterFor(w.val)
+	customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val)
 	_, isAny := w.schemaType.(*schema.TypeAny)
 	if customConverter != nil {
 		var typ interface{}
@@ -881,7 +881,7 @@ func (w *_assembler) AssignInt(i int64) error {
 		return err
 	}
 	// TODO: check for overflow
-	customConverter := w.cfg.converterFor(w.val)
+	customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val)
 	_, isAny := w.schemaType.(*schema.TypeAny)
 	if customConverter != nil {
 		var typ interface{}
@@ -926,7 +926,7 @@ func (w *_assembler) AssignFloat(f float64) error {
 	if err := compatibleKind(w.schemaType, datamodel.Kind_Float); err != nil {
 		return err
 	}
-	customConverter := w.cfg.converterFor(w.val)
+	customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val)
 	_, isAny := w.schemaType.(*schema.TypeAny)
 	if customConverter != nil {
 		var typ interface{}
@@ -965,7 +965,7 @@ func (w *_assembler) AssignString(s string) error {
 	if err := compatibleKind(w.schemaType, datamodel.Kind_String); err != nil {
 		return err
 	}
-	customConverter := w.cfg.converterFor(w.val)
+	customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val)
 	_, isAny := w.schemaType.(*schema.TypeAny)
 	if customConverter != nil {
 		var typ interface{}
@@ -1004,7 +1004,7 @@ func (w *_assembler) AssignBytes(p []byte) error {
 	if err := compatibleKind(w.schemaType, datamodel.Kind_Bytes); err != nil {
 		return err
 	}
-	customConverter := w.cfg.converterFor(w.val)
+	customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val)
 	_, isAny := w.schemaType.(*schema.TypeAny)
 	if customConverter != nil {
 		var typ interface{}
@@ -1042,7 +1042,7 @@ func (w *_assembler) AssignBytes(p []byte) error {
 func (w *_assembler) AssignLink(link datamodel.Link) error {
 	val := w.createNonPtrVal()
 	// TODO: newVal.Type() panics if link==nil; add a test and fix.
-	customConverter := w.cfg.converterFor(w.val)
+	customConverter := w.cfg.converterFor(w.schemaType.Name(), w.val)
 	if _, ok := w.schemaType.(*schema.TypeAny); ok {
 		if customConverter != nil {
 			// field is an Any, so the converter will be an Any converter that wants
@@ -1118,7 +1118,7 @@ func (w *_assembler) Prototype() datamodel.NodePrototype {
 type _structAssembler struct {
 	// TODO: embed _assembler?
 
-	cfg config
+	cfg *config
 
 	schemaType *schema.TypeStruct
 	val        reflect.Value // non-pointer
@@ -1245,7 +1245,7 @@ func (w _errorAssembler) Prototype() datamodel.NodePrototype               { ret
 // used for Maps which we can assume are of type: struct{Keys []string, Values map[x]y},
 // where we have Keys in keysVal and Values in valuesVal
 type _mapAssembler struct {
-	cfg        config
+	cfg        *config
 	schemaType *schema.TypeMap
 	keysVal    reflect.Value // non-pointer
 	valuesVal  reflect.Value // non-pointer
@@ -1311,7 +1311,7 @@ func (w *_mapAssembler) ValuePrototype(k string) datamodel.NodePrototype {
 
 // _listAssembler is for operating directly on slices, which we have in val
 type _listAssembler struct {
-	cfg        config
+	cfg        *config
 	schemaType *schema.TypeList
 	val        reflect.Value // non-pointer
 	finish     func() error
@@ -1345,7 +1345,7 @@ func (w *_listAssembler) ValuePrototype(idx int64) datamodel.NodePrototype {
 // when assembling as a Map but we anticipate a single value, which we need to
 // look up in the union members
 type _unionAssembler struct {
-	cfg        config
+	cfg        *config
 	schemaType *schema.TypeUnion
 	val        reflect.Value // non-pointer
 	finish     func() error
@@ -1376,11 +1376,12 @@ func (w *_unionAssembler) AssembleValue() datamodel.NodeAssembler {
 		}
 	}
 	if mtyp == nil {
-		return _errorAssembler{fmt.Errorf("bindnode TODO: missing member %s in %s", name, w.schemaType.Name())}
-		// return nil, datamodel.ErrInvalidKey{
-		// 	TypeName: w.schemaType.Name(),
-		// 	Key:      basicnode.NewString(name),
-		// }
+		return _errorAssembler{
+			schema.ErrNotUnionStructure{
+				TypeName: w.schemaType.Name(),
+				Detail:   fmt.Sprintf("no member named %q", name),
+			},
+		}
 	}
 
 	goType := w.val.Field(idx).Type().Elem()
@@ -1433,7 +1434,7 @@ func (w *_unionAssembler) ValuePrototype(k string) datamodel.NodePrototype {
 // should match the schema for this type.
 type _structIterator struct {
 	// TODO: support embedded fields?
-	cfg config
+	cfg *config
 
 	schemaType *schema.TypeStruct
 	fields     []schema.StructField
@@ -1462,7 +1463,7 @@ func (w *_structIterator) Next() (key, value datamodel.Node, _ error) {
 	}
 	_, isAny := field.Type().(*schema.TypeAny)
 	if isAny {
-		if customConverter := w.cfg.converterFor(val); customConverter != nil {
+		if customConverter := w.cfg.converterFor(field.Type().Name(), val); customConverter != nil {
 			// field is an Any and we have an Any converter which takes the underlying
 			// struct field value and returns a datamodel.Node
 			v, err := customConverter.customToAny(ptrVal(val).Interface())
@@ -1494,7 +1495,7 @@ func (w *_structIterator) Done() bool {
 // _mapIterator is for iterating over a struct{Keys []string, Values map[x]y},
 // where we have the Keys in keysVal and Values in valuesVal
 type _mapIterator struct {
-	cfg        config
+	cfg        *config
 	schemaType *schema.TypeMap
 	keysVal    reflect.Value // non-pointer
 	valuesVal  reflect.Value // non-pointer
@@ -1512,7 +1513,7 @@ func (w *_mapIterator) Next() (key, value datamodel.Node, _ error) {
 	key = newNode(w.cfg, w.schemaType.KeyType(), goKey)
 	_, isAny := w.schemaType.ValueType().(*schema.TypeAny)
 	if isAny {
-		if customConverter := w.cfg.converterFor(val); customConverter != nil {
+		if customConverter := w.cfg.converterFor(w.schemaType.ValueType().Name(), val); customConverter != nil {
 			// values of this map are Any and we have an Any converter which takes the
 			// underlying map value and returns a datamodel.Node
 
@@ -1542,7 +1543,7 @@ func (w *_mapIterator) Done() bool {
 
 // _listIterator is for iterating over slices, which is held in val
 type _listIterator struct {
-	cfg        config
+	cfg        *config
 	schemaType *schema.TypeList
 	val        reflect.Value // non-pointer
 	nextIndex  int
@@ -1562,7 +1563,7 @@ func (w *_listIterator) Next() (index int64, value datamodel.Node, _ error) {
 		val = val.Elem() // nullable values are pointers
 	}
 	if _, ok := w.schemaType.ValueType().(*schema.TypeAny); ok {
-		if customConverter := w.cfg.converterFor(val); customConverter != nil {
+		if customConverter := w.cfg.converterFor(w.schemaType.ValueType().Name(), val); customConverter != nil {
 			// values are Any and we have an Any converter which can take whatever
 			// the underlying Go type in this slice is and return a datamodel.Node
 			val, err := customConverter.customToAny(ptrVal(val).Interface())
@@ -1580,7 +1581,7 @@ func (w *_listIterator) Done() bool {
 
 type _unionIterator struct {
 	// TODO: support embedded fields?
-	cfg        config
+	cfg        *config
 	schemaType *schema.TypeUnion
 	members    []schema.Type
 	val        reflect.Value // non-pointer
@@ -1614,7 +1615,7 @@ func (w *_unionIterator) Done() bool {
 // --- uint64 special case handling
 
 type _uintNode struct {
-	cfg        config
+	cfg        *config
 	schemaType schema.Type
 
 	val reflect.Value // non-pointer
@@ -1721,7 +1722,7 @@ func (tu *_uintNodeRepr) AsInt() (int64, error) {
 	if err := compatibleKind(tu.schemaType, datamodel.Kind_Int); err != nil {
 		return 0, err
 	}
-	if customConverter := tu.cfg.converterFor(tu.val); customConverter != nil {
+	if customConverter := tu.cfg.converterFor(tu.schemaType.Name(), tu.val); customConverter != nil {
 		// user has registered a converter that takes the underlying type and returns an int
 		return customConverter.customToInt(ptrVal(tu.val).Interface())
 	}

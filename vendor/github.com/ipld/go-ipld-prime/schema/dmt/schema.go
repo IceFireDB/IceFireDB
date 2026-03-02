@@ -292,7 +292,7 @@ func init() {
 	ts.Accumulate(schema.SpawnMap("Map__TypeName__Int",
 		"String", "Int", false,
 	))
-	ts.Accumulate(schema.SpawnString("RepresentationKind")) // todo: RepresentationKind is supposed to be an enum, but we're puting it to a string atm.
+	ts.Accumulate(schema.SpawnString("RepresentationKind")) // todo: RepresentationKind is supposed to be an enum, but we're putting it to a string atm.
 	ts.Accumulate(schema.SpawnStruct("TypeDefnStruct",
 		[]schema.StructField{
 			schema.SpawnStructField("fields", "Map__FieldName__StructField", false, false), // todo: dodging inline defn's again.

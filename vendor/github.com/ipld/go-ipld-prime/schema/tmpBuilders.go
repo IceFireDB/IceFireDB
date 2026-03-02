@@ -149,6 +149,93 @@ func SpawnEnum(name TypeName, members []string, repr EnumRepresentation) *TypeEn
 	return &TypeEnum{typeBase{name, nil}, members, repr}
 }
 
+// Utility function adding default basic types to schema type system
+func SpawnDefaultBasicTypes(ts *TypeSystem) {
+	ts.Accumulate(SpawnBool("Bool"))
+	ts.Accumulate(SpawnInt("Int"))
+	ts.Accumulate(SpawnFloat("Float"))
+	ts.Accumulate(SpawnString("String"))
+	ts.Accumulate(SpawnBytes("Bytes"))
+
+	ts.Accumulate(SpawnAny("Any"))
+
+	ts.Accumulate(SpawnMap("Map", "String", "Any", false))
+	ts.Accumulate(SpawnList("List", "Any", false))
+
+	// Should be &Any, really.
+	ts.Accumulate(SpawnLink("Link"))
+
+	// TODO: schema package lacks support?
+	// ts.Accumulate(schema.SpawnUnit("Null", NullRepr))
+}
+
+// Clone creates a copy of a type that is not in the original's universe (so it can be used elsewhere safely)
+func Clone(typ Type) Type {
+	switch kindedType := typ.(type) {
+	case *TypeBool:
+		return SpawnBool(kindedType.Name())
+	case *TypeString:
+		return SpawnString(kindedType.Name())
+	case *TypeBytes:
+		return SpawnBytes(kindedType.Name())
+	case *TypeInt:
+		return SpawnInt(kindedType.Name())
+	case *TypeFloat:
+		return SpawnFloat(kindedType.Name())
+	case *TypeAny:
+		return SpawnAny(kindedType.Name())
+	case *TypeMap:
+		return SpawnMap(kindedType.Name(),
+			kindedType.KeyType().Name(),
+			kindedType.ValueType().Name(),
+			kindedType.ValueIsNullable())
+	case *TypeList:
+		return SpawnList(kindedType.Name(), kindedType.ValueType().Name(), kindedType.ValueIsNullable())
+	case *TypeLink:
+		if kindedType.HasReferencedType() {
+			return SpawnLinkReference(kindedType.Name(), kindedType.ReferencedType().Name())
+		} else {
+			return SpawnLink(kindedType.Name())
+		}
+	case *TypeUnion:
+		members := kindedType.Members()
+		memberNames := make([]TypeName, 0, len(members))
+		for _, member := range members {
+			memberNames = append(memberNames, member.Name())
+		}
+		return SpawnUnion(kindedType.Name(), memberNames, kindedType.RepresentationStrategy())
+	case *TypeStruct:
+		oldFields := kindedType.Fields()
+		newFields := make([]StructField, 0, len(oldFields))
+		for _, oldField := range oldFields {
+			newFields = append(newFields, SpawnStructField(oldField.Name(), oldField.Type().Name(), oldField.IsOptional(), oldField.IsNullable()))
+		}
+		return SpawnStruct(kindedType.Name(), newFields, kindedType.RepresentationStrategy())
+	case *TypeEnum:
+		return SpawnEnum(kindedType.Name(), kindedType.Members(), kindedType.RepresentationStrategy())
+	default:
+		panic("unexpected type, don't know how to clone")
+	}
+}
+
+func MergeTypeSystem(target *TypeSystem, source *TypeSystem, ignoreDups bool) {
+	for _, name := range source.Names() {
+		typ := Clone(source.TypeByName(name))
+		if ignoreDups {
+			accumulateWithRecovery(target, typ)
+		} else {
+			target.Accumulate(typ)
+		}
+	}
+}
+
+func accumulateWithRecovery(ts *TypeSystem, typ Type) {
+	defer func() {
+		_ = recover()
+	}()
+	ts.Accumulate(typ)
+}
+
 // The methods relating to TypeSystem are also mutation-heavy and placeholdery.
 
 func (ts *TypeSystem) Init() {

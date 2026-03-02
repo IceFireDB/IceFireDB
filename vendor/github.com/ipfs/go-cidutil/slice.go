@@ -1,8 +1,10 @@
 package cidutil
 
 import (
+	"slices"
+	"strings"
+
 	"github.com/ipfs/go-cid"
-	"sort"
 )
 
 // Slice is a convenience type for sorting CIDs
@@ -21,10 +23,12 @@ func (s Slice) Swap(i, j int) {
 }
 
 func (s Slice) Sort() {
-	sort.Sort(s)
+	Sort(s)
 }
 
 // Sort sorts a slice of CIDs
 func Sort(s []cid.Cid) {
-	Slice(s).Sort()
+	slices.SortFunc(s, func(a, b cid.Cid) int {
+		return strings.Compare(a.KeyString(), b.KeyString())
+	})
 }

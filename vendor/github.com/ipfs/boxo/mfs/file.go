@@ -12,9 +12,7 @@ import (
 	ft "github.com/ipfs/boxo/ipld/unixfs"
 	mod "github.com/ipfs/boxo/ipld/unixfs/mod"
 	"github.com/ipfs/boxo/provider"
-	"github.com/ipfs/boxo/util"
 	ipld "github.com/ipfs/go-ipld-format"
-	mh "github.com/multiformats/go-multihash"
 )
 
 // File represents a file in the MFS, its logic its mainly targeted
@@ -104,36 +102,17 @@ func (fi *File) Open(flags Flags) (_ FileDescriptor, _retErr error) {
 		// Ok as well.
 	}
 
-	dmod, err := mod.NewDagModifier(context.TODO(), node, fi.dagService, chunker.DefaultSplitter)
-	// TODO: Remove the use of the `chunker` package here, add a new `NewDagModifier` in
-	// `go-unixfs` with the `DefaultSplitter` already included.
+	// Use configured chunker from parent, fall back to default
+	chunkerGen := fi.parent.getChunker()
+	if chunkerGen == nil {
+		chunkerGen = chunker.DefaultSplitter
+	}
+
+	dmod, err := mod.NewDagModifier(context.TODO(), node, fi.dagService, chunkerGen)
 	if err != nil {
 		return nil, err
 	}
 	dmod.RawLeaves = fi.RawLeaves
-
-	// If the node uses identity hash, configure DagModifier with a fallback
-	// to avoid issues when the data grows beyond the identity hash size limit
-	if dmod.Prefix.MhType == mh.IDENTITY {
-		// Try to inherit full prefix from parent directory
-		if fi.parent != nil {
-			if dir, ok := fi.parent.(*Directory); ok {
-				if parentNode, err := dir.GetNode(); err == nil {
-					parentPrefix := parentNode.Cid().Prefix()
-					if parentPrefix.MhType != mh.IDENTITY {
-						// Use parent's full prefix (all fields)
-						dmod.Prefix = parentPrefix
-					}
-				}
-			}
-		}
-
-		// If still identity (no suitable parent), set up fallback
-		if dmod.Prefix.MhType == mh.IDENTITY {
-			dmod.Prefix.MhType = util.DefaultIpfsHash
-			dmod.Prefix.MhLength = -1 // Use default length for the hash function
-		}
-	}
 
 	return &fileDescriptor{
 		inode: fi,

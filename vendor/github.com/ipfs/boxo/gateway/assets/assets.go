@@ -96,11 +96,12 @@ type GlobalData struct {
 
 type DagTemplateData struct {
 	GlobalData
-	Path      string
-	CID       string
-	CodecName string
-	CodecHex  string
-	Node      *ParsedNode
+	Path                 string
+	CID                  string
+	CodecName            string
+	CodecHex             string
+	Node                 *ParsedNode
+	AllowCodecConversion bool
 }
 
 type ErrorTemplateData struct {

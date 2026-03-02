@@ -18,7 +18,7 @@ var (
 //
 // When using this value, typically you'll use it as `Link`, and not `*Link`.
 // This includes when handling the value as an `datamodel.Link` interface -- the non-pointer form is typically preferable.
-// This is because the datamodel.Link inteface is often desirable to be able to use as a golang map key,
+// This is because the datamodel.Link interface is often desirable to be able to use as a golang map key,
 // and in that context, pointers would not result in the desired behavior.
 type Link struct {
 	cid.Cid

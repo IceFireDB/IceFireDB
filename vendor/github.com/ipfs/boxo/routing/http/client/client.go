@@ -667,6 +667,7 @@ func (c *Client) GetClosestPeers(ctx context.Context, key cid.Cid) (peers iter.R
 	var skipBodyClose bool
 	defer func() {
 		if !skipBodyClose {
+			io.Copy(io.Discard, resp.Body) // Drain body for connection reuse
 			resp.Body.Close()
 		}
 	}()

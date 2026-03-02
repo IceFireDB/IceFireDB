@@ -29,6 +29,7 @@ import (
 	"os"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/gammazero/deque"
 	dag "github.com/ipfs/boxo/ipld/merkledag"
@@ -86,6 +87,22 @@ type Shard struct {
 	// leaf node
 	key string
 	val *ipld.Link
+
+	// Optional metadata for the root shard node
+	mode  os.FileMode
+	mtime time.Time
+}
+
+// SetStat sets optional mode and mtime metadata on the shard.
+// These are included in the UnixFS data field when Node() is called.
+// Pass mode=0 or zero time to leave that field unchanged.
+func (ds *Shard) SetStat(mode os.FileMode, mtime time.Time) {
+	if mode != 0 {
+		ds.mode = mode
+	}
+	if !mtime.IsZero() {
+		ds.mtime = mtime
+	}
 }
 
 // NewShard creates a new, empty HAMT shard with the given size.
@@ -213,7 +230,7 @@ func (ds *Shard) Node() (ipld.Node, error) {
 		sliceIndex++
 	}
 
-	data, err := format.HAMTShardData(ds.childer.bitfield.Bytes(), uint64(ds.tableSize), HashMurmur3)
+	data, err := format.HAMTShardDataWithStat(ds.childer.bitfield.Bytes(), uint64(ds.tableSize), HashMurmur3, ds.mode, ds.mtime)
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +519,7 @@ func parallelShardWalk(ctx context.Context, root *Shard, dserv ipld.DAGService, 
 	out := make(chan *listCidsAndShards)
 	done := make(chan struct{})
 
-	for i := 0; i < concurrency; i++ {
+	for range concurrency {
 		grp.Go(func() error {
 			for feedChildren := range feed {
 				for _, nextShard := range feedChildren.shards {

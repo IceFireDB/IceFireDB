@@ -116,7 +116,7 @@ func NewNameSystem(r routing.ValueStore, opts ...Option) (NameSystem, error) {
 	// IPFS_NS_MAP="dnslink-test.example.com:/ipfs/bafkreicysg23kiwv34eg2d7qweipxwosdo2py4ldv42nbauguluen5v6am"
 	if list := os.Getenv("IPFS_NS_MAP"); list != "" {
 		staticMap = make(map[string]*cacheEntry)
-		for _, pair := range strings.Split(list, ",") {
+		for pair := range strings.SplitSeq(list, ",") {
 			mapping := strings.SplitN(pair, ":", 2)
 			key := mapping[0]
 			value, err := path.NewPath(mapping[1])

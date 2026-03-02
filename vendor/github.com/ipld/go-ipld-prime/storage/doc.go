@@ -55,7 +55,7 @@
 // This is intentional, and was done very carefully.
 // If implementing a storage system, you should find it possible to do so *without* importing this package.
 // Because only standard library types are present in the interface contracts,
-// it's possible to implement types that align with the interfaces without refering to them.
+// it's possible to implement types that align with the interfaces without referring to them.
 //
 // Note that where keys are discussed in this package, they use the golang string type --
 // however, they may be binary.  (The golang string type allows arbitrary bytes in general,

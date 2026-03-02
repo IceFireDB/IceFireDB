@@ -85,26 +85,38 @@ type converter struct {
 	customToAny   func(interface{}) (datamodel.Node, error)
 }
 
-type config map[reflect.Type]*converter
+type config struct {
+	namedConverters map[schema.TypeName]*converter
+	typeConverters  map[reflect.Type]*converter
+}
 
 // this mainly exists to short-circuit the nonPtrType() call; the `Type()` variant
 // exists for completeness
-func (c config) converterFor(val reflect.Value) *converter {
-	if len(c) == 0 {
+func (c *config) converterFor(typeName schema.TypeName, val reflect.Value) *converter {
+	if c == nil {
 		return nil
 	}
-	return c[nonPtrType(val)]
+
+	if namedConverter, ok := c.namedConverters[typeName]; ok {
+		return namedConverter
+	}
+
+	return c.typeConverters[nonPtrType(val)]
 }
 
-func (c config) converterForType(typ reflect.Type) *converter {
-	if len(c) == 0 {
+func (c *config) converterForType(typeName schema.TypeName, typ reflect.Type) *converter {
+	if c == nil {
 		return nil
 	}
-	return c[typ]
+	if namedConverter, ok := c.namedConverters[typeName]; ok {
+		return namedConverter
+	}
+
+	return c.typeConverters[typ]
 }
 
 // Option is able to apply custom options to the bindnode API
-type Option func(config)
+type Option func(*config)
 
 // TypedBoolConverter adds custom converter functions for a particular
 // type as identified by a pointer in the first argument.
@@ -121,8 +133,8 @@ func TypedBoolConverter(ptrVal interface{}, from func(bool) (interface{}, error)
 		customFromBool: from,
 		customToBool:   to,
 	}
-	return func(cfg config) {
-		cfg[customType] = converter
+	return func(cfg *config) {
+		cfg.typeConverters[customType] = converter
 	}
 }
 
@@ -141,8 +153,8 @@ func TypedIntConverter(ptrVal interface{}, from func(int64) (interface{}, error)
 		customFromInt: from,
 		customToInt:   to,
 	}
-	return func(cfg config) {
-		cfg[customType] = converter
+	return func(cfg *config) {
+		cfg.typeConverters[customType] = converter
 	}
 }
 
@@ -161,8 +173,8 @@ func TypedFloatConverter(ptrVal interface{}, from func(float64) (interface{}, er
 		customFromFloat: from,
 		customToFloat:   to,
 	}
-	return func(cfg config) {
-		cfg[customType] = converter
+	return func(cfg *config) {
+		cfg.typeConverters[customType] = converter
 	}
 }
 
@@ -181,8 +193,8 @@ func TypedStringConverter(ptrVal interface{}, from func(string) (interface{}, er
 		customFromString: from,
 		customToString:   to,
 	}
-	return func(cfg config) {
-		cfg[customType] = converter
+	return func(cfg *config) {
+		cfg.typeConverters[customType] = converter
 	}
 }
 
@@ -201,8 +213,8 @@ func TypedBytesConverter(ptrVal interface{}, from func([]byte) (interface{}, err
 		customFromBytes: from,
 		customToBytes:   to,
 	}
-	return func(cfg config) {
-		cfg[customType] = converter
+	return func(cfg *config) {
+		cfg.typeConverters[customType] = converter
 	}
 }
 
@@ -225,8 +237,8 @@ func TypedLinkConverter(ptrVal interface{}, from func(cid.Cid) (interface{}, err
 		customFromLink: from,
 		customToLink:   to,
 	}
-	return func(cfg config) {
-		cfg[customType] = converter
+	return func(cfg *config) {
+		cfg.typeConverters[customType] = converter
 	}
 }
 
@@ -248,18 +260,162 @@ func TypedAnyConverter(ptrVal interface{}, from func(datamodel.Node) (interface{
 		customFromAny: from,
 		customToAny:   to,
 	}
-	return func(cfg config) {
-		cfg[customType] = converter
+	return func(cfg *config) {
+		cfg.typeConverters[customType] = converter
 	}
 }
 
-func applyOptions(opt ...Option) config {
+// NamedBoolConverter adds custom converter functions for given
+// named schema type.
+// The fromFunc is of the form: func(bool) (interface{}, error)
+// and toFunc is of the form: func(interface{}) (bool, error)
+// where interface{} is a pointer form of the type we are converting.
+//
+// NamedBoolConverter is an EXPERIMENTAL API and may be removed or
+// changed in a future release.
+func NamedBoolConverter(typeName schema.TypeName, from func(bool) (interface{}, error), to func(interface{}) (bool, error)) Option {
+	converter := &converter{
+		kind:           schema.TypeKind_Bool,
+		customFromBool: from,
+		customToBool:   to,
+	}
+	return func(cfg *config) {
+		cfg.namedConverters[typeName] = converter
+	}
+}
+
+// NamedIntConverter adds custom converter functions for given
+// named schema type.
+// The fromFunc is of the form: func(int64) (interface{}, error)
+// and toFunc is of the form: func(interface{}) (int64, error)
+// where interface{} is a pointer form of the type we are converting.
+//
+// NamedIntConverter is an EXPERIMENTAL API and may be removed or
+// changed in a future release.
+func NamedIntConverter(typeName schema.TypeName, from func(int64) (interface{}, error), to func(interface{}) (int64, error)) Option {
+	converter := &converter{
+		kind:          schema.TypeKind_Int,
+		customFromInt: from,
+		customToInt:   to,
+	}
+	return func(cfg *config) {
+		cfg.namedConverters[typeName] = converter
+	}
+}
+
+// NamedFloatConverter adds custom converter functions for given
+// named schema type.
+// The fromFunc is of the form: func(float64) (interface{}, error)
+// and toFunc is of the form: func(interface{}) (float64, error)
+// where interface{} is a pointer form of the type we are converting.
+//
+// NamedFloatConverter is an EXPERIMENTAL API and may be removed or
+// changed in a future release.
+func NamedFloatConverter(typeName schema.TypeName, from func(float64) (interface{}, error), to func(interface{}) (float64, error)) Option {
+	converter := &converter{
+		kind:            schema.TypeKind_Float,
+		customFromFloat: from,
+		customToFloat:   to,
+	}
+	return func(cfg *config) {
+		cfg.namedConverters[typeName] = converter
+	}
+}
+
+// NamedStringConverter adds custom converter functions for given
+// named schema type.
+// The fromFunc is of the form: func(string) (interface{}, error)
+// and toFunc is of the form: func(interface{}) (string, error)
+// where interface{} is a pointer form of the type we are converting.
+//
+// NamedStringConverter is an EXPERIMENTAL API and may be removed or
+// changed in a future release.
+func NamedStringConverter(typeName schema.TypeName, from func(string) (interface{}, error), to func(interface{}) (string, error)) Option {
+	converter := &converter{
+		kind:             schema.TypeKind_String,
+		customFromString: from,
+		customToString:   to,
+	}
+	return func(cfg *config) {
+		cfg.namedConverters[typeName] = converter
+	}
+}
+
+// NamedBytesConverter adds custom converter functions for given
+// named schema type.
+// The fromFunc is of the form: func([]byte) (interface{}, error)
+// and toFunc is of the form: func(interface{}) ([]byte, error)
+// where interface{} is a pointer form of the type we are converting.
+//
+// NamedBytesConverter is an EXPERIMENTAL API and may be removed or
+// changed in a future release.
+func NamedBytesConverter(typeName schema.TypeName, from func([]byte) (interface{}, error), to func(interface{}) ([]byte, error)) Option {
+	converter := &converter{
+		kind:            schema.TypeKind_Bytes,
+		customFromBytes: from,
+		customToBytes:   to,
+	}
+	return func(cfg *config) {
+		cfg.namedConverters[typeName] = converter
+	}
+}
+
+// NamedLinkConverter adds custom converter functions for given
+// named schema type.
+// The fromFunc is of the form: func([]byte) (interface{}, error)
+// and toFunc is of the form: func(interface{}) ([]byte, error)
+// where interface{} is a pointer form of the type we are converting.
+//
+// Beware that this API is only compatible with cidlink.Link types in the data
+// model and may result in errors if attempting to convert from other
+// datamodel.Link types.
+//
+// NamedLinkConverter is an EXPERIMENTAL API and may be removed or
+// changed in a future release.
+func NamedLinkConverter(typeName schema.TypeName, from func(cid.Cid) (interface{}, error), to func(interface{}) (cid.Cid, error)) Option {
+	converter := &converter{
+		kind:           schema.TypeKind_Link,
+		customFromLink: from,
+		customToLink:   to,
+	}
+	return func(cfg *config) {
+		cfg.namedConverters[typeName] = converter
+	}
+}
+
+// NamedAnyConverter adds custom converter functions for given
+// named schema type.
+// The fromFunc is of the form: func(datamodel.Node) (interface{}, error)
+// and toFunc is of the form: func(interface{}) (datamodel.Node, error)
+// where interface{} is a pointer form of the type we are converting.
+//
+// This method should be able to deal with all forms of Any and return an error
+// if the expected data forms don't match the expected.
+//
+// NamedAnyConverter is an EXPERIMENTAL API and may be removed or
+// changed in a future release.
+func NamedAnyConverter(typeName schema.TypeName, from func(datamodel.Node) (interface{}, error), to func(interface{}) (datamodel.Node, error)) Option {
+	converter := &converter{
+		kind:          schema.TypeKind_Any,
+		customFromAny: from,
+		customToAny:   to,
+	}
+	return func(cfg *config) {
+		cfg.namedConverters[typeName] = converter
+	}
+}
+
+func applyOptions(opt ...Option) *config {
 	if len(opt) == 0 {
 		// no need to allocate, we access it via converterFor and converterForType
 		// which are safe for nil maps
 		return nil
 	}
-	cfg := make(map[reflect.Type]*converter)
+	cfg := &config{
+		namedConverters: make(map[string]*converter),
+		typeConverters:  make(map[reflect.Type]*converter),
+	}
+
 	for _, o := range opt {
 		o(cfg)
 	}

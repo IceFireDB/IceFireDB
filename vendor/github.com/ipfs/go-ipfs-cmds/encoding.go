@@ -10,12 +10,12 @@ import (
 
 // Encoder encodes values onto e.g. an io.Writer. Examples are json.Encoder and xml.Encoder.
 type Encoder interface {
-	Encode(value interface{}) error
+	Encode(value any) error
 }
 
 // Decoder decodes values into value (which should be a pointer).
 type Decoder interface {
-	Decode(value interface{}) error
+	Decode(value any) error
 }
 
 // EncodingType defines a supported encoding
@@ -35,6 +35,11 @@ const (
 	Protobuf    = "protobuf"
 	Text        = "text"
 	TextNewline = "textnl"
+
+	// OctetStream is a generic binary pass-through encoding.
+	// Use SetContentType() to specify the actual MIME type if different
+	// from application/octet-stream.
+	OctetStream = "octet-stream"
 
 	// PostRunTypes
 	CLI = "cli"
@@ -65,28 +70,36 @@ var Encoders = EncoderMap{
 	TextNewline: func(req *Request) func(io.Writer) Encoder {
 		return func(w io.Writer) Encoder { return TextEncoder{w: w, suffix: "\n"} }
 	},
+	// OctetStream is a pass-through encoder for binary data. The data is
+	// already in the correct format; we just need to set the right
+	// Content-Type header. The actual encoding happens in the command's
+	// Run function. Use SetContentType() to override the default
+	// application/octet-stream MIME type.
+	OctetStream: func(req *Request) func(io.Writer) Encoder {
+		return func(w io.Writer) Encoder { return TextEncoder{w: w} }
+	},
 }
 
-func MakeEncoder(f func(*Request, io.Writer, interface{}) error) func(*Request) func(io.Writer) Encoder {
+func MakeEncoder(f func(*Request, io.Writer, any) error) func(*Request) func(io.Writer) Encoder {
 	return func(req *Request) func(io.Writer) Encoder {
 		return func(w io.Writer) Encoder { return &genericEncoder{f: f, w: w, req: req} }
 	}
 }
 
-func MakeTypedEncoder(f interface{}) func(*Request) func(io.Writer) Encoder {
+func MakeTypedEncoder(f any) func(*Request) func(io.Writer) Encoder {
 	val := reflect.ValueOf(f)
 	t := val.Type()
 	if t.Kind() != reflect.Func || t.NumIn() != 3 {
 		panic("MakeTypedEncoder must receive a function with three parameters")
 	}
 
-	errorInterface := reflect.TypeOf((*error)(nil)).Elem()
+	errorInterface := reflect.TypeFor[error]()
 	if t.NumOut() != 1 || !t.Out(0).Implements(errorInterface) {
 		panic("MakeTypedEncoder must return an error")
 	}
 
-	writerInt := reflect.TypeOf((*io.Writer)(nil)).Elem()
-	if t.In(0) != reflect.TypeOf(&Request{}) || !t.In(1).Implements(writerInt) {
+	writerInt := reflect.TypeFor[io.Writer]()
+	if t.In(0) != reflect.TypeFor[*Request]() || !t.In(1).Implements(writerInt) {
 		panic("MakeTypedEncoder must receive a function matching func(*Request, io.Writer, ...)")
 	}
 
@@ -95,14 +108,14 @@ func MakeTypedEncoder(f interface{}) func(*Request) func(io.Writer) Encoder {
 	)
 
 	valType = t.In(2)
-	valTypeIsPtr := valType.Kind() == reflect.Ptr
+	valTypeIsPtr := valType.Kind() == reflect.Pointer
 	if valTypeIsPtr {
 		valTypeAlt = valType.Elem()
 	} else {
 		valTypeAlt = reflect.PointerTo(valType)
 	}
 
-	return MakeEncoder(func(req *Request, w io.Writer, i interface{}) error {
+	return MakeEncoder(func(req *Request, w io.Writer, i any) error {
 		iType := reflect.TypeOf(i)
 		iValue := reflect.ValueOf(i)
 		switch iType {
@@ -138,12 +151,12 @@ func MakeTypedEncoder(f interface{}) func(*Request) func(io.Writer) Encoder {
 }
 
 type genericEncoder struct {
-	f   func(*Request, io.Writer, interface{}) error
+	f   func(*Request, io.Writer, any) error
 	w   io.Writer
 	req *Request
 }
 
-func (e *genericEncoder) Encode(v interface{}) error {
+func (e *genericEncoder) Encode(v any) error {
 	return e.f(e.req, e.w, v)
 }
 
@@ -152,7 +165,7 @@ type TextEncoder struct {
 	suffix string
 }
 
-func (e TextEncoder) Encode(v interface{}) error {
+func (e TextEncoder) Encode(v any) error {
 	_, err := fmt.Fprintf(e.w, "%s%s", v, e.suffix)
 	return err
 }

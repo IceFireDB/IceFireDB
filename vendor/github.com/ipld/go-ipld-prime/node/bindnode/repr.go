@@ -333,7 +333,7 @@ func (w *_nodeRepr) lengthMinusAbsents() int64 {
 
 type _tupleIteratorRepr struct {
 	// TODO: support embedded fields?
-	cfg        config
+	cfg        *config
 	schemaType *schema.TypeStruct
 	fields     []schema.StructField
 	val        reflect.Value // non-pointer
@@ -361,7 +361,7 @@ func (w *_tupleIteratorRepr) Done() bool {
 }
 
 type _listpairsIteratorRepr struct {
-	cfg        config
+	cfg        *config
 	schemaType *schema.TypeStruct
 	fields     []schema.StructField
 	val        reflect.Value // non-pointer
@@ -627,7 +627,7 @@ func (w *_builderRepr) Reset() {
 }
 
 type _assemblerRepr struct {
-	cfg        config
+	cfg        *config
 	schemaType schema.Type
 	val        reflect.Value // non-pointer
 	finish     func() error

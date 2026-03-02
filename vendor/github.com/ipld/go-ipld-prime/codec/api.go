@@ -37,13 +37,13 @@ import (
 // and is the equivalent of creating a zero-value ReusableEncoder or ReusableDecoder (aka, default config)
 // and using its Encode or Decode methods.
 // This package-scope function may also internally use a sync.Pool
-// to keep some ReusableEncoder values on hand to avoid unnecesary allocations.
+// to keep some ReusableEncoder values on hand to avoid unnecessary allocations.
 //
 // Note that an EncoderConfig or DecoderConfig type that supports configuration options
 // does not functionally expose those options when invoked by the multicodec system --
 // multicodec indicator codes do not provide room for extended configuration info.
 // Codecs that expose configuration options are doing so for library users to enjoy;
-// it does not mean those non-default configurations will necessarly be available
+// it does not mean those non-default configurations will necessarily be available
 // in all scenarios that use codecs indirectly.
 // There is also no standard interface for such configurations: by nature,
 // if they exist at all, they tend to vary per codec.

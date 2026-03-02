@@ -115,9 +115,8 @@ type FormatStringError struct {
 func (e FormatStringError) Error() string {
 	if e.Specifier == "" {
 		return e.Message
-	} else {
-		return fmt.Sprintf("%s: %s", e.Message, e.Specifier)
 	}
+	return fmt.Sprintf("%s: %s", e.Message, e.Specifier)
 }
 
 func baseToString(base mb.Encoding) string {
