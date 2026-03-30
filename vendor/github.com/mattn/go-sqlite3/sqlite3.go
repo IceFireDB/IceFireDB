@@ -875,7 +875,7 @@ func (c *SQLiteConn) exec(ctx context.Context, query string, args []driver.Named
 			// consume the number of arguments used in the current
 			// statement and append all named arguments not
 			// contained therein
-			if len(args[start:start+na]) > 0 {
+			if na > 0 {
 				stmtArgs = append(stmtArgs, args[start:start+na]...)
 				for i := range args {
 					if (i < start || i >= na) && args[i].Name != "" {
@@ -1783,15 +1783,18 @@ func (d *SQLiteDriver) Open(dsn string) (driver.Conn, error) {
 
 // Close the connection.
 func (c *SQLiteConn) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.db == nil {
+		return nil
+	}
+	runtime.SetFinalizer(c, nil)
 	rv := C.sqlite3_close_v2(c.db)
 	if rv != C.SQLITE_OK {
-		return c.lastError()
+		return lastError(c.db)
 	}
 	deleteHandles(c)
-	c.mu.Lock()
 	c.db = nil
-	c.mu.Unlock()
-	runtime.SetFinalizer(c, nil)
 	return nil
 }
 
@@ -1932,16 +1935,18 @@ func (s *SQLiteStmt) Close() error {
 		return nil
 	}
 	s.closed = true
-	if !s.c.dbConnOpen() {
+	runtime.SetFinalizer(s, nil)
+	conn := s.c
+	stmt := s.s
+	s.s = nil
+	s.c = nil
+	if !conn.dbConnOpen() {
 		return errors.New("sqlite statement with already closed database connection")
 	}
-	rv := C.sqlite3_finalize(s.s)
-	s.s = nil
+	rv := C.sqlite3_finalize(stmt)
 	if rv != C.SQLITE_OK {
-		return s.c.lastError()
+		return conn.lastError()
 	}
-	s.c = nil
-	runtime.SetFinalizer(s, nil)
 	return nil
 }
 
@@ -1958,10 +1963,12 @@ func (s *SQLiteStmt) bind(args []driver.NamedValue) error {
 		return s.c.lastError()
 	}
 
+	C.sqlite3_clear_bindings(s.s)
+
 	bindIndices := make([][3]int, len(args))
 	prefixes := []string{":", "@", "$"}
 	for i, v := range args {
-		bindIndices[i][0] = args[i].Ordinal
+		bindIndices[i][0] = v.Ordinal
 		if v.Name != "" {
 			for j := range prefixes {
 				cname := C.CString(prefixes[j] + v.Name)
@@ -2172,7 +2179,7 @@ func (rc *SQLiteRows) Columns() []string {
 	defer rc.s.mu.Unlock()
 	if rc.s.s != nil && int(rc.nc) != len(rc.cols) {
 		rc.cols = make([]string, rc.nc)
-		for i := 0; i < int(rc.nc); i++ {
+		for i := range rc.cols {
 			rc.cols[i] = C.GoString(C.sqlite3_column_name(rc.s.s, C.int(i)))
 		}
 	}
@@ -2182,7 +2189,7 @@ func (rc *SQLiteRows) Columns() []string {
 func (rc *SQLiteRows) declTypes() []string {
 	if rc.s.s != nil && rc.decltype == nil {
 		rc.decltype = make([]string, rc.nc)
-		for i := 0; i < int(rc.nc); i++ {
+		for i := range rc.decltype {
 			rc.decltype[i] = strings.ToLower(C.GoString(C.sqlite3_column_decltype(rc.s.s, C.int(i))))
 		}
 	}
@@ -2244,11 +2251,13 @@ func (rc *SQLiteRows) nextSyncLocked(dest []driver.Value) error {
 
 	rc.declTypes()
 
+	decltype := rc.decltype
+	_ = decltype[len(dest)-1]
 	for i := range dest {
 		switch C.sqlite3_column_type(rc.s.s, C.int(i)) {
 		case C.SQLITE_INTEGER:
 			val := int64(C.sqlite3_column_int64(rc.s.s, C.int(i)))
-			switch rc.decltype[i] {
+			switch decltype[i] {
 			case columnTimestamp, columnDatetime, columnDate:
 				var t time.Time
 				// Assume a millisecond unix timestamp if it's 13 digits -- too
@@ -2288,7 +2297,7 @@ func (rc *SQLiteRows) nextSyncLocked(dest []driver.Value) error {
 			n := int(C.sqlite3_column_bytes(rc.s.s, C.int(i)))
 			s := C.GoStringN((*C.char)(unsafe.Pointer(C.sqlite3_column_text(rc.s.s, C.int(i)))), C.int(n))
 
-			switch rc.decltype[i] {
+			switch decltype[i] {
 			case columnTimestamp, columnDatetime, columnDate:
 				var t time.Time
 				s = strings.TrimSuffix(s, "Z")
