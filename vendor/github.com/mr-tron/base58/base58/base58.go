@@ -11,23 +11,27 @@ var (
 )
 
 // Encode encodes the passed bytes into a base58 encoded string.
+// Deprecated: use github.com/mr-tron/base58.Encode instead.
 func Encode(bin []byte) string {
 	return FastBase58Encoding(bin)
 }
 
 // EncodeAlphabet encodes the passed bytes into a base58 encoded string with the
 // passed alphabet.
+// Deprecated: use github.com/mr-tron/base58.EncodeAlphabet instead.
 func EncodeAlphabet(bin []byte, alphabet *Alphabet) string {
 	return FastBase58EncodingAlphabet(bin, alphabet)
 }
 
 // FastBase58Encoding encodes the passed bytes into a base58 encoded string.
+// Deprecated: use github.com/mr-tron/base58.FastBase58Encoding instead.
 func FastBase58Encoding(bin []byte) string {
 	return FastBase58EncodingAlphabet(bin, BTCAlphabet)
 }
 
 // FastBase58EncodingAlphabet encodes the passed bytes into a base58 encoded
 // string with the passed alphabet.
+// Deprecated: use github.com/mr-tron/base58.FastBase58EncodingAlphabet instead.
 func FastBase58EncodingAlphabet(bin []byte, alphabet *Alphabet) string {
 	zero := alphabet.encode[0]
 
@@ -80,12 +84,14 @@ func FastBase58EncodingAlphabet(bin []byte, alphabet *Alphabet) string {
 
 // TrivialBase58Encoding encodes the passed bytes into a base58 encoded string
 // (inefficiently).
+// Deprecated: use github.com/mr-tron/base58.FastBase58Encoding instead.
 func TrivialBase58Encoding(a []byte) string {
 	return TrivialBase58EncodingAlphabet(a, BTCAlphabet)
 }
 
 // TrivialBase58EncodingAlphabet encodes the passed bytes into a base58 encoded
 // string (inefficiently) with the passed alphabet.
+// Deprecated: use github.com/mr-tron/base58.FastBase58EncodingAlphabet instead.
 func TrivialBase58EncodingAlphabet(a []byte, alphabet *Alphabet) string {
 	zero := alphabet.encode[0]
 	idx := len(a)*138/100 + 1
@@ -108,22 +114,26 @@ func TrivialBase58EncodingAlphabet(a []byte, alphabet *Alphabet) string {
 }
 
 // Decode decodes the base58 encoded bytes.
+// Deprecated: use github.com/mr-tron/base58.Decode instead.
 func Decode(str string) ([]byte, error) {
 	return FastBase58Decoding(str)
 }
 
 // DecodeAlphabet decodes the base58 encoded bytes using the given b58 alphabet.
+// Deprecated: use github.com/mr-tron/base58.DecodeAlphabet instead.
 func DecodeAlphabet(str string, alphabet *Alphabet) ([]byte, error) {
 	return FastBase58DecodingAlphabet(str, alphabet)
 }
 
 // FastBase58Decoding decodes the base58 encoded bytes.
+// Deprecated: use github.com/mr-tron/base58.Decode instead.
 func FastBase58Decoding(str string) ([]byte, error) {
 	return FastBase58DecodingAlphabet(str, BTCAlphabet)
 }
 
 // FastBase58DecodingAlphabet decodes the base58 encoded bytes using the given
 // b58 alphabet.
+// Deprecated: use github.com/mr-tron/base58.FastBase58DecodingAlphabet instead.
 func FastBase58DecodingAlphabet(str string, alphabet *Alphabet) ([]byte, error) {
 	if len(str) == 0 {
 		return nil, fmt.Errorf("zero length string")
@@ -227,12 +237,14 @@ func FastBase58DecodingAlphabet(str string, alphabet *Alphabet) ([]byte, error) 
 }
 
 // TrivialBase58Decoding decodes the base58 encoded bytes (inefficiently).
+// Deprecated: use github.com/mr-tron/base58.Decode instead.
 func TrivialBase58Decoding(str string) ([]byte, error) {
 	return TrivialBase58DecodingAlphabet(str, BTCAlphabet)
 }
 
 // TrivialBase58DecodingAlphabet decodes the base58 encoded bytes
 // (inefficiently) using the given b58 alphabet.
+// Deprecated: use github.com/mr-tron/base58.FastBase58DecodingAlphabet instead.
 func TrivialBase58DecodingAlphabet(str string, alphabet *Alphabet) ([]byte, error) {
 	zero := alphabet.encode[0]
 

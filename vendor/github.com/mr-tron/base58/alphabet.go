@@ -8,7 +8,8 @@ type Alphabet struct {
 
 // NewAlphabet creates a new alphabet from the passed string.
 //
-// It panics if the passed string is not 58 bytes long or isn't valid ASCII.
+// It panics if the passed string is not 58 bytes long, isn't valid ASCII,
+// or does not contain 58 distinct characters.
 func NewAlphabet(s string) *Alphabet {
 	if len(s) != 58 {
 		panic("base58 alphabets must be 58 bytes long")
@@ -18,9 +19,19 @@ func NewAlphabet(s string) *Alphabet {
 	for i := range ret.decode {
 		ret.decode[i] = -1
 	}
+
+	distinct := 0
 	for i, b := range ret.encode {
+		if ret.decode[b] == -1 {
+			distinct++
+		}
 		ret.decode[b] = int8(i)
 	}
+
+	if distinct != 58 {
+		panic("provided alphabet does not consist of 58 distinct characters")
+	}
+
 	return ret
 }
 

@@ -11,11 +11,11 @@ To decode a base58 string:
 To encode the same data:
 
 	encoded := base58.Encode(buf)
- 
+
 With custom alphabet
 
   customAlphabet := base58.NewAlphabet("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
   encoded := base58.EncodeAlphabet(buf, customAlphabet)
-  
+
 */
 package base58
