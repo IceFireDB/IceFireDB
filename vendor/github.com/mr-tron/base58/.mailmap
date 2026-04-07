@@ -1,0 +1,7 @@
+# This file allows re-mapping author names/emails
+# while maintaining the integrity of the repository
+#
+# Spec: https://www.kernel.org/pub/software/scm/git/docs/git-shortlog.html#_mapping_authors
+#
+
+Peter Rabbitson <ribasushi@leporine.io> <ribasushi@protocol.ai>

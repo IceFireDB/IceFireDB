@@ -1,8 +1,29 @@
 package base58
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math/bits"
 )
+
+const (
+	base58EncodeChunkDigits = 10
+	base58EncodeChunkBase   = uint64(430804206899405824) // 58^10
+)
+
+var base58ChunkPowers = [...]uint64{
+	1,
+	58,
+	3364,
+	195112,
+	11316496,
+	656356768,
+	38068692544,
+	2207984167552,
+	128063081718016,
+	7427658739644928,
+	base58EncodeChunkBase,
+}
 
 // Encode encodes the passed bytes into a base58 encoded string.
 func Encode(bin []byte) string {
@@ -23,49 +44,91 @@ func FastBase58Encoding(bin []byte) string {
 // FastBase58EncodingAlphabet encodes the passed bytes into a base58 encoded
 // string with the passed alphabet.
 func FastBase58EncodingAlphabet(bin []byte, alphabet *Alphabet) string {
-
-	size := len(bin)
+	if len(bin) == 0 {
+		return ""
+	}
 
 	zcount := 0
-	for zcount < size && bin[zcount] == 0 {
+	for zcount < len(bin) && bin[zcount] == 0 {
 		zcount++
 	}
-
-	// It is crucial to make this as short as possible, especially for
-	// the usual case of bitcoin addrs
-	size = zcount +
-		// This is an integer simplification of
-		// ceil(log(256)/log(58))
-		(size-zcount)*555/406 + 1
-
-	out := make([]byte, size)
-
-	var i, high int
-	var carry uint32
-
-	high = size - 1
-	for _, b := range bin {
-		i = size - 1
-		for carry = uint32(b); i > high || carry != 0; i-- {
-			carry = carry + 256*uint32(out[i])
-			out[i] = byte(carry % 58)
-			carry /= 58
+	if zcount == len(bin) {
+		out := make([]byte, zcount)
+		for i := range out {
+			out[i] = alphabet.encode[0]
 		}
-		high = i
+		return string(out)
 	}
 
-	// Determine the additional "zero-gap" in the buffer (aside from zcount)
-	for i = zcount; i < size && out[i] == 0; i++ {
+	payload := bin[zcount:]
+	wordCount := (len(payload) + 7) / 8
+
+	var smallWords [8]uint64
+	var smallScratch [8]uint64
+	words := smallWords[:0]
+	scratch := smallScratch[:0]
+	if wordCount <= len(smallWords) {
+		words = smallWords[:wordCount]
+		scratch = smallScratch[:wordCount]
+	} else {
+		words = make([]uint64, wordCount)
+		scratch = make([]uint64, wordCount)
+	}
+	loadBase256Words(words, payload)
+
+	chunkEstimate := (len(payload)*555/406 + base58EncodeChunkDigits - 1) / base58EncodeChunkDigits
+	var smallChunks [12]uint64
+	chunks := smallChunks[:0]
+	if chunkEstimate <= len(smallChunks) {
+		chunks = smallChunks[:0]
+	} else {
+		chunks = make([]uint64, 0, chunkEstimate)
 	}
 
-	// Now encode the values with actual alphabet in-place
-	val := out[i-zcount:]
-	size = len(val)
-	for i = 0; i < size; i++ {
-		out[i] = alphabet.encode[val[i]]
+	start := 0
+	for {
+		remainder := uint64(0)
+		nextStart := len(words)
+		for i := start; i < len(words); i++ {
+			quotient, rem := bits.Div64(remainder, words[i], base58EncodeChunkBase)
+			scratch[i] = quotient
+			remainder = rem
+			if quotient != 0 && nextStart == len(words) {
+				nextStart = i
+			}
+		}
+		chunks = append(chunks, remainder)
+		if nextStart == len(words) {
+			break
+		}
+		words, scratch = scratch, words
+		start = nextStart
 	}
 
-	return string(out[:size])
+	msDigits := countBase58Digits(chunks[len(chunks)-1])
+	out := make([]byte, zcount+msDigits+(len(chunks)-1)*base58EncodeChunkDigits)
+	for i := 0; i < zcount; i++ {
+		out[i] = alphabet.encode[0]
+	}
+
+	pos := len(out)
+	for i := 0; i < len(chunks)-1; i++ {
+		chunk := chunks[i]
+		for j := 0; j < base58EncodeChunkDigits; j++ {
+			pos--
+			out[pos] = alphabet.encode[chunk%58]
+			chunk /= 58
+		}
+	}
+
+	chunk := chunks[len(chunks)-1]
+	for chunk > 0 {
+		pos--
+		out[pos] = alphabet.encode[chunk%58]
+		chunk /= 58
+	}
+
+	return string(out)
 }
 
 // Decode decodes the base58 encoded bytes.
@@ -98,53 +161,123 @@ func FastBase58DecodingAlphabet(str string, alphabet *Alphabet) ([]byte, error) 
 		zcount++
 	}
 
-	var t, c uint64
-
-	// the 32bit algo stretches the result up to 2 times
-	binu := make([]byte, 2*((b58sz*406/555)+1))
-	outi := make([]uint32, (b58sz+3)/4)
-
-	for _, r := range str {
-		if r > 127 {
-			return nil, fmt.Errorf("high-bit set on invalid digit")
-		}
-		if alphabet.decode[r] == -1 {
-			return nil, fmt.Errorf("invalid base58 digit (%q)", r)
-		}
-
-		c = uint64(alphabet.decode[r])
-
-		for j := len(outi) - 1; j >= 0; j-- {
-			t = uint64(outi[j])*58 + c
-			c = t >> 32
-			outi[j] = uint32(t & 0xffffffff)
-		}
+	if zcount == b58sz {
+		return make([]byte, zcount), nil
 	}
 
-	// initial mask depends on b58sz, on further loops it always starts at 24 bits
-	mask := (uint(b58sz%4) * 8)
-	if mask == 0 {
-		mask = 32
-	}
-	mask -= 8
+	payload := str[zcount:]
+	byteEstimate := (len(payload)*406/555 + 1)
+	wordCap := (byteEstimate + 7) / 8
 
-	outLen := 0
-	for j := 0; j < len(outi); j++ {
-		for mask < 32 { // loop relies on uint overflow
-			binu[outLen] = byte(outi[j] >> mask)
-			mask -= 8
-			outLen++
+	var smallWords [8]uint64
+	words := smallWords[:0]
+	if wordCap > len(smallWords) {
+		words = make([]uint64, 0, wordCap)
+	}
+
+	firstChunkDigits := len(payload) % base58EncodeChunkDigits
+	if firstChunkDigits == 0 {
+		firstChunkDigits = base58EncodeChunkDigits
+	}
+
+	for offset := 0; offset < len(payload); {
+		chunkDigits := base58EncodeChunkDigits
+		if offset == 0 {
+			chunkDigits = firstChunkDigits
 		}
-		mask = 24
-	}
 
-	// find the most significant byte post-decode, if any
-	for msb := zcount; msb < len(binu); msb++ {
-		if binu[msb] > 0 {
-			return binu[msb-zcount : outLen], nil
+		chunk := uint64(0)
+		for i := 0; i < chunkDigits; i++ {
+			ch := payload[offset+i]
+			if ch > 127 {
+				return nil, fmt.Errorf("high-bit set on invalid digit")
+			}
+			val := alphabet.decode[ch]
+			if val == -1 {
+				return nil, fmt.Errorf("invalid base58 digit (%q)", ch)
+			}
+			chunk = chunk*58 + uint64(val)
 		}
+		mulAddBase58WordsLE(&words, base58ChunkPowers[chunkDigits], chunk)
+		offset += chunkDigits
 	}
 
-	// it's all zeroes
-	return binu[:outLen], nil
+	return unpackBase58WordsLE(words, zcount), nil
+}
+
+func loadBase256Words(dst []uint64, src []byte) {
+	first := len(src) % 8
+	if first == 0 {
+		first = 8
+	}
+
+	word := uint64(0)
+	for _, b := range src[:first] {
+		word = (word << 8) | uint64(b)
+	}
+	dst[0] = word
+
+	offset := first
+	for i := 1; offset < len(src); i++ {
+		dst[i] = binary.BigEndian.Uint64(src[offset : offset+8])
+		offset += 8
+	}
+}
+
+func countBase58Digits(v uint64) int {
+	digits := 0
+	for v > 0 {
+		digits++
+		v /= 58
+	}
+	if digits == 0 {
+		return 1
+	}
+	return digits
+}
+
+func mulAddBase58WordsLE(words *[]uint64, mul, add uint64) {
+	if len(*words) == 0 {
+		if add != 0 {
+			*words = append(*words, add)
+		}
+		return
+	}
+
+	carry := add
+	for i := 0; i < len(*words); i++ {
+		hi, lo := bits.Mul64((*words)[i], mul)
+		lo, c := bits.Add64(lo, carry, 0)
+		(*words)[i] = lo
+		carry = hi + c
+	}
+	if carry != 0 {
+		*words = append(*words, carry)
+	}
+}
+
+func unpackBase58WordsLE(words []uint64, zcount int) []byte {
+	high := len(words) - 1
+	for high >= 0 && words[high] == 0 {
+		high--
+	}
+	if high < 0 {
+		return make([]byte, zcount)
+	}
+
+	msBytes := (bits.Len64(words[high]) + 7) / 8
+	out := make([]byte, zcount+msBytes+8*high)
+	pos := zcount
+
+	var tmp [8]byte
+	binary.BigEndian.PutUint64(tmp[:], words[high])
+	copy(out[pos:], tmp[8-msBytes:])
+	pos += msBytes
+
+	for i := high - 1; i >= 0; i-- {
+		binary.BigEndian.PutUint64(out[pos:pos+8], words[i])
+		pos += 8
+	}
+
+	return out
 }

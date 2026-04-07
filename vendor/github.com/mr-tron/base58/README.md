@@ -4,22 +4,23 @@
 
 Fast implementation of base58 encoding in Go. 
 
-Base algorithm is copied from https://github.com/trezor/trezor-crypto/blob/master/base58.c
+Base algorithm is adapted from https://github.com/trezor/trezor-crypto/blob/master/base58.c
 
 ## Benchmark
-Trivial - encoding via big.Int (over libraries use this implemenation)
-Fast - optimized algorythm from trezor
+- Trivial - encoding based on big.Int (most libraries use such an implementation)
+- Fast - optimized algorithm provided by this module
 
 ```
-BenchmarkTrivialBase58Encoding-4          123063              9568 ns/op
-BenchmarkFastBase58Encoding-4             690040              1598 ns/op
+cpu: Apple M4
+BenchmarkTrivialBase58Encoding-10       	  712528	      1539 ns/op
+BenchmarkFastBase58Encoding-10          	 6090552	       193.7 ns/op
 
-BenchmarkTrivialBase58Decoding-4          275216              4301 ns/op
-BenchmarkFastBase58Decoding-4            1812105               658 ns/op
+BenchmarkTrivialBase58Decoding-10       	 1539550	       767.5 ns/op
+BenchmarkFastBase58Decoding-10          	18001034	        64.68 ns/op
 ```
-Encoding - **faster by 6 times**
+Encoding - **faster by 8 times**
 
-Decoding - **faster by 6 times**
+Decoding - **faster by 12 times**
 
 ## Usage example
 
