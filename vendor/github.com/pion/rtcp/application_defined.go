@@ -38,7 +38,7 @@ func (a ApplicationDefined) Marshal() ([]byte, error) {
 	packetSize := a.MarshalSize()
 	header := Header{
 		Type:    TypeApplicationDefined,
-		Length:  uint16((packetSize / 4) - 1),
+		Length:  uint16((packetSize / 4) - 1), //nolint:gosec // G115
 		Padding: paddingSize != 0,
 		Count:   a.SubType,
 	}
@@ -110,7 +110,7 @@ func (a *ApplicationDefined) Unmarshal(rawPacket []byte) error {
 	return nil
 }
 
-// MarshalSize returns the size of the packet once marshaled
+// MarshalSize returns the size of the packet once marshaled.
 func (a *ApplicationDefined) MarshalSize() int {
 	dataLength := len(a.Data)
 	// Calculate the padding size to be added to make the packet length a multiple of 4 bytes.
@@ -118,5 +118,6 @@ func (a *ApplicationDefined) MarshalSize() int {
 	if paddingSize == 4 {
 		paddingSize = 0
 	}
+
 	return 12 + dataLength + paddingSize
 }

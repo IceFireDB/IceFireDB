@@ -118,6 +118,9 @@ const (
 var (
 	// ErrClosed is returned when the provider is closed.
 	ErrClosed = errors.New("provider: closed")
+	// defaultKeystoreKey is the key used to store the keystore in the datastore
+	// if no other keystore is provided by the user.
+	defaultKeystoreKey = datastore.NewKey("keystore")
 	// reprovideHistoryKeyPrefix is the prefix for keys storing the timestamp of
 	// the last reprovide for a given region in the datastore.
 	reprovideHistoryKeyPrefix = "history"
@@ -223,7 +226,8 @@ func New(opts ...Option) (*SweepingProvider, error) {
 		// Setup Keystore if missing
 		mapDs = dssync.MutexWrap(datastore.NewMapDatastore())
 		cleanupFuncs = append(cleanupFuncs, mapDs.Close)
-		cfg.keystore, err = keystore.NewKeystore(mapDs)
+		keysDs := namespace.Wrap(mapDs, defaultKeystoreKey)
+		cfg.keystore, err = keystore.NewKeystore(keysDs)
 		if err != nil {
 			cleanup(cleanupFuncs)
 			return nil, err
