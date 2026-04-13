@@ -14,7 +14,7 @@ require (
 	github.com/ipfs/go-ipfs-api v0.7.0
 	github.com/ipfs/kubo v0.40.1
 	github.com/ledisdb/ledisdb v0.0.0-20200510135210-d35789ec47e6
-	github.com/philippgille/gokv/encoding v0.6.0
+	github.com/philippgille/gokv/encoding v0.7.0
 	github.com/philippgille/gokv/test v0.7.0
 	github.com/philippgille/gokv/util v0.6.0
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726

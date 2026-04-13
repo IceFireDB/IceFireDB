@@ -9,11 +9,11 @@ import (
 type JSONcodec struct{}
 
 // Marshal encodes a Go value to JSON.
-func (c JSONcodec) Marshal(v interface{}) ([]byte, error) {
+func (c JSONcodec) Marshal(v any) ([]byte, error) {
 	return json.Marshal(v)
 }
 
 // Unmarshal decodes a JSON value into a Go value.
-func (c JSONcodec) Unmarshal(data []byte, v interface{}) error {
+func (c JSONcodec) Unmarshal(data []byte, v any) error {
 	return json.Unmarshal(data, v)
 }
