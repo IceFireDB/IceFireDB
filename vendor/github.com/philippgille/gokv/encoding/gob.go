@@ -10,7 +10,7 @@ import (
 type GobCodec struct{}
 
 // Marshal encodes a Go value to gob.
-func (c GobCodec) Marshal(v interface{}) ([]byte, error) {
+func (c GobCodec) Marshal(v any) ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	encoder := gob.NewEncoder(buffer)
 	err := encoder.Encode(v)
@@ -21,7 +21,7 @@ func (c GobCodec) Marshal(v interface{}) ([]byte, error) {
 }
 
 // Unmarshal decodes a gob value into a Go value.
-func (c GobCodec) Unmarshal(data []byte, v interface{}) error {
+func (c GobCodec) Unmarshal(data []byte, v any) error {
 	reader := bytes.NewReader(data)
 	decoder := gob.NewDecoder(reader)
 	return decoder.Decode(v)
