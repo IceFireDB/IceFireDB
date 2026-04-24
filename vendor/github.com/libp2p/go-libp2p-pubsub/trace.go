@@ -25,10 +25,10 @@ type EventTracer interface {
 // Warning: this interface is not fixed, we may be adding new methods as necessitated by the system
 // in the future.
 type RawTracer interface {
-	// AddPeer is invoked when a new peer is added.
-	AddPeer(p peer.ID, proto protocol.ID)
-	// RemovePeer is invoked when a peer is removed.
-	RemovePeer(p peer.ID)
+	// OnNewOutboundStream is invoked when a new outbound stream is opened.
+	OnNewOutboundStream(p peer.ID, proto protocol.ID)
+	// OnClosedOutboundStream is invoked when an outbound stream is closed.
+	OnClosedOutboundStream(p peer.ID)
 	// Join is invoked when a new topic is joined
 	Join(topic string)
 	// Leave is invoked when a topic is abandoned
@@ -193,13 +193,13 @@ func (t *pubsubTracer) DeliverMessage(msg *Message) {
 	t.tracer.Trace(evt)
 }
 
-func (t *pubsubTracer) AddPeer(p peer.ID, proto protocol.ID) {
+func (t *pubsubTracer) OnNewOutboundStream(p peer.ID, proto protocol.ID) {
 	if t == nil {
 		return
 	}
 
 	for _, tr := range t.raw {
-		tr.AddPeer(p, proto)
+		tr.OnNewOutboundStream(p, proto)
 	}
 
 	if t.tracer == nil {
@@ -209,10 +209,10 @@ func (t *pubsubTracer) AddPeer(p peer.ID, proto protocol.ID) {
 	protoStr := string(proto)
 	now := time.Now().UnixNano()
 	evt := &pb.TraceEvent{
-		Type:      pb.TraceEvent_ADD_PEER.Enum(),
+		Type:      pb.TraceEvent_ON_NEW_OUTBOUND_STREAM.Enum(),
 		PeerID:    []byte(t.pid),
 		Timestamp: &now,
-		AddPeer: &pb.TraceEvent_AddPeer{
+		OnNewOutboundStream: &pb.TraceEvent_OnNewOutboundStream{
 			PeerID: []byte(p),
 			Proto:  &protoStr,
 		},
@@ -221,13 +221,13 @@ func (t *pubsubTracer) AddPeer(p peer.ID, proto protocol.ID) {
 	t.tracer.Trace(evt)
 }
 
-func (t *pubsubTracer) RemovePeer(p peer.ID) {
+func (t *pubsubTracer) OnClosedOutboundStream(p peer.ID) {
 	if t == nil {
 		return
 	}
 
 	for _, tr := range t.raw {
-		tr.RemovePeer(p)
+		tr.OnClosedOutboundStream(p)
 	}
 
 	if t.tracer == nil {
@@ -236,10 +236,10 @@ func (t *pubsubTracer) RemovePeer(p peer.ID) {
 
 	now := time.Now().UnixNano()
 	evt := &pb.TraceEvent{
-		Type:      pb.TraceEvent_REMOVE_PEER.Enum(),
+		Type:      pb.TraceEvent_ON_CLOSED_OUTBOUND_STREAM.Enum(),
 		PeerID:    []byte(t.pid),
 		Timestamp: &now,
-		RemovePeer: &pb.TraceEvent_RemovePeer{
+		OnClosedOutboundStream: &pb.TraceEvent_OnClosedOutboundStream{
 			PeerID: []byte(p),
 		},
 	}

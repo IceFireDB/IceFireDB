@@ -960,10 +960,11 @@ github.com/libp2p/go-libp2p-kad-dht/rtrefresh
 github.com/libp2p/go-libp2p-kbucket
 github.com/libp2p/go-libp2p-kbucket/keyspace
 github.com/libp2p/go-libp2p-kbucket/peerdiversity
-# github.com/libp2p/go-libp2p-pubsub v0.15.0
+# github.com/libp2p/go-libp2p-pubsub v0.16.0
 ## explicit; go 1.24
 github.com/libp2p/go-libp2p-pubsub
 github.com/libp2p/go-libp2p-pubsub/internal/gologshim
+github.com/libp2p/go-libp2p-pubsub/partialmessages
 github.com/libp2p/go-libp2p-pubsub/pb
 github.com/libp2p/go-libp2p-pubsub/timecache
 # github.com/libp2p/go-libp2p-pubsub-router v0.6.0

@@ -41,13 +41,16 @@ func (fs *FloodSubRouter) Attach(p *PubSub) {
 	fs.tracer = p.tracer
 }
 
-func (fs *FloodSubRouter) AddPeer(p peer.ID, proto protocol.ID, hello *RPC) *RPC {
-	fs.tracer.AddPeer(p, proto)
+func (fs *FloodSubRouter) OnNewIncomingStream(peer.ID, protocol.ID)    {}
+func (fs *FloodSubRouter) OnClosedIncomingStream(peer.ID, protocol.ID) {}
+
+func (fs *FloodSubRouter) OnNewOutboundStream(p peer.ID, proto protocol.ID, hello *RPC) *RPC {
+	fs.tracer.OnNewOutboundStream(p, proto)
 	return hello
 }
 
-func (fs *FloodSubRouter) RemovePeer(p peer.ID) {
-	fs.tracer.RemovePeer(p)
+func (fs *FloodSubRouter) OnClosedOutboundStream(p peer.ID) {
+	fs.tracer.OnClosedOutboundStream(p)
 }
 
 func (fs *FloodSubRouter) EnoughPeers(topic string, suggested int) bool {

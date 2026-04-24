@@ -598,7 +598,7 @@ func (ps *peerScore) gcDeliveryRecords() {
 }
 
 // tracer interface
-func (ps *peerScore) AddPeer(p peer.ID, proto protocol.ID) {
+func (ps *peerScore) OnNewOutboundStream(p peer.ID, proto protocol.ID) {
 	ps.Lock()
 	defer ps.Unlock()
 
@@ -614,7 +614,7 @@ func (ps *peerScore) AddPeer(p peer.ID, proto protocol.ID) {
 	pstats.ips = ips
 }
 
-func (ps *peerScore) RemovePeer(p peer.ID) {
+func (ps *peerScore) OnClosedOutboundStream(p peer.ID) {
 	ps.Lock()
 	defer ps.Unlock()
 
@@ -709,7 +709,7 @@ func (ps *peerScore) DeliverMessage(msg *Message) {
 	ps.Lock()
 	defer ps.Unlock()
 
-	ps.markFirstMessageDelivery(msg.ReceivedFrom, msg)
+	ps.markFirstMessageDelivery(msg.ReceivedFrom, msg.GetTopic())
 
 	drec := ps.deliveries.getRecord(ps.idGen.ID(msg))
 
@@ -746,7 +746,7 @@ func (ps *peerScore) RejectMessage(msg *Message, reason string) {
 	case RejectUnexpectedAuthInfo:
 		fallthrough
 	case RejectSelfOrigin:
-		ps.markInvalidMessageDelivery(msg.ReceivedFrom, msg)
+		ps.markInvalidMessageDelivery(msg.ReceivedFrom, msg.GetTopic())
 		return
 
 		// we ignore those messages, so do nothing.
@@ -789,9 +789,9 @@ func (ps *peerScore) RejectMessage(msg *Message, reason string) {
 	// mark the message as invalid and penalize peers that have already forwarded it.
 	drec.status = deliveryInvalid
 
-	ps.markInvalidMessageDelivery(msg.ReceivedFrom, msg)
+	ps.markInvalidMessageDelivery(msg.ReceivedFrom, msg.GetTopic())
 	for p := range drec.peers {
-		ps.markInvalidMessageDelivery(p, msg)
+		ps.markInvalidMessageDelivery(p, msg.GetTopic())
 	}
 
 	// release the delivery time tracking map to free some memory early
@@ -823,7 +823,7 @@ func (ps *peerScore) DuplicateMessage(msg *Message) {
 
 	case deliveryInvalid:
 		// we no longer track delivery time
-		ps.markInvalidMessageDelivery(msg.ReceivedFrom, msg)
+		ps.markInvalidMessageDelivery(msg.ReceivedFrom, msg.GetTopic())
 
 	case deliveryThrottled:
 		// the message was throttled; do nothing (we don't know if it was valid)
@@ -904,13 +904,12 @@ func (pstats *peerStats) getTopicStats(topic string, params *PeerScoreParams) (*
 
 // markInvalidMessageDelivery increments the "invalid message deliveries"
 // counter for all scored topics the message is published in.
-func (ps *peerScore) markInvalidMessageDelivery(p peer.ID, msg *Message) {
+func (ps *peerScore) markInvalidMessageDelivery(p peer.ID, topic string) {
 	pstats, ok := ps.peerStats[p]
 	if !ok {
 		return
 	}
 
-	topic := msg.GetTopic()
 	tstats, ok := pstats.getTopicStats(topic, ps.params)
 	if !ok {
 		return
@@ -922,13 +921,12 @@ func (ps *peerScore) markInvalidMessageDelivery(p peer.ID, msg *Message) {
 // markFirstMessageDelivery increments the "first message deliveries" counter
 // for all scored topics the message is published in, as well as the "mesh
 // message deliveries" counter, if the peer is in the mesh for the topic.
-func (ps *peerScore) markFirstMessageDelivery(p peer.ID, msg *Message) {
+func (ps *peerScore) markFirstMessageDelivery(p peer.ID, topic string) {
 	pstats, ok := ps.peerStats[p]
 	if !ok {
 		return
 	}
 
-	topic := msg.GetTopic()
 	tstats, ok := pstats.getTopicStats(topic, ps.params)
 	if !ok {
 		return

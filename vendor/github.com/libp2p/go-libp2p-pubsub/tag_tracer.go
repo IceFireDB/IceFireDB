@@ -49,7 +49,7 @@ type tagTracer struct {
 	idGen    *msgIDGenerator
 	decayer  connmgr.Decayer
 	decaying map[string]connmgr.DecayingTag
-	direct   map[peer.ID]struct{}
+	isDirect func(p peer.ID) bool
 
 	// a map of message ids to the set of peers who delivered the message after the first delivery,
 	// but before the message was finished validating
@@ -71,7 +71,7 @@ func newTagTracer(cmgr connmgr.ConnManager) *tagTracer {
 		decayer:   decayer,
 		decaying:  make(map[string]connmgr.DecayingTag),
 		nearFirst: make(map[string]map[peer.ID]struct{}),
-		direct:    make(map[peer.ID]struct{}),
+		isDirect:  func(p peer.ID) bool { return false },
 		logger:    logger, // Overridden in Start
 	}
 }
@@ -83,18 +83,9 @@ func (t *tagTracer) Start(gs *GossipSubRouter, logger *slog.Logger) {
 	t.logger = logger
 
 	t.idGen = gs.p.idGen
-	t.direct = gs.direct
-}
-
-func (t *tagTracer) tagPeerIfDirect(p peer.ID) {
-	if t.direct == nil {
-		return
-	}
-
-	// tag peer if it is a direct peer
-	_, direct := t.direct[p]
-	if direct {
-		t.cmgr.Protect(p, "pubsub:<direct>")
+	t.isDirect = func(p peer.ID) bool {
+		_, ok := gs.direct[p]
+		return ok
 	}
 }
 
@@ -181,11 +172,21 @@ func (t *tagTracer) nearFirstPeers(msg *Message) []peer.ID {
 	return peers
 }
 
+func (t *tagTracer) protectDirect(p peer.ID) {
+	t.cmgr.Protect(p, "pubsub:<direct>")
+}
+
+func (t *tagTracer) unprotectDirect(p peer.ID) {
+	t.cmgr.Unprotect(p, "pubsub:<direct>")
+}
+
 // -- RawTracer interface methods
 var _ RawTracer = (*tagTracer)(nil)
 
-func (t *tagTracer) AddPeer(p peer.ID, proto protocol.ID) {
-	t.tagPeerIfDirect(p)
+func (t *tagTracer) OnNewOutboundStream(p peer.ID, proto protocol.ID) {
+	if t.isDirect(p) {
+		t.protectDirect(p)
+	}
 }
 
 func (t *tagTracer) Join(topic string) {
@@ -259,7 +260,7 @@ func (t *tagTracer) RejectMessage(msg *Message, reason string) {
 	}
 }
 
-func (t *tagTracer) RemovePeer(peer.ID)                {}
+func (t *tagTracer) OnClosedOutboundStream(peer.ID)    {}
 func (t *tagTracer) ThrottlePeer(p peer.ID)            {}
 func (t *tagTracer) RecvRPC(rpc *RPC)                  {}
 func (t *tagTracer) SendRPC(rpc *RPC, p peer.ID)       {}

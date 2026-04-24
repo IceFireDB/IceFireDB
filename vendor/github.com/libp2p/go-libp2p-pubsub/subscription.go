@@ -14,6 +14,11 @@ type Subscription struct {
 	ctx      context.Context
 	err      error
 	once     sync.Once
+
+	// filter is an optional function to filter messages before delivery.
+	// Messages for which filter returns false are dropped before entering
+	// the subscription channel buffer. Nil means accept all messages.
+	filter func(*Message) bool
 }
 
 // Topic returns the topic string associated with the Subscription

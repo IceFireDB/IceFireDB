@@ -371,7 +371,7 @@ func (pg *peerGater) AcceptFrom(p peer.ID) AcceptStatus {
 var _ RawTracer = (*peerGater)(nil)
 
 // tracer interface
-func (pg *peerGater) AddPeer(p peer.ID, proto protocol.ID) {
+func (pg *peerGater) OnNewOutboundStream(p peer.ID, proto protocol.ID) {
 	pg.Lock()
 	defer pg.Unlock()
 
@@ -379,7 +379,7 @@ func (pg *peerGater) AddPeer(p peer.ID, proto protocol.ID) {
 	st.connected++
 }
 
-func (pg *peerGater) RemovePeer(p peer.ID) {
+func (pg *peerGater) OnClosedOutboundStream(p peer.ID) {
 	pg.Lock()
 	defer pg.Unlock()
 

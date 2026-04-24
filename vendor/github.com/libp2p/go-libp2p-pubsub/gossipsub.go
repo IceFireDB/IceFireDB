@@ -533,7 +533,10 @@ func WithDirectPeers(pis []peer.AddrInfo) Option {
 		gs.direct = direct
 
 		if gs.tagTracer != nil {
-			gs.tagTracer.direct = direct
+			gs.tagTracer.isDirect = func(p peer.ID) bool {
+				_, ok := gs.direct[p]
+				return ok
+			}
 		}
 
 		return nil
@@ -747,9 +750,17 @@ func (gs *GossipSubRouter) manageAddrBook() {
 	}
 }
 
-func (gs *GossipSubRouter) AddPeer(p peer.ID, proto protocol.ID, helloPacket *RPC) *RPC {
+func (gs *GossipSubRouter) OnNewIncomingStream(peer.ID, protocol.ID) {}
+
+func (gs *GossipSubRouter) OnClosedIncomingStream(pid peer.ID, proto protocol.ID) {
+	if gs.feature(GossipSubFeatureExtensions, proto) {
+		gs.extensions.OnClosedIncomingStream(pid, proto)
+	}
+}
+
+func (gs *GossipSubRouter) OnNewOutboundStream(p peer.ID, proto protocol.ID, helloPacket *RPC) *RPC {
 	gs.logger.Debug("PEERUP: Add new peer using protocol", "peer", p, "protocol", proto)
-	gs.tracer.AddPeer(p, proto)
+	gs.tracer.OnNewOutboundStream(p, proto)
 	gs.peers[p] = proto
 
 	// track the connection direction
@@ -775,16 +786,16 @@ loop:
 	}
 	gs.outbound[p] = outbound
 	if gs.feature(GossipSubFeatureExtensions, proto) {
-		helloPacket = gs.extensions.AddPeer(p, helloPacket)
+		helloPacket = gs.extensions.OnNewOutboundStream(p, helloPacket)
 	}
 	return helloPacket
 }
 
-func (gs *GossipSubRouter) RemovePeer(p peer.ID) {
+func (gs *GossipSubRouter) OnClosedOutboundStream(p peer.ID) {
 	gs.logger.Debug("PEERDOWN: Remove disconnected peer", "peer", p)
-	gs.tracer.RemovePeer(p)
+	gs.tracer.OnClosedOutboundStream(p)
 	if gs.feature(GossipSubFeatureExtensions, gs.peers[p]) {
-		gs.extensions.RemovePeer(p)
+		gs.extensions.OnClosedOutboundStream(p)
 	}
 	delete(gs.peers, p)
 	for _, peers := range gs.mesh {
@@ -827,6 +838,20 @@ func (gs *GossipSubRouter) EnoughPeers(topic string, suggested int) bool {
 	return false
 }
 
+func (gs *GossipSubRouter) AddDirectPeer(pi peer.AddrInfo) {
+	if gs.direct == nil {
+		gs.direct = make(map[peer.ID]struct{})
+	}
+	gs.direct[pi.ID] = struct{}{}
+	gs.p.host.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.PermanentAddrTTL)
+	gs.tagTracer.protectDirect(pi.ID)
+}
+
+func (gs *GossipSubRouter) RemoveDirectPeer(p peer.ID) {
+	delete(gs.direct, p)
+	gs.tagTracer.unprotectDirect(p)
+}
+
 func (gs *GossipSubRouter) AcceptFrom(p peer.ID) AcceptStatus {
 	_, direct := gs.direct[p]
 	if direct {
@@ -864,6 +889,12 @@ func (gs *GossipSubRouter) Preprocess(from peer.ID, msgs []*Message) {
 				// We don't send IDONTWANT to the peer that sent us the messages
 				continue
 			}
+			if gs.iRequestPartial(topic) && gs.peerSupportsSendingPartial(p, topic) {
+				// Don't send IDONTWANT to peers that are using partial messages
+				// for this topic
+				continue
+			}
+
 			// send to only peers that support IDONTWANT
 			if gs.feature(GossipSubFeatureIdontwant, gs.peers[p]) {
 				idontwant := []*pb.ControlIDontWant{{MessageIDs: mids}}
@@ -875,7 +906,10 @@ func (gs *GossipSubRouter) Preprocess(from peer.ID, msgs []*Message) {
 }
 
 func (gs *GossipSubRouter) HandleRPC(rpc *RPC) {
-	gs.extensions.HandleRPC(rpc)
+	err := gs.extensions.HandleRPC(rpc)
+	if err != nil {
+		gs.logger.Warn("error in handling RPC", "from", rpc.from, "err", err)
+	}
 
 	ctl := rpc.GetControl()
 	if ctl == nil {
@@ -1343,20 +1377,7 @@ func (gs *GossipSubRouter) rpcs(msg *Message) iter.Seq2[peer.ID, *RPC] {
 			gmap, ok := gs.mesh[topic]
 			if !ok {
 				// we are not in the mesh for topic, use fanout peers
-				gmap, ok = gs.fanout[topic]
-				if !ok || len(gmap) == 0 {
-					// we don't have any, pick some with score above the publish threshold
-					peers := gs.getPeers(topic, gs.params.D, func(p peer.ID) bool {
-						_, direct := gs.direct[p]
-						return !direct && gs.score.Score(p) >= gs.publishThreshold
-					})
-
-					if len(peers) > 0 {
-						gmap = peerListToMap(peers)
-						gs.fanout[topic] = gmap
-					}
-				}
-				gs.lastpub[topic] = time.Now().UnixNano()
+				gmap = gs.getFanoutPeersForPublishing(topic)
 			}
 
 			csum := computeChecksum(gs.p.idGen.ID(msg))
@@ -1375,12 +1396,36 @@ func (gs *GossipSubRouter) rpcs(msg *Message) iter.Seq2[peer.ID, *RPC] {
 			if pid == from || pid == peer.ID(msg.GetFrom()) {
 				continue
 			}
+			if gs.iSupportSendingPartial(topic) && gs.peerRequestsPartial(pid, topic) {
+				// The peer requested partial messages. We'll skip sending them full messages
+				continue
+			}
 
 			if !yield(pid, out) {
 				return
 			}
 		}
 	}
+}
+
+func (gs *GossipSubRouter) peerSupportsSendingPartial(p peer.ID, topic string) bool {
+	peerStates, ok := gs.p.topics[topic]
+	return ok && gs.extensions.myExtensions.PartialMessages && peerStates[p].supportsPartial
+}
+
+func (gs *GossipSubRouter) peerRequestsPartial(p peer.ID, topic string) bool {
+	peerStates, ok := gs.p.topics[topic]
+	return ok && gs.extensions.myExtensions.PartialMessages && peerStates[p].requestsPartial
+}
+
+func (gs *GossipSubRouter) iSupportSendingPartial(topic string) bool {
+	myTopicState := gs.p.myTopics[topic]
+	return myTopicState != nil && myTopicState.supportsPartialMessages
+}
+
+func (gs *GossipSubRouter) iRequestPartial(topic string) bool {
+	myTopicState := gs.p.myTopics[topic]
+	return myTopicState != nil && myTopicState.requestPartialMessages
 }
 
 func (gs *GossipSubRouter) Join(topic string) {
@@ -1833,6 +1878,8 @@ func (gs *GossipSubRouter) heartbeat() {
 
 	// advance the message history window
 	gs.mcache.Shift()
+
+	gs.extensions.Heartbeat()
 }
 
 func (gs *GossipSubRouter) clearIHaveCounters() {
@@ -1978,6 +2025,7 @@ func (gs *GossipSubRouter) emitGossip(topic string, exclude map[peer.ID]struct{}
 	for p := range gs.p.topics[topic] {
 		_, inExclude := exclude[p]
 		_, direct := gs.direct[p]
+
 		if !inExclude && !direct && gs.feature(GossipSubFeatureMesh, gs.peers[p]) && gs.score.Score(p) >= gs.gossipThreshold {
 			peers = append(peers, p)
 		}
@@ -1996,6 +2044,9 @@ func (gs *GossipSubRouter) emitGossip(topic string, exclude map[peer.ID]struct{}
 	}
 	peers = peers[:target]
 
+	// avoid a reallocation to collect peers that requested partial messages.
+	partialMessagePeers := peers[:0]
+
 	// Emit the IHAVE gossip to the selected peers.
 	for _, p := range peers {
 		peerMids := mids
@@ -2007,7 +2058,18 @@ func (gs *GossipSubRouter) emitGossip(topic string, exclude map[peer.ID]struct{}
 			shuffleStrings(mids)
 			copy(peerMids, mids)
 		}
+
+		if gs.iSupportSendingPartial(topic) && gs.peerRequestsPartial(p, topic) {
+			partialMessagePeers = append(partialMessagePeers, p)
+			// We should send the peer partial messages for gossip instead
+			continue
+		}
+
 		gs.enqueueGossip(p, &pb.ControlIHave{TopicID: &topic, MessageIDs: peerMids})
+	}
+
+	if len(partialMessagePeers) > 0 {
+		gs.extensions.partialMessagesExtension.EmitGossip(topic, partialMessagePeers)
 	}
 }
 
@@ -2131,6 +2193,24 @@ func (gs *GossipSubRouter) makePrune(p peer.ID, topic string, doPX bool, isUnsub
 	}
 
 	return &pb.ControlPrune{TopicID: &topic, Peers: px, Backoff: &backoff}
+}
+
+// getFanoutPeersForPublishing returns fanout peers for a topic, initializing them if needed,
+// and updates lastpub to keep the fanout alive.
+func (gs *GossipSubRouter) getFanoutPeersForPublishing(topic string) map[peer.ID]struct{} {
+	peers := gs.fanout[topic]
+	if len(peers) == 0 {
+		peerSlice := gs.getPeers(topic, gs.params.D, func(p peer.ID) bool {
+			_, direct := gs.direct[p]
+			return !direct && gs.score.Score(p) >= gs.publishThreshold
+		})
+		if len(peerSlice) > 0 {
+			peers = peerListToMap(peerSlice)
+			gs.fanout[topic] = peers
+		}
+	}
+	gs.lastpub[topic] = time.Now().UnixNano()
+	return peers
 }
 
 func (gs *GossipSubRouter) getPeers(topic string, count int, filter func(peer.ID) bool) []peer.ID {
