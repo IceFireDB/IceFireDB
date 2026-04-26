@@ -2,6 +2,7 @@ package dagjson
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 
@@ -13,6 +14,12 @@ import (
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 )
+
+// ErrDecodeDepthExceeded is returned when a decoded structure nests deeper
+// than the configured MaxDepth.
+var ErrDecodeDepthExceeded = errors.New("message structure exceeded maximum nesting depth")
+
+const defaultMaxDepth int64 = 1024
 
 // This drifts pretty far from the general unmarshal in the parent package:
 //   - we know JSON never has length hints, so we ignore that field in tokens;
@@ -39,6 +46,20 @@ type DecodeOptions struct {
 	// part of the JSON structure and will error if there is extraneous
 	// non-whitespace data.
 	DontParseBeyondEnd bool
+
+	// MaxDepth sets the maximum nesting depth for decoded structures. If the
+	// decoder encounters a map or list nested beyond this depth, it returns
+	// ErrDecodeDepthExceeded.
+	//
+	// When zero, a default of 1024 is used.
+	MaxDepth int64
+}
+
+func (cfg DecodeOptions) maxDepth() int64 {
+	if cfg.MaxDepth > 0 {
+		return cfg.MaxDepth
+	}
+	return defaultMaxDepth
 }
 
 // Decode deserializes data from the given io.Reader and feeds it into the given datamodel.NodeAssembler.
@@ -98,7 +119,7 @@ func Unmarshal(na datamodel.NodeAssembler, tokSrc shared.TokenSource, options De
 	if done && !st.tk[0].Type.IsValue() && st.tk[0].Type != tok.TNull {
 		return fmt.Errorf("unexpected eof")
 	}
-	return st.unmarshal(na, tokSrc)
+	return st.unmarshal(na, tokSrc, 0)
 }
 
 type unmarshalState struct {
@@ -298,10 +319,13 @@ func (st *unmarshalState) bytesLookahead(na datamodel.NodeAssembler, tokSrc shar
 // starts with the first token already primed.  Necessary to get recursion
 //
 //	to flow right without a peek+unpeek system.
-func (st *unmarshalState) unmarshal(na datamodel.NodeAssembler, tokSrc shared.TokenSource) error {
+func (st *unmarshalState) unmarshal(na datamodel.NodeAssembler, tokSrc shared.TokenSource, depth int64) error {
 	// FUTURE: check for schema.TypedNodeBuilder that's going to parse a Link (they can slurp any token kind they want).
 	switch st.tk[0].Type {
 	case tok.TMapOpen:
+		if depth >= st.options.maxDepth() {
+			return ErrDecodeDepthExceeded
+		}
 		// dag-json has special needs: we pump a few tokens ahead to look for dag-json's "link" pattern.
 		//  We can't actually call BeginMap until we're sure it's not gonna turn out to be a link.
 		if st.options.ParseLinks {
@@ -351,7 +375,7 @@ func (st *unmarshalState) unmarshal(na datamodel.NodeAssembler, tokSrc shared.To
 			if err != nil { // return in error if next token unreadable
 				return err
 			}
-			err = st.unmarshal(mva, tokSrc)
+			err = st.unmarshal(mva, tokSrc, depth+1)
 			if err != nil { // return in error if some part of the recursion errored
 				return err
 			}
@@ -359,6 +383,9 @@ func (st *unmarshalState) unmarshal(na datamodel.NodeAssembler, tokSrc shared.To
 	case tok.TMapClose:
 		return fmt.Errorf("unexpected mapClose token")
 	case tok.TArrOpen:
+		if depth >= st.options.maxDepth() {
+			return ErrDecodeDepthExceeded
+		}
 		la, err := na.BeginList(-1)
 		if err != nil {
 			return err
@@ -372,7 +399,7 @@ func (st *unmarshalState) unmarshal(na datamodel.NodeAssembler, tokSrc shared.To
 			case tok.TArrClose:
 				return la.Finish()
 			default:
-				err := st.unmarshal(la.AssembleValue(), tokSrc)
+				err := st.unmarshal(la.AssembleValue(), tokSrc, depth+1)
 				if err != nil { // return in error if some part of the recursion errored
 					return err
 				}

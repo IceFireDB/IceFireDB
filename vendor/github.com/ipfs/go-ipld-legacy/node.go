@@ -80,7 +80,7 @@ func (ln *LegacyNode) focusToLinkEdge(p ipld.Path) (ipld.Node, []ipld.PathSegmen
 
 // Resolve resolves a path through this node, stopping at any link boundary
 // and returning the object found as well as the remaining path to traverse
-func (ln *LegacyNode) Resolve(path []string) (interface{}, []string, error) {
+func (ln *LegacyNode) Resolve(path []string) (any, []string, error) {
 	segments := make([]ipld.PathSegment, 0, len(path))
 	for _, pathSegment := range path {
 		segments = append(segments, ipld.ParsePathSegment(pathSegment))
@@ -106,7 +106,7 @@ func (ln *LegacyNode) Resolve(path []string) (interface{}, []string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	var out interface{}
+	var out any
 	err = json.Unmarshal(buf.Bytes(), &out)
 	if err != nil {
 		return nil, nil, err
