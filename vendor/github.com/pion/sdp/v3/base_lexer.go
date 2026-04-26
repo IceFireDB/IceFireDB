@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package sdp
@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 )
 
@@ -168,6 +169,19 @@ func (l *baseLexer) readField() (string, error) {
 	return l.value[start:stop], nil
 }
 
+func (l *lexer) readRequiredField() (string, error) {
+	field, err := l.readField()
+	if err != nil {
+		return "", err
+	}
+
+	if field == "" {
+		return "", errFieldMissing
+	}
+
+	return field, nil
+}
+
 // Returns symbols until line end.
 func (l *baseLexer) readLine() (string, error) {
 	start := l.pos
@@ -215,11 +229,5 @@ func isNewline(ch byte) bool { return ch == '\n' || ch == '\r' }
 func isWhitespace(ch byte) bool { return ch == ' ' || ch == '\t' }
 
 func anyOf(element string, data ...string) bool {
-	for _, v := range data {
-		if element == v {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(data, element)
 }
