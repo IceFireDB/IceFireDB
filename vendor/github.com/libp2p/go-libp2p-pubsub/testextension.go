@@ -10,7 +10,7 @@ type testExtension struct {
 	onReceiveTestExtension func(peer.ID)
 }
 
-func (e *testExtension) AddPeer(id peer.ID) {
+func (e *testExtension) OnNewOutboundStream(id peer.ID) {
 	e.sendRPC(id, &RPC{
 		RPC: pubsub_pb.RPC{
 			TestExtension: &pubsub_pb.TestExtension{},

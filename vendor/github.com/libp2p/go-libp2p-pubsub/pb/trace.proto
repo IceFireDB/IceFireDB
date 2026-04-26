@@ -11,8 +11,8 @@ message TraceEvent {
   optional RejectMessage rejectMessage = 5;
   optional DuplicateMessage duplicateMessage = 6;
   optional DeliverMessage deliverMessage = 7;
-  optional AddPeer addPeer = 8;
-  optional RemovePeer removePeer = 9;
+  optional OnNewOutboundStream onNewOutboundStream = 8;
+  optional OnClosedOutboundStream onClosedOutboundStream = 9;
   optional RecvRPC recvRPC = 10;
   optional SendRPC sendRPC = 11;
   optional DropRPC dropRPC = 12;
@@ -26,8 +26,8 @@ message TraceEvent {
     REJECT_MESSAGE  = 1;
     DUPLICATE_MESSAGE = 2;
     DELIVER_MESSAGE = 3;
-    ADD_PEER = 4;
-    REMOVE_PEER = 5;
+    ON_NEW_OUTBOUND_STREAM = 4;
+    ON_CLOSED_OUTBOUND_STREAM = 5;
     RECV_RPC = 6;
     SEND_RPC = 7;
     DROP_RPC = 8;
@@ -61,12 +61,12 @@ message TraceEvent {
     optional bytes receivedFrom = 3;
   }
 
-  message AddPeer {
+  message OnNewOutboundStream {
     optional bytes peerID = 1;
     optional string proto = 2;
   }
 
-  message RemovePeer {
+  message OnClosedOutboundStream {
     optional bytes peerID = 1;
   }
 

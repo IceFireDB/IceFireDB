@@ -44,6 +44,17 @@ var (
 
 type ProtocolMatchFn = func(protocol.ID) func(protocol.ID) bool
 
+type peerTopicState struct {
+	requestsPartial bool
+	supportsPartial bool
+}
+
+type peerOutgoingStream struct {
+	network.Stream
+	FirstMessage chan *RPC
+	Cancel       context.CancelFunc
+}
+
 // PubSub is the implementation of the pubsub system.
 type PubSub struct {
 	// atomic counter for seqnos
@@ -77,7 +88,7 @@ type PubSub struct {
 	peerOutboundQueueSize int
 
 	// incoming messages from other peers
-	incoming chan *RPC
+	incoming chan incomingUnion
 
 	// addSub is a control channel for us to add and remove subscriptions
 	addSub chan *addSubReq
@@ -110,7 +121,7 @@ type PubSub struct {
 	newPeersPend   map[peer.ID]struct{}
 
 	// a notification channel for new outoging peer streams
-	newPeerStream chan network.Stream
+	newPeerStream chan peerOutgoingStream
 
 	// a notification channel for errors opening new peer streams
 	newPeerError chan peer.ID
@@ -133,7 +144,7 @@ type PubSub struct {
 	myTopics map[string]*Topic
 
 	// topics tracks which topics each of our peers are subscribed to
-	topics map[string]map[peer.ID]struct{}
+	topics map[string]map[peer.ID]peerTopicState
 
 	// sendMsg handles messages that have been validated
 	sendMsg chan *Message
@@ -157,7 +168,7 @@ type PubSub struct {
 	peers map[peer.ID]*rpcQueue
 
 	inboundStreamsMx sync.Mutex
-	inboundStreams   map[peer.ID]network.Stream
+	inboundStreams   map[peer.ID]inboundHandler
 
 	seenMessages    timecache.TimeCache
 	seenMsgTTL      time.Duration
@@ -196,13 +207,15 @@ type PubSubRouter interface {
 	// Attach is invoked by the PubSub constructor to attach the router to a
 	// freshly initialized PubSub instance.
 	Attach(*PubSub)
-	// AddPeer notifies the router that a new peer has been connected. It
-	// includes a reference to the initial RPC that will be sent to the peer.
+	// OnNewOutboundStream notifies the router that a new outbound stream has been opened.
+	// It includes a reference to the initial RPC that will be sent to the peer.
 	// Routers may add messages to the RPC to try to have them sent in the
 	// initial packet. This is also referred to as the "hello packet."
-	AddPeer(peer.ID, protocol.ID, *RPC) *RPC
-	// RemovePeer notifies the router that a peer has been disconnected.
-	RemovePeer(peer.ID)
+	OnNewOutboundStream(peer.ID, protocol.ID, *RPC) *RPC
+	// OnClosedOutboundStream notifies the router that an outbound stream has been closed.
+	OnClosedOutboundStream(peer.ID)
+	OnNewIncomingStream(peer.ID, protocol.ID)
+	OnClosedIncomingStream(peer.ID, protocol.ID)
 	// EnoughPeers returns whether the router needs more peers before it's ready to publish new records.
 	// Suggested (if greater than 0) is a suggested number of peers that the router should need.
 	EnoughPeers(topic string, suggested int) bool
@@ -255,11 +268,69 @@ func (m *Message) GetFrom() peer.ID {
 	return peer.ID(m.Message.GetFrom())
 }
 
+// inboundHandler tracks an active inbound stream handler. The done channel is
+// closed when the handler exits, allowing successive handlers for the same peer
+// to serialize their newStream/closedStream notifications.
+type inboundHandler struct {
+	s    network.Stream
+	done chan struct{}
+}
+
+type incomingKind uint8
+
+const (
+	incomingKindRPC = iota
+	incomingKindNewStream
+	incomingKindClosedStream
+)
+
+// incomingUnion wraps the different messages the incoming stream handler can
+// send. We want these kinds of messages to be serialized.
+type incomingUnion struct {
+	rpc *RPC // only set when kind == RPC
+	// s is only set when kind == NewStream or kind == ClosedStream
+	s    network.Stream
+	kind incomingKind
+}
+
 type RPC struct {
 	pb.RPC
 
 	// unexported on purpose, not sending this over the wire
 	from peer.ID
+}
+
+func (rpc *RPC) From() peer.ID {
+	return rpc.from
+}
+
+// LogValue implements slog.LogValuer.
+func (rpc *RPC) LogValue() slog.Value {
+	// Messages
+	msgs := make([]any, 0, len(rpc.Publish))
+	for _, msg := range rpc.Publish {
+		msgs = append(msgs, slog.Group(
+			"message",
+			slog.String("topic", msg.GetTopic()),
+			slog.Any("dataPrefix", msg.Data[0:min(len(msg.Data), 32)]),
+			slog.Any("dataLen", len(msg.Data)),
+		))
+	}
+
+	fields := make([]slog.Attr, 0, len(msgs)+3)
+	if len(msgs) > 0 {
+		fields = append(fields, slog.Group("publish", msgs...))
+	}
+	if rpc.Control != nil {
+		fields = append(fields, slog.Any("control", rpc.Control))
+	}
+	if rpc.Subscriptions != nil {
+		fields = append(fields, slog.Any("subscriptions", rpc.Subscriptions))
+	}
+	if rpc.Partial != nil {
+		fields = append(fields, slog.Any("Partial", rpc.Partial))
+	}
+	return slog.GroupValue(fields...)
 }
 
 // split splits the given RPC If a sub RPC is too large and can't be split
@@ -477,10 +548,10 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 		signID:                h.ID(),
 		signKey:               nil,
 		signPolicy:            StrictSign,
-		incoming:              make(chan *RPC, 32),
+		incoming:              make(chan incomingUnion, 32),
 		newPeers:              make(chan struct{}, 1),
 		newPeersPend:          make(map[peer.ID]struct{}),
-		newPeerStream:         make(chan network.Stream),
+		newPeerStream:         make(chan peerOutgoingStream),
 		newPeerError:          make(chan peer.ID),
 		peerDead:              make(chan struct{}, 1),
 		peerDeadPend:          make(map[peer.ID]struct{}),
@@ -501,9 +572,9 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 		myTopics:              make(map[string]*Topic),
 		mySubs:                make(map[string]map[*Subscription]struct{}),
 		myRelays:              make(map[string]int),
-		topics:                make(map[string]map[peer.ID]struct{}),
+		topics:                make(map[string]map[peer.ID]peerTopicState),
 		peers:                 make(map[peer.ID]*rpcQueue),
-		inboundStreams:        make(map[peer.ID]network.Stream),
+		inboundStreams:        make(map[peer.ID]inboundHandler),
 		blacklist:             NewMapBlacklist(),
 		blacklistPeer:         make(chan peer.ID),
 		seenMsgTTL:            TimeCacheDuration,
@@ -815,6 +886,7 @@ func (p *PubSub) processLoop(ctx context.Context) {
 			q, ok := p.peers[pid]
 			if !ok {
 				p.logger.Warn("new stream for unknown peer", "peer", pid)
+				s.Cancel()
 				s.Reset()
 				continue
 			}
@@ -823,13 +895,14 @@ func (p *PubSub) processLoop(ctx context.Context) {
 				p.logger.Warn("closing stream for blacklisted peer", "peer", pid)
 				q.Close()
 				delete(p.peers, pid)
+				s.Cancel()
 				s.Reset()
 				continue
 			}
 
 			helloPacket := p.getHelloPacket()
-			helloPacket = p.rt.AddPeer(pid, s.Protocol(), helloPacket)
-			q.Push(helloPacket, true)
+			helloPacket = p.rt.OnNewOutboundStream(pid, s.Protocol(), helloPacket)
+			s.FirstMessage <- helloPacket
 
 		case pid := <-p.newPeerError:
 			delete(p.peers, pid)
@@ -872,9 +945,17 @@ func (p *PubSub) processLoop(ctx context.Context) {
 				peers = append(peers, p)
 			}
 			preq.resp <- peers
-		case rpc := <-p.incoming:
-			p.handleIncomingRPC(rpc)
-
+		case in := <-p.incoming:
+			switch in.kind {
+			case incomingKindRPC:
+				p.handleIncomingRPC(in.rpc)
+			case incomingKindNewStream:
+				p.rt.OnNewIncomingStream(
+					in.s.Conn().RemotePeer(), in.s.Protocol())
+			case incomingKindClosedStream:
+				p.onClosedIncomingStream(
+					in.s.Conn().RemotePeer(), in.s.Protocol())
+			}
 		case msg := <-p.sendMsg:
 			p.publishMessage(msg)
 
@@ -898,13 +979,8 @@ func (p *PubSub) processLoop(ctx context.Context) {
 			if ok {
 				q.Close()
 				delete(p.peers, pid)
-				for t, tmap := range p.topics {
-					if _, ok := tmap[pid]; ok {
-						delete(tmap, pid)
-						p.notifyLeave(t, pid)
-					}
-				}
-				p.rt.RemovePeer(pid)
+				p.clearPeerFromTopicsState(pid)
+				p.rt.OnClosedOutboundStream(pid)
 			}
 
 		case <-ctx.Done():
@@ -949,6 +1025,22 @@ func (p *PubSub) handlePendingPeers() {
 	}
 }
 
+func (p *PubSub) onClosedIncomingStream(pid peer.ID, proto protocol.ID) {
+	// This topic state is made when a peer sends us messages. If they close the
+	// incoming stream, we must clear their state or risk leaking memory.
+	p.clearPeerFromTopicsState(pid)
+	p.rt.OnClosedIncomingStream(pid, proto)
+}
+
+func (p *PubSub) clearPeerFromTopicsState(pid peer.ID) {
+	for t, tmap := range p.topics {
+		if _, ok := tmap[pid]; ok {
+			delete(tmap, pid)
+			p.notifyLeave(t, pid)
+		}
+	}
+}
+
 func (p *PubSub) handleDeadPeers() {
 	p.peerDeadPrioLk.Lock()
 
@@ -970,14 +1062,8 @@ func (p *PubSub) handleDeadPeers() {
 		q.Close()
 		delete(p.peers, pid)
 
-		for t, tmap := range p.topics {
-			if _, ok := tmap[pid]; ok {
-				delete(tmap, pid)
-				p.notifyLeave(t, pid)
-			}
-		}
-
-		p.rt.RemovePeer(pid)
+		p.clearPeerFromTopicsState(pid)
+		p.rt.OnClosedOutboundStream(pid)
 
 		if p.host.Network().Connectedness(pid) == network.Connected {
 			backoffDelay, err := p.deadPeerBackoff.updateAndGet(pid)
@@ -1054,8 +1140,12 @@ func (p *PubSub) handleRemoveSubscription(sub *Subscription) {
 		// stop announcing only if there are no more subs and relays
 		if p.myRelays[sub.topic] == 0 {
 			p.disc.StopAdvertise(sub.topic)
-			p.announce(sub.topic, false)
-			p.rt.Leave(sub.topic)
+			// skip mesh unsubscription for fanout-only topics since we never joined
+			topic := p.myTopics[sub.topic]
+			if topic == nil || !topic.fanoutOnly {
+				p.announce(sub.topic, false)
+				p.rt.Leave(sub.topic)
+			}
 		}
 	}
 }
@@ -1071,8 +1161,13 @@ func (p *PubSub) handleAddSubscription(req *addSubReq) {
 	// announce we want this topic if neither subs nor relays exist so far
 	if len(subs) == 0 && p.myRelays[sub.topic] == 0 {
 		p.disc.Advertise(sub.topic)
-		p.announce(sub.topic, true)
-		p.rt.Join(sub.topic)
+		// skip mesh subscription for fanout-only topics;
+		// discovery/advertising is still needed to find peers for fanout publishing
+		topic := p.myTopics[sub.topic]
+		if topic == nil || !topic.fanoutOnly {
+			p.announce(sub.topic, true)
+			p.rt.Join(sub.topic)
+		}
 	}
 
 	// make new if not there
@@ -1148,9 +1243,19 @@ func (p *PubSub) handleRemoveRelay(topic string) {
 // announce announces whether or not this node is interested in a given topic
 // Only called from processLoop.
 func (p *PubSub) announce(topic string, sub bool) {
+	var requestPartialMessages bool
+	var supportsPartialMessages bool
+	if sub {
+		if t, ok := p.myTopics[topic]; ok {
+			requestPartialMessages = t.requestPartialMessages
+			supportsPartialMessages = t.supportsPartialMessages
+		}
+	}
 	subopt := &pb.RPC_SubOpts{
-		Topicid:   &topic,
-		Subscribe: &sub,
+		Topicid:                &topic,
+		Subscribe:              &sub,
+		RequestsPartial:        &requestPartialMessages,
+		SupportsSendingPartial: &supportsPartialMessages,
 	}
 
 	out := rpcWithSubs(subopt)
@@ -1192,9 +1297,19 @@ func (p *PubSub) doAnnounceRetry(pid peer.ID, topic string, sub bool) {
 		return
 	}
 
+	var requestPartialMessages bool
+	var supportsPartialMessages bool
+	if sub {
+		if t, ok := p.myTopics[topic]; ok {
+			requestPartialMessages = t.requestPartialMessages
+			supportsPartialMessages = t.supportsPartialMessages
+		}
+	}
 	subopt := &pb.RPC_SubOpts{
-		Topicid:   &topic,
-		Subscribe: &sub,
+		Topicid:                &topic,
+		Subscribe:              &sub,
+		RequestsPartial:        &requestPartialMessages,
+		SupportsSendingPartial: &supportsPartialMessages,
 	}
 
 	out := rpcWithSubs(subopt)
@@ -1214,6 +1329,9 @@ func (p *PubSub) notifySubs(msg *Message) {
 	topic := msg.GetTopic()
 	subs := p.mySubs[topic]
 	for f := range subs {
+		if f.filter != nil && !f.filter(msg) {
+			continue
+		}
 		select {
 		case f.ch <- msg:
 		default:
@@ -1294,12 +1412,19 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 		if subopt.GetSubscribe() {
 			tmap, ok := p.topics[t]
 			if !ok {
-				tmap = make(map[peer.ID]struct{})
+				tmap = make(map[peer.ID]peerTopicState)
 				p.topics[t] = tmap
 			}
 
-			if _, ok = tmap[rpc.from]; !ok {
-				tmap[rpc.from] = struct{}{}
+			pts := peerTopicState{
+				requestsPartial: subopt.GetRequestsPartial(),
+				// If the peer requested partial, they support it by default
+				supportsPartial: subopt.GetRequestsPartial() || subopt.GetSupportsSendingPartial(),
+			}
+			_, seenBefore := tmap[rpc.from]
+			tmap[rpc.from] = pts
+			if !seenBefore {
+				tmap[rpc.from] = pts
 				if topic, ok := p.myTopics[t]; ok {
 					peer := rpc.from
 					topic.sendNotification(PeerEvent{PeerJoin, peer})
@@ -1338,7 +1463,7 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 				continue
 			}
 
-			msg := &Message{pmsg, "", rpc.from, nil, false}
+			msg := &Message{Message: pmsg, ID: "", ReceivedFrom: rpc.from, ValidatorData: nil, Local: false}
 			if p.shouldPush(msg) {
 				toPush = append(toPush, msg)
 			}
@@ -1477,9 +1602,64 @@ type rmTopicReq struct {
 	resp  chan error
 }
 
-type TopicOptions struct{}
+type TopicOptions struct {
+	SkipPublishingToPartialMessageCapablePeers bool
+}
+
+// RequestPartialMessages requests that peers, if they support it, send us
+// partial messages on this topic.
+//
+// If a peer does not support partial messages, this has no effect, and the peer
+// will continue sending us full messages.
+//
+// It is an error to use this option if partial messages are not enabled.
+// This option implies `SupportsPartialMessages`.
+func RequestPartialMessages() TopicOpt {
+	return func(t *Topic) error {
+		gs, ok := t.p.rt.(*GossipSubRouter)
+		if !ok {
+			return errors.New("partial messages only supported by gossipsub")
+		}
+
+		if !gs.extensions.myExtensions.PartialMessages {
+			return errors.New("partial messages are not enabled")
+		}
+		t.requestPartialMessages = true
+		t.supportsPartialMessages = true
+		return nil
+	}
+}
+
+// SupportsPartialMessages signals to other peers that you will send partial
+// message metadata and fulfill their partial message request, but you will not
+// request partial messages.
+func SupportsPartialMessages() TopicOpt {
+	return func(t *Topic) error {
+		gs, ok := t.p.rt.(*GossipSubRouter)
+		if !ok {
+			return errors.New("partial messages only supported by gossipsub")
+		}
+
+		if !gs.extensions.myExtensions.PartialMessages {
+			return errors.New("partial messages are not enabled")
+		}
+		t.supportsPartialMessages = true
+		return nil
+	}
+}
 
 type TopicOpt func(t *Topic) error
+
+// FanoutOnly enforces fanout-only mode for the topic. In this mode, the node can publish
+// messages to the topic but will never subscribe to the p2p mesh, even if Topic.Subscribe
+// is called. Subscribers will only receive locally published messages via Topic.Publish.
+// Calling Topic.Relay on a fanout-only topic will return ErrFanoutOnlyTopic.
+func FanoutOnly() TopicOpt {
+	return func(t *Topic) error {
+		t.fanoutOnly = true
+		return nil
+	}
+}
 
 // WithTopicMessageIdFn sets custom MsgIdFunction for a Topic, enabling topics to have own msg id generation rules.
 func WithTopicMessageIdFn(msgId MsgIdFunction) TopicOpt {
@@ -1576,6 +1756,18 @@ func WithBufferSize(size int) SubOpt {
 	}
 }
 
+// WithMessageFilter sets a filter function for the subscription.
+// Messages for which the filter function returns false are dropped
+// before entering the subscription's channel buffer.
+// This filtering happens in notifySubs, so filtered messages never
+// consume buffer capacity.
+func WithMessageFilter(filter func(*Message) bool) SubOpt {
+	return func(sub *Subscription) error {
+		sub.filter = filter
+		return nil
+	}
+}
+
 type topicReq struct {
 	resp chan []string
 }
@@ -1602,6 +1794,37 @@ func (p *PubSub) Publish(topic string, data []byte, opts ...PubOpt) error {
 	}
 
 	return t.Publish(context.TODO(), data, opts...)
+}
+
+type PeerFeedbackKind int
+
+const (
+	PeerFeedbackUsefulMessage PeerFeedbackKind = iota
+	PeerFeedbackInvalidMessage
+)
+
+// PeerFeedback lets applications inform GossipSub's peer scorer about the
+// performance of a peer's message. This is useful if the application is using
+// partial messages, because the application handles merging parts.
+func (p *PubSub) PeerFeedback(topic string, peer peer.ID, kind PeerFeedbackKind) error {
+	gs, ok := p.rt.(*GossipSubRouter)
+	if !ok {
+		return errors.New("peer feedback is only supported by GossipSub")
+	}
+	p.eval <- func() {
+		if gs.score == nil {
+			return
+		}
+		gs.score.Lock()
+		defer gs.score.Unlock()
+		switch kind {
+		case PeerFeedbackUsefulMessage:
+			gs.score.markFirstMessageDelivery(peer, topic)
+		case PeerFeedbackInvalidMessage:
+			gs.score.markInvalidMessageDelivery(peer, topic)
+		}
+	}
+	return nil
 }
 
 // PublishBatch publishes a batch of messages. This only works for routers that
@@ -1716,4 +1939,45 @@ type RelayCancelFunc func()
 type addRelayReq struct {
 	topic string
 	resp  chan RelayCancelFunc
+}
+
+func (p *PubSub) syncEval(f func()) error {
+	done := make(chan struct{})
+	syncFn := func() {
+		defer close(done)
+		f()
+	}
+	select {
+	case p.eval <- syncFn:
+		select {
+		case <-done:
+		case <-p.ctx.Done():
+			return p.ctx.Err()
+		}
+	case <-p.ctx.Done():
+		return p.ctx.Err()
+	}
+	return nil
+}
+
+// AddDirectPeer tags the peer as a direct peer at the internal router
+func (p *PubSub) AddDirectPeer(pInfo peer.AddrInfo) error {
+	gs, ok := p.rt.(*GossipSubRouter)
+	if !ok {
+		return errors.New("add direct peer only supported by gossipsub")
+	}
+	return p.syncEval(func() {
+		gs.AddDirectPeer(pInfo)
+	})
+}
+
+// RemoveDirectPeer un-tags the peer from being direct peer at the internal router
+func (p *PubSub) RemoveDirectPeer(pid peer.ID) error {
+	gs, ok := p.rt.(*GossipSubRouter)
+	if !ok {
+		return errors.New("remove direct peer only supported by gossipsub")
+	}
+	return p.syncEval(func() {
+		gs.RemoveDirectPeer(pid)
+	})
 }

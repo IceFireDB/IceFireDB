@@ -167,17 +167,17 @@ func (gt *gossipTracer) ValidateMessage(msg *Message) {
 	gt.fulfillPromise(msg)
 }
 
-func (gt *gossipTracer) AddPeer(p peer.ID, proto protocol.ID) {}
-func (gt *gossipTracer) RemovePeer(p peer.ID)                 {}
-func (gt *gossipTracer) Join(topic string)                    {}
-func (gt *gossipTracer) Leave(topic string)                   {}
-func (gt *gossipTracer) Graft(p peer.ID, topic string)        {}
-func (gt *gossipTracer) Prune(p peer.ID, topic string)        {}
-func (gt *gossipTracer) DuplicateMessage(msg *Message)        {}
-func (gt *gossipTracer) RecvRPC(rpc *RPC)                     {}
-func (gt *gossipTracer) SendRPC(rpc *RPC, p peer.ID)          {}
-func (gt *gossipTracer) DropRPC(rpc *RPC, p peer.ID)          {}
-func (gt *gossipTracer) UndeliverableMessage(msg *Message)    {}
+func (gt *gossipTracer) OnNewOutboundStream(p peer.ID, proto protocol.ID) {}
+func (gt *gossipTracer) OnClosedOutboundStream(p peer.ID)                 {}
+func (gt *gossipTracer) Join(topic string)                                {}
+func (gt *gossipTracer) Leave(topic string)                               {}
+func (gt *gossipTracer) Graft(p peer.ID, topic string)                    {}
+func (gt *gossipTracer) Prune(p peer.ID, topic string)                    {}
+func (gt *gossipTracer) DuplicateMessage(msg *Message)                    {}
+func (gt *gossipTracer) RecvRPC(rpc *RPC)                                 {}
+func (gt *gossipTracer) SendRPC(rpc *RPC, p peer.ID)                      {}
+func (gt *gossipTracer) DropRPC(rpc *RPC, p peer.ID)                      {}
+func (gt *gossipTracer) UndeliverableMessage(msg *Message)                {}
 
 func (gt *gossipTracer) ThrottlePeer(p peer.ID) {
 	gt.Lock()

@@ -29,3 +29,24 @@ func (m *RPC) LogValue() slog.Value {
 	}
 	return slog.GroupValue(fields...)
 }
+
+var _ slog.LogValuer = (*PartialMessagesExtension)(nil)
+
+func (e *PartialMessagesExtension) LogValue() slog.Value {
+	fields := make([]slog.Attr, 0, 4)
+	fields = append(fields, slog.String("topic", e.GetTopicID()))
+	fields = append(fields, slog.Any("groupID", e.GetGroupID()))
+
+	// Message
+	if e.PartialMessage != nil {
+		fields = append(fields, slog.Group(
+			"message",
+			slog.Any("dataLen", len(e.PartialMessage)),
+		))
+	}
+
+	if e.PartsMetadata != nil {
+		fields = append(fields, slog.Any("partsMetadata", e.PartsMetadata))
+	}
+	return slog.GroupValue(fields...)
+}
