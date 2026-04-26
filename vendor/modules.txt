@@ -1112,8 +1112,8 @@ github.com/philippgille/gokv/encoding
 # github.com/philippgille/gokv/test v0.7.0
 ## explicit; go 1.20
 github.com/philippgille/gokv/test
-# github.com/philippgille/gokv/util v0.6.0
-## explicit; go 1.13
+# github.com/philippgille/gokv/util v0.7.0
+## explicit; go 1.20
 github.com/philippgille/gokv/util
 # github.com/pingcap/check v0.0.0-20211026125417-57bd13f7b5f0
 ## explicit; go 1.13
