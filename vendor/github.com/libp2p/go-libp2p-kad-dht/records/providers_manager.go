@@ -26,18 +26,9 @@ const (
 	// ProvidersKeyPrefix is the prefix/namespace for ALL provider record
 	// keys stored in the data store.
 	ProvidersKeyPrefix = "/providers/"
-
-	// ProviderAddrTTL is the TTL to keep the multi addresses of provider
-	// peers around. Those addresses are returned alongside provider. After
-	// it expires, the returned records will require an extra lookup, to
-	// find the multiaddress associated with the returned peer id.
-	ProviderAddrTTL = amino.DefaultProviderAddrTTL
 )
 
-// ProvideValidity is the default time that a Provider Record should last on DHT
-// This value is also known as Provider Record Expiration Interval.
 var (
-	ProvideValidity        = amino.DefaultProvideValidity
 	defaultCleanupInterval = time.Hour
 	lruCacheSize           = 256
 	batchBufferSize        = 256
@@ -64,6 +55,8 @@ type ProviderManager struct {
 	newprovs chan *addProv
 	getprovs chan *getProv
 
+	providerAddrTTL time.Duration
+	provideValidity time.Duration
 	cleanupInterval time.Duration
 
 	cancel context.CancelFunc
@@ -89,6 +82,26 @@ func (pm *ProviderManager) applyOptions(opts ...Option) error {
 func CleanupInterval(d time.Duration) Option {
 	return func(pm *ProviderManager) error {
 		pm.cleanupInterval = d
+		return nil
+	}
+}
+
+// ProviderAddrTTL is the TTL to keep the multi addresses of provider
+// peers around. Those addresses are returned alongside provider. After
+// it expires, the returned records will require an extra lookup, to
+// find the multiaddress associated with the returned peer id.
+func ProviderAddrTTL(d time.Duration) Option {
+	return func(pm *ProviderManager) error {
+		pm.providerAddrTTL = d
+		return nil
+	}
+}
+
+// ProvideValidity is the default time that a Provider Record should last on DHT
+// This value is also known as Provider Record Expiration Interval.
+func ProvideValidity(d time.Duration) Option {
+	return func(pm *ProviderManager) error {
+		pm.provideValidity = d
 		return nil
 	}
 }
@@ -128,6 +141,8 @@ func NewProviderManager(ctx context.Context, local peer.ID, ps peerstore.Peersto
 		pstore:          ps,
 		dstore:          autobatch.NewAutoBatching(dstore, batchBufferSize),
 		cache:           cache,
+		providerAddrTTL: amino.DefaultProviderAddrTTL,
+		provideValidity: amino.DefaultProvideValidity,
 		cleanupInterval: defaultCleanupInterval,
 	}
 	if err := pm.applyOptions(opts...); err != nil {
@@ -207,7 +222,7 @@ func (pm *ProviderManager) run(ctx context.Context) {
 					// couldn't parse the time
 					log.Error("parsing providers record from disk: ", err)
 					fallthrough
-				case gcTime.Sub(t) > ProvideValidity:
+				case gcTime.Sub(t) > pm.provideValidity:
 					// or expired
 					err = pm.dstore.Delete(ctx, ds.RawKey(res.Key))
 					if err != nil && err != ds.ErrNotFound {
@@ -252,7 +267,7 @@ func (pm *ProviderManager) AddProvider(ctx context.Context, k []byte, provInfo p
 	defer span.End()
 
 	if provInfo.ID != pm.self { // don't add own addrs.
-		pm.pstore.AddAddrs(provInfo.ID, provInfo.Addrs, ProviderAddrTTL)
+		pm.pstore.AddAddrs(provInfo.ID, provInfo.Addrs, pm.providerAddrTTL)
 	}
 	prov := &addProv{
 		ctx: ctx,
@@ -339,10 +354,22 @@ func (pm *ProviderManager) getProvidersForKey(ctx context.Context, k []byte) ([]
 func (pm *ProviderManager) getProviderSetForKey(ctx context.Context, k []byte) (*providerSet, error) {
 	cached, ok := pm.cache.Get(string(k))
 	if ok {
-		return cached.(*providerSet), nil
+		ps := cached.(*providerSet)
+		providers := []peer.ID{}
+		set := map[peer.ID]time.Time{}
+		for k, v := range ps.set {
+			if time.Since(v) > pm.provideValidity {
+				continue
+			}
+			providers = append(providers, k)
+			set[k] = v
+		}
+		ps.providers = providers
+		ps.set = set
+		return ps, nil
 	}
 
-	pset, err := loadProviderSet(ctx, pm.dstore, k)
+	pset, err := loadProviderSet(ctx, pm.dstore, pm.provideValidity, k)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +382,7 @@ func (pm *ProviderManager) getProviderSetForKey(ctx context.Context, k []byte) (
 }
 
 // loads the ProviderSet out of the datastore
-func loadProviderSet(ctx context.Context, dstore ds.Datastore, k []byte) (*providerSet, error) {
+func loadProviderSet(ctx context.Context, dstore ds.Datastore, provideValidity time.Duration, k []byte) (*providerSet, error) {
 	res, err := dstore.Query(ctx, dsq.Query{Prefix: mkProvKey(k)})
 	if err != nil {
 		return nil, err
@@ -381,7 +408,7 @@ func loadProviderSet(ctx context.Context, dstore ds.Datastore, k []byte) (*provi
 			// couldn't parse the time
 			log.Error("parsing providers record from disk: ", err)
 			fallthrough
-		case now.Sub(t) > ProvideValidity:
+		case now.Sub(t) > provideValidity:
 			// or just expired
 			err = dstore.Delete(ctx, ds.RawKey(e.Key))
 			if err != nil && errors.Is(err, ds.ErrNotFound) {
