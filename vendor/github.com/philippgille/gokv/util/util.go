@@ -5,7 +5,7 @@ import (
 )
 
 // CheckKeyAndValue returns an error if k == "" or if v == nil
-func CheckKeyAndValue(k string, v interface{}) error {
+func CheckKeyAndValue(k string, v any) error {
 	if err := CheckKey(k); err != nil {
 		return err
 	}
@@ -21,7 +21,7 @@ func CheckKey(k string) error {
 }
 
 // CheckVal returns an error if v == nil
-func CheckVal(v interface{}) error {
+func CheckVal(v any) error {
 	if v == nil {
 		return errors.New("The passed value is nil, which is not allowed")
 	}

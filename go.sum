@@ -787,8 +787,8 @@ github.com/philippgille/gokv/encoding v0.7.0 h1:2oxepKzzTsi00iLZBCZ7Rmqrallh9zws
 github.com/philippgille/gokv/encoding v0.7.0/go.mod h1:yncOBBUciyniPI8t5ECF8XSCwhONE9Rjf3My5IHs3fA=
 github.com/philippgille/gokv/test v0.7.0 h1:0wBKnKaFZlSeHxLXcmUJqK//IQGUMeu+o8B876KCiOM=
 github.com/philippgille/gokv/test v0.7.0/go.mod h1:TP/VzO/qAoi6njsfKnRpXKno0hRuzD5wsLnHhtUcVkY=
-github.com/philippgille/gokv/util v0.6.0 h1:GrTxVENzKBxs8lB3tnaA88mKOuVPT7atZPplxX+PNmo=
-github.com/philippgille/gokv/util v0.6.0/go.mod h1:ovoDHZ2Svr7YX972SPPJQRXbhHEy3Gb20HRH/Tr9BiQ=
+github.com/philippgille/gokv/util v0.7.0 h1:5avUK/a3aSj/aWjhHv4/FkqgMon2B7k2BqFgLcR+DYg=
+github.com/philippgille/gokv/util v0.7.0/go.mod h1:i9KLHbPxGiHLMhkix/CcDQhpPbCkJy5BkW+RKgwDHMo=
 github.com/pingcap/check v0.0.0-20190102082844-67f458068fc8/go.mod h1:B1+S9LNcuMyLH/4HMTViQOJevkGiik3wW2AN9zb2fNQ=
 github.com/pingcap/check v0.0.0-20211026125417-57bd13f7b5f0 h1:HVl5539r48eA+uDuX/ziBmQCxzT1pGrzWbKuXT46Bq0=
 github.com/pingcap/check v0.0.0-20211026125417-57bd13f7b5f0/go.mod h1:PYMCGwN0JHjoqGr3HrZoD+b8Tgx8bKnArhSq8YVzUMc=
