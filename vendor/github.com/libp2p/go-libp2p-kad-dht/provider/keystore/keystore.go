@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	ds "github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipfs/go-datastore/query"
 	"github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-kad-dht/provider/internal/keyspace"
@@ -101,7 +100,7 @@ func NewKeystore(d ds.Batching, opts ...Option) (Keystore, error) {
 		return nil, err
 	}
 	ks := &keystore{
-		ds:         namespace.Wrap(d, ds.NewKey(cfg.path)),
+		ds:         d,
 		prefixBits: cfg.prefixBits,
 		batchSize:  cfg.batchSize,
 		requests:   make(chan operation),

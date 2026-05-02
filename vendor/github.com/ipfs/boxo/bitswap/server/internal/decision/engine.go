@@ -4,7 +4,6 @@ package decision
 import (
 	"cmp"
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -120,7 +119,69 @@ type ScoreLedger interface {
 	Stop()
 }
 
-// Engine manages sending requested blocks to peers.
+// Engine schedules outbound bitswap traffic. It turns wantlists received
+// from peers into a stream of message envelopes on [Engine.Outbox],
+// deciding which peer to serve next, which blocks to pack into each
+// message, and how to answer when a wanted block is missing.
+//
+// # Request flow
+//
+// [Engine.MessageReceived] parses an incoming wantlist, records it in the
+// per-peer ledger, and pushes one task per wanted CID onto the internal
+// peer-task queue. Task workers loop through nextEnvelope: pop a batch of
+// tasks for a single peer, fetch the blocks from the blockstore, build a
+// BitSwapMessage, and emit it on Outbox. The envelope's Sent callback
+// marks those tasks done once the network layer has taken the message.
+//
+// # Peer selection
+//
+// The peer-task queue picks whose turn is next through a peer comparator.
+// The default is [fairPeerComparator]; see its godoc for the five
+// ordering layers (empty queue loses, starvation override, active-work
+// locality, capped pending, salted-hash tiebreak). An engine built with
+// [WithTaskComparator] supplies a custom comparator instead, and the fair
+// scheduler stays uninstalled.
+//
+// # Task selection within a peer
+//
+// Once the comparator picks a peer, PopTasks pulls tasks from that peer's
+// subqueue until it has packed approximately targetMessageSize bytes. A
+// [TaskComparator] set with [WithTaskComparator] reorders tasks within
+// the subqueue; the default ordering comes from go-peertaskqueue.
+//
+// # Want-have vs want-block
+//
+// For each wanted CID the engine inspects the block. If the block is
+// present and fits under wantHaveReplaceSize bytes (see
+// [WithWantHaveReplaceSize]), the engine answers a want-have with the
+// block itself, saving one round-trip on small blocks. For larger blocks
+// the engine returns HAVE and lets the peer decide whether to upgrade to
+// want-block. A missing block produces DONT_HAVE when the task asked for
+// it ([WithSetSendDontHave]).
+//
+// # Anti-abuse limits
+//
+// [WithMaxQueuedWantlistEntriesPerPeer] caps how many wants one peer can
+// keep queued; newer high-priority wants evict lower-priority ones, so a
+// peer cannot grow the queue without bound. [WithMaxCidSize] rejects CIDs
+// whose encoded length exceeds the limit, defending against pathological
+// varint encodings. [WithMaxOutstandingBytesPerPeer] applies soft
+// per-peer backpressure: once outstanding bytes for a peer cross the
+// limit, the queue stops handing it new tasks until earlier ones drain.
+//
+// # Peer scoring
+//
+// [ScoreLedger] tracks bytes sent and received per peer. The default
+// ledger feeds a reputation score to the libp2p connection manager, which
+// uses it to keep useful peers connected under churn. The score does not
+// influence ordering in the default comparator; only a custom
+// TaskComparator can read it.
+//
+// # Freeze and thaw
+//
+// When a peer cancels a batch of wants, the peer-task queue may freeze
+// that peer's slot briefly. An internal ticker calls ThawRound every
+// 100ms so a frozen slot cannot stall a task worker.
 type Engine struct {
 	// peerRequestQueue is a priority queue of requests received from peers.
 	// Requests are popped from the queue, packaged up, and placed in the
@@ -188,6 +249,10 @@ type Engine struct {
 
 	maxQueuedWantlistEntriesPerPeer uint
 	maxCidSize                      uint
+
+	// scheduler holds per-peer state the fair comparator reads. The engine
+	// installs the fair comparator only when no custom task comparator is set.
+	scheduler *peerScheduler
 }
 
 // TaskInfo represents the details of a request from a peer.
@@ -371,6 +436,7 @@ func NewEngine(
 	}
 
 	e.peerLedger = newPeerLedger(e.maxQueuedWantlistEntriesPerPeer)
+	e.scheduler = newPeerScheduler()
 
 	e.bsm = newBlockstoreManager(bs, e.bstoreWorkerCount, bmetrics.PendingBlocksGauge(ctx), bmetrics.ActiveBlocksGauge(ctx))
 
@@ -387,6 +453,8 @@ func NewEngine(
 		queueTaskComparator := wrapTaskComparator(e.taskComparator)
 		peerTaskQueueOpts = append(peerTaskQueueOpts, peertaskqueue.PeerComparator(peertracker.TaskPriorityPeerComparator(queueTaskComparator)))
 		peerTaskQueueOpts = append(peerTaskQueueOpts, peertaskqueue.TaskComparator(queueTaskComparator))
+	} else {
+		peerTaskQueueOpts = append(peerTaskQueueOpts, peertaskqueue.PeerComparator(fairPeerComparator(e.scheduler)))
 	}
 
 	e.peerRequestQueue = peertaskqueue.New(peerTaskQueueOpts...)
@@ -466,6 +534,7 @@ func (e *Engine) onPeerAdded(p peer.ID) {
 
 func (e *Engine) onPeerRemoved(p peer.ID) {
 	e.peerTagger.UntagPeer(p, e.tagQueued)
+	e.scheduler.forget(p)
 }
 
 // WantlistForPeer returns the list of keys that the given peer has asked for
@@ -598,6 +667,7 @@ func (e *Engine) nextEnvelope(ctx context.Context) (*Envelope, error) {
 		}
 
 		log.Debugw("Bitswap engine -> msg", "local", e.self, "to", p, "blockCount", len(msg.Blocks()), "presenceCount", len(msg.BlockPresences()), "size", msg.Size())
+		e.scheduler.markServed(p)
 		return &Envelope{
 			Peer:    p,
 			Message: msg,
@@ -889,7 +959,12 @@ func (e *Engine) splitWantsCancelsDenials(p peer.ID, m bsmsg.BitSwapMessage) ([]
 			continue
 		}
 		if c.Prefix().MhType == mh.IDENTITY {
-			return nil, nil, nil, errors.New("peer canceled an identity CID")
+			// Ignore identity CIDs rather than killing the connection.
+			// Some implementations naively send these without malicious
+			// intent, and peers don't update fast enough to justify
+			// disconnecting them.
+			log.Debugw("ignoring identity CID in wantlist", "local", e.self, "from", p, "cid", c)
+			continue
 		}
 
 		if et.Cancel {

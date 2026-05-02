@@ -49,6 +49,7 @@ type Config struct {
 	MaxRecordAge           time.Duration
 	EnableProviders        bool
 	EnableValues           bool
+	ProviderManagerOpts    []records.Option
 	ProviderStore          records.ProviderStore
 	QueryPeerFilter        QueryFilterFunc
 	LookupCheckConcurrency int
@@ -128,7 +129,7 @@ var Defaults = func(o *Config) error {
 	o.RoutingTable.AutoRefresh = true
 	o.RoutingTable.PeerFilter = EmptyRTFilter
 
-	o.MaxRecordAge = records.ProvideValidity
+	o.MaxRecordAge = amino.DefaultProvideValidity
 
 	o.BucketSize = amino.DefaultBucketSize
 	o.Concurrency = amino.DefaultConcurrency
