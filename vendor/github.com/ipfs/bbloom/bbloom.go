@@ -1,22 +1,4 @@
-// The MIT License (MIT)
-// Copyright (c) 2014 Andreas Briese, eduToolbox@Bri-C GmbH, Sarstedt
-
-// Permission is hereby granted, free of charge, to any person obtaining a copy of
-// this software and associated documentation files (the "Software"), to deal in
-// the Software without restriction, including without limitation the rights to
-// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software is furnished to do so,
-// subject to the following conditions:
-
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-// FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-// COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-// IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-// CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+// SPDX-License-Identifier: MIT
 
 package bbloom
 
@@ -48,11 +30,28 @@ func calcSizeByWrongPositives(numEntries, wrongs float64) (uint64, uint64) {
 	return uint64(size), uint64(locs)
 }
 
-var ErrUsage = errors.New("usage: New(float64(number_of_entries), float64(number_of_hashlocations)) i.e. New(float64(1000), float64(3)) or New(float64(number_of_entries), float64(ratio_of_false_positives)) i.e. New(float64(1000), float64(0.03))")
-var ErrInvalidParms = errors.New("One of parameters was outside of allowed range")
+var (
+	// ErrUsage is returned by [New] when it is not called with exactly two arguments.
+	ErrUsage = errors.New("usage: New(float64(number_of_entries), float64(number_of_hashlocations)) i.e. New(float64(1000), float64(3)) or New(float64(number_of_entries), float64(ratio_of_false_positives)) i.e. New(float64(1000), float64(0.03))")
 
-// New
-// returns a new bloomfilter
+	// ErrInvalidParms is returned by [New] when a parameter is negative.
+	ErrInvalidParms = errors.New("one of the parameters was outside of allowed range")
+)
+
+// New creates a bloom filter with default SipHash keys. It accepts exactly
+// two float64 arguments:
+//
+//   - If the second parameter is < 1 it is treated as a false-positive rate,
+//     and the filter is sized automatically.
+//     Example: New(float64(1<<16), 0.01) -- 65536 items, 1% FP rate.
+//
+//   - If the second parameter is >= 1 it is treated as the number of hash
+//     locations, and the first parameter is the bitset size.
+//     Example: New(650000.0, 7.0) -- 650000-bit filter, 7 hash locations.
+//
+// The default SipHash keys are publicly known constants. If the filter will
+// hold data controlled by untrusted parties, use [NewWithKeys] instead to
+// prevent hash-flooding attacks.
 func New(params ...float64) (bloomfilter *Bloom, err error) {
 	var entries, locs uint64
 	if len(params) == 2 {
@@ -69,18 +68,51 @@ func New(params ...float64) (bloomfilter *Bloom, err error) {
 	}
 	size, exponent := getSize(uint64(entries))
 	bloomfilter = &Bloom{
-		sizeExp: exponent,
-		size:    size - 1,
-		setLocs: locs,
-		shift:   64 - exponent,
-		bitset:  make([]uint64, size>>6),
+		sizeExp:     exponent,
+		size:        size - 1,
+		setLocs:     locs,
+		shift:       64 - exponent,
+		bitset:      make([]uint64, size>>6),
+		k0:          defaultK0,
+		k1:          defaultK1,
+		hashVersion: 1,
 	}
 	return bloomfilter, nil
 }
 
-// NewWithBoolset
-// takes a []byte slice and number of locs per entry
-// returns the bloomfilter with a bitset populated according to the input []byte
+// NewWithKeys creates a bloom filter with caller-provided SipHash keys.
+//
+// The default keys used by [New] are publicly known constants baked into the
+// source code. An attacker who knows the keys can craft inputs that all hash
+// to the same bit positions, filling the filter faster than normal and raising
+// the false-positive rate. This is a concern when the filter holds data
+// chosen by untrusted parties (e.g. content-addressed blocks fetched from
+// the network).
+//
+// Providing random, secret keys (e.g. generated once per node from
+// crypto/rand) restores SipHash's anti-collision guarantees and makes such
+// attacks infeasible.
+//
+// The params are interpreted the same way as in [New]. Custom keys are
+// preserved across [Bloom.JSONMarshal] / [JSONUnmarshal] round-trips.
+// Note: custom keys are included in plaintext in the [Bloom.JSONMarshal]
+// output, so treat serialized filters accordingly.
+func NewWithKeys(k0, k1 uint64, params ...float64) (*Bloom, error) {
+	bf, err := New(params...)
+	if err != nil {
+		return nil, err
+	}
+	bf.k0 = k0
+	bf.k1 = k1
+	return bf, nil
+}
+
+// NewWithBoolset creates a bloom filter from a pre-existing bitset, typically
+// obtained from a previous [Bloom.JSONMarshal] export or an external source.
+// bs is the serialized bitset (big-endian uint64 words) and locs is the
+// number of hash locations per entry. The filter uses default SipHash keys;
+// use [NewWithBoolsetAndKeys] to restore a filter that was created with
+// custom keys.
 func NewWithBoolset(bs []byte, locs uint64) (bloomfilter *Bloom) {
 	bloomfilter, err := New(float64(len(bs)<<3), float64(locs))
 	if err != nil {
@@ -92,16 +124,34 @@ func NewWithBoolset(bs []byte, locs uint64) (bloomfilter *Bloom) {
 	return bloomfilter
 }
 
+// NewWithBoolsetAndKeys creates a bloom filter from a pre-existing bitset
+// with caller-provided SipHash keys. This is the constructor to use when
+// restoring a filter that was originally created with [NewWithKeys].
+// See [NewWithKeys] for why custom keys matter and [NewWithBoolset] for
+// how the bitset parameter is interpreted.
+func NewWithBoolsetAndKeys(bs []byte, locs, k0, k1 uint64) (bloomfilter *Bloom) {
+	bloomfilter = NewWithBoolset(bs, locs)
+	bloomfilter.k0 = k0
+	bloomfilter.k1 = k1
+	return bloomfilter
+}
+
 // bloomJSONImExport
 // Im/Export structure used by JSONMarshal / JSONUnmarshal
 type bloomJSONImExport struct {
 	FilterSet []byte
 	SetLocs   uint64
+	Version   uint8   `json:"Version,omitempty"`
+	K0        *uint64 `json:"K0,omitempty"`
+	K1        *uint64 `json:"K1,omitempty"`
 }
 
-//
-// Bloom filter
+// Bloom is a bloom filter backed by a power-of-two sized bitset.
+// The Mtx field is exposed so callers can hold the lock across
+// multiple operations when needed.
 type Bloom struct {
+	// Mtx is exposed so callers can hold the lock across multiple
+	// operations (e.g. a Has followed by Add) without racing.
 	Mtx     sync.RWMutex
 	bitset  []uint64
 	sizeExp uint64
@@ -109,7 +159,9 @@ type Bloom struct {
 	setLocs uint64
 	shift   uint64
 
-	content uint64
+	content     uint64
+	k0, k1      uint64 // SipHash keys
+	hashVersion uint8  // 0 = legacy, 1 = l|=1 fix (issue #11)
 }
 
 // ElementsAdded returns the number of elements added to the bloom filter.
@@ -134,8 +186,8 @@ func (bl *Bloom) ElementsAdded() uint64 {
 // https://131002.net/siphash/
 // siphash was implemented for Go by Dmitry Chestnykh https://github.com/dchest/siphash
 
-// Add
-// set the bit(s) for entry; Adds an entry to the Bloom filter
+// Add inserts entry into the bloom filter. Not safe for concurrent use;
+// see [Bloom.AddTS] for a mutex-protected variant.
 func (bl *Bloom) Add(entry []byte) {
 	bl.content++
 	l, h := bl.sipHash(entry)
@@ -144,17 +196,17 @@ func (bl *Bloom) Add(entry []byte) {
 	}
 }
 
-// AddTS
-// Thread safe: Mutex.Lock the bloomfilter for the time of processing the entry
+// AddTS is the thread-safe version of [Bloom.Add]. It acquires a write lock
+// for the duration of the operation.
 func (bl *Bloom) AddTS(entry []byte) {
 	bl.Mtx.Lock()
 	bl.Add(entry)
 	bl.Mtx.Unlock()
 }
 
-// Has
-// check if bit(s) for entry is/are set
-// returns true if the entry was added to the Bloom Filter
+// Has reports whether entry is in the filter. A true result may be a
+// false positive; a false result is always definitive. Not safe for
+// concurrent use; see [Bloom.HasTS].
 func (bl *Bloom) Has(entry []byte) bool {
 	l, h := bl.sipHash(entry)
 	res := true
@@ -170,8 +222,8 @@ func (bl *Bloom) Has(entry []byte) bool {
 	return res
 }
 
-// HasTS
-// Thread safe: Mutex.Lock the bloomfilter for the time of processing the entry
+// HasTS is the thread-safe version of [Bloom.Has]. It acquires a read lock
+// for the duration of the operation.
 func (bl *Bloom) HasTS(entry []byte) bool {
 	bl.Mtx.RLock()
 	has := bl.Has(entry[:])
@@ -179,10 +231,9 @@ func (bl *Bloom) HasTS(entry []byte) bool {
 	return has
 }
 
-// AddIfNotHas
-// Only Add entry if it's not present in the bloomfilter
-// returns true if entry was added
-// returns false if entry was allready registered in the bloomfilter
+// AddIfNotHas adds entry only if it is not already present in the filter.
+// It returns true if the entry was added, false if it was already present.
+// Not safe for concurrent use; see [Bloom.AddIfNotHasTS].
 func (bl *Bloom) AddIfNotHas(entry []byte) (added bool) {
 	l, h := bl.sipHash(entry)
 	contained := true
@@ -196,10 +247,8 @@ func (bl *Bloom) AddIfNotHas(entry []byte) (added bool) {
 	return !contained
 }
 
-// AddIfNotHasTS
-// Tread safe: Only Add entry if it's not present in the bloomfilter
-// returns true if entry was added
-// returns false if entry was allready registered in the bloomfilter
+// AddIfNotHasTS is the thread-safe version of [Bloom.AddIfNotHas].
+// It acquires a write lock for the duration of the operation.
 func (bl *Bloom) AddIfNotHasTS(entry []byte) (added bool) {
 	bl.Mtx.Lock()
 	added = bl.AddIfNotHas(entry[:])
@@ -207,8 +256,8 @@ func (bl *Bloom) AddIfNotHasTS(entry []byte) (added bool) {
 	return added
 }
 
-// Clear
-// resets the Bloom filter
+// Clear resets the bloom filter, zeroing the bitset and the element counter.
+// Not safe for concurrent use; see [Bloom.ClearTS].
 func (bl *Bloom) Clear() {
 	bs := bl.bitset // important performance optimization.
 	for i := range bs {
@@ -217,7 +266,7 @@ func (bl *Bloom) Clear() {
 	bl.content = 0
 }
 
-// ClearTS clears the bloom filter (thread safe).
+// ClearTS is the thread-safe version of [Bloom.Clear].
 func (bl *Bloom) ClearTS() {
 	bl.Mtx.Lock()
 	bl.Clear()
@@ -242,6 +291,12 @@ func (bl *Bloom) isSet(idx uint64) bool {
 func (bl *Bloom) marshal() bloomJSONImExport {
 	bloomImEx := bloomJSONImExport{}
 	bloomImEx.SetLocs = uint64(bl.setLocs)
+	bloomImEx.Version = bl.hashVersion
+	if bl.k0 != defaultK0 || bl.k1 != defaultK1 {
+		k0, k1 := bl.k0, bl.k1
+		bloomImEx.K0 = &k0
+		bloomImEx.K1 = &k1
+	}
 	bloomImEx.FilterSet = make([]byte, len(bl.bitset)<<3)
 	for i, w := range bl.bitset {
 		binary.BigEndian.PutUint64(bloomImEx.FilterSet[i<<3:], w)
@@ -249,8 +304,9 @@ func (bl *Bloom) marshal() bloomJSONImExport {
 	return bloomImEx
 }
 
-// JSONMarshal
-// returns JSON-object (type bloomJSONImExport) as []byte
+// JSONMarshal serializes the bloom filter to a JSON byte slice.
+// The result can be restored with [JSONUnmarshal].
+// Not safe for concurrent use; see [Bloom.JSONMarshalTS].
 func (bl *Bloom) JSONMarshal() []byte {
 	data, err := json.Marshal(bl.marshal())
 	if err != nil {
@@ -259,7 +315,7 @@ func (bl *Bloom) JSONMarshal() []byte {
 	return data
 }
 
-// JSONMarshalTS is a thread-safe version of JSONMarshal
+// JSONMarshalTS is the thread-safe version of [Bloom.JSONMarshal].
 func (bl *Bloom) JSONMarshalTS() []byte {
 	bl.Mtx.RLock()
 	export := bl.marshal()
@@ -271,20 +327,29 @@ func (bl *Bloom) JSONMarshalTS() []byte {
 	return data
 }
 
-// JSONUnmarshal
-// takes JSON-Object (type bloomJSONImExport) as []bytes
-// returns bloom32 / bloom64 object
+// JSONUnmarshal restores a bloom filter from a JSON byte slice produced by
+// [Bloom.JSONMarshal] or [Bloom.JSONMarshalTS].
 func JSONUnmarshal(dbData []byte) (*Bloom, error) {
 	bloomImEx := bloomJSONImExport{}
 	err := json.Unmarshal(dbData, &bloomImEx)
 	if err != nil {
 		return nil, err
 	}
-	bf := NewWithBoolset(bloomImEx.FilterSet, bloomImEx.SetLocs)
+	if (bloomImEx.K0 == nil) != (bloomImEx.K1 == nil) {
+		return nil, errors.New("both K0 and K1 must be present or both absent")
+	}
+	var bf *Bloom
+	if bloomImEx.K0 != nil && bloomImEx.K1 != nil {
+		bf = NewWithBoolsetAndKeys(bloomImEx.FilterSet, bloomImEx.SetLocs, *bloomImEx.K0, *bloomImEx.K1)
+	} else {
+		bf = NewWithBoolset(bloomImEx.FilterSet, bloomImEx.SetLocs)
+	}
+	bf.hashVersion = bloomImEx.Version
 	return bf, nil
 }
 
-// FillRatio returns the fraction of bits set.
+// FillRatio returns the fraction of bits set in the filter (0.0 to 1.0).
+// Not safe for concurrent use; see [Bloom.FillRatioTS].
 func (bl *Bloom) FillRatio() float64 {
 	count := uint64(0)
 	for _, b := range bl.bitset {
@@ -293,7 +358,7 @@ func (bl *Bloom) FillRatio() float64 {
 	return float64(count) / float64(bl.size+1)
 }
 
-// FillRatioTS is a thread-save version of FillRatio
+// FillRatioTS is the thread-safe version of [Bloom.FillRatio].
 func (bl *Bloom) FillRatioTS() float64 {
 	bl.Mtx.RLock()
 	fr := bl.FillRatio()

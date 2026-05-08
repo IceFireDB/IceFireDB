@@ -68,7 +68,10 @@ func (s *SweepingProvider) Stats() stats.Stats {
 	}
 	s.scheduleLk.Unlock()
 
-	currentOffset := s.currentTimeOffset()
+	var currentOffset time.Duration
+	if s.scheduleEnabled() {
+		currentOffset = s.currentTimeOffset()
+	}
 	nextReprovideAt := time.Time{}
 	if ok {
 		nextReprovideAt = now.Add(s.timeUntil(nextReprovideOffset))

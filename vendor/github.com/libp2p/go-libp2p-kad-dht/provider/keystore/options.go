@@ -3,11 +3,11 @@ package keystore
 import (
 	"fmt"
 
+	ds "github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-kad-dht/provider/internal"
 )
 
 type config struct {
-	path       string
 	prefixBits int
 	batchSize  int
 	loggerName string
@@ -17,7 +17,6 @@ type config struct {
 type Option func(*config) error
 
 const (
-	DefaultPath       = "keystore"
 	DefaultBatchSize  = 1 << 14
 	DefaultPrefixBits = 16
 	DefaultLoggerName = internal.DefaultLoggerName
@@ -26,7 +25,6 @@ const (
 // getOpts creates a config and applies Options to it.
 func getOpts(opts []Option) (config, error) {
 	cfg := config{
-		path:       DefaultPath,
 		prefixBits: DefaultPrefixBits,
 		batchSize:  DefaultBatchSize,
 		loggerName: DefaultLoggerName,
@@ -34,22 +32,10 @@ func getOpts(opts []Option) (config, error) {
 
 	for i, opt := range opts {
 		if err := opt(&cfg); err != nil {
-			return config{}, fmt.Errorf("option %d error: %s", i, err)
+			return config{}, fmt.Errorf("option %d error: %w", i, err)
 		}
 	}
 	return cfg, nil
-}
-
-// WithDatastorePath sets the datastore prefix under which multihashes are
-// stored.
-func WithDatastorePath(path string) Option {
-	return func(cfg *config) error {
-		if path == "" {
-			return fmt.Errorf("datastore name cannot be empty")
-		}
-		cfg.path = path
-		return nil
-	}
 }
 
 // WithPrefixBits sets how many bits from binary keys become individual path
@@ -95,4 +81,71 @@ func WithLoggerName(name string) Option {
 		cfg.loggerName = name
 		return nil
 	}
+}
+
+// resettableKeystoreConfig holds resettable-specific fields and the base
+// keystore config.
+type resettableKeystoreConfig struct {
+	config // base keystore config (prefixBits, batchSize, loggerName)
+
+	createDs  func(string) (ds.Batching, error) // factory to create per-namespace datastores
+	destroyDs func(string) error                // destroys a per-namespace datastore on disk
+}
+
+// ResettableKeystoreOption configures a ResettableKeystore.
+type ResettableKeystoreOption func(*resettableKeystoreConfig) error
+
+// KeystoreOption wraps base keystore Options for use with NewResettableKeystore.
+func KeystoreOption(opts ...Option) ResettableKeystoreOption {
+	return func(c *resettableKeystoreConfig) error {
+		for _, opt := range opts {
+			if err := opt(&c.config); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+// WithDatastoreFactory configures the ResettableKeystore to use independent
+// datastores per namespace. create produces a new datastore for a given
+// namespace suffix ("0" or "1"), and destroy removes it entirely from disk
+// (e.g. os.RemoveAll). The constructor calls create for the active data
+// namespace only. The alternate datastore is created on demand when ResetCids
+// is called and destroyed after the reset completes. This enables full disk
+// reclamation because the old datastore is deleted from disk rather than
+// emptied key-by-key.
+//
+// The meta datastore (for the active-namespace marker) is the positional
+// datastore argument passed to NewResettableKeystore.
+func WithDatastoreFactory(create func(string) (ds.Batching, error), destroy func(string) error) ResettableKeystoreOption {
+	return func(c *resettableKeystoreConfig) error {
+		if create == nil {
+			return fmt.Errorf("create function cannot be nil")
+		}
+		if destroy == nil {
+			return fmt.Errorf("destroy function cannot be nil")
+		}
+		c.createDs = create
+		c.destroyDs = destroy
+		return nil
+	}
+}
+
+// getResettableOpts applies ResettableKeystoreOptions and returns the
+// resulting configuration.
+func getResettableOpts(opts []ResettableKeystoreOption) (resettableKeystoreConfig, error) {
+	cfg := resettableKeystoreConfig{
+		config: config{
+			prefixBits: DefaultPrefixBits,
+			batchSize:  DefaultBatchSize,
+			loggerName: DefaultLoggerName,
+		},
+	}
+	for i, opt := range opts {
+		if err := opt(&cfg); err != nil {
+			return resettableKeystoreConfig{}, fmt.Errorf("resettable option %d error: %w", i, err)
+		}
+	}
+	return cfg, nil
 }

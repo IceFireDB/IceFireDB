@@ -132,10 +132,28 @@ func WithReplicationFactor(n int) Option {
 }
 
 // WithReprovideInterval sets the interval at which regions are reprovided.
+//
+// Set to 0 to disable the periodic reprovide schedule entirely. In that
+// no-schedule mode the SweepingProvider runs in burst-only operation:
+//
+//   - ProvideOnce and StartProviding continue to publish provider records
+//     to the DHT immediately, via the burst worker pool.
+//   - StartProviding collapses to ProvideOnce semantics: keys are
+//     published immediately but NOT persisted in the keystore. Without a
+//     schedule, persisting keys would only grow the keystore on disk
+//     without any reader to consume them.
+//   - No schedule is constructed, no periodic reprovide loop runs, and
+//     AddToSchedule and RefreshSchedule become no-ops.
+//
+// Use the no-schedule mode when an external system is responsible for
+// driving reprovides (for example, by calling ProvideOnce on a custom
+// schedule), or when only one-shot ad-hoc announcements are wanted.
+//
+// Negative durations are rejected.
 func WithReprovideInterval(d time.Duration) Option {
 	return func(cfg *config) error {
-		if d <= 0 {
-			return errors.New("provider config: reprovide interval must be greater than 0")
+		if d < 0 {
+			return errors.New("provider config: reprovide interval must be >= 0 (use 0 to disable the schedule)")
 		}
 		cfg.reprovideInterval = d
 		return nil

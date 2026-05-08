@@ -118,6 +118,9 @@ const (
 var (
 	// ErrClosed is returned when the provider is closed.
 	ErrClosed = errors.New("provider: closed")
+	// defaultKeystoreKey is the key used to store the keystore in the datastore
+	// if no other keystore is provided by the user.
+	defaultKeystoreKey = datastore.NewKey("keystore")
 	// reprovideHistoryKeyPrefix is the prefix for keys storing the timestamp of
 	// the last reprovide for a given region in the datastore.
 	reprovideHistoryKeyPrefix = "history"
@@ -211,6 +214,11 @@ type SweepingProvider struct {
 }
 
 // New creates a new SweepingProvider instance with the supplied options.
+//
+// When [WithReprovideInterval] is set to 0, the provider operates in
+// no-schedule (burst-only) mode: ProvideOnce and StartProviding still
+// publish records to the DHT, but no schedule is built and no periodic
+// reprovide loop runs. See [WithReprovideInterval] for details.
 func New(opts ...Option) (*SweepingProvider, error) {
 	cfg, err := getOpts(opts)
 	if err != nil {
@@ -223,7 +231,8 @@ func New(opts ...Option) (*SweepingProvider, error) {
 		// Setup Keystore if missing
 		mapDs = dssync.MutexWrap(datastore.NewMapDatastore())
 		cleanupFuncs = append(cleanupFuncs, mapDs.Close)
-		cfg.keystore, err = keystore.NewKeystore(mapDs)
+		keysDs := namespace.Wrap(mapDs, defaultKeystoreKey)
+		cfg.keystore, err = keystore.NewKeystore(keysDs)
 		if err != nil {
 			cleanup(cleanupFuncs)
 			return nil, err
@@ -528,6 +537,15 @@ func (s *SweepingProvider) closed() bool {
 	default:
 		return false
 	}
+}
+
+// scheduleEnabled reports whether the periodic reprovide schedule is
+// active. It is false when the provider was constructed with
+// WithReprovideInterval(0); in that no-schedule mode immediate provides
+// (StartProviding, ProvideOnce) still publish records, but no schedule
+// is built and no periodic reprovide loop runs.
+func (s *SweepingProvider) scheduleEnabled() bool {
+	return s.reprovideInterval > 0
 }
 
 // scheduleNextReprovideNoLock makes sure the scheduler wakes up in
@@ -1081,7 +1099,7 @@ loop:
 	s.increaseProvideCounter(successfulKeys)
 
 	errCountLoaded := int(errCount.Load())
-	s.logger.Infof("sent provider records to peers in %s, errors %d/%d", time.Since(startTime), errCountLoaded, len(keysAllocations))
+	s.logger.Debugf("sent provider records to peers in %s, errors %d/%d", time.Since(startTime), errCountLoaded, len(keysAllocations))
 	reachablePeers = nPeers - errCountLoaded
 
 	if errCountLoaded == nPeers || errCountLoaded > int(float32(nPeers)*(1-minimalRegionReachablePeersRatio)) {
@@ -1695,6 +1713,7 @@ func (s *SweepingProvider) batchProvide(prefix bitstr.Key, keys []mh.Multihash) 
 	if keyCount == 0 {
 		return
 	}
+	s.logger.Infof("provide starting for prefix %q, %d keys", prefix, keyCount)
 	s.logger.Debugw("batchProvide called", "prefix", prefix, "count", keyCount)
 	addrInfo, ok := s.selfAddrInfo()
 	if !ok {
@@ -1706,8 +1725,10 @@ func (s *SweepingProvider) batchProvide(prefix bitstr.Key, keys []mh.Multihash) 
 	startTime := time.Now()
 	s.stats.ongoingProvides.start(keyCount)
 	defer func() {
+		elapsed := time.Since(startTime)
 		s.stats.ongoingProvides.finish(len(keys))
-		s.stats.provideDuration.Add(int64(time.Since(startTime)))
+		s.stats.provideDuration.Add(int64(elapsed))
+		s.logger.Infof("provide finished for prefix %q, %d keys in %s", prefix, keyCount, elapsed)
 	}()
 
 	if keyCount <= individualProvideThreshold {
@@ -1760,15 +1781,18 @@ func (s *SweepingProvider) batchReprovide(prefix bitstr.Key) {
 	}
 	keyCount := len(keys)
 	if keyCount == 0 {
-		s.logger.Infof("No keys to reprovide for prefix %s", prefix)
+		s.logger.Infof("no keys to reprovide for prefix %s", prefix)
 		return
 	}
 
+	s.logger.Infof("reprovide starting for prefix %q, %d keys", prefix, keyCount)
 	startTime := time.Now()
 	s.stats.ongoingReprovides.start(keyCount)
 	defer func() {
+		elapsed := time.Since(startTime)
 		s.stats.ongoingReprovides.finish(len(keys))
-		s.stats.reprovideDuration.Add(prefix, int64(time.Since(startTime)))
+		s.stats.reprovideDuration.Add(prefix, int64(elapsed))
+		s.logger.Infof("reprovide finished for prefix %q, %d keys in %s", prefix, keyCount, elapsed)
 	}()
 
 	if keyCount <= individualProvideThreshold {
@@ -1915,6 +1939,12 @@ func (s *SweepingProvider) individualProvide(prefix bitstr.Key, keys []mh.Multih
 // It iterate over supplied regions, and allocates the regions provider records
 // to the appropriate DHT servers.
 func (s *SweepingProvider) provideRegions(regions []keyspace.Region, addrInfo peer.AddrInfo, reprovide bool) bool {
+	op := "provide"
+	if reprovide {
+		op = "reprovide"
+	}
+	s.logger.Debugf("starting %s for %d region(s)", op, len(regions))
+	startTime := time.Now()
 	errCount := 0
 	for _, r := range regions {
 		if r.Keys == nil || r.Keys.IsEmptyLeaf() {
@@ -1968,6 +1998,7 @@ func (s *SweepingProvider) provideRegions(regions []keyspace.Region, addrInfo pe
 		s.increaseProvideCounter(nKeys)
 		s.logger.Debugw("sent provider records", "prefix", r.Prefix, "count", nKeys, "keys", keys)
 	}
+	s.logger.Debugf("finished %s for %d region(s) in %s, errors %d/%d", op, len(regions), time.Since(startTime), errCount, len(regions))
 	// If at least 1 regions was provided, we don't consider it a failure.
 	return errCount < len(regions)
 }
@@ -2020,6 +2051,10 @@ func (s *SweepingProvider) ProvideOnce(keys ...mh.Multihash) error {
 // StopProviding is called for the same keys or user defined garbage collection
 // deletes the keys.
 //
+// When the provider is in no-schedule mode ([WithReprovideInterval] = 0),
+// StartProviding behaves identically to ProvideOnce: keys are published
+// to the DHT immediately but NOT persisted in the keystore.
+//
 // Returns an error if the keys could not be added to the provide queue. This
 // can happen if the provider is closed or if the node is currently Offline
 // (either never bootstrapped, or disconnected since more than `OfflineDelay`).
@@ -2029,7 +2064,7 @@ func (s *SweepingProvider) StartProviding(force bool, keys ...mh.Multihash) erro
 	if s.closed() {
 		return ErrClosed
 	}
-	s.handleProvide(force, true, keys...)
+	s.handleProvide(force, s.scheduleEnabled(), keys...)
 	return nil
 }
 
@@ -2040,11 +2075,15 @@ func (s *SweepingProvider) StopProviding(keys ...mh.Multihash) error {
 	if s.closed() {
 		return ErrClosed
 	}
+	s.provideQueue.Remove(keys...)
+	if !s.scheduleEnabled() {
+		// No-schedule mode: keystore is empty, nothing to remove.
+		return nil
+	}
 	err := s.keystore.Delete(s.ctx, keys...)
 	if err != nil {
 		err = fmt.Errorf("failed to stop providing keys: %w", err)
 	}
-	s.provideQueue.Remove(keys...)
 	return err
 }
 
@@ -2063,6 +2102,9 @@ func (s *SweepingProvider) Clear() int {
 // AddToSchedule makes sure the prefixes associated with the supplied keys are
 // scheduled to be reprovided.
 //
+// In no-schedule mode ([WithReprovideInterval] = 0) this is a no-op and
+// returns nil.
+//
 // Returns an error if the provider is closed or if the node is currently
 // Offline (either never bootstrapped, or disconnected since more than
 // `OfflineDelay`). The schedule depends on the network size, hence recent
@@ -2070,6 +2112,10 @@ func (s *SweepingProvider) Clear() int {
 func (s *SweepingProvider) AddToSchedule(keys ...mh.Multihash) error {
 	if s.closed() {
 		return ErrClosed
+	}
+	if !s.scheduleEnabled() {
+		// No-schedule mode: nothing to schedule.
+		return nil
 	}
 	if !s.isOffline() {
 		// If node is offline, the schedule will be refreshed when the node
@@ -2087,6 +2133,9 @@ func (s *SweepingProvider) AddToSchedule(keys ...mh.Multihash) error {
 // This is done automatically during the reprovide operation if a region has no
 // keys.
 //
+// In no-schedule mode ([WithReprovideInterval] = 0) this is a no-op and
+// returns nil.
+//
 // Returns an error if the provider is closed or if the node is currently
 // Offline (either never bootstrapped, or disconnected since more than
 // `OfflineDelay`). The schedule depends on the network size, hence recent
@@ -2094,6 +2143,10 @@ func (s *SweepingProvider) AddToSchedule(keys ...mh.Multihash) error {
 func (s *SweepingProvider) RefreshSchedule() error {
 	if s.closed() {
 		return ErrClosed
+	}
+	if !s.scheduleEnabled() {
+		// No-schedule mode: nothing to refresh.
+		return nil
 	}
 	// Look for prefixes not included in the schedule
 	s.scheduleLk.Lock()

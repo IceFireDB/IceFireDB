@@ -157,8 +157,8 @@ func WithDatastoreWAN(ds datastore.Batching) Option {
 
 func withReprovideInterval(reprovideInterval time.Duration, dhts ...uint8) Option {
 	return func(cfg *config) error {
-		if reprovideInterval <= 0 {
-			return fmt.Errorf("reprovide interval must be positive, got %s", reprovideInterval)
+		if reprovideInterval < 0 {
+			return fmt.Errorf("reprovide interval must be >= 0 (use 0 to disable the schedule), got %s", reprovideInterval)
 		}
 		for _, dht := range dhts {
 			cfg.reprovideInterval[dht] = reprovideInterval
@@ -167,14 +167,23 @@ func withReprovideInterval(reprovideInterval time.Duration, dhts ...uint8) Optio
 	}
 }
 
+// WithReprovideInterval sets the reprovide interval for both the LAN and
+// WAN providers. See [provider.WithReprovideInterval] for the no-schedule
+// (burst-only) semantics when set to 0.
 func WithReprovideInterval(reprovideInterval time.Duration) Option {
 	return withReprovideInterval(reprovideInterval, lanID, wanID)
 }
 
+// WithReprovideIntervalLAN sets the reprovide interval for the LAN
+// provider. See [provider.WithReprovideInterval] for the no-schedule
+// (burst-only) semantics when set to 0.
 func WithReprovideIntervalLAN(reprovideInterval time.Duration) Option {
 	return withReprovideInterval(reprovideInterval, lanID)
 }
 
+// WithReprovideIntervalWAN sets the reprovide interval for the WAN
+// provider. See [provider.WithReprovideInterval] for the no-schedule
+// (burst-only) semantics when set to 0.
 func WithReprovideIntervalWAN(reprovideInterval time.Duration) Option {
 	return withReprovideInterval(reprovideInterval, wanID)
 }

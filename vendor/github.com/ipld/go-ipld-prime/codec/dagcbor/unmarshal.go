@@ -19,6 +19,7 @@ import (
 var (
 	ErrInvalidMultibase         = errors.New("invalid multibase on IPLD link")
 	ErrAllocationBudgetExceeded = errors.New("message structure demanded too many resources to process")
+	ErrDecodeDepthExceeded      = errors.New("message structure exceeded maximum nesting depth")
 	ErrTrailingBytes            = errors.New("unexpected content after end of cbor object")
 )
 
@@ -63,7 +64,7 @@ type DecodeOptions struct {
 	// extraneous data after the end of the object.
 	DontParseBeyondEnd bool
 
-	// AllowBudget sets the maximum budget for the decoder. The budget is
+	// AllocationBudget sets the maximum budget for the decoder. The budget is
 	// decremented as the decoder allocates resources (nodes, map entries, list
 	// elements, string/bytes content). If the budget is exhausted, the decoder
 	// returns ErrAllocationBudgetExceeded.
@@ -79,11 +80,19 @@ type DecodeOptions struct {
 	//
 	// When zero, a default of 1024 is used.
 	MaxCollectionPrealloc int64
+
+	// MaxDepth sets the maximum nesting depth for decoded structures. If the
+	// decoder encounters a map or list nested beyond this depth, it returns
+	// ErrDecodeDepthExceeded.
+	//
+	// When zero, a default of 1024 is used.
+	MaxDepth int64
 }
 
 const (
 	defaultAllocationBudget      int64 = 1048576 * 10
 	defaultMaxCollectionPrealloc int64 = 1024
+	defaultMaxDepth              int64 = 1024
 )
 
 // Decode deserializes data from the given io.Reader and feeds it into the given datamodel.NodeAssembler.
@@ -92,6 +101,10 @@ const (
 // The behavior of the decoder can be customized by setting fields in the DecodeOptions struct before calling this method.
 func (cfg DecodeOptions) Decode(na datamodel.NodeAssembler, r io.Reader) error {
 	// Probe for a builtin fast path.  Shortcut to that if possible.
+	// Note: when an assembler implements this interface, it receives only the
+	// reader and none of the fields set on cfg. Implementations are responsible
+	// for enforcing their own equivalents of AllocationBudget,
+	// MaxCollectionPrealloc, MaxDepth and the other DecodeOptions fields.
 	type detectFastPath interface {
 		DecodeDagCbor(io.Reader) error
 	}
@@ -135,7 +148,7 @@ func Unmarshal(na datamodel.NodeAssembler, tokSrc shared.TokenSource, options De
 	if budget == 0 {
 		budget = defaultAllocationBudget
 	}
-	return unmarshal1(na, tokSrc, &budget, options)
+	return unmarshal1(na, tokSrc, &budget, 0, options)
 }
 
 func (cfg DecodeOptions) maxPrealloc() int64 {
@@ -145,7 +158,14 @@ func (cfg DecodeOptions) maxPrealloc() int64 {
 	return defaultMaxCollectionPrealloc
 }
 
-func unmarshal1(na datamodel.NodeAssembler, tokSrc shared.TokenSource, budget *int64, options DecodeOptions) error {
+func (cfg DecodeOptions) maxDepth() int64 {
+	if cfg.MaxDepth > 0 {
+		return cfg.MaxDepth
+	}
+	return defaultMaxDepth
+}
+
+func unmarshal1(na datamodel.NodeAssembler, tokSrc shared.TokenSource, budget *int64, depth int64, options DecodeOptions) error {
 	var tk tok.Token
 	done, err := tokSrc.Step(&tk)
 	if err == io.EOF {
@@ -157,16 +177,19 @@ func unmarshal1(na datamodel.NodeAssembler, tokSrc shared.TokenSource, budget *i
 	if done && !tk.Type.IsValue() && tk.Type != tok.TNull {
 		return fmt.Errorf("unexpected eof")
 	}
-	return unmarshal2(na, tokSrc, &tk, budget, options)
+	return unmarshal2(na, tokSrc, &tk, budget, depth, options)
 }
 
 // starts with the first token already primed.  Necessary to get recursion
 //
 //	to flow right without a peek+unpeek system.
-func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.Token, budget *int64, options DecodeOptions) error {
+func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.Token, budget *int64, depth int64, options DecodeOptions) error {
 	// FUTURE: check for schema.TypedNodeBuilder that's going to parse a Link (they can slurp any token kind they want).
 	switch tk.Type {
 	case tok.TMapOpen:
+		if depth >= options.maxDepth() {
+			return ErrDecodeDepthExceeded
+		}
 		expectLen := int64(tk.Length)
 		allocLen := int64(tk.Length)
 		if tk.Length == -1 {
@@ -221,7 +244,7 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 			if err != nil { // return in error if the key was rejected
 				return err
 			}
-			err = unmarshal1(mva, tokSrc, budget, options)
+			err = unmarshal1(mva, tokSrc, budget, depth+1, options)
 			if err != nil { // return in error if some part of the recursion errored
 				return err
 			}
@@ -229,6 +252,9 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 	case tok.TMapClose:
 		return fmt.Errorf("unexpected mapClose token")
 	case tok.TArrOpen:
+		if depth >= options.maxDepth() {
+			return ErrDecodeDepthExceeded
+		}
 		expectLen := int64(tk.Length)
 		allocLen := int64(tk.Length)
 		if tk.Length == -1 {
@@ -268,7 +294,7 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 				if observedLen > expectLen {
 					return fmt.Errorf("unexpected continuation of array elements beyond declared length")
 				}
-				err := unmarshal2(la.AssembleValue(), tokSrc, tk, budget, options)
+				err := unmarshal2(la.AssembleValue(), tokSrc, tk, budget, depth+1, options)
 				if err != nil { // return in error if some part of the recursion errored
 					return err
 				}

@@ -7,7 +7,7 @@ import "errors"
 
 // UnknownAttributes represents UNKNOWN-ATTRIBUTES attribute.
 //
-// RFC 5389 Section 15.9
+// RFC 5389 Section 15.9.
 type UnknownAttributes []AttrType
 
 func (a UnknownAttributes) String() string {
@@ -22,6 +22,7 @@ func (a UnknownAttributes) String() string {
 			s += ", "
 		}
 	}
+
 	return s
 }
 
@@ -39,6 +40,7 @@ func (a UnknownAttributes) AddTo(m *Message) error {
 		bin.PutUint16(v[first:last], t.Value())
 	}
 	m.Add(AttrUnknownAttributes, v)
+
 	return nil
 }
 
@@ -62,5 +64,6 @@ func (a *UnknownAttributes) GetFrom(m *Message) error {
 		*a = append(*a, AttrType(bin.Uint16(v[first:last])))
 		first = last
 	}
+
 	return nil
 }
