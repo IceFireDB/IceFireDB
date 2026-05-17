@@ -390,15 +390,40 @@ func (bsnet *impl) SendMessage(
 		return err
 	}
 
-	// Set a read deadline to prevent Close() from blocking indefinitely
-	// when the remote peer is slow or unresponsive during multistream
-	// handshake completion.
+	// Close the stream in a background goroutine so this caller does not
+	// wait while lazyClientConn.Close completes the multistream handshake
+	// with the remote peer. Holding bitswap taskWorker goroutines on that
+	// wait can saturate the worker pool when peers are unresponsive and
+	// block service to other peers.
+	// See: https://github.com/ipfs/boxo/issues/1142
 	// See: https://github.com/multiformats/go-multistream/issues/47
-	// See: https://github.com/ipshipyard/waterworks-infra/issues/860
-	if err := s.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-		log.Debugf("error setting read deadline: %s", err)
-	}
-	return s.Close()
+	closeStreamAsync(s, timeout)
+	return nil
+}
+
+// closeStreamAsync sets a read deadline on s and closes s in a new goroutine,
+// so lazyClientConn.Close, which completes the multistream handshake by
+// reading from the remote, cannot block the caller. The caller must not use
+// s after calling this function.
+//
+// Close errors are logged at Debug, matching the pre-async behavior when
+// bitswap/server.sendBlocks logged the error returned from SendMessage. A
+// recover() guard catches panics so that a bug in go-libp2p or
+// go-multistream cannot bring down the process from a detached goroutine.
+func closeStreamAsync(s network.Stream, timeout time.Duration) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Errorf("panic during async stream close to %s: %v", s.Conn().RemotePeer(), r)
+			}
+		}()
+		if err := s.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+			log.Debugf("error setting read deadline on async close to %s: %s", s.Conn().RemotePeer(), err)
+		}
+		if err := s.Close(); err != nil {
+			log.Debugf("failed to close stream to %s: %s", s.Conn().RemotePeer(), err)
+		}
+	}()
 }
 
 func (bsnet *impl) newStreamToPeer(ctx context.Context, p peer.ID) (network.Stream, error) {
@@ -447,7 +472,10 @@ func (bsnet *impl) IsConnectedToPeer(ctx context.Context, p peer.ID) bool {
 
 // handleNewStream receives a new stream from the network.
 func (bsnet *impl) handleNewStream(s network.Stream) {
-	defer s.Close()
+	// Close in a background goroutine so this handler does not wait on
+	// lazyClientConn.Close's multistream handshake read when the remote
+	// peer has gone silent. See https://github.com/ipfs/boxo/issues/1142.
+	defer closeStreamAsync(s, minSendTimeout)
 
 	// In HTTPnet this metric measures sending the request and reading the
 	// response.

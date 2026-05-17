@@ -11,7 +11,7 @@ import (
 
 // ErrorCodeAttribute represents ERROR-CODE attribute.
 //
-// RFC 5389 Section 15.6
+// RFC 5389 Section 15.6.
 type ErrorCodeAttribute struct {
 	Code   ErrorCode
 	Reason []byte
@@ -31,7 +31,7 @@ const (
 )
 
 // AddTo adds ERROR-CODE to m.
-func (c ErrorCodeAttribute) AddTo(m *Message) error {
+func (c ErrorCodeAttribute) AddTo(msg *Message) error {
 	value := make([]byte, 0, errorCodeReasonStart+errorCodeReasonMaxB)
 	if err := CheckOverflow(AttrErrorCode,
 		len(c.Reason)+errorCodeReasonStart,
@@ -45,26 +45,28 @@ func (c ErrorCodeAttribute) AddTo(m *Message) error {
 	value[errorCodeClassByte] = class
 	value[errorCodeNumberByte] = number
 	copy(value[errorCodeReasonStart:], c.Reason)
-	m.Add(AttrErrorCode, value)
+	msg.Add(AttrErrorCode, value)
+
 	return nil
 }
 
 // GetFrom decodes ERROR-CODE from m. Reason is valid until m.Raw is valid.
 func (c *ErrorCodeAttribute) GetFrom(m *Message) error {
-	v, err := m.Get(AttrErrorCode)
+	value, err := m.Get(AttrErrorCode)
 	if err != nil {
 		return err
 	}
-	if len(v) < errorCodeReasonStart {
+	if len(value) < errorCodeReasonStart {
 		return io.ErrUnexpectedEOF
 	}
 	var (
-		class  = uint16(v[errorCodeClassByte])
-		number = uint16(v[errorCodeNumberByte])
+		class  = uint16(value[errorCodeClassByte])
+		number = uint16(value[errorCodeNumberByte])
 		code   = int(class*errorCodeModulo + number)
 	)
 	c.Code = ErrorCode(code)
-	c.Reason = v[errorCodeReasonStart:]
+	c.Reason = value[errorCodeReasonStart:]
+
 	return nil
 }
 
@@ -86,6 +88,7 @@ func (c ErrorCode) AddTo(m *Message) error {
 		Code:   c,
 		Reason: reason,
 	}
+
 	return a.AddTo(m)
 }
 
@@ -108,7 +111,7 @@ const (
 
 // Error codes from RFC 5766.
 //
-// RFC 5766 Section 15
+// RFC 5766 Section 15.
 const (
 	CodeForbidden             ErrorCode = 403 // Forbidden
 	CodeAllocMismatch         ErrorCode = 437 // Allocation Mismatch
@@ -120,7 +123,7 @@ const (
 
 // Error codes from RFC 6062.
 //
-// RFC 6062 Section 6.3
+// RFC 6062 Section 6.3.
 const (
 	CodeConnAlreadyExists    ErrorCode = 446
 	CodeConnTimeoutOrFailure ErrorCode = 447
@@ -128,7 +131,7 @@ const (
 
 // Error codes from RFC 6156.
 //
-// RFC 6156 Section 10.2
+// RFC 6156 Section 10.2.
 const (
 	CodeAddrFamilyNotSupported ErrorCode = 440 // Address Family not Supported
 	CodePeerAddrFamilyMismatch ErrorCode = 443 // Peer Address Family Mismatch
@@ -159,4 +162,20 @@ var errorReasons = map[ErrorCode][]byte{
 	// RFC 6156.
 	CodeAddrFamilyNotSupported: []byte("Address Family not Supported"),
 	CodePeerAddrFamilyMismatch: []byte("Peer Address Family Mismatch"),
+}
+
+// TurnError represents an error from a TURN response.
+type TurnError struct {
+	StunMessageType MessageType
+	ErrorCodeAttr   ErrorCodeAttribute
+}
+
+// Error returns the formatted TURN error message.
+func (e TurnError) Error() string {
+	return fmt.Sprintf("%s (error %s)", e.StunMessageType, e.ErrorCodeAttr.String())
+}
+
+// String returns the error message as a string.
+func (e TurnError) String() string {
+	return e.Error()
 }

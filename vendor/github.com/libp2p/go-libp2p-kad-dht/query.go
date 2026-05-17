@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sync"
 	"time"
 
@@ -24,10 +25,19 @@ import (
 // ErrNoPeersQueried is returned when we failed to connect to any peers.
 var ErrNoPeersQueried = errors.New("failed to query any peers")
 
-type (
-	queryFn func(context.Context, peer.ID) ([]*peer.AddrInfo, error)
-	stopFn  func(*qpeerset.QueryPeerset) bool
-)
+// queryFn runs once per peer visited in a DHT lookup. The returned
+// slice is the "heard" set the worker follows up on, and is commonly
+// also published via routing.QueryEvent.Responses.
+//
+// The returned slice and the AddrInfo values it points at are
+// read-only: mutating them (e.g. appending to AddrInfo.Addrs) races
+// with any RegisterForQueryEvents consumer reading the published
+// event.
+type queryFn func(context.Context, peer.ID) ([]*peer.AddrInfo, error)
+
+// stopFn decides whether a lookup has collected enough results and
+// can terminate early.
+type stopFn func(*qpeerset.QueryPeerset) bool
 
 // query represents a single DHT query.
 type query struct {
@@ -451,17 +461,25 @@ func (q *query) queryPeer(ctx context.Context, ch chan<- *queryUpdate, p peer.ID
 			continue
 		}
 
-		// add any other know addresses for the candidate peer.
+		// A RegisterForQueryEvents consumer may be reading next.Addrs
+		// right now: the same *peer.AddrInfo is published on
+		// routing.QueryEvent.Responses. Don't use append:
+		//   - with spare capacity, append writes into next.Addrs's
+		//     backing array, which the consumer still holds.
+		//   - writing the result back to next.Addrs races on the slice
+		//     header (three words, torn read/write).
+		// slices.Concat always allocates a fresh backing array, so our
+		// addrs don't share memory with the consumer's view.
 		curInfo := q.dht.peerstore.PeerInfo(next.ID)
-		next.Addrs = append(next.Addrs, curInfo.Addrs...)
+		addrs := slices.Concat(next.Addrs, curInfo.Addrs)
 
 		// add their addresses to the dialer's peerstore
 		//
 		// add the next peer to the query if matches the query target even if it would otherwise fail the query filter
 		// TODO: this behavior is really specific to how FindPeer works and not GetClosestPeers or any other function
 		isTarget := string(next.ID) == q.key
-		if isTarget || q.dht.queryPeerFilter(q.dht, *next) {
-			q.dht.maybeAddAddrs(next.ID, next.Addrs, pstore.TempAddrTTL)
+		if isTarget || q.dht.queryPeerFilter(q.dht, peer.AddrInfo{ID: next.ID, Addrs: addrs}) {
+			q.dht.maybeAddAddrs(next.ID, addrs, pstore.TempAddrTTL)
 			saw = append(saw, next.ID)
 		}
 	}
