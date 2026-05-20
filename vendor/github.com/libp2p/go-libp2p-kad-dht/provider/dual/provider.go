@@ -70,6 +70,7 @@ func New(d *dual.DHT, opts ...Option) (*SweepingProvider, error) {
 			provider.WithMaxReprovideDelay(cfg.maxReprovideDelay[i]),
 			provider.WithOfflineDelay(cfg.offlineDelay[i]),
 			provider.WithConnectivityCheckOnlineInterval(cfg.connectivityCheckOnlineInterval[i]),
+			provider.WithSendProviderRecordTimeout(cfg.sendProviderRecordTimeout[i]),
 			provider.WithMaxWorkers(cfg.maxWorkers[i]),
 			provider.WithDedicatedPeriodicWorkers(cfg.dedicatedPeriodicWorkers[i]),
 			provider.WithDedicatedBurstWorkers(cfg.dedicatedBurstWorkers[i]),
