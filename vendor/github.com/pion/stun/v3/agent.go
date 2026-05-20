@@ -24,6 +24,7 @@ func NewAgent(h Handler) *Agent {
 		transactions: make(map[transactionID]agentTransaction),
 		handler:      h,
 	}
+
 	return a
 }
 
@@ -80,6 +81,7 @@ func (a *Agent) StopWithError(id [TransactionIDSize]byte, err error) error {
 	a.mux.Lock()
 	if a.closed {
 		a.mux.Unlock()
+
 		return ErrAgentClosed
 	}
 	t, exists := a.transactions[id]
@@ -93,6 +95,7 @@ func (a *Agent) StopWithError(id [TransactionIDSize]byte, err error) error {
 		TransactionID: t.id,
 		Error:         err,
 	})
+
 	return nil
 }
 
@@ -124,6 +127,7 @@ func (a *Agent) Start(id [TransactionIDSize]byte, deadline time.Time) error {
 		id:       id,
 		deadline: deadline,
 	}
+
 	return nil
 }
 
@@ -147,6 +151,7 @@ func (a *Agent) Collect(gcTime time.Time) error {
 		// All transactions should be already closed
 		// during Close() call.
 		a.mux.Unlock()
+
 		return ErrAgentClosed
 	}
 	// Adding all transactions with deadline before gcTime
@@ -175,24 +180,27 @@ func (a *Agent) Collect(gcTime time.Time) error {
 		event.TransactionID = id
 		h(event)
 	}
+
 	return nil
 }
 
 // Process incoming message, synchronously passing it to handler.
 func (a *Agent) Process(m *Message) error {
-	e := Event{
+	event := Event{
 		TransactionID: m.TransactionID,
 		Message:       m,
 	}
 	a.mux.Lock()
 	if a.closed {
 		a.mux.Unlock()
+
 		return ErrAgentClosed
 	}
 	h := a.handler
 	delete(a.transactions, m.TransactionID)
 	a.mux.Unlock()
-	h(e)
+	h(event)
+
 	return nil
 }
 
@@ -201,10 +209,12 @@ func (a *Agent) SetHandler(h Handler) error {
 	a.mux.Lock()
 	if a.closed {
 		a.mux.Unlock()
+
 		return ErrAgentClosed
 	}
 	a.handler = h
 	a.mux.Unlock()
+
 	return nil
 }
 
@@ -217,6 +227,7 @@ func (a *Agent) Close() error {
 	a.mux.Lock()
 	if a.closed {
 		a.mux.Unlock()
+
 		return ErrAgentClosed
 	}
 	for _, t := range a.transactions {
@@ -227,6 +238,7 @@ func (a *Agent) Close() error {
 	a.closed = true
 	a.handler = nil
 	a.mux.Unlock()
+
 	return nil
 }
 

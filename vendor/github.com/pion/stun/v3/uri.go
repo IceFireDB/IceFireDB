@@ -104,9 +104,9 @@ const (
 // string naming the transport protocol type.
 func NewProtoType(raw string) ProtoType {
 	switch raw {
-	case "udp":
+	case "udp": //nolint:goconst
 		return ProtoTypeUDP
-	case "tcp":
+	case "tcp": //nolint:goconst
 		return ProtoTypeTCP
 	default:
 		return ProtoTypeUnknown
@@ -124,7 +124,7 @@ func (t ProtoType) String() string {
 	}
 }
 
-// URI represents a STUN (rfc7064) or TURN (rfc7065) URI
+// URI represents a STUN (rfc7064) or TURN (rfc7065) URI.
 type URI struct {
 	Scheme   SchemeType
 	Host     string
@@ -137,73 +137,78 @@ type URI struct {
 // ParseURI parses a STUN or TURN urls following the ABNF syntax described in
 // https://tools.ietf.org/html/rfc7064 and https://tools.ietf.org/html/rfc7065
 // respectively.
-func ParseURI(raw string) (*URI, error) { //nolint:gocognit
+func ParseURI(raw string) (*URI, error) { //nolint:gocognit,cyclop
 	rawParts, err := url.Parse(raw)
 	if err != nil {
 		return nil, err
 	}
 
-	var u URI
-	u.Scheme = NewSchemeType(rawParts.Scheme)
-	if u.Scheme == SchemeTypeUnknown {
+	var uri URI
+	uri.Scheme = NewSchemeType(rawParts.Scheme)
+	if uri.Scheme == SchemeTypeUnknown {
 		return nil, ErrSchemeType
 	}
 
 	var rawPort string
-	if u.Host, rawPort, err = net.SplitHostPort(rawParts.Opaque); err != nil {
+	if uri.Host, rawPort, err = net.SplitHostPort(rawParts.Opaque); err != nil { //nolint:nestif
 		var e *net.AddrError
 		if errors.As(err, &e) {
 			if e.Err == "missing port in address" {
-				nextRawURL := u.Scheme.String() + ":" + rawParts.Opaque
-				switch {
-				case u.Scheme == SchemeTypeSTUN || u.Scheme == SchemeTypeTURN:
+				nextRawURL := uri.Scheme.String() + ":" + rawParts.Opaque
+				switch uri.Scheme {
+				case SchemeTypeSTUN, SchemeTypeTURN:
 					nextRawURL += ":3478"
 					if rawParts.RawQuery != "" {
 						nextRawURL += "?" + rawParts.RawQuery
 					}
+
 					return ParseURI(nextRawURL)
-				case u.Scheme == SchemeTypeSTUNS || u.Scheme == SchemeTypeTURNS:
+				case SchemeTypeSTUNS, SchemeTypeTURNS:
 					nextRawURL += ":5349"
 					if rawParts.RawQuery != "" {
 						nextRawURL += "?" + rawParts.RawQuery
 					}
+
 					return ParseURI(nextRawURL)
+				default:
+					return nil, ErrSchemeType
 				}
 			}
 		}
+
 		return nil, err
 	}
 
-	if u.Host == "" {
+	if uri.Host == "" {
 		return nil, ErrHost
 	}
 
-	if u.Port, err = strconv.Atoi(rawPort); err != nil {
+	if uri.Port, err = strconv.Atoi(rawPort); err != nil {
 		return nil, ErrPort
 	}
 
-	switch u.Scheme {
+	switch uri.Scheme {
 	case SchemeTypeSTUN:
 		qArgs, err := url.ParseQuery(rawParts.RawQuery)
 		if err != nil || len(qArgs) > 0 {
 			return nil, ErrSTUNQuery
 		}
-		u.Proto = ProtoTypeUDP
+		uri.Proto = ProtoTypeUDP
 	case SchemeTypeSTUNS:
 		qArgs, err := url.ParseQuery(rawParts.RawQuery)
 		if err != nil || len(qArgs) > 0 {
 			return nil, ErrSTUNQuery
 		}
-		u.Proto = ProtoTypeTCP
+		uri.Proto = ProtoTypeTCP
 	case SchemeTypeTURN:
 		proto, err := parseProto(rawParts.RawQuery)
 		if err != nil {
 			return nil, err
 		}
 
-		u.Proto = proto
-		if u.Proto == ProtoTypeUnknown {
-			u.Proto = ProtoTypeUDP
+		uri.Proto = proto
+		if uri.Proto == ProtoTypeUnknown {
+			uri.Proto = ProtoTypeUDP
 		}
 	case SchemeTypeTURNS:
 		proto, err := parseProto(rawParts.RawQuery)
@@ -211,15 +216,15 @@ func ParseURI(raw string) (*URI, error) { //nolint:gocognit
 			return nil, err
 		}
 
-		u.Proto = proto
-		if u.Proto == ProtoTypeUnknown {
-			u.Proto = ProtoTypeTCP
+		uri.Proto = proto
+		if uri.Proto == ProtoTypeUnknown {
+			uri.Proto = ProtoTypeTCP
 		}
 
 	case SchemeTypeUnknown:
 	}
 
-	return &u, nil
+	return &uri, nil
 }
 
 func parseProto(raw string) (ProtoType, error) {
@@ -230,9 +235,10 @@ func parseProto(raw string) (ProtoType, error) {
 
 	var proto ProtoType
 	if rawProto := qArgs.Get("transport"); rawProto != "" {
-		if proto = NewProtoType(rawProto); proto == ProtoType(0) {
+		if proto = NewProtoType(rawProto); proto == ProtoTypeUnknown {
 			return ProtoTypeUnknown, ErrProtoType
 		}
+
 		return proto, nil
 	}
 
@@ -248,6 +254,7 @@ func (u URI) String() string {
 	if u.Scheme == SchemeTypeTURN || u.Scheme == SchemeTypeTURNS {
 		rawURL += "?transport=" + u.Proto.String()
 	}
+
 	return rawURL
 }
 

@@ -21,6 +21,11 @@ var (
 	globalSeqGen atomic.Uint64
 )
 
+const (
+	minTcpPort = 1024
+	maxTcpPort = 65535
+)
+
 func init() {
 	SetSeed(time.Now().UTC().UnixNano())
 }
@@ -53,13 +58,38 @@ func SetSeed(seed int64) {
 	globalSeqGen.Store(rng.Uint64())
 }
 
-// Addrs returns a slice of n random unique addresses.
+// Addrs returns a slice of n random unique IPv4 addresses.
 func Addrs(n int) []string {
 	addrs := make([]string, n)
-	addrSet := make(map[string]struct{})
+	addrSet := make(map[string]struct{}, n)
 	rng := NewRand()
 	for i := 0; i < n; i++ {
-		addr := fmt.Sprintf("/ip4/%d.%d.%d.%d/tcp/%d", rng.Int()%255, rng.Intn(254)+1, rng.Intn(254)+1, rng.Intn(254)+1, rng.Intn(48157)+1024)
+		addr := fmt.Sprintf("/ip4/%d.%d.%d.%d/tcp/%d", rng.Intn(254)+1, rng.Intn(254)+1, rng.Intn(254)+1, rng.Intn(254)+1, rng.Intn(maxTcpPort-minTcpPort)+minTcpPort)
+		if _, ok := addrSet[addr]; ok {
+			i--
+			continue
+		}
+		addrs[i] = addr
+	}
+	return addrs
+}
+
+// DnsAddrs returns a slice of n random unique DNS addresses in the format
+// "xxxxxxxx.example.com:port".
+func DnsAddrs(n int) []string {
+	const (
+		nameLen     = 8
+		lowerAsciiA = 97
+	)
+	addrs := make([]string, n)
+	addrSet := make(map[string]struct{}, n)
+	rng := NewRand()
+	for i := 0; i < n; i++ {
+		var name [nameLen]byte
+		for j := range nameLen {
+			name[j] = byte(rng.Intn(26) + lowerAsciiA)
+		}
+		addr := fmt.Sprintf("/dns4/%s.example.com/tcp/%d", name, rng.Intn(maxTcpPort-minTcpPort)+minTcpPort)
 		if _, ok := addrSet[addr]; ok {
 			i--
 			continue
@@ -114,9 +144,8 @@ func Identity() (peer.ID, crypto.PrivKey, crypto.PubKey) {
 	return peerID, privKey, pubKey
 }
 
-// Multiaddrs returns a slice of n random unique Multiaddrs.
-func Multiaddrs(n int) []multiaddr.Multiaddr {
-	addrs := Addrs(n)
+func multiaddrs(n int, addrsFunc func(int) []string) []multiaddr.Multiaddr {
+	addrs := addrsFunc(n)
 	maddrs := make([]multiaddr.Multiaddr, n)
 	for i, addr := range addrs {
 		maddr, err := multiaddr.NewMultiaddr(addr)
@@ -128,15 +157,34 @@ func Multiaddrs(n int) []multiaddr.Multiaddr {
 	return maddrs
 }
 
+// Multiaddrs returns a slice of n random unique Multiaddrs with IPv4 addresses.
+func Multiaddrs(n int) []multiaddr.Multiaddr {
+	return multiaddrs(n, Addrs)
+}
+
+// DnsMultiaddrs returns a slice of n random unique Multiaddrs with DNS addresses.
+func DnsMultiaddrs(n int) []multiaddr.Multiaddr {
+	return multiaddrs(n, DnsAddrs)
+}
+
 var httpMultiaddrComponent = multiaddr.StringCast("/http")
 
-// HttpMultiaddrs returns a slice of n random unique Multiaddrs.
-func HttpMultiaddrs(n int) []multiaddr.Multiaddr {
-	maddrs := Multiaddrs(n)
+func httpMultiaddrs(n int, multiaddrsFunc func(int) []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+	maddrs := multiaddrsFunc(n)
 	for i, ma := range maddrs {
 		maddrs[i] = multiaddr.Join(ma, httpMultiaddrComponent)
 	}
 	return maddrs
+}
+
+// HttpMultiaddrs returns a slice of n random unique Multiaddrs.
+func HttpMultiaddrs(n int) []multiaddr.Multiaddr {
+	return httpMultiaddrs(n, Multiaddrs)
+}
+
+// HttpDnsMultiaddrs returns a slice of n random unique Multiaddrs with DNS addresses.
+func HttpDnsMultiaddrs(n int) []multiaddr.Multiaddr {
+	return httpMultiaddrs(n, DnsMultiaddrs)
 }
 
 // Multihashes returns a slice of n random unique Multihashes.
@@ -171,6 +219,46 @@ func Peers(n int) []peer.ID {
 		peerIDs[i] = peerID
 	}
 	return peerIDs
+}
+
+func addrInfos(numPeers, numAddrs int, multiaddrsFunc func(int) []multiaddr.Multiaddr) []peer.AddrInfo {
+	peerIDs := Peers(numPeers)
+	addrInfos := make([]peer.AddrInfo, numPeers)
+	for i := range numPeers {
+		addrInfos[i] = peer.AddrInfo{
+			ID:    peerIDs[i],
+			Addrs: multiaddrsFunc(numAddrs),
+		}
+	}
+	return addrInfos
+}
+
+// AddrInfos returns a slice AddrInfo with numPeers elements. Each AddrInfo
+// element will have a unique ID and numAddrs Addresses. The multiaddrs will be
+// ipv4 addresses.
+func AddrInfos(numPeers, numAddrs int) []peer.AddrInfo {
+	return addrInfos(numPeers, numAddrs, Multiaddrs)
+}
+
+// AddrInfos returns a slice AddrInfo with numPeers elements. Each AddrInfo
+// element will have a unique ID and numAddrs Addresses. The multiaddrs will be
+// dns addresses.
+func DnsAddrInfos(numPeers, numAddrs int) []peer.AddrInfo {
+	return addrInfos(numPeers, numAddrs, DnsMultiaddrs)
+}
+
+// AddrInfos returns a slice AddrInfo with numPeers elements. Each AddrInfo
+// element will have a unique ID and numAddrs Addresses. The multiaddrs will be
+// ipv4 addresses with http.
+func HttpAddrInfos(numPeers, numAddrs int) []peer.AddrInfo {
+	return addrInfos(numPeers, numAddrs, HttpMultiaddrs)
+}
+
+// AddrInfos returns a slice AddrInfo with numPeers elements. Each AddrInfo
+// element will have a unique ID and numAddrs Addresses. The multiaddrs will be
+// dns addresses with http.
+func HttpDnsAddrInfos(numPeers, numAddrs int) []peer.AddrInfo {
+	return addrInfos(numPeers, numAddrs, HttpDnsMultiaddrs)
 }
 
 // Sequence returns a series of monotonically increasing numbers, starting at
