@@ -529,8 +529,8 @@ github.com/ipld/go-car/v2 v2.16.0/go.mod h1:RqFGWN9ifcXVmCrTAVnfnxiWZk1+jIx67SYh
 github.com/ipld/go-codec-dagpb v1.7.0 h1:hpuvQjCSVSLnTnHXn+QAMR0mLmb1gA6wl10LExo2Ts0=
 github.com/ipld/go-codec-dagpb v1.7.0/go.mod h1:rD3Zg+zub9ZnxcLwfol/OTQRVjaLzXypgy4UqHQvilM=
 github.com/ipld/go-ipld-prime v0.11.0/go.mod h1:+WIAkokurHmZ/KwzDOMUuoeJgaRQktHtEaLglS3ZeV8=
-github.com/ipld/go-ipld-prime v0.22.0 h1:YJhDhjEOvOYaqshd3b4atIWUoRg/rKrgmwCyUHwlbuY=
-github.com/ipld/go-ipld-prime v0.22.0/go.mod h1:ol7vKxOOVgEh0iAPuiDalM+0gScXVMA5ZZa4DVrTnEA=
+github.com/ipld/go-ipld-prime v0.23.0 h1:csqdPZH60BsTC+AZrv7fpa27v+09I/oTqyHYYYE27eE=
+github.com/ipld/go-ipld-prime v0.23.0/go.mod h1:46YCFSFNFBJHPjB0pfMuv7Ly7df2eChpkpyPo5SE0bA=
 github.com/ipld/go-ipld-prime/storage/bsadapter v0.0.0-20250821084354-a425e60cd714 h1:cqNk8PEwHnK0vqWln+U/YZhQc9h2NB3KjUjDPZo5Q2s=
 github.com/ipld/go-ipld-prime/storage/bsadapter v0.0.0-20250821084354-a425e60cd714/go.mod h1:ZEUdra3CoqRVRYgAX/jAJO9aZGz6SKtKEG628fHHktY=
 github.com/ipshipyard/p2p-forge v0.7.0 h1:PQayexxZC1FR2Vx0XOSbmZ6wDPliidS48I+xXWuF+YU=

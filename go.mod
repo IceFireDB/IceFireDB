@@ -1,6 +1,6 @@
 module github.com/IceFireDB/IceFireDB
 
-go 1.25.0
+go 1.25.7
 
 require (
 	github.com/IceFireDB/icefiredb-crdt-kv v0.3.0
@@ -159,7 +159,7 @@ require (
 	github.com/ipfs/go-unixfsnode v1.10.3 // indirect
 	github.com/ipld/go-car/v2 v2.16.0 // indirect
 	github.com/ipld/go-codec-dagpb v1.7.0 // indirect
-	github.com/ipld/go-ipld-prime v0.22.0 // indirect
+	github.com/ipld/go-ipld-prime v0.23.0 // indirect
 	github.com/ipshipyard/p2p-forge v0.7.0 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect

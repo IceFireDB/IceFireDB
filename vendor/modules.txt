@@ -745,8 +745,8 @@ github.com/ipld/go-car/v2/storage
 # github.com/ipld/go-codec-dagpb v1.7.0
 ## explicit; go 1.22
 github.com/ipld/go-codec-dagpb
-# github.com/ipld/go-ipld-prime v0.22.0
-## explicit; go 1.24.0
+# github.com/ipld/go-ipld-prime v0.23.0
+## explicit; go 1.25.7
 github.com/ipld/go-ipld-prime
 github.com/ipld/go-ipld-prime/adl
 github.com/ipld/go-ipld-prime/codec
