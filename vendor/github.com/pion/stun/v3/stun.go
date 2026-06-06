@@ -27,6 +27,7 @@ func readFullOrPanic(r io.Reader, v []byte) int {
 	if err != nil {
 		panic(err) //nolint
 	}
+
 	return n
 }
 
@@ -35,6 +36,7 @@ func writeOrPanic(w io.Writer, v []byte) int {
 	if err != nil {
 		panic(err) //nolint
 	}
+
 	return n
 }
 

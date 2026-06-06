@@ -1125,3 +1125,38 @@ func (i *handler) getTemplateGlobalData(r *http.Request, contentPath path.Path) 
 func (i *handler) webError(w http.ResponseWriter, r *http.Request, err error, defaultCode int) {
 	webError(w, r, i.config, err, defaultCode)
 }
+
+// cacheControlSizeLimit is the Cache-Control header for responses rejected by
+// content size limits (MaxDeserializedResponseSize, MaxUnixFSDAGResponseSize).
+// Fresh for 1 week, serve stale for up to 31 days while revalidating in the
+// background. Uses 410 Gone which is heuristically cacheable per RFC 9110 and
+// cached by CDNs (Cloudflare, Fastly) by default.
+const cacheControlSizeLimit = "public, max-age=604800, stale-while-revalidate=2678400"
+
+// exceedsMaxUnixFSDAGResponseSize checks whether sz exceeds the configured
+// MaxUnixFSDAGResponseSize. If it does, it writes a cacheable 410 Gone
+// response and returns true. Returns false (no-op) when the limit is disabled
+// or not exceeded.
+func (i *handler) exceedsMaxUnixFSDAGResponseSize(w http.ResponseWriter, r *http.Request, sz int64) bool {
+	if i.config.MaxUnixFSDAGResponseSize > 0 && sz > i.config.MaxUnixFSDAGResponseSize {
+		err := fmt.Errorf("responses are not supported for content larger than %d bytes: for large content, run your own IPFS node (https://docs.ipfs.tech/install/)", i.config.MaxUnixFSDAGResponseSize)
+		w.Header().Set("Cache-Control", cacheControlSizeLimit)
+		i.webError(w, r, err, http.StatusGone)
+		return true
+	}
+	return false
+}
+
+// exceedsMaxDeserializedResponseSize checks whether sz exceeds the configured
+// MaxDeserializedResponseSize. If it does, it writes a cacheable 410 Gone
+// response and returns true. Returns false (no-op) when the limit is disabled
+// or not exceeded.
+func (i *handler) exceedsMaxDeserializedResponseSize(w http.ResponseWriter, r *http.Request, sz int64) bool {
+	if i.config.MaxDeserializedResponseSize > 0 && sz > i.config.MaxDeserializedResponseSize {
+		err := fmt.Errorf("deserialized responses are not supported for content larger than %d bytes: for large content, run your own IPFS node (https://docs.ipfs.tech/install/)", i.config.MaxDeserializedResponseSize)
+		w.Header().Set("Cache-Control", cacheControlSizeLimit)
+		i.webError(w, r, err, http.StatusGone)
+		return true
+	}
+	return false
+}
