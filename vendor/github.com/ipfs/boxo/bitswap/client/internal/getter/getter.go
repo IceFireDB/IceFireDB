@@ -94,18 +94,19 @@ func AsyncGetBlocks(ctx, sessctx context.Context, keys []cid.Cid, notif notifica
 	return out, nil
 }
 
-// Listens for incoming blocks, passing them to the out channel.
-// If the context is cancelled or the incoming channel closes, calls cfun with
-// any keys corresponding to blocks that were never received.
+// Listens for incoming blocks, passing them to the out channel. If the context
+// is canceled or the incoming channel closes, calls cfun with any keys
+// corresponding to blocks that were never received.
 func handleIncoming(ctx, sessctx context.Context, remaining *cid.Set, in <-chan blocks.Block, out chan blocks.Block, cfun func([]cid.Cid)) {
 	ctx, span := internal.StartSpan(ctx, "Getter.handleIncoming") // ProbeLab: don't delete/change span without notice
 	defer span.End()
 
 	// Clean up before exiting this function, and call the cancel function on
-	// any remaining keys
+	// any remaining keys.
 	defer func() {
 		close(out)
-		// can't just defer this call on its own, arguments are resolved *when* the defer is created
+		// Can't just defer this call on its own, arguments are resolved *when*
+		// the defer is created.
 		cfun(remaining.Keys())
 	}()
 

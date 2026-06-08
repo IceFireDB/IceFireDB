@@ -98,6 +98,7 @@ type P2PForgeCertMgrConfig struct {
 	trustedRoots               *x509.CertPool
 	storage                    certmagic.Storage
 	modifyForgeRequest         func(r *http.Request) error
+	httpClient                 *http.Client
 	onCertLoaded               func()
 	onCertRenewed              func()
 	log                        *zap.SugaredLogger
@@ -152,7 +153,7 @@ func WithUserEmail(email string) P2PForgeCertMgrOptions {
 	}
 }
 
-// WithForgeAuth sets optional secret be sent with requests to the forge
+// WithForgeAuth sets optional secret to be sent with requests to the forge
 // registration endpoint.
 func WithForgeAuth(forgeAuth string) P2PForgeCertMgrOptions {
 	return func(config *P2PForgeCertMgrConfig) error {
@@ -169,14 +170,26 @@ func WithUserAgent(userAgent string) P2PForgeCertMgrOptions {
 	}
 }
 
-/*
-// WithHTTPClient sets a custom HTTP Client to be used when talking to registration endpoint.
-func WithHTTPClient(h httpClient) error {
+// WithHTTPClient sets the *http.Client used when talking to the forge
+// registration endpoint. The default is http.DefaultClient.
+//
+// Callers can supply a client with a custom Transport (custom resolver,
+// rewritten dial address, alternate root CAs for the registration endpoint
+// itself, etc.). Useful for test harnesses that run an in-process forge on a
+// loopback address while the PeerID-auth signature must still be scoped to
+// the production registration hostname.
+//
+// The client's Timeout, Transport, CheckRedirect, and Jar are honored as-is;
+// PeerID auth is layered on top via httppeeridauth.ClientPeerIDAuth.
+func WithHTTPClient(c *http.Client) P2PForgeCertMgrOptions {
 	return func(config *P2PForgeCertMgrConfig) error {
+		if c == nil {
+			return fmt.Errorf("WithHTTPClient: client must not be nil")
+		}
+		config.httpClient = c
 		return nil
 	}
 }
-*/
 
 // WithModifiedForgeRequest enables modifying how the ACME DNS challenges are sent to the forge, such as to enable
 // custom HTTP headers, etc.
@@ -363,6 +376,7 @@ func NewP2PForgeCertMgr(opts ...P2PForgeCertMgrOptions) (*P2PForgeCertMgr, error
 			forgeAuth:                  mgrCfg.forgeAuth,
 			hostFn:                     mgr.hostFn,
 			modifyForgeRequest:         mgrCfg.modifyForgeRequest,
+			httpClient:                 mgrCfg.httpClient,
 			userAgent:                  mgrCfg.userAgent,
 			allowPrivateForgeAddresses: mgrCfg.allowPrivateForgeAddresses,
 			log:                        acmeLog.Named("dns01solver"),
@@ -454,7 +468,7 @@ func (m *P2PForgeCertMgr) Start() error {
 			log.Infof("no cert found for %q", name)
 		}
 
-		// Start immediatelly if either:
+		// Start immediately if either:
 		// (A) preexisting certificate is found in certmagic storage
 		// (B) allowPrivateForgeAddresses flag is set
 		if certExists || m.allowPrivateForgeAddresses {
@@ -462,7 +476,7 @@ func (m *P2PForgeCertMgr) Start() error {
 		} else {
 			// No preexisting cert found.
 			// We will get a new one, but don't want to ask for one
-			// if our node is not publicly diallable.
+			// if our node is not publicly dialable.
 			// To avoid ERROR(s) in log and unnecessary retries we wait for libp2p
 			// confirmation that node is publicly reachable before sending
 			// multiaddrs to p2p-forge's registration endpoint.
@@ -472,7 +486,7 @@ func (m *P2PForgeCertMgr) Start() error {
 	return nil
 }
 
-// withHostConnectivity executes callback func only after certain libp2p connectivity checks / criteria against passed host are fullfilled.
+// withHostConnectivity executes callback func only after certain libp2p connectivity checks / criteria against passed host are fulfilled.
 // It will also delay registration to ensure user-set registrationDelay is respected.
 // The main purpose is to not bother CA ACME endpoint or p2p-forge registration endpoint if we know the peer is not
 // ready to use TLS cert.
@@ -623,6 +637,7 @@ type dns01P2PForgeSolver struct {
 	forgeAuth                  string
 	hostFn                     func() host.Host
 	modifyForgeRequest         func(r *http.Request) error
+	httpClient                 *http.Client
 	userAgent                  string
 	allowPrivateForgeAddresses bool
 	log                        *zap.SugaredLogger
@@ -643,7 +658,7 @@ func (d *dns01P2PForgeSolver) Wait(ctx context.Context, challenge acme.Challenge
 	// Check if DNS-01 TXT record is correctly published by the p2p-forge
 	// backend. This step ensures we are good citizens: we don't want to move
 	// further and bother ACME endpoint with work if we are not confident
-	// DNS-01 chalelnge will be successful.
+	// DNS-01 challenge will be successful.
 	// We check fast, with backoff to avoid spamming DNS.
 	pollInterval := 1 * time.Second
 	maxPollInterval := 1 * time.Minute
@@ -701,6 +716,10 @@ func (d *dns01P2PForgeSolver) Present(ctx context.Context, challenge acme.Challe
 	d.log.Debugw("advertised libp2p addrs for p2p-forge broker to try", "addrs", advertisedAddrs)
 
 	d.log.Debugw("asking p2p-forge broker to set DNS-01 TXT record", "url", d.forgeRegistrationEndpoint, "dns01_value", dns01value)
+	var sendOpts []SendChallengeOption
+	if d.httpClient != nil {
+		sendOpts = append(sendOpts, WithChallengeHTTPClient(d.httpClient))
+	}
 	err := SendChallenge(ctx,
 		d.forgeRegistrationEndpoint,
 		h.Peerstore().PrivKey(h.ID()),
@@ -709,6 +728,7 @@ func (d *dns01P2PForgeSolver) Present(ctx context.Context, challenge acme.Challe
 		d.forgeAuth,
 		d.userAgent,
 		d.modifyForgeRequest,
+		sendOpts...,
 	)
 	if err != nil {
 		return fmt.Errorf("p2p-forge broker registration error: %w", err)

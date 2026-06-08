@@ -1,6 +1,7 @@
-// Package unixfs implements a data format for files in the IPFS filesystem It
-// is not the only format in ipfs, but it is the one that the filesystem
-// assumes
+// Package unixfs implements the [UnixFS] data format for describing files,
+// directories, and symlinks in IPFS.
+//
+// [UnixFS]: https://specs.ipfs.tech/unixfs/
 package unixfs
 
 import (

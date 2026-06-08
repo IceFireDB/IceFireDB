@@ -22,7 +22,7 @@ const (
 // BlockPresence indicates whether a peer has a block.
 // Note that the order is important, we decide which peer to send a want to
 // based on knowing whether peer has the block. eg we're more likely to send
-// a want to a peer that has the block than a peer that doesnt have the block
+// a want to a peer that has the block than a peer that doesn't have the block
 // so BPHave > BPDontHave
 type BlockPresence int
 
@@ -61,7 +61,7 @@ type peerAvailability struct {
 type change struct {
 	// new wants requested
 	add []cid.Cid
-	// wants cancelled
+	// wants canceled
 	cancel []cid.Cid
 	// new message received by session (blocks / HAVEs / DONT_HAVEs)
 	update update
@@ -153,7 +153,7 @@ func (sws *sessionWantSender) Add(ks []cid.Cid) {
 	sws.addChange(change{add: ks})
 }
 
-// Cancel is called when a request is cancelled
+// Cancel is called when a request is canceled
 func (sws *sessionWantSender) Cancel(ks []cid.Cid) {
 	if len(ks) == 0 {
 		return
@@ -250,7 +250,7 @@ func (sws *sessionWantSender) onChange(changes []change) {
 			sws.trackWant(c)
 		}
 
-		// Remove cancelled wants
+		// Remove canceled wants
 		for _, c := range chng.cancel {
 			sws.untrackWant(c)
 			cancels = append(cancels, c)
