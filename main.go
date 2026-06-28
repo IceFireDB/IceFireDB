@@ -9,26 +9,17 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	ipfs_log "github.com/IceFireDB/IceFireDB/driver/ipfs-log"
-	"github.com/IceFireDB/icefiredb-ipfs-log/stores/levelkv"
 	"github.com/joho/godotenv"
 
-	badger "github.com/dgraph-io/badger/v4"
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/ledisdb/ledisdb/ledis"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/tidwall/sds"
+	"github.com/ledisdb/ledisdb/store/driver"
 	rafthub "github.com/tidwall/uhaha"
 
 	_ "github.com/IceFireDB/IceFireDB/driver/badger"
-	"github.com/IceFireDB/IceFireDB/driver/crdt"
 	"github.com/IceFireDB/IceFireDB/driver/hybriddb"
 	"github.com/IceFireDB/IceFireDB/driver/ipfs"
-	"github.com/IceFireDB/IceFireDB/driver/ipfs-synckv"
-
-	// "github.com/IceFireDB/IceFireDB/driver/orbitdb"
-	"github.com/IceFireDB/IceFireDB/driver/oss"
-	"github.com/IceFireDB/icefiredb-crdt-kv/kv"
+	ipfs_synckv "github.com/IceFireDB/IceFireDB/driver/ipfs-synckv"
 )
 
 var (
@@ -54,8 +45,6 @@ func main() {
 	conf.Flag.Custom = true
 	confInit(&conf)
 	conf.DataDirReady = func(dir string) {
-		//os.RemoveAll(filepath.Join(dir, "main.db"))
-
 		ldsCfg = lediscfg.NewConfigDefault()
 		ldsCfg.DataDir = filepath.Join(dir, "main.db")
 		ldsCfg.Databases = 1
@@ -74,42 +63,15 @@ func main() {
 			return
 		}
 
-		// Obtain the leveldb object and handle it carefully
-		driver := ldb.GetSDB().GetDriver().GetStorageEngine()
-		switch v := driver.(type) {
-		case *leveldb.DB:
-			db = v
-		case *badger.DB:
-		case *kv.CRDTKeyValueDB:
-			db = ldb.GetSDB().GetDriver().(*crdt.DB).GetLevelDB()
-		case *levelkv.LevelKV:
-			switch driver := ldb.GetSDB().GetDriver().(type) {
-			case *ipfs_log.DB:
-				db = driver.GetLevelDB()
-			case *ipfs_synckv.DB:
-				db = driver.GetStorageEngine().(*leveldb.DB)
-			}
-		default:
-			log.Printf("unsupported storage engine: %T", v)
-			return
-		}
-		if storageBackend == hybriddb.StorageName {
+		// Register backend-specific metrics with the INFO endpoint.
+		switch storageBackend {
+		case hybriddb.StorageName:
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*hybriddb.DB).Metrics)
-		}
-		if storageBackend == ipfs.StorageName {
+		case ipfs.StorageName:
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*ipfs.DB).Metrics)
-		}
-		// if storageBackend == orbitdb.StorageName {
-		// 	serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*orbitdb.DB).Metrics)
-		// }
-
-		if storageBackend == oss.StorageName {
-			//serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*orbitdb.DB).Metrics)
-		}
-		if storageBackend == ipfs_synckv.StorageName {
+		case ipfs_synckv.StorageName:
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*ipfs_synckv.DB).Metrics)
 		}
-
 	}
 	if debug {
 		// pprof for profiling
@@ -127,32 +89,24 @@ func main() {
 	rafthub.Main(conf)
 }
 
-type snap struct {
-	s *leveldb.Snapshot
+// storageDriver returns the low-level storage driver backing the active ledis
+// database. Used by Raft snapshot/restore so the logic is backend-agnostic.
+func storageDriver() driver.IDB {
+	return ldb.GetSDB().GetDriver()
 }
 
-func (s *snap) Done(path string) {}
+type snap struct {
+	s driver.ISnapshot
+}
+
+func (s *snap) Done(path string) { s.s.Close() }
 
 func (s *snap) Persist(wr io.Writer) error {
-	sw := sds.NewWriter(wr)
-	iter := s.s.NewIterator(nil, nil)
-	for ok := iter.First(); ok; ok = iter.Next() {
-		if err := sw.WriteBytes(iter.Key()); err != nil {
-			return err
-		}
-		if err := sw.WriteBytes(iter.Value()); err != nil {
-			return err
-		}
-	}
-	iter.Release()
-	if err := iter.Error(); err != nil {
-		return err
-	}
-	return sw.Flush()
+	return writeSnapshot(s.s, wr)
 }
 
 func snapshot(data interface{}) (rafthub.Snapshot, error) {
-	s, err := db.GetSnapshot()
+	s, err := storageDriver().NewSnapshot()
 	if err != nil {
 		return nil, err
 	}
@@ -160,32 +114,7 @@ func snapshot(data interface{}) (rafthub.Snapshot, error) {
 }
 
 func restore(rd io.Reader) (interface{}, error) {
-	sr := sds.NewReader(rd)
-	var batch leveldb.Batch
-	for {
-		key, err := sr.ReadBytes()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-		value, err := sr.ReadBytes()
-		if err != nil {
-			return nil, err
-		}
-		batch.Put(key, value)
-		if batch.Len() == 1000 {
-			if err := db.Write(&batch, nil); err != nil {
-				return nil, err
-			}
-			batch.Reset()
-		}
-	}
-	if err := db.Write(&batch, nil); err != nil {
-		return nil, err
-	}
-	return nil, nil
+	return nil, restoreSnapshot(storageDriver(), rd)
 }
 
 func connOpened(addr string) (context interface{}, accept bool) {
