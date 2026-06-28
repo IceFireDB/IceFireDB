@@ -71,6 +71,12 @@ test:
 test-compat:
 	DRIVER=$(DRIVER) go test -v -count=1 -tags alltest ./
 
+# Integration tests launch the real binary as subprocesses to exercise crash
+# recovery (SIGKILL) and multi-node Raft failover. Builds the binary first.
+test-integration:
+	go build -o /tmp/icefiredb-it .
+	IFDB_BIN=/tmp/icefiredb-it go test -v -count=1 -tags integration -run TestIntegration ./
+
 bench-run:
 	rm -rf ./data
 	./bin/IceFireDB --nosync
