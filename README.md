@@ -203,6 +203,28 @@ IceFireDB implements a sophisticated layered architecture with the following cor
 | **🔧 [Codec Layer](https://docs.icefiredb.xyz/icefiredb_docs/icefiredb/icefiredb-nosql/designs/codec/)** | Core data abstraction and encoding/decoding engine | **KV**, **Strings**, **Hashes**, **Lists**, **Sorted Sets**, **Sets**, **SQL**, **PubSub** |
 
 
+## 🧱 Backend Support Matrix (1.0.0)
+
+Storage backends are classified by support tier for the 1.0.0 release. "GA" backends are
+recommended for production; "Beta" are usable and CI-tested but may need tuning or carry
+caveats; "Experimental" are decentralized/external-service backends still maturing.
+
+| Backend       | Tier         | Storage              | External dependency      | Notes |
+|---------------|--------------|----------------------|--------------------------|-------|
+| `goleveldb`   | **GA**       | Local LSM (default)  | none                     | Default engine; mature ledis storage. |
+| `hybriddb`    | **GA**       | Local hot/cold tier  | none                     | ristretto cache over leveldb; has dedicated unit tests. |
+| `badger`      | Beta         | Local LSM            | none                     | CI-tested; default open options are memory-heavy — tune before heavy production use. |
+| `ipfs-synckv` | Beta         | IPFS + local mirror  | IPFS daemon (:5001)      | Encrypted (AES-GCM); CI-tested against a real IPFS node. |
+| `ipfs`        | Experimental | IPFS                 | IPFS daemon (:5001)      | Decentralized storage; beta maturity. |
+| `ipfs-log`    | Experimental | IPFS append-only log | IPFS daemon (:5001)      | Decentralized log; multi-node identifier via `--ipfs-log-dbname`. |
+| `oss`         | Experimental | S3 / object storage  | S3 endpoint + credentials| Object-storage backend. |
+| `crdt`        | Experimental | P2P CRDT             | libp2p networking        | Conflict-free cross-site sync; beta maturity. |
+
+> All backends are exercised by the per-backend CI jobs in `.github/workflows/test.yml`.
+> Tier reflects production-readiness and operational complexity, not just test coverage.
+> RESP semantics are identical across backends — see [COMPATIBILITY.md](COMPATIBILITY.md).
+
+
 ## 🚀 Quick Start
 
 Get started with IceFireDB in minutes with our comprehensive quick start guide:
