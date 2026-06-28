@@ -34,7 +34,12 @@ func (w *WriteBatch) Put(key, value []byte) {
 	// Encrypt value for IPFS if needed
 	ipfsValue := value
 	if w.db.encryptionKey != nil {
-		ipfsValue = encrypt(value, w.db.encryptionKey)
+		encrypted, err := encrypt(value, w.db.encryptionKey)
+		if err != nil {
+			w.err = fmt.Errorf("encrypt failed during batch put: %w", err)
+			return
+		}
+		ipfsValue = encrypted
 	}
 
 	// Add local operations to the leveldb batch

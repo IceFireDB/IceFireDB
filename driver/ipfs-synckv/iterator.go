@@ -25,9 +25,13 @@ func (it *Iterator) Value() []byte {
 		value, err := it.ipfsDB.Get(key)
 		if err == nil && value != nil {
 			if it.db.encryptionKey != nil {
-				return decrypt(value, it.db.encryptionKey)
+				if pt, derr := decrypt(value, it.db.encryptionKey); derr == nil {
+					return pt
+				}
+				// Decrypt failed (corrupt/foreign data): fall through to the local value.
+			} else {
+				return value
 			}
-			return value
 		}
 	}
 	// Fall back to local value if IPFS fails or returns nil

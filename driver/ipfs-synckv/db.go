@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"strconv"
 	"sync"
@@ -235,7 +236,11 @@ func (db *DB) Put(key, value []byte) error {
 	// Prepare data for IPFS (encrypt if key is available)
 	ipfsValue := value
 	if db.encryptionKey != nil {
-		ipfsValue = encrypt(value, db.encryptionKey)
+		encrypted, err := encrypt(value, db.encryptionKey)
+		if err != nil {
+			return fmt.Errorf("encrypt failed during put: %w", err)
+		}
+		ipfsValue = encrypted
 	}
 
 	// --- Atomic Write (IPFS-first) ---
@@ -303,7 +308,13 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 
 	// Decrypt IPFS value if needed
 	if ipfsErr == nil && ipfsValue != nil && db.encryptionKey != nil {
-		ipfsValue = decrypt(ipfsValue, db.encryptionKey)
+		pt, derr := decrypt(ipfsValue, db.encryptionKey)
+		if derr != nil {
+			log.Printf("ipfs-synckv: decrypt failed for key %q: %v", key, derr)
+			ipfsValue = nil
+		} else {
+			ipfsValue = pt
+		}
 	}
 
 	// --- Conflict Resolution ---
