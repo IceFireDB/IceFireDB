@@ -47,23 +47,11 @@ func main() {
 	conf.Flag.Custom = true
 	confInit(&conf)
 	conf.DataDirReady = func(dir string) {
-		ldsCfg = lediscfg.NewConfigDefault()
-		ldsCfg.DataDir = filepath.Join(dir, "main.db")
-		ldsCfg.Databases = 1
-		ldsCfg.DBName = storageBackend
-
-		var err error
-		le, err = ledis.Open(ldsCfg)
+		cfg, l, d, err := openStorage(dir, storageBackend)
 		if err != nil {
-			log.Printf("failed to open ledis database: %v", err)
-			return
+			log.Fatalf("failed to initialize storage backend %q: %v", storageBackend, err)
 		}
-
-		ldb, err = le.Select(0)
-		if err != nil {
-			log.Printf("failed to select ledis database: %v", err)
-			return
-		}
+		ldsCfg, le, ldb = cfg, l, d
 
 		// Register backend-specific metrics with the INFO endpoint.
 		switch storageBackend {
@@ -92,6 +80,27 @@ func main() {
 
 	fmt.Printf("start with Storage Engine: %s\n", storageBackend)
 	rafthub.Main(conf)
+}
+
+// openStorage opens the ledis database for the given data dir and storage
+// backend, returning the config and handles. It returns an error instead of
+// aborting so callers (and tests) can decide how to handle failure.
+func openStorage(dir, backend string) (*lediscfg.Config, *ledis.Ledis, *ledis.DB, error) {
+	cfg := lediscfg.NewConfigDefault()
+	cfg.DataDir = filepath.Join(dir, "main.db")
+	cfg.Databases = 1
+	cfg.DBName = backend
+
+	l, err := ledis.Open(cfg)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	d, err := l.Select(0)
+	if err != nil {
+		l.Close()
+		return nil, nil, nil, err
+	}
+	return cfg, l, d, nil
 }
 
 // storageDriver returns the low-level storage driver backing the active ledis
