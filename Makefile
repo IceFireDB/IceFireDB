@@ -68,6 +68,9 @@ run_dev:
 test:
 	DRIVER=$(DRIVER) go test -v --v ./...
 
+test-compat:
+	DRIVER=$(DRIVER) go test -v -count=1 -tags alltest ./
+
 bench-run:
 	rm -rf ./data
 	./bin/IceFireDB --nosync

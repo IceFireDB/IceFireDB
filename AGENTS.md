@@ -44,6 +44,7 @@ git commit -s -m "feat(hybriddb): add configurable cache TTL support"
 | `make localbuild`               | Build binary for local environment.                 |
 | `make test`                    | Run test suite.                                   |
 | `DRIVER=badger make test`      | Run tests with specific storage driver.            |
+| `DRIVER=goleveldb make test-compat` | Run the RESP command-compatibility suite (`-tags alltest`). |
 | `go test ./...`                | Execute all tests.                                 |
 | `go mod tidy`                  | Clean up dependencies.                             |
 | `make race`                    | Run tests with race detection.                      |
