@@ -310,6 +310,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	if ipfsErr == nil && ipfsValue != nil && db.encryptionKey != nil {
 		pt, derr := decrypt(ipfsValue, db.encryptionKey)
 		if derr != nil {
+			// Decrypt failure (corrupt/tampered IPFS copy): drop it so the local value wins rather than crashing.
 			log.Printf("ipfs-synckv: decrypt failed for key %q: %v", key, derr)
 			ipfsValue = nil
 		} else {

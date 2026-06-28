@@ -40,6 +40,18 @@ func TestDecryptCorruptReturnsErrorNoPanic(t *testing.T) {
 	}
 }
 
+func TestDecryptTamperedReturnsError(t *testing.T) {
+	key := testKey()
+	ct, err := encrypt([]byte("authentic data"), key)
+	if err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	ct[len(ct)-1] ^= 0xff // flip a byte in the auth tag / ciphertext
+	if _, err := decrypt(ct, key); err == nil {
+		t.Fatalf("decrypt of tampered ciphertext = nil error, want error")
+	}
+}
+
 func TestNonceUniqueness(t *testing.T) {
 	key := testKey()
 	seen := make(map[string]struct{})
