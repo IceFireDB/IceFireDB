@@ -61,6 +61,8 @@ Advanced options:
   --init-run-quit  : initialize a bootstrap operation and then quit
   --raft-backend   : Raft storage backend
   --storage-backend : Storage backend (e.g. goleveldb, oss, ipfs-log, ipfs, ipfs-synckv, hybriddb)
+  --pprof          : enable the pprof profiling server (default: off)
+  --pprof-addr addr: pprof bind address (default: 127.0.0.1:26063)
   --ipfs-endpoint	: ipfs endpoint connect
   --ipfs-synckv-key : ipfs-synckv driver encryption key
   --pubsub-id		: orbitdb pub sub
@@ -127,7 +129,10 @@ func confInit(conf *rafthub.Config) {
 	flag.BoolVar(&conf.TryErrors, "try-errors", conf.TryErrors, "")
 	flag.BoolVar(&conf.InitRunQuit, "init-run-quit", conf.InitRunQuit, "")
 	flag.StringVar(&storageBackend, "storage-backend", "goleveldb", "Storage backend (e.g. goleveldb, hybriddb, ipfs, oss, ipfs-synckv)")
-	flag.StringVar(&pprofAddr, "pprof-addr", ":26063", "")
+	// pprof is opt-in and bound to loopback by default to avoid exposing
+	// profiling/debug endpoints on a public interface.
+	flag.StringVar(&pprofAddr, "pprof-addr", "127.0.0.1:26063", "")
+	flag.BoolVar(&enablePprof, "pprof", false, "enable the pprof profiling HTTP server")
 	flag.BoolVar(&debug, "debug", false, "")
 	// p2p
 	flag.StringVar(&crdt.DefaultConfig.ServiceName, "servicename", crdt.DefaultConfig.ServiceName, "")

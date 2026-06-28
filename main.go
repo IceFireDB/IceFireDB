@@ -25,8 +25,10 @@ import (
 var (
 	// storageBackend select storage Engine
 	storageBackend string
-	// pprof listen
+	// pprofAddr is the listen address for the optional pprof server.
 	pprofAddr string
+	// enablePprof gates the pprof profiling server (off by default).
+	enablePprof bool
 	// debug
 	debug bool
 )
@@ -73,10 +75,13 @@ func main() {
 			serverInfo.RegisterExtInfo(ldb.GetSDB().GetDriver().(*ipfs_synckv.DB).Metrics)
 		}
 	}
-	if debug {
-		// pprof for profiling
+	if enablePprof {
+		// pprof for profiling — opt-in, loopback by default.
 		go func() {
-			http.ListenAndServe(pprofAddr, nil)
+			log.Printf("pprof listening on %s", pprofAddr)
+			if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+				log.Printf("pprof server stopped: %v", err)
+			}
 		}()
 	}
 	conf.Snapshot = snapshot
