@@ -225,6 +225,30 @@ caveats; "Experimental" are decentralized/external-service backends still maturi
 > RESP semantics are identical across backends — see [COMPATIBILITY.md](COMPATIBILITY.md).
 
 
+## 💾 Durability & `--nosync`
+
+Writes go through the Raft log before being applied to the storage backend. By
+default each Raft log append is synced to disk (`fsync`) before the write is
+acknowledged, so an acknowledged write survives a power loss or process crash on
+that node.
+
+- **Default (sync on):** durable but slower — every write pays an `fsync`.
+- **`--nosync`:** the Raft log is *not* fsync'd on every append. Writes are much
+  faster, but a sudden power loss or OS crash can lose the most recent
+  acknowledged writes on that node. A clean process kill (e.g. `SIGKILL`) is
+  still safe because the data already reached the OS page cache; `--nosync` only
+  trades away protection against losing un-flushed pages on power/kernel failure.
+
+In a multi-node cluster, a Raft write commits once a **majority** of nodes have
+appended it, so the cluster as a whole tolerates the loss of a minority of nodes
+even with `--nosync`. Crash-recovery and leader-failover behavior is verified by
+the integration tests (`make test-integration`).
+
+Recommendation: keep the default (sync on) for single-node or durability-
+sensitive deployments; consider `--nosync` only for multi-node clusters where the
+majority-commit guarantee and higher throughput outweigh per-node power-loss risk.
+
+
 ## 🚀 Quick Start
 
 Get started with IceFireDB in minutes with our comprehensive quick start guide:
