@@ -61,7 +61,7 @@ IceFireDB/
 │   ├── ipfs/                    # IPFS storage driver
 │   ├── ipfs-log/                # IPFS Log driver (append-only log)
 │   ├── ipfs-synckv/             # IPFS SyncKV driver
-│   ├── orbitdb/                 # OrbitDB driver
+│   ├── orbitdb/                 # OrbitDB driver (currently DISABLED — commented out in main.go/flags.go)
 │   └── oss/                     # Object Storage Service driver
 ├── IceFireDB-SQLite/            # MySQL protocol to SQLite backend
 ├── IceFireDB-SQLProxy/          # MySQL protocol proxy for traditional DBs
@@ -91,17 +91,26 @@ IceFireDB/
 
 ## 8. Storage Driver Interface
 
-All storage drivers implement the `driver.IDB` interface:
+All storage drivers implement the `github.com/ledisdb/ledisdb/store/driver.IDB`
+interface:
 
 ```go
 type IDB interface {
-    Put(key, value []byte) error
+    Close() error
+
     Get(key []byte) ([]byte, error)
+    Put(key []byte, value []byte) error
     Delete(key []byte) error
-    NewWriteBatch() IWriteBatch
+
+    SyncPut(key []byte, value []byte) error
+    SyncDelete(key []byte) error
+
     NewIterator() IIterator
+    NewWriteBatch() IWriteBatch
     NewSnapshot() (ISnapshot, error)
-    GetStorageEngine() any
+
+    Compact() error
+    GetStorageEngine() interface{}
 }
 ```
 
