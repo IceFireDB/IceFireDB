@@ -142,6 +142,13 @@ func confInit(conf *rafthub.Config) {
 	flag.StringVar(&ipfs_log.Dbname, "ipfs-log-dbname", ipfs_log.Dbname, "")
 	flag.Parse()
 
+	// Allow the cluster auth token to come from the environment so it is not
+	// exposed on the command line / process list. The --auth flag takes
+	// precedence when both are set.
+	if conf.Auth == "" {
+		conf.Auth = os.Getenv("ICEFIREDB_AUTH")
+	}
+
 	switch raftBackend {
 	case "leveldb":
 		conf.Backend = rafthub.LevelDB
