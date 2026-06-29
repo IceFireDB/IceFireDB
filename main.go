@@ -29,6 +29,10 @@ var (
 	pprofAddr string
 	// enablePprof gates the pprof profiling server (off by default).
 	enablePprof bool
+	// enableMetrics gates the observability HTTP server (off by default).
+	enableMetrics bool
+	// metricsAddr is the listen address for the observability server.
+	metricsAddr string
 	// debug
 	debug bool
 )
@@ -71,6 +75,9 @@ func main() {
 				log.Printf("pprof server stopped: %v", err)
 			}
 		}()
+	}
+	if enableMetrics {
+		startObservabilityServer(metricsAddr, func() bool { return ldb != nil })
 	}
 	conf.Snapshot = snapshot
 	conf.Restore = restore

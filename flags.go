@@ -63,6 +63,8 @@ Advanced options:
   --storage-backend : Storage backend (e.g. goleveldb, oss, ipfs-log, ipfs, ipfs-synckv, hybriddb)
   --pprof          : enable the pprof profiling server (default: off)
   --pprof-addr addr: pprof bind address (default: 127.0.0.1:26063)
+  --metrics        : enable the observability server (/healthz /readyz /metrics) (default: off)
+  --metrics-addr addr : observability bind address (default: 127.0.0.1:11002)
   --ipfs-endpoint	: ipfs endpoint connect
   --ipfs-synckv-key : ipfs-synckv driver encryption key
   --pubsub-id		: orbitdb pub sub
@@ -133,6 +135,9 @@ func confInit(conf *rafthub.Config) {
 	// profiling/debug endpoints on a public interface.
 	flag.StringVar(&pprofAddr, "pprof-addr", "127.0.0.1:26063", "")
 	flag.BoolVar(&enablePprof, "pprof", false, "enable the pprof profiling HTTP server")
+	// metrics observability server is opt-in and bound to loopback by default.
+	flag.BoolVar(&enableMetrics, "metrics", false, "enable the observability HTTP server (/healthz /readyz /metrics)")
+	flag.StringVar(&metricsAddr, "metrics-addr", "127.0.0.1:11002", "")
 	flag.BoolVar(&debug, "debug", false, "")
 	// p2p
 	flag.StringVar(&crdt.DefaultConfig.ServiceName, "servicename", crdt.DefaultConfig.ServiceName, "")
