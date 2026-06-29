@@ -77,6 +77,13 @@ test-integration:
 	go build -o /tmp/icefiredb-it .
 	IFDB_BIN=/tmp/icefiredb-it go test -v -count=1 -tags integration -run TestIntegration ./
 
+# Partition test runs a 3-node cluster in Docker containers and cuts the leader
+# off the inter-node network to verify Raft's no-split-brain guarantee. Requires
+# docker; builds a static linux binary for the containers.
+test-partition:
+	CGO_ENABLED=0 go build -o /tmp/icefiredb-static .
+	IFDB_STATIC=/tmp/icefiredb-static go test -v -count=1 -tags partition -run TestPartition ./
+
 bench-run:
 	rm -rf ./data
 	./bin/IceFireDB --nosync
