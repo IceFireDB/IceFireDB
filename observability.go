@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -46,7 +47,12 @@ func observabilityMux(readyFn func() bool) http.Handler {
 func startObservabilityServer(addr string, ready func() bool) {
 	go func() {
 		log.Printf("observability server listening on %s (/healthz /readyz /metrics)", addr)
-		if err := http.ListenAndServe(addr, observabilityMux(ready)); err != nil {
+		srv := &http.Server{
+			Addr:              addr,
+			Handler:           observabilityMux(ready),
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+		if err := srv.ListenAndServe(); err != nil {
 			log.Printf("observability server stopped: %v", err)
 		}
 	}()

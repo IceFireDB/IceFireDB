@@ -56,6 +56,7 @@ func main() {
 			log.Fatalf("failed to initialize storage backend %q: %v", storageBackend, err)
 		}
 		ldsCfg, le, ldb = cfg, l, d
+		storageReady.Store(true)
 
 		// Register backend-specific metrics with the INFO endpoint.
 		switch storageBackend {
@@ -77,7 +78,7 @@ func main() {
 		}()
 	}
 	if enableMetrics {
-		startObservabilityServer(metricsAddr, func() bool { return ldb != nil })
+		startObservabilityServer(metricsAddr, func() bool { return storageReady.Load() })
 	}
 	conf.Snapshot = snapshot
 	conf.Restore = restore

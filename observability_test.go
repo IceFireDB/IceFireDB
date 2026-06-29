@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -35,5 +36,8 @@ func TestMetricsServed(t *testing.T) {
 	}
 	if ct := rr.Header().Get("Content-Type"); ct == "" {
 		t.Fatalf("/metrics missing Content-Type")
+	}
+	if !strings.Contains(rr.Body.String(), "icefiredb_connected_clients") {
+		t.Fatalf("/metrics body missing icefiredb_connected_clients gauge")
 	}
 }
