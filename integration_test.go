@@ -68,24 +68,6 @@ func waitWritable(t *testing.T, addr string, timeout time.Duration) *redis.Clien
 	return nil
 }
 
-func waitReadable(t *testing.T, addr string, timeout time.Duration) *redis.Client {
-	t.Helper()
-	c := redis.NewClient(&redis.Options{Addr: addr})
-	ctx := context.Background()
-	deadline := time.Now().Add(timeout)
-	var lastErr error
-	for time.Now().Before(deadline) {
-		if err := c.Ping(ctx).Err(); err == nil {
-			return c
-		} else {
-			lastErr = err
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-	t.Fatalf("node at %s not reachable within %s: %v", addr, timeout, lastErr)
-	return nil
-}
-
 func kill9(t *testing.T, cmd *exec.Cmd) {
 	t.Helper()
 	if cmd == nil || cmd.Process == nil {
@@ -265,6 +247,108 @@ func TestIntegrationClusterFailover(t *testing.T) {
 	}
 	if got, ok := clusterGet(survivors, "clus:postfailover", 30*time.Second); !ok || got != "ok" {
 		t.Fatalf("read-back after failover = %q, ok=%v; want \"ok\"", got, ok)
+	}
+}
+
+// TestIntegrationFollowerRejoin exercises join/leave churn: it kills a follower,
+// restarts it (which must rejoin from its persisted Raft state), then kills the
+// original leader. A new leader can only be elected if the restarted follower
+// successfully rejoined to restore quorum (2 of 3). This proves rejoin plus
+// data durability across the churn.
+func TestIntegrationFollowerRejoin(t *testing.T) {
+	bin := itBinary(t)
+	addrs := []string{"127.0.0.1:11091", "127.0.0.1:11092", "127.0.0.1:11093"}
+	ids := []string{"1", "2", "3"}
+	dirs := []string{t.TempDir(), t.TempDir(), t.TempDir()}
+	cmds := make([]*exec.Cmd, 3)
+
+	// Bring up the cluster: node 1 bootstraps, nodes 2 and 3 join.
+	cmds[0] = startNode(t, bin, addrs[0], ids[0], dirs[0])
+	defer func() { kill9(t, cmds[0]) }()
+	_ = waitWritable(t, addrs[0], 30*time.Second)
+	cmds[1] = startNode(t, bin, addrs[1], ids[1], dirs[1], "-j", addrs[0])
+	defer func() { kill9(t, cmds[1]) }()
+	cmds[2] = startNode(t, bin, addrs[2], ids[2], dirs[2], "-j", addrs[0])
+	defer func() { kill9(t, cmds[2]) }()
+
+	// Wait for formation (both 2 and 3 report as followers).
+	formDeadline := time.Now().Add(45 * time.Second)
+	for {
+		if nodeRole(addrs[1]) == "follower" && nodeRole(addrs[2]) == "follower" {
+			break
+		}
+		if time.Now().After(formDeadline) {
+			t.Fatalf("cluster did not form (n2=%s n3=%s)", nodeRole(addrs[1]), nodeRole(addrs[2]))
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	// Write data to the current leader.
+	const n = 150
+	if !clusterSet(addrs, "rejoin:seed", "1", 30*time.Second) {
+		t.Fatalf("seed write failed")
+	}
+	ctx := context.Background()
+	leaderAddr := waitLeaderAmong(t, addrs, 30*time.Second)
+	lc := redis.NewClient(&redis.Options{Addr: leaderAddr})
+	for i := 0; i < n; i++ {
+		if err := lc.Set(ctx, fmt.Sprintf("rejoin:%d", i), fmt.Sprintf("v%d", i), 0).Err(); err != nil {
+			lc.Close()
+			t.Fatalf("write %d: %v", i, err)
+		}
+	}
+	lc.Close()
+
+	// Identify a follower (not the leader), find its index, kill and restart it.
+	followerIdx := -1
+	for i, a := range addrs {
+		if a != leaderAddr && nodeRole(a) == "follower" {
+			followerIdx = i
+			break
+		}
+	}
+	if followerIdx == -1 {
+		t.Fatalf("no follower found to restart (leader=%s)", leaderAddr)
+	}
+	t.Logf("restarting follower %s (node %s)", addrs[followerIdx], ids[followerIdx])
+	kill9(t, cmds[followerIdx])
+	// Restart WITHOUT -j: it must rejoin from persisted Raft state.
+	cmds[followerIdx] = startNode(t, bin, addrs[followerIdx], ids[followerIdx], dirs[followerIdx])
+	// Give it a moment to come back and rejoin.
+	rejoinDeadline := time.Now().Add(30 * time.Second)
+	for nodeRole(addrs[followerIdx]) == "down" && time.Now().Before(rejoinDeadline) {
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	// Now kill the original leader. Quorum (2/3) only holds if the restarted
+	// follower rejoined; otherwise no new leader can be elected.
+	for i, a := range addrs {
+		if a == leaderAddr {
+			kill9(t, cmds[i])
+		}
+	}
+	survivors := []string{}
+	for _, a := range addrs {
+		if a != leaderAddr {
+			survivors = append(survivors, a)
+		}
+	}
+	newLeader := waitLeaderAmong(t, survivors, 45*time.Second)
+	t.Logf("new leader after follower-rejoin + leader-kill: %s", newLeader)
+
+	// Data must be intact and the cluster writable.
+	for i := 0; i < n; i++ {
+		key := fmt.Sprintf("rejoin:%d", i)
+		got, ok := clusterGet(survivors, key, 45*time.Second)
+		if !ok {
+			t.Fatalf("could not read %s after churn", key)
+		}
+		if want := fmt.Sprintf("v%d", i); got != want {
+			t.Fatalf("%s = %q after churn, want %q (data lost)", key, got, want)
+		}
+	}
+	if !clusterSet(survivors, "rejoin:postchurn", "ok", 30*time.Second) {
+		t.Fatalf("cluster not writable after churn")
 	}
 }
 
