@@ -250,6 +250,172 @@ func TestIntegrationClusterFailover(t *testing.T) {
 	}
 }
 
+// clusterRoles returns the current role of each address (for diagnostics).
+func clusterRoles(addrs []string) []string {
+	r := make([]string, len(addrs))
+	for i, a := range addrs {
+		r[i] = nodeRole(a)
+	}
+	return r
+}
+
+// startCluster3 brings up a 3-node cluster (node1 bootstraps, nodes 2 and 3
+// join) on ports base, base+1, base+2, and waits for a healthy 1-leader/
+// 2-follower formation. Returns the addresses, data dirs, and commands. The
+// caller is responsible for killing the commands.
+func startCluster3(t *testing.T, bin string, base int) (addrs, dirs []string, cmds []*exec.Cmd) {
+	t.Helper()
+	for i := 0; i < 3; i++ {
+		addrs = append(addrs, fmt.Sprintf("127.0.0.1:%d", base+i))
+		dirs = append(dirs, t.TempDir())
+	}
+	cmds = make([]*exec.Cmd, 3)
+	cmds[0] = startNode(t, bin, addrs[0], "1", dirs[0])
+	_ = waitWritable(t, addrs[0], 30*time.Second)
+	cmds[1] = startNode(t, bin, addrs[1], "2", dirs[1], "-j", addrs[0])
+	cmds[2] = startNode(t, bin, addrs[2], "3", dirs[2], "-j", addrs[0])
+
+	deadline := time.Now().Add(60 * time.Second)
+	for {
+		leaders, followers := 0, 0
+		for _, a := range addrs {
+			switch nodeRole(a) {
+			case "leader":
+				leaders++
+			case "follower":
+				followers++
+			}
+		}
+		if leaders == 1 && followers == 2 {
+			return addrs, dirs, cmds
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("cluster did not form: roles=%v", clusterRoles(addrs))
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+}
+
+// waitNodeUp waits until a node responds (role != "down") after a restart.
+func waitNodeUp(t *testing.T, addr string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if nodeRole(addr) != "down" {
+			return
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	t.Fatalf("node %s did not come back within %s", addr, timeout)
+}
+
+// TestIntegrationRollingRestart restarts every node one at a time while writing
+// continuously, asserting the cluster stays available throughout (quorum holds
+// with 2/3 up) and that every acknowledged write survives the full rotation.
+func TestIntegrationRollingRestart(t *testing.T) {
+	bin := itBinary(t)
+	addrs, dirs, cmds := startCluster3(t, bin, 11111)
+	defer func() {
+		for _, c := range cmds {
+			kill9(t, c)
+		}
+	}()
+	ids := []string{"1", "2", "3"}
+
+	written := 0
+	writeBatch := func(n int) {
+		for i := 0; i < n; i++ {
+			key := fmt.Sprintf("roll:%d", written)
+			if !clusterSet(addrs, key, fmt.Sprintf("v%d", written), 30*time.Second) {
+				t.Fatalf("write %s failed — cluster unavailable during rolling restart", key)
+			}
+			written++
+		}
+	}
+
+	writeBatch(30)
+	for i := 0; i < 3; i++ {
+		kill9(t, cmds[i])
+		// With one node down (2/3 up) the cluster must remain writable.
+		writeBatch(20)
+		// Restart on the same data dir; it recovers and rejoins.
+		cmds[i] = startNode(t, bin, addrs[i], ids[i], dirs[i])
+		waitNodeUp(t, addrs[i], 45*time.Second)
+		writeBatch(20)
+	}
+
+	// Every acknowledged write must still be present.
+	for i := 0; i < written; i++ {
+		key := fmt.Sprintf("roll:%d", i)
+		got, ok := clusterGet(addrs, key, 30*time.Second)
+		if !ok || got != fmt.Sprintf("v%d", i) {
+			t.Fatalf("%s lost/mismatch after rolling restart: got=%q ok=%v", key, got, ok)
+		}
+	}
+	t.Logf("rolling restart complete; all %d acknowledged writes survived", written)
+}
+
+// TestIntegrationLeaderChurn repeatedly kills the current leader. Each round a
+// new leader must be elected and all previously-acknowledged data must persist.
+// The killed node is restarted each round to keep quorum capacity for the next.
+func TestIntegrationLeaderChurn(t *testing.T) {
+	bin := itBinary(t)
+	addrs, dirs, cmds := startCluster3(t, bin, 11121)
+	defer func() {
+		for _, c := range cmds {
+			kill9(t, c)
+		}
+	}()
+	ids := []string{"1", "2", "3"}
+	idxByAddr := map[string]int{addrs[0]: 0, addrs[1]: 1, addrs[2]: 2}
+
+	type kv struct{ k, v string }
+	var acked []kv
+	put := func(k, v string) {
+		if !clusterSet(addrs, k, v, 30*time.Second) {
+			t.Fatalf("write %s failed during leader churn", k)
+		}
+		acked = append(acked, kv{k, v})
+	}
+
+	put("churn:seed", "s")
+
+	const rounds = 3
+	for r := 0; r < rounds; r++ {
+		leader := waitLeaderAmong(t, addrs, 30*time.Second)
+		put(fmt.Sprintf("churn:r%d", r), fmt.Sprintf("v%d", r))
+
+		li := idxByAddr[leader]
+		t.Logf("round %d: killing leader %s", r, leader)
+		kill9(t, cmds[li])
+
+		// Survivors must elect a new leader.
+		survivors := []string{}
+		for j, a := range addrs {
+			if j != li {
+				survivors = append(survivors, a)
+			}
+		}
+		newLeader := waitLeaderAmong(t, survivors, 45*time.Second)
+		if newLeader == leader {
+			t.Fatalf("round %d: leader did not change", r)
+		}
+
+		// Restart the killed node so it rejoins (restores 3-node quorum capacity).
+		cmds[li] = startNode(t, bin, addrs[li], ids[li], dirs[li])
+		waitNodeUp(t, addrs[li], 45*time.Second)
+	}
+
+	// All acknowledged data must have survived the churn.
+	for _, e := range acked {
+		got, ok := clusterGet(addrs, e.k, 30*time.Second)
+		if !ok || got != e.v {
+			t.Fatalf("%s lost/mismatch after leader churn: got=%q ok=%v", e.k, got, ok)
+		}
+	}
+	t.Logf("leader churn complete over %d rounds; all %d acknowledged writes survived", rounds, len(acked))
+}
+
 // TestIntegrationFollowerRejoin exercises join/leave churn: it kills a follower,
 // restarts it (which must rejoin from its persisted Raft state), then kills the
 // original leader. A new leader can only be elected if the restarted follower
