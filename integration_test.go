@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -414,6 +416,160 @@ func TestIntegrationLeaderChurn(t *testing.T) {
 		}
 	}
 	t.Logf("leader churn complete over %d rounds; all %d acknowledged writes survived", rounds, len(acked))
+}
+
+// TestIntegrationSoak drives sustained concurrent write load against a 3-node
+// cluster for a configurable duration, then verifies a sample of acknowledged
+// writes survived. With SOAK_CHAOS=1 it also kills+restarts the leader on a
+// timer during the run (soak-under-chaos). Tunables:
+//
+//	SOAK_DURATION (default 30s), SOAK_WORKERS (default 4), SOAK_CHAOS=1
+func TestIntegrationSoak(t *testing.T) {
+	bin := itBinary(t)
+
+	dur := 30 * time.Second
+	if s := os.Getenv("SOAK_DURATION"); s != "" {
+		if d, err := time.ParseDuration(s); err == nil {
+			dur = d
+		}
+	}
+	workers := 4
+	if s := os.Getenv("SOAK_WORKERS"); s != "" {
+		if n, err := fmt.Sscanf(s, "%d", &workers); err != nil || n != 1 || workers < 1 {
+			workers = 4
+		}
+	}
+	chaos := os.Getenv("SOAK_CHAOS") == "1"
+
+	addrs, dirs, cmds := startCluster3(t, bin, 11131)
+	ids := []string{"1", "2", "3"}
+	var cmdMu sync.Mutex // guards cmds during chaos restarts
+	defer func() {
+		cmdMu.Lock()
+		defer cmdMu.Unlock()
+		for _, c := range cmds {
+			kill9(t, c)
+		}
+	}()
+
+	deadline := time.Now().Add(dur)
+	var totalOK, totalErr int64
+	ackedPerWorker := make([][]string, workers)
+	var wg sync.WaitGroup
+
+	// Optional chaos: kill + restart the current leader on a timer.
+	if chaos {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for time.Now().Before(deadline) {
+				time.Sleep(8 * time.Second)
+				if !time.Now().Before(deadline) {
+					return
+				}
+				leader := ""
+				for _, a := range addrs {
+					if nodeRole(a) == "leader" {
+						leader = a
+						break
+					}
+				}
+				if leader == "" {
+					continue
+				}
+				li := 0
+				for j, a := range addrs {
+					if a == leader {
+						li = j
+					}
+				}
+				cmdMu.Lock()
+				kill9(t, cmds[li])
+				cmds[li] = nil
+				cmdMu.Unlock()
+				// Let the majority elect a new leader, then restart the node.
+				time.Sleep(3 * time.Second)
+				c := startNode(t, bin, addrs[li], ids[li], dirs[li])
+				cmdMu.Lock()
+				cmds[li] = c
+				cmdMu.Unlock()
+				t.Logf("soak-chaos: cycled leader %s", leader)
+			}
+		}()
+	}
+
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			clients := make([]*redis.Client, len(addrs))
+			for i, a := range addrs {
+				clients[i] = redis.NewClient(&redis.Options{Addr: a, DialTimeout: 2 * time.Second, ReadTimeout: 3 * time.Second, WriteTimeout: 3 * time.Second})
+			}
+			defer func() {
+				for _, c := range clients {
+					c.Close()
+				}
+			}()
+			li, n := 0, 0
+			for time.Now().Before(deadline) {
+				key := fmt.Sprintf("soak:%d:%d", id, n)
+				ok := false
+				for try := 0; try < len(addrs)+1; try++ {
+					ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+					err := clients[li].Set(ctx, key, key, 0).Err()
+					cancel()
+					if err == nil {
+						ok = true
+						break
+					}
+					li = (li + 1) % len(addrs) // rotate to find the current leader
+				}
+				if ok {
+					atomic.AddInt64(&totalOK, 1)
+					ackedPerWorker[id] = append(ackedPerWorker[id], key)
+				} else {
+					atomic.AddInt64(&totalErr, 1)
+				}
+				n++
+			}
+		}(w)
+	}
+
+	wg.Wait()
+
+	ok := atomic.LoadInt64(&totalOK)
+	errs := atomic.LoadInt64(&totalErr)
+	t.Logf("soak: duration=%s workers=%d chaos=%v acked=%d failed=%d (%.0f ok-ops/sec)",
+		dur, workers, chaos, ok, errs, float64(ok)/dur.Seconds())
+
+	if ok == 0 {
+		t.Fatalf("soak made no successful writes")
+	}
+	// Without chaos the cluster should be continuously available — failures
+	// should be negligible. With chaos, brief unavailability during elections
+	// is expected, so we only require that progress was made.
+	if !chaos && errs > ok/100+5 {
+		t.Fatalf("soak: too many write failures without chaos: acked=%d failed=%d", ok, errs)
+	}
+
+	// Verify a strided sample of acknowledged writes survived (value == key).
+	checked := 0
+	for id := 0; id < workers; id++ {
+		keys := ackedPerWorker[id]
+		step := 1
+		if len(keys) > 100 {
+			step = len(keys) / 100
+		}
+		for i := 0; i < len(keys); i += step {
+			got, found := clusterGet(addrs, keys[i], 30*time.Second)
+			if !found || got != keys[i] {
+				t.Fatalf("soak: acknowledged key %s lost/mismatch: got=%q found=%v", keys[i], got, found)
+			}
+			checked++
+		}
+	}
+	t.Logf("soak: verified %d sampled acknowledged writes intact", checked)
 }
 
 // TestIntegrationFollowerRejoin exercises join/leave churn: it kills a follower,

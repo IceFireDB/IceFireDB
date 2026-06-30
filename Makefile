@@ -84,6 +84,13 @@ test-partition:
 	CGO_ENABLED=0 go build -o /tmp/icefiredb-static .
 	IFDB_STATIC=/tmp/icefiredb-static go test -v -count=1 -tags partition -run TestPartition ./
 
+# Sustained soak/load test against a 3-node cluster. Tune via environment:
+#   SOAK_DURATION (e.g. 10m), SOAK_WORKERS (e.g. 8), SOAK_CHAOS=1 (cycle leaders).
+# Example: SOAK_DURATION=10m SOAK_CHAOS=1 make soak
+soak:
+	go build -o /tmp/icefiredb-it .
+	IFDB_BIN=/tmp/icefiredb-it go test -v -count=1 -timeout 0 -tags integration -run TestIntegrationSoak ./
+
 bench-run:
 	rm -rf ./data
 	./bin/IceFireDB --nosync

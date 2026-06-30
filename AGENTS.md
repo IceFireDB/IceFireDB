@@ -47,6 +47,7 @@ git commit -s -m "feat(hybriddb): add configurable cache TTL support"
 | `DRIVER=goleveldb make test-compat` | Run the RESP command-compatibility suite (`-tags alltest`). |
 | `make test-integration`        | Crash-recovery + multi-node Raft failover tests (`-tags integration`). |
 | `make test-partition`          | Docker-based split-brain / network-partition test (`-tags partition`). |
+| `make soak`                    | Sustained load/soak test (`SOAK_DURATION`, `SOAK_WORKERS`, `SOAK_CHAOS=1`). |
 | `go test ./...`                | Execute all tests.                                 |
 | `go mod tidy`                  | Clean up dependencies.                             |
 | `make race`                    | Run tests with race detection.                      |
