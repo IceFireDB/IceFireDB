@@ -21,6 +21,7 @@ func (a Attributes) Get(t AttrType) (RawAttribute, bool) {
 			return candidate, true
 		}
 	}
+
 	return RawAttribute{}, false
 }
 
@@ -77,7 +78,7 @@ const (
 	AttrReservationToken   AttrType = 0x0022 // RESERVATION-TOKEN
 )
 
-// Attributes from RFC 5780 NAT Behavior Discovery
+// Attributes from RFC 5780 NAT Behavior Discovery.
 const (
 	AttrChangeRequest  AttrType = 0x0003 // CHANGE-REQUEST
 	AttrPadding        AttrType = 0x0026 // PADDING
@@ -119,6 +120,12 @@ const (
 	AttrAlternateDomain        AttrType = 0x8003 // ALTERNATE-DOMAIN
 )
 
+// Attributes from SPED.
+const (
+	AttrDtlsInStun    AttrType = 0xC070
+	AttrDtlsInStunAck AttrType = 0xC071
+)
+
 // Value returns uint16 representation of attribute type.
 func (t AttrType) Value() uint16 {
 	return uint16(t)
@@ -157,6 +164,8 @@ func attrNames() map[AttrType]string {
 		AttrUserhash:               "USERHASH",
 		AttrPasswordAlgorithms:     "PASSWORD-ALGORITHMS",
 		AttrAlternateDomain:        "ALTERNATE-DOMAIN",
+		AttrDtlsInStun:             "DTLS-IN-STUN",
+		AttrDtlsInStunAck:          "DTLS-IN-STUN-ACKNOWLEDGEMENT",
 	}
 }
 
@@ -166,7 +175,16 @@ func (t AttrType) String() string {
 		// Just return hex representation of unknown attribute type.
 		return fmt.Sprintf("0x%x", uint16(t))
 	}
+
 	return s
+}
+
+// Known returns true if AttrType is known and implemented
+// by this library.
+func (t AttrType) Known() bool {
+	_, valid := attrNames()[t]
+
+	return valid
 }
 
 // RawAttribute is a Type-Length-Value (TLV) object that
@@ -186,6 +204,7 @@ type RawAttribute struct {
 // the Length field.
 func (a RawAttribute) AddTo(m *Message) error {
 	m.Add(a.Type, a.Value)
+
 	return nil
 }
 
@@ -205,6 +224,7 @@ func (a RawAttribute) Equal(b RawAttribute) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -224,6 +244,7 @@ func (m *Message) Get(t AttrType) ([]byte, error) {
 	if !ok {
 		return nil, ErrAttributeNotFound
 	}
+
 	return v.Value, nil
 }
 
@@ -240,15 +261,17 @@ func nearestPaddedValueLength(l int) int {
 	if n < l {
 		n += padding
 	}
+
 	return n
 }
 
-// This method converts uint16 vlue to AttrType. If it finds an old attribute
+// This method converts an uint16 value to AttrType. If it finds an old attribute
 // type value, it also translates it to the new value to enable backward
 // compatibility. (See: https://github.com/pion/stun/issues/21)
 func compatAttrType(val uint16) AttrType {
 	if val == 0x8020 { // draft-ietf-behave-rfc3489bis-02, MS-TURN
 		return AttrXORMappedAddress // new: 0x0020 (from draft-ietf-behave-rfc3489bis-03 on)
 	}
+
 	return AttrType(val)
 }

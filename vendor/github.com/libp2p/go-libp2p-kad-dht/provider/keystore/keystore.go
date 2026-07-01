@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	ds "github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/namespace"
 	"github.com/ipfs/go-datastore/query"
 	"github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-kad-dht/provider/internal/keyspace"
@@ -41,6 +40,12 @@ var (
 type Keystore interface {
 	Put(context.Context, ...mh.Multihash) ([]mh.Multihash, error)
 	Get(context.Context, bitstr.Key) ([]mh.Multihash, error)
+	// CountKeysUpTo returns how many stored multihashes match the prefix, capped
+	// at limit, without materialising them. It stops scanning once limit matches
+	// are found, so callers can cheaply decide whether a region exceeds a
+	// threshold before loading it with Get. The result is min(matches, limit) for
+	// a positive limit; a non-positive limit counts every match.
+	CountKeysUpTo(context.Context, bitstr.Key, int) (int, error)
 	ContainsPrefix(context.Context, bitstr.Key) (bool, error)
 	Delete(context.Context, ...mh.Multihash) error
 	Empty(context.Context) error
@@ -59,6 +64,7 @@ const (
 	opDelete
 	opEmpty
 	opSize
+	opCount
 	lastOp
 )
 
@@ -68,6 +74,7 @@ type operation struct {
 	ctx      context.Context
 	keys     []mh.Multihash
 	prefix   bitstr.Key
+	limit    int
 	response chan<- operationResponse
 }
 
@@ -101,7 +108,7 @@ func NewKeystore(d ds.Batching, opts ...Option) (Keystore, error) {
 		return nil, err
 	}
 	ks := &keystore{
-		ds:         namespace.Wrap(d, ds.NewKey(cfg.path)),
+		ds:         d,
 		prefixBits: cfg.prefixBits,
 		batchSize:  cfg.batchSize,
 		requests:   make(chan operation),
@@ -234,6 +241,10 @@ func (s *keystore) worker() {
 			case opSize:
 				op.response <- operationResponse{size: s.size}
 
+			case opCount:
+				n, err := s.countUpTo(op.ctx, op.prefix, op.limit)
+				op.response <- operationResponse{size: n, err: err}
+
 			default:
 				op.response <- operationResponse{err: fmt.Errorf("unknown operation %d", op.op)}
 			}
@@ -339,6 +350,46 @@ func (s *keystore) get(ctx context.Context, prefix bitstr.Key) ([]mh.Multihash, 
 	}
 
 	return out, nil
+}
+
+// countUpTo returns the number of stored multihashes whose bit256
+// representation matches the provided prefix, capped at limit. It runs a
+// keys-only datastore query and never materialises the multihash values, so its
+// memory use is bounded regardless of how many keys match (unlike get, which
+// builds a slice of all matches). When limit is positive it stops scanning once
+// limit matches are found, so it never iterates a large region just to learn it
+// is large; a non-positive limit counts every match.
+func (s *keystore) countUpTo(ctx context.Context, prefix bitstr.Key, limit int) (int, error) {
+	longPrefix := prefix.BitLen() > s.prefixBits
+	dsk := dsKey(prefix, s.prefixBits).String()
+	q := query.Query{Prefix: dsk, KeysOnly: true}
+	if limit > 0 && !longPrefix {
+		// Every key under the datastore prefix matches, so the datastore can stop
+		// once it has returned enough. Long prefixes still need per-key filtering
+		// below, so they can't delegate the cap to the query.
+		q.Limit = limit
+	}
+	n := 0
+	for r, err := range ds.QueryIter(ctx, s.ds, q) {
+		if err != nil {
+			return 0, err
+		}
+		// Depending on prefix length, filter out non matching keys
+		if longPrefix {
+			k, err := s.decodeKey(r.Key)
+			if err != nil {
+				return 0, err
+			}
+			if !keyspace.IsPrefix(prefix, k) {
+				continue
+			}
+		}
+		n++
+		if limit > 0 && n >= limit {
+			break
+		}
+	}
+	return n, nil
 }
 
 // containsPrefix reports whether the Keystore currently holds at least one
@@ -464,7 +515,7 @@ func refreshSize(ctx context.Context, d ds.Datastore) (size int, err error) {
 // executeOperation sends an operation request to the worker goroutine and
 // waits for the response. It handles the communication protocol and returns
 // the results based on the operation type.
-func (s *keystore) executeOperation(op opType, ctx context.Context, keys []mh.Multihash, prefix bitstr.Key) ([]mh.Multihash, int, bool, error) {
+func (s *keystore) executeOperation(op opType, ctx context.Context, keys []mh.Multihash, prefix bitstr.Key, limit int) ([]mh.Multihash, int, bool, error) {
 	response := make(chan operationResponse, 1)
 	select {
 	case s.requests <- operation{
@@ -472,6 +523,7 @@ func (s *keystore) executeOperation(op opType, ctx context.Context, keys []mh.Mu
 		ctx:      ctx,
 		keys:     keys,
 		prefix:   prefix,
+		limit:    limit,
 		response: response,
 	}:
 	case <-ctx.Done():
@@ -500,28 +552,39 @@ func (s *keystore) Put(ctx context.Context, keys ...mh.Multihash) ([]mh.Multihas
 	if len(keys) == 0 {
 		return nil, nil
 	}
-	newKeys, _, _, err := s.executeOperation(opPut, ctx, keys, "")
+	newKeys, _, _, err := s.executeOperation(opPut, ctx, keys, "", 0)
 	return newKeys, err
 }
 
 // Get returns all keys whose bit256 representation matches the provided
 // prefix.
 func (s *keystore) Get(ctx context.Context, prefix bitstr.Key) ([]mh.Multihash, error) {
-	keys, _, _, err := s.executeOperation(opGet, ctx, nil, prefix)
+	keys, _, _, err := s.executeOperation(opGet, ctx, nil, prefix, 0)
 	return keys, err
+}
+
+// CountKeysUpTo returns the number of stored multihashes whose bit256 key
+// matches the provided prefix, capped at limit, without materialising the
+// multihashes. For a positive limit it stops scanning once limit matches are
+// found, letting callers cheaply decide e.g. whether a region exceeds a
+// threshold before loading it with Get; a non-positive limit counts every
+// match. The result is min(matches, limit) for a positive limit.
+func (s *keystore) CountKeysUpTo(ctx context.Context, prefix bitstr.Key, limit int) (int, error) {
+	_, n, _, err := s.executeOperation(opCount, ctx, nil, prefix, limit)
+	return n, err
 }
 
 // ContainsPrefix reports whether the Keystore currently holds at least one
 // multihash whose kademlia identifier (bit256.Key) starts with the provided
 // bit-prefix.
 func (s *keystore) ContainsPrefix(ctx context.Context, prefix bitstr.Key) (bool, error) {
-	_, _, found, err := s.executeOperation(opContainsPrefix, ctx, nil, prefix)
+	_, _, found, err := s.executeOperation(opContainsPrefix, ctx, nil, prefix, 0)
 	return found, err
 }
 
 // Empty deletes all entries under the datastore prefix.
 func (s *keystore) Empty(ctx context.Context) error {
-	_, _, _, err := s.executeOperation(opEmpty, ctx, nil, "")
+	_, _, _, err := s.executeOperation(opEmpty, ctx, nil, "", 0)
 	return err
 }
 
@@ -530,7 +593,7 @@ func (s *keystore) Delete(ctx context.Context, keys ...mh.Multihash) error {
 	if len(keys) == 0 {
 		return nil
 	}
-	_, _, _, err := s.executeOperation(opDelete, ctx, keys, "")
+	_, _, _, err := s.executeOperation(opDelete, ctx, keys, "", 0)
 	return err
 }
 
@@ -539,7 +602,7 @@ func (s *keystore) Delete(ctx context.Context, keys ...mh.Multihash) error {
 // The size is obtained by iterating over all keys in the underlying
 // datastore, so it may be expensive for large stores.
 func (s *keystore) Size(ctx context.Context) (int, error) {
-	_, size, _, err := s.executeOperation(opSize, ctx, nil, "")
+	_, size, _, err := s.executeOperation(opSize, ctx, nil, "", 0)
 	return size, err
 }
 
