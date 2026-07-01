@@ -8,7 +8,7 @@ import (
 	"fmt"
 )
 
-// A SenderReport (SR) packet provides reception quality feedback for an RTP stream
+// A SenderReport (SR) packet provides reception quality feedback for an RTP stream.
 type SenderReport struct {
 	// The synchronization source identifier for the originator of this SR packet.
 	SSRC uint32
@@ -56,7 +56,7 @@ const (
 	srReportOffset      = srOctetCountOffset + srOctetCountLength
 )
 
-// Marshal encodes the SenderReport in binary
+// Marshal encodes the SenderReport in binary.
 func (r SenderReport) Marshal() ([]byte, error) {
 	/*
 	 *         0                   1                   2                   3
@@ -130,7 +130,7 @@ func (r SenderReport) Marshal() ([]byte, error) {
 	return rawPacket, nil
 }
 
-// Unmarshal decodes the SenderReport from binary
+// Unmarshal decodes the SenderReport from binary.
 func (r *SenderReport) Unmarshal(rawPacket []byte) error {
 	/*
 	 *         0                   1                   2                   3
@@ -174,12 +174,12 @@ func (r *SenderReport) Unmarshal(rawPacket []byte) error {
 		return errPacketTooShort
 	}
 
-	var h Header
-	if err := h.Unmarshal(rawPacket); err != nil {
+	var header Header
+	if err := header.Unmarshal(rawPacket); err != nil {
 		return err
 	}
 
-	if h.Type != TypeSenderReport {
+	if header.Type != TypeSenderReport {
 		return errWrongType
 	}
 
@@ -192,7 +192,7 @@ func (r *SenderReport) Unmarshal(rawPacket []byte) error {
 	r.OctetCount = binary.BigEndian.Uint32(packetBody[srOctetCountOffset:])
 
 	offset := srReportOffset
-	for i := 0; i < int(h.Count); i++ {
+	for i := 0; i < int(header.Count); i++ {
 		rrEnd := offset + receptionReportLength
 		if rrEnd > len(packetBody) {
 			return errPacketTooShort
@@ -211,7 +211,7 @@ func (r *SenderReport) Unmarshal(rawPacket []byte) error {
 		r.ProfileExtensions = packetBody[offset:]
 	}
 
-	if uint8(len(r.Reports)) != h.Count {
+	if uint8(len(r.Reports)) != header.Count { //nolint:gosec // G115
 		return errInvalidHeader
 	}
 
@@ -225,24 +225,26 @@ func (r *SenderReport) DestinationSSRC() []uint32 {
 		out[i] = v.SSRC
 	}
 	out[len(r.Reports)] = r.SSRC
+
 	return out
 }
 
-// MarshalSize returns the size of the packet once marshaled
+// MarshalSize returns the size of the packet once marshaled.
 func (r *SenderReport) MarshalSize() int {
 	repsLength := 0
 	for _, rep := range r.Reports {
 		repsLength += rep.len()
 	}
+
 	return headerLength + srHeaderLength + repsLength + len(r.ProfileExtensions)
 }
 
 // Header returns the Header associated with this packet.
 func (r *SenderReport) Header() Header {
 	return Header{
-		Count:  uint8(len(r.Reports)),
+		Count:  uint8(len(r.Reports)), //nolint:gosec // G115
 		Type:   TypeSenderReport,
-		Length: uint16((r.MarshalSize() / 4) - 1),
+		Length: uint16((r.MarshalSize() / 4) - 1), //nolint:gosec // G115
 	}
 }
 
@@ -258,5 +260,6 @@ func (r SenderReport) String() string {
 		out += fmt.Sprintf("\t%x\t%d/%d\t%d\n", i.SSRC, i.FractionLost, i.TotalLost, i.LastSequenceNumber)
 	}
 	out += fmt.Sprintf("\tProfile Extension Data: %v\n", r.ProfileExtensions)
+
 	return out
 }

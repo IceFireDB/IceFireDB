@@ -10,7 +10,7 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/pion/transport/v3/utils/xor"
+	"github.com/pion/transport/v4/utils/xor"
 )
 
 const (
@@ -20,7 +20,7 @@ const (
 
 // XORMappedAddress implements XOR-MAPPED-ADDRESS attribute.
 //
-// RFC 5389 Section 15.2
+// RFC 5389 Section 15.2.
 type XORMappedAddress struct {
 	IP   net.IP
 	Port int
@@ -43,14 +43,15 @@ func isZeros(p net.IP) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
 // ErrBadIPLength means that len(IP) is not net.{IPv6len,IPv4len}.
 var ErrBadIPLength = errors.New("invalid length of IP value")
 
-// AddToAs adds XOR-MAPPED-ADDRESS value to m as t attribute.
-func (a XORMappedAddress) AddToAs(m *Message, t AttrType) error {
+// AddToAs adds XOR-MAPPED-ADDRESS value to msg as attr attribute.
+func (a XORMappedAddress) AddToAs(msg *Message, attr AttrType) error {
 	var (
 		family = familyIPv4
 		ip     = a.IP
@@ -67,12 +68,13 @@ func (a XORMappedAddress) AddToAs(m *Message, t AttrType) error {
 	value := make([]byte, 32+128)
 	value[0] = 0 // first 8 bits are zeroes
 	xorValue := make([]byte, net.IPv6len)
-	copy(xorValue[4:], m.TransactionID[:])
+	copy(xorValue[4:], msg.TransactionID[:])
 	bin.PutUint32(xorValue[0:4], magicCookie)
 	bin.PutUint16(value[0:2], family)
-	bin.PutUint16(value[2:4], uint16(a.Port^magicCookie>>16))
+	bin.PutUint16(value[2:4], uint16(a.Port^magicCookie>>16)) //nolint:gosec // G115, false positive, port
 	xor.XorBytes(value[4:4+len(ip)], ip, xorValue)
-	m.Add(t, value[:4+len(ip)])
+	msg.Add(attr, value[:4+len(ip)])
+
 	return nil
 }
 
@@ -83,13 +85,13 @@ func (a XORMappedAddress) AddTo(m *Message) error {
 }
 
 // GetFromAs decodes XOR-MAPPED-ADDRESS attribute value in message
-// getting it as for t type.
-func (a *XORMappedAddress) GetFromAs(m *Message, t AttrType) error {
-	v, err := m.Get(t)
+// getting it as for attr type.
+func (a *XORMappedAddress) GetFromAs(msg *Message, attr AttrType) error {
+	value, err := msg.Get(attr)
 	if err != nil {
 		return err
 	}
-	family := bin.Uint16(v[0:2])
+	family := bin.Uint16(value[0:2])
 	if family != familyIPv6 && family != familyIPv4 {
 		return newDecodeErr("xor-mapped address", "family",
 			fmt.Sprintf("bad value %d", family),
@@ -101,26 +103,26 @@ func (a *XORMappedAddress) GetFromAs(m *Message, t AttrType) error {
 	}
 	// Ensuring len(a.IP) == ipLen and reusing a.IP.
 	if len(a.IP) < ipLen {
-		a.IP = a.IP[:cap(a.IP)]
-		for len(a.IP) < ipLen {
-			a.IP = append(a.IP, 0)
+		a.IP = make(net.IP, ipLen)
+	} else {
+		a.IP = a.IP[:ipLen]
+		for i := range a.IP {
+			a.IP[i] = 0
 		}
 	}
-	a.IP = a.IP[:ipLen]
-	for i := range a.IP {
-		a.IP[i] = 0
-	}
-	if len(v) <= 4 {
+
+	if len(value) <= 4 {
 		return io.ErrUnexpectedEOF
 	}
-	if err := CheckOverflow(t, len(v[4:]), len(a.IP)); err != nil {
+	if err := CheckOverflow(attr, len(value[4:]), len(a.IP)); err != nil {
 		return err
 	}
-	a.Port = int(bin.Uint16(v[2:4])) ^ (magicCookie >> 16)
+	a.Port = int(bin.Uint16(value[2:4])) ^ (magicCookie >> 16)
 	xorValue := make([]byte, 4+TransactionIDSize)
 	bin.PutUint32(xorValue[0:4], magicCookie)
-	copy(xorValue[4:], m.TransactionID[:])
-	xor.XorBytes(a.IP, v[4:], xorValue)
+	copy(xorValue[4:], msg.TransactionID[:])
+	xor.XorBytes(a.IP, value[4:], xorValue)
+
 	return nil
 }
 
