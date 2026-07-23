@@ -41,6 +41,13 @@ reachability analysis and the disposition.
   pick it up via plan `2026-07-24-04-fork-dependency-coordination.md` or a direct
   bump once the transitive consumer (libp2p/kubo) advances.
 
+### GO-2024-3218 — github.com/libp2p/go-libp2p-kad-dht@v0.38.0
+
+- **Disposition:** Tracked in plan `2026-07-24-03-core-dependency-upgrade.md`.
+  `govulncheck` reports `Fixed in: N/A`, but a newer `libp2p-kad-dht` (v0.40.0)
+  exists and may carry an untagged fix. A conservative bump to v0.40.0 is applied
+  in that plan, followed by a `govulncheck` re-test to confirm resolution.
+
 ## Roadmap
 
 Per-user ACLs (multiple identities with scoped permissions) are a planned future
