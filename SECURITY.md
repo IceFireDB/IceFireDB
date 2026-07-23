@@ -29,24 +29,20 @@ reachability analysis and the disposition.
 ### GO-2026-4479 — github.com/pion/dtls/v2@v2.2.12 (no upstream fix as of 2026-07-24)
 
 - **Reachability:** Not reached by IceFireDB application code. IceFireDB does not
-  import `pion/dtls` or `pion/webrtc` directly; the package is present only as an
-  *indirect* transitive dependency of the libp2p/kubo transport stack
-  (`go.mod` marks it `// indirect`), and no `webrtc` transport is enabled by any
-  flag in `flags.go`/`main.go`. The `govulncheck` traces are limited to package
-  `init()` initialization and `fmt.Sprintf` reflection into `String()` methods —
-  i.e. linkage reachability, not an actual DTLS handshake or authentication-key
-  operation. The vulnerable functionality (DTLS authentication) is therefore not
-  exercised.
-- **Disposition:** Accepted risk for 1.0.0 GA. If an upstream fix is published,
-  pick it up via plan `2026-07-24-04-fork-dependency-coordination.md` or a direct
-  bump once the transitive consumer (libp2p/kubo) advances.
+  import `pion/dtls` or `pion/webrtc` directly; the package was present only as an
+  *indirect* transitive dependency of the libp2p/kubo transport stack.
+- **Status:** RESOLVED. The kubo v0.41.0 bump (branch `chore/deps-conservative-upgrade`)
+  advanced the transitive pion/dtls dependency; `govulncheck` no longer reports
+  GO-2026-4479.
 
-### GO-2024-3218 — github.com/libp2p/go-libp2p-kad-dht@v0.38.0
+### GO-2024-3218 — github.com/libp2p/go-libp2p-kad-dht
 
-- **Disposition:** Tracked in plan `2026-07-24-03-core-dependency-upgrade.md`.
-  `govulncheck` reports `Fixed in: N/A`, but a newer `libp2p-kad-dht` (v0.40.0)
-  exists and may carry an untagged fix. A conservative bump to v0.40.0 is applied
-  in that plan, followed by a `govulncheck` re-test to confirm resolution.
+- **Status:** Persisting. Advanced from v0.38.0 to v0.39.1 by the kubo v0.41.0
+  bump on branch `chore/deps-conservative-upgrade`; `govulncheck` reports
+  `Fixed in: N/A`. A force-bump to v0.40.0 was attempted but is **incompatible**
+  with the conservative kubo v0.41.0 (API drift in `provider/keystore` and
+  `prov.Stats`); it needs a newer kubo release and is deferred. Accepted risk
+  for 1.0.0 GA.
 
 ## Roadmap
 
