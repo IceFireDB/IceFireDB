@@ -510,10 +510,7 @@ func (ht *Network) Connect(ctx context.Context, pi peer.AddrInfo) error {
 	// Filter addresses based on allow and denylists
 	var filteredURLs []network.ParsedURL
 	for _, u := range urls {
-		host, _, err := net.SplitHostPort(u.URL.Host)
-		if err != nil {
-			return err
-		}
+		host := u.URL.Hostname()
 
 		// Filter out if allowlist is enabled and it is not allowed,
 		// OR if host is in denylist.

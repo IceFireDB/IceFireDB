@@ -71,12 +71,18 @@ func (i *handler) serveCodec(ctx context.Context, w http.ResponseWriter, r *http
 	}
 	defer data.Close()
 
-	setIpfsRootsHeader(w, rq, &pathMetadata)
-
 	blockSize, err := data.Size()
 	if !i.handleRequestErrors(w, r, rq.contentPath, err) {
 		return false
 	}
+
+	// Check size limit before setting response headers so 410 responses
+	// stay clean.
+	if i.exceedsMaxUnixFSDAGResponseSize(w, r, blockSize) {
+		return false
+	}
+
+	setIpfsRootsHeader(w, rq, &pathMetadata)
 
 	return i.renderCodec(ctx, w, r, rq, blockSize, data)
 }

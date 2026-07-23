@@ -49,6 +49,15 @@ func ProviderStore(ps records.ProviderStore) Option {
 	}
 }
 
+// ProviderManagerOptions specifies the options passed to the the
+// provider manager storing provide records.
+func ProviderManagerOpts(opts ...records.Option) Option {
+	return func(pm *dhtcfg.Config) error {
+		pm.ProviderManagerOpts = opts
+		return nil
+	}
+}
+
 // RoutingTableLatencyTolerance sets the maximum acceptable latency for peers
 // in the routing table's cluster.
 func RoutingTableLatencyTolerance(latency time.Duration) Option {

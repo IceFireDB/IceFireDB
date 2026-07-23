@@ -26,7 +26,7 @@ func ValidateWithName(rec *Record, name Name) error {
 	return Validate(rec, pk)
 }
 
-// Validates validates the given IPNS Record against the given [crypto.PubKey],
+// Validate validates the given IPNS Record against the given [crypto.PubKey],
 // following the [Record Verification] specification.
 //
 // [Record Verification]: https://specs.ipfs.tech/ipns/ipns-record/#record-verification

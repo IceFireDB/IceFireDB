@@ -20,6 +20,18 @@ func (i *handler) serveRawBlock(ctx context.Context, w http.ResponseWriter, r *h
 	}
 	defer data.Close()
 
+	sz, err := data.Size()
+	if err != nil {
+		i.handleRequestErrors(w, r, rq.contentPath, err)
+		return false
+	}
+
+	// Check size limit before setting response headers so 410 responses
+	// stay clean.
+	if i.exceedsMaxUnixFSDAGResponseSize(w, r, sz) {
+		return false
+	}
+
 	setIpfsRootsHeader(w, rq, &pathMetadata)
 
 	blockCid := pathMetadata.LastSegment.RootCid()
@@ -37,12 +49,6 @@ func (i *handler) serveRawBlock(ctx context.Context, w http.ResponseWriter, r *h
 	modtime := addCacheControlHeaders(w, r, rq.contentPath, rq.ttl, rq.lastMod, blockCid, rawResponseFormat)
 	w.Header().Set("Content-Type", rawResponseFormat)
 	w.Header().Set("X-Content-Type-Options", "nosniff") // no funny business in the browsers :^)
-
-	sz, err := data.Size()
-	if err != nil {
-		i.handleRequestErrors(w, r, rq.contentPath, err)
-		return false
-	}
 
 	if !i.seekToStartOfFirstRange(w, r, data, sz) {
 		return false

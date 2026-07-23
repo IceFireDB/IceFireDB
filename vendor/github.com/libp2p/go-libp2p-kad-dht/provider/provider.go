@@ -118,6 +118,9 @@ const (
 var (
 	// ErrClosed is returned when the provider is closed.
 	ErrClosed = errors.New("provider: closed")
+	// defaultKeystoreKey is the key used to store the keystore in the datastore
+	// if no other keystore is provided by the user.
+	defaultKeystoreKey = datastore.NewKey("keystore")
 	// reprovideHistoryKeyPrefix is the prefix for keys storing the timestamp of
 	// the last reprovide for a given region in the datastore.
 	reprovideHistoryKeyPrefix = "history"
@@ -223,7 +226,8 @@ func New(opts ...Option) (*SweepingProvider, error) {
 		// Setup Keystore if missing
 		mapDs = dssync.MutexWrap(datastore.NewMapDatastore())
 		cleanupFuncs = append(cleanupFuncs, mapDs.Close)
-		cfg.keystore, err = keystore.NewKeystore(mapDs)
+		keysDs := namespace.Wrap(mapDs, defaultKeystoreKey)
+		cfg.keystore, err = keystore.NewKeystore(keysDs)
 		if err != nil {
 			cleanup(cleanupFuncs)
 			return nil, err
@@ -1081,7 +1085,7 @@ loop:
 	s.increaseProvideCounter(successfulKeys)
 
 	errCountLoaded := int(errCount.Load())
-	s.logger.Infof("sent provider records to peers in %s, errors %d/%d", time.Since(startTime), errCountLoaded, len(keysAllocations))
+	s.logger.Debugf("sent provider records to peers in %s, errors %d/%d", time.Since(startTime), errCountLoaded, len(keysAllocations))
 	reachablePeers = nPeers - errCountLoaded
 
 	if errCountLoaded == nPeers || errCountLoaded > int(float32(nPeers)*(1-minimalRegionReachablePeersRatio)) {
@@ -1695,6 +1699,7 @@ func (s *SweepingProvider) batchProvide(prefix bitstr.Key, keys []mh.Multihash) 
 	if keyCount == 0 {
 		return
 	}
+	s.logger.Infof("provide starting for prefix %q, %d keys", prefix, keyCount)
 	s.logger.Debugw("batchProvide called", "prefix", prefix, "count", keyCount)
 	addrInfo, ok := s.selfAddrInfo()
 	if !ok {
@@ -1706,8 +1711,10 @@ func (s *SweepingProvider) batchProvide(prefix bitstr.Key, keys []mh.Multihash) 
 	startTime := time.Now()
 	s.stats.ongoingProvides.start(keyCount)
 	defer func() {
+		elapsed := time.Since(startTime)
 		s.stats.ongoingProvides.finish(len(keys))
-		s.stats.provideDuration.Add(int64(time.Since(startTime)))
+		s.stats.provideDuration.Add(int64(elapsed))
+		s.logger.Infof("provide finished for prefix %q, %d keys in %s", prefix, keyCount, elapsed)
 	}()
 
 	if keyCount <= individualProvideThreshold {
@@ -1760,15 +1767,18 @@ func (s *SweepingProvider) batchReprovide(prefix bitstr.Key) {
 	}
 	keyCount := len(keys)
 	if keyCount == 0 {
-		s.logger.Infof("No keys to reprovide for prefix %s", prefix)
+		s.logger.Infof("no keys to reprovide for prefix %s", prefix)
 		return
 	}
 
+	s.logger.Infof("reprovide starting for prefix %q, %d keys", prefix, keyCount)
 	startTime := time.Now()
 	s.stats.ongoingReprovides.start(keyCount)
 	defer func() {
+		elapsed := time.Since(startTime)
 		s.stats.ongoingReprovides.finish(len(keys))
-		s.stats.reprovideDuration.Add(prefix, int64(time.Since(startTime)))
+		s.stats.reprovideDuration.Add(prefix, int64(elapsed))
+		s.logger.Infof("reprovide finished for prefix %q, %d keys in %s", prefix, keyCount, elapsed)
 	}()
 
 	if keyCount <= individualProvideThreshold {
@@ -1915,6 +1925,12 @@ func (s *SweepingProvider) individualProvide(prefix bitstr.Key, keys []mh.Multih
 // It iterate over supplied regions, and allocates the regions provider records
 // to the appropriate DHT servers.
 func (s *SweepingProvider) provideRegions(regions []keyspace.Region, addrInfo peer.AddrInfo, reprovide bool) bool {
+	op := "provide"
+	if reprovide {
+		op = "reprovide"
+	}
+	s.logger.Debugf("starting %s for %d region(s)", op, len(regions))
+	startTime := time.Now()
 	errCount := 0
 	for _, r := range regions {
 		if r.Keys == nil || r.Keys.IsEmptyLeaf() {
@@ -1968,6 +1984,7 @@ func (s *SweepingProvider) provideRegions(regions []keyspace.Region, addrInfo pe
 		s.increaseProvideCounter(nKeys)
 		s.logger.Debugw("sent provider records", "prefix", r.Prefix, "count", nKeys, "keys", keys)
 	}
+	s.logger.Debugf("finished %s for %d region(s) in %s, errors %d/%d", op, len(regions), time.Since(startTime), errCount, len(regions))
 	// If at least 1 regions was provided, we don't consider it a failure.
 	return errCount < len(regions)
 }

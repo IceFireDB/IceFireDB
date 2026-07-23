@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"slices"
 	"strconv"
@@ -292,7 +291,7 @@ func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsm
 
 	sender.ht.metrics.ResponseSizes.Observe(float64(respLen))
 	sender.ht.metrics.RequestsInFlight.Dec()
-	host, _, _ := net.SplitHostPort(u.URL.Host)
+	host := u.URL.Hostname()
 	// updateStatusCounter
 	sender.ht.metrics.updateStatusCounter(req.Method, statusCode, host)
 
