@@ -2,6 +2,8 @@ module github.com/IceFireDB/IceFireDB
 
 go 1.25.0
 
+toolchain go1.26.5
+
 require (
 	github.com/IceFireDB/icefiredb-crdt-kv v0.3.0
 	github.com/IceFireDB/icefiredb-ipfs-log v0.5.0
