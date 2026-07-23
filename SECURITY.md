@@ -20,6 +20,27 @@ Raft layer: one token, shared by all clients and all cluster nodes.
 - Keep the pprof server off in production (it is off by default; only `--pprof`
   enables it, bound to loopback).
 
+## Known accepted vulnerabilities
+
+Vulnerabilities that remain open because there is no upstream fix, or because
+the vulnerable code path is not reached by IceFireDB. Each entry records the
+reachability analysis and the disposition.
+
+### GO-2026-4479 — github.com/pion/dtls/v2@v2.2.12 (no upstream fix as of 2026-07-24)
+
+- **Reachability:** Not reached by IceFireDB application code. IceFireDB does not
+  import `pion/dtls` or `pion/webrtc` directly; the package is present only as an
+  *indirect* transitive dependency of the libp2p/kubo transport stack
+  (`go.mod` marks it `// indirect`), and no `webrtc` transport is enabled by any
+  flag in `flags.go`/`main.go`. The `govulncheck` traces are limited to package
+  `init()` initialization and `fmt.Sprintf` reflection into `String()` methods —
+  i.e. linkage reachability, not an actual DTLS handshake or authentication-key
+  operation. The vulnerable functionality (DTLS authentication) is therefore not
+  exercised.
+- **Disposition:** Accepted risk for 1.0.0 GA. If an upstream fix is published,
+  pick it up via plan `2026-07-24-04-fork-dependency-coordination.md` or a direct
+  bump once the transitive consumer (libp2p/kubo) advances.
+
 ## Roadmap
 
 Per-user ACLs (multiple identities with scoped permissions) are a planned future
