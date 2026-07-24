@@ -213,7 +213,7 @@ caveats; "Experimental" are decentralized/external-service backends still maturi
 |---------------|--------------|----------------------|--------------------------|-------|
 | `goleveldb`   | **GA**       | Local LSM (default)  | none                     | Default engine; mature ledis storage. |
 | `hybriddb`    | **GA**       | Local hot/cold tier  | none                     | ristretto cache over leveldb; has dedicated unit tests. |
-| `badger`      | Beta         | Local LSM            | none                     | CI-tested; default open options are memory-heavy — tune before heavy production use. |
+| `badger`      | **GA**       | Local LSM            | none                     | GA-graduated: snapshot isolation + Compact GC; passes crash-recovery, failover, rolling-restart, leader-churn, soak, and RESP-compat. Default open options are memory-heavy — tune before heavy production use. |
 | `ipfs-synckv` | Beta         | IPFS + local mirror  | IPFS daemon (:5001)      | Encrypted (AES-GCM); CI-tested against a real IPFS node. |
 | `ipfs`        | Experimental | IPFS                 | IPFS daemon (:5001)      | Decentralized storage; beta maturity. |
 | `ipfs-log`    | Experimental | IPFS append-only log | IPFS daemon (:5001)      | Decentralized log; multi-node identifier via `--ipfs-log-dbname`. |
