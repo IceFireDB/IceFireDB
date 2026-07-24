@@ -37,13 +37,13 @@
 
 **Files:** `.gitignore` (modify), `.env.example` (create)
 
-- [ ] **Step 1: Stop tracking `.env` (keep the local file)**
+- [x] **Step 1: Stop tracking `.env` (keep the local file)**
 
 ```bash
 git rm --cached .env
 ```
 
-- [ ] **Step 2: Add `.env` to `.gitignore`**
+- [x] **Step 2: Add `.env` to `.gitignore`**
 
 Append under a new comment near the top-level ignore list:
 
@@ -52,7 +52,7 @@ Append under a new comment near the top-level ignore list:
 .env
 ```
 
-- [ ] **Step 3: Create `.env.example`** documenting the variable shape without real values:
+- [x] **Step 3: Create `.env.example`** documenting the variable shape without real values:
 
 ```
 # Copy to .env for local development. Values here are examples only.
@@ -61,7 +61,7 @@ Append under a new comment near the top-level ignore list:
 IPFS_LOG_DB_NAME="ifdb-ipfs-log-db-name-channel1"
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `git status --porcelain` — should show `.env` removed from the index, `.env.example` and `.gitignore` staged. `git ls-files | grep -c '^\.env$'` → `0`.
 
@@ -78,7 +78,7 @@ git commit -s -m "chore(repo): stop tracking .env; add .env.example"
 
 The `AGENTS.md` "Storage Driver Interface" block omits methods. The real interface is `github.com/ledisdb/ledisdb/store/driver.IDB`.
 
-- [ ] **Step 1: Replace the interface block** in `AGENTS.md` section 8 with the accurate definition:
+- [x] **Step 1: Replace the interface block** in `AGENTS.md` section 8 with the accurate definition:
 
 ```go
 type IDB interface {
@@ -100,13 +100,13 @@ type IDB interface {
 }
 ```
 
-- [ ] **Step 2: Add an orbitdb note.** In section 6 (Project Structure Reference), append a line after the `orbitdb/` entry clarifying status:
+- [x] **Step 2: Add an orbitdb note.** In section 6 (Project Structure Reference), append a line after the `orbitdb/` entry clarifying status:
 
 ```
 │   │                            # NOTE: orbitdb is currently disabled in main.go/flags.go (commented out)
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add AGENTS.md
@@ -119,7 +119,7 @@ git commit -s -m "docs(agents): correct IDB interface definition; note orbitdb i
 
 **Files:** `flags.go` (modify), `SECURITY.md` (create)
 
-- [ ] **Step 1: Add an env fallback for `--auth` in `flags.go`.** After `flag.Parse()` (so the flag wins if both are set), add:
+- [x] **Step 1: Add an env fallback for `--auth` in `flags.go`.** After `flag.Parse()` (so the flag wins if both are set), add:
 
 ```go
 	// Allow the cluster auth token to come from the environment so it is not
@@ -132,7 +132,7 @@ git commit -s -m "docs(agents): correct IDB interface definition; note orbitdb i
 
 (`os` is already imported in flags.go.)
 
-- [ ] **Step 2: Create `SECURITY.md`:**
+- [x] **Step 2: Create `SECURITY.md`:**
 
 ```markdown
 # Security Model
@@ -163,7 +163,7 @@ Per-user ACLs (multiple identities with scoped permissions) are a planned future
 enhancement and are not part of 1.0.0.
 ```
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 Run: `go build ./...`. Then verify the env fallback compiles and is reachable (it is plain code after flag.Parse).
 
@@ -182,7 +182,7 @@ git commit -s -m "feat(security): allow auth token via ICEFIREDB_AUTH env; add S
 
 Opt-in, separate from pprof, bound to loopback by default.
 
-- [ ] **Step 1: Write `observability_test.go`** (drives the handlers directly via httptest, no real server/port needed):
+- [x] **Step 1: Write `observability_test.go`** (drives the handlers directly via httptest, no real server/port needed):
 
 ```go
 package main
@@ -228,11 +228,11 @@ func TestMetricsServed(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test — expect compile failure** (`undefined: observabilityMux`).
+- [x] **Step 2: Run the test — expect compile failure** (`undefined: observabilityMux`).
 
 Run: `go test ./ -run 'TestHealthz|TestReadyz|TestMetrics' -v`
 
-- [ ] **Step 3: Implement `observability.go`:**
+- [x] **Step 3: Implement `observability.go`:**
 
 ```go
 package main
@@ -290,7 +290,7 @@ func startObservabilityServer(addr string, ready func() bool) {
 }
 ```
 
-- [ ] **Step 4: Wire flags in `flags.go`.** Add near the pprof flags:
+- [x] **Step 4: Wire flags in `flags.go`.** Add near the pprof flags:
 
 ```go
 	flag.BoolVar(&enableMetrics, "metrics", false, "enable the observability HTTP server (/healthz /readyz /metrics)")
@@ -304,7 +304,7 @@ And add to the `usage` const Advanced options:
   --metrics-addr addr : observability bind address (default: 127.0.0.1:11002)
 ```
 
-- [ ] **Step 5: Wire globals + startup in `main.go`.** Add to the `var (...)` block:
+- [x] **Step 5: Wire globals + startup in `main.go`.** Add to the `var (...)` block:
 
 ```go
 	// enableMetrics gates the observability HTTP server (off by default).
@@ -321,11 +321,11 @@ And in `main()`, alongside the pprof block (before `rafthub.Main(conf)`):
 	}
 ```
 
-- [ ] **Step 6: Run tests and build**
+- [x] **Step 6: Run tests and build**
 
 Run: `go test ./ -run 'TestHealthz|TestReadyz|TestMetrics' -v` (all PASS), `go build ./...`, `gofmt -l observability.go observability_test.go main.go flags.go`, `go vet ./`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add observability.go observability_test.go flags.go main.go
@@ -338,7 +338,7 @@ git commit -s -m "feat(observability): add opt-in /healthz, /readyz, and Prometh
 
 **Files:** `OPERATIONS.md` (create)
 
-- [ ] **Step 1: Create `OPERATIONS.md`:**
+- [x] **Step 1: Create `OPERATIONS.md`:**
 
 ```markdown
 # Operations Runbook
@@ -394,7 +394,7 @@ Enable the observability server with `--metrics` and point your orchestrator at:
 - `/metrics` — Prometheus exposition (Go/process metrics + connected clients).
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add OPERATIONS.md
@@ -405,8 +405,8 @@ git commit -s -m "docs(ops): add operations runbook (backup/restore/rolling upgr
 
 ## Final Verification
 
-- [ ] `go build ./...` clean.
-- [ ] `go test ./ -run 'TestHealthz|TestReadyz|TestMetrics'` passes.
-- [ ] `git ls-files | grep -c '^\.env$'` → 0.
-- [ ] `go vet ./` clean; `gofmt -l` clean on changed Go files.
-- [ ] New docs present: `SECURITY.md`, `OPERATIONS.md`, `.env.example`.
+- [x] `go build ./...` clean.
+- [x] `go test ./ -run 'TestHealthz|TestReadyz|TestMetrics'` passes.
+- [x] `git ls-files | grep -c '^\.env$'` → 0.
+- [x] `go vet ./` clean; `gofmt -l` clean on changed Go files.
+- [x] New docs present: `SECURITY.md`, `OPERATIONS.md`, `.env.example`.
