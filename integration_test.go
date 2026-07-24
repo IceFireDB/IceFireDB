@@ -546,6 +546,14 @@ func TestIntegrationSoak(t *testing.T) {
 	if ok == 0 {
 		t.Fatalf("soak made no successful writes")
 	}
+	// GA guard: refuse to pass if throughput collapsed to near-nothing. This
+	// catches degraded-but-nonzero regressions that the ok==0 check alone misses.
+	// The 1 ops/s floor is deliberately conservative (typical runs are hundreds
+	// of ops/s) so it does not flake under chaos or on slow CI.
+	throughput := float64(ok) / dur.Seconds()
+	if throughput < 1.0 {
+		t.Fatalf("soak throughput %.1f ops/s below 1 ops/s GA floor (acked=%d, duration=%s)", throughput, ok, dur)
+	}
 	// Without chaos the cluster should be continuously available — failures
 	// should be negligible. With chaos, brief unavailability during elections
 	// is expected, so we only require that progress was made.
