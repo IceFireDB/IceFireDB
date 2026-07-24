@@ -1,5 +1,14 @@
 # Dependabot Branch Cleanup — Implementation Plan
 
+> **STATUS (2026-07-24):** Executed. A `git fetch --prune` showed the remote had
+> already deleted the bulk of the backlog (35 → 4 branches). Triage via
+> `scripts/triage-dependabot-branches.sh` (created by Task 1) found **0 SUPERSEDED**
+> and **4 ACTIONABLE** (all newer than the rc.1 baseline: go-datastore 0.9.2,
+> libp2p-kad-dht 0.41.0 [note: incompatible with kubo 0.41.0, see plan 03],
+> go-sqlite3 1.14.47, go-redis 9.21.0). **Task 2 (mass deletion) is moot — there is
+> nothing superseded to delete.** The 4 actionable bumps are tracked as future
+> dependency work (plan 03 follow-on), not deletion candidates.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Collapse the accumulated dependabot branch backlog (~30 remote + several local) to **0 open branches below the current dependency baseline**, by deleting superseded bumps and handing the 3 newer-than-current bumps (kubo 0.41.0, kad-dht 0.40.0, go-redis 9.20.0) to plan 03.
