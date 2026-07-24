@@ -32,7 +32,11 @@ func (ns *namesys) cacheGet(name string) (path.Path, time.Duration, time.Time, b
 	}
 
 	if time.Now().Before(entry.cacheEOL) {
-		return entry.val, entry.ttl, entry.lastMod, true
+		// Cap the returned TTL to the entry's remaining cache lifetime, which is
+		// bounded by the record's EOL (see cacheSet). Without this, a late cache
+		// hit re-advertises the full original TTL and could let a downstream
+		// cache outlive the record.
+		return entry.val, min(entry.ttl, time.Until(entry.cacheEOL)), entry.lastMod, true
 	}
 
 	// We do not delete the entry from the cache. Removals are handled by the

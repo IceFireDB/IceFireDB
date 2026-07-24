@@ -9,9 +9,9 @@ import (
 )
 
 /*
-	A lovely mechanism to stash marshalMachine objects pre-allocated and avoid mallocs.
-	Works together with the Atlas: the Atlas says what kind of machinery is needed;
-	the marshalSlab "allocates" it and returns it upon your request.
+A lovely mechanism to stash marshalMachine objects pre-allocated and avoid mallocs.
+Works together with the Atlas: the Atlas says what kind of machinery is needed;
+the marshalSlab "allocates" it and returns it upon your request.
 */
 type marshalSlab struct {
 	atlas atlas.Atlas
@@ -34,14 +34,14 @@ type marshalSlabRow struct {
 // A thunk value that can be used to trigger `isNil` paths.
 // (Substituting an 'invalid' kind reflect.Value with this is an easy way
 // to emit a null without needing any additional special cases or error handling.)
-var nil_rv reflect.Value = reflect.Zero(reflect.PtrTo(reflect.TypeOf(0)))
+var nil_rv reflect.Value = reflect.Zero(reflect.PointerTo(reflect.TypeOf(0)))
 
 /*
-	Return a reference to a machine from the slab.
-	*You must release() when done.*
+Return a reference to a machine from the slab.
+*You must release() when done.*
 
-	Errors -- including "no info in Atlas for this type" -- are expressed by
-	returning a machine that is a constantly-erroring thunk.
+Errors -- including "no info in Atlas for this type" -- are expressed by
+returning a machine that is a constantly-erroring thunk.
 */
 func (slab *marshalSlab) requisitionMachine(rt reflect.Type) MarshalMachine {
 	// Acquire a row.
@@ -54,9 +54,9 @@ func (slab *marshalSlab) requisitionMachine(rt reflect.Type) MarshalMachine {
 }
 
 /*
-	Like requisitionMachine, but does *not* grow the slab; assumes the current
-	tip row is usable.
-	Thus, you must grow() before using, and release correspondingly.
+Like requisitionMachine, but does *not* grow the slab; assumes the current
+tip row is usable.
+Thus, you must grow() before using, and release correspondingly.
 */
 func (slab *marshalSlab) yieldMachine(rt reflect.Type) MarshalMachine {
 	// Grab the last row.
@@ -150,7 +150,7 @@ func _yieldBareMarshalMachinePtr(row *marshalSlabRow, atl atlas.Atlas, rt reflec
 	case reflect.Interface:
 		return &row.marshalMachineWildcard
 	case reflect.Func:
-		panic(fmt.Errorf("functions cannot be marshalled!"))
+		panic(fmt.Errorf("functions cannot be marshalled"))
 	case reflect.Ptr:
 		panic(fmt.Errorf("unreachable: ptrs must already be resolved"))
 	default:

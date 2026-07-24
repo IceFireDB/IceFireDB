@@ -23,23 +23,23 @@ func (x *BuilderStructMap) Complete() *AtlasEntry {
 }
 
 /*
-	Add a field to the mapping based on its name.
+Add a field to the mapping based on its name.
 
-	Given a struct:
+Given a struct:
 
-		struct{
-			X int
-			Y struct{ Z int }
-		}
+	struct{
+		X int
+		Y struct{ Z int }
+	}
 
-	`AddField("X", {"x", ...}) will cause that field to be serialized as key "x";
-	`AddField("Y.Z", {"z", ...})` will cause that *nested* field to be serialized
-	as key "z" in the same object (e.g. "x" and "z" will be siblings).
+`AddField("X", {"x", ...}) will cause that field to be serialized as key "x";
+`AddField("Y.Z", {"z", ...})` will cause that *nested* field to be serialized
+as key "z" in the same object (e.g. "x" and "z" will be siblings).
 
-	Returns the mutated builder for convenient call chaining.
+Returns the mutated builder for convenient call chaining.
 
-	If the fieldName string doesn't map onto the structure type info,
-	a panic will be raised.
+If the fieldName string doesn't map onto the structure type info,
+a panic will be raised.
 */
 func (x *BuilderStructMap) AddField(fieldName string, mapping StructMapEntry) *BuilderStructMap {
 	fieldNameSplit := strings.Split(fieldName, ".")
@@ -74,11 +74,11 @@ func fieldNameToReflectRoute(rt reflect.Type, fieldNameSplit []string) (rr Refle
 }
 
 /*
-	Automatically generate mappings by looking at the struct type info,
-	taking any hints from tags, and appending that to the builder.
+Automatically generate mappings by looking at the struct type info,
+taking any hints from tags, and appending that to the builder.
 
-	You may use autogeneration in concert with manually adding field mappings,
-	though if doing so be mindful not to map the same fields twice.
+You may use autogeneration in concert with manually adding field mappings,
+though if doing so be mindful not to map the same fields twice.
 */
 func (x *BuilderStructMap) Autogenerate() *BuilderStructMap {
 	autoEntry := AutogenerateStructMapEntry(x.entry.Type)
@@ -87,7 +87,7 @@ func (x *BuilderStructMap) Autogenerate() *BuilderStructMap {
 }
 
 /*
-	Automatically generate mappings using a given struct field sorting scheme
+Automatically generate mappings using a given struct field sorting scheme
 */
 func (x *BuilderStructMap) AutogenerateWithSortingScheme(sorting KeySortMode) *BuilderStructMap {
 	autoEntry := AutogenerateStructMapEntryUsingTags(x.entry.Type, "refmt", sorting)

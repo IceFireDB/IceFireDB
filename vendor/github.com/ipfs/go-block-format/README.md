@@ -1,9 +1,7 @@
 go-block-format
 ==================
 
-[![](https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square)](http://ipn.io)
 [![](https://img.shields.io/badge/project-IPFS-blue.svg?style=flat-square)](http://ipfs.io/)
-[![](https://img.shields.io/badge/freenode-%23ipfs-blue.svg?style=flat-square)](http://webchat.freenode.net/?channels=%23ipfs)
 [![Coverage Status](https://codecov.io/gh/ipfs/go-block-format/branch/master/graph/badge.svg)](https://codecov.io/gh/ipfs/go-block-format/branch/master)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/ipfs/go-block-format/go-test.yml?branch=master)](https://github.com/ipfs/go-block-format/actions)
 [![GoDoc](https://pkg.go.dev/badge/github.com/ipfs/go-block-format)](https://pkg.go.dev/github.com/ipfs/go-block-format)
@@ -12,7 +10,6 @@ go-block-format
 
 ## Table of Contents
 
-- [Background](#background)
 - [Documentation](#documentation)
 - [Contribute](#contribute)
 - [License](#license)
