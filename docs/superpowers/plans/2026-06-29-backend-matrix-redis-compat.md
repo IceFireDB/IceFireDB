@@ -37,7 +37,7 @@
 
 This records the product decision for 1.0.0. The recommended tiers (rationale: GA = pure-local + mature/dedicated tests; Beta = works and CI-tested but needs hardening or external infra; Experimental = decentralized/external, still maturing per the README's own status badges).
 
-- [ ] **Step 1: Add the support-matrix section to README.md**
+- [x] **Step 1: Add the support-matrix section to README.md**
 
 Insert a new section (place it just after the "System Design" table, before "Quick Start"):
 
@@ -64,11 +64,11 @@ caveats; "Experimental" are decentralized/external-service backends still maturi
 > RESP semantics are identical across backends — see [COMPATIBILITY.md](COMPATIBILITY.md).
 ```
 
-- [ ] **Step 2: Verify the README renders (no broken table) and links resolve**
+- [x] **Step 2: Verify the README renders (no broken table) and links resolve**
 
 Run: `grep -n "Backend Support Matrix" README.md` (confirms the section exists) and visually check the table columns are aligned and the `COMPATIBILITY.md` link target will exist after Task 2.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add README.md
@@ -85,7 +85,7 @@ git commit -s -m "docs(readme): add 1.0.0 backend support matrix (GA/Beta/Experi
 
 Document the known RESP divergences and add a test that pins the *current* behavior so it can't drift silently. The test ASSERTS the documented (divergent) behavior — its purpose is regression-locking + executable documentation, not asserting Redis-correctness.
 
-- [ ] **Step 1: Write the lock-in test (it should pass against current behavior)**
+- [x] **Step 1: Write the lock-in test (it should pass against current behavior)**
 
 Create `compat_test.go`:
 
@@ -133,12 +133,12 @@ func TestCompatCrossTypeKeyspaces(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the lock-in test**
+- [x] **Step 2: Run the lock-in test**
 
 Run: `DRIVER=goleveldb go test -tags alltest -run TestCompatCrossTypeKeyspaces -v ./`
 Expected: PASS. (The server takes a few seconds to boot in the harness — uhaha syncs time first; this is normal.)
 
-- [ ] **Step 3: Create COMPATIBILITY.md**
+- [x] **Step 3: Create COMPATIBILITY.md**
 
 ```markdown
 # Redis Protocol Compatibility
@@ -188,7 +188,7 @@ to date. Additional differences may exist; contributions documenting (and where
 appropriate, locking via `compat_test.go`) further divergences are welcome.
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add compat_test.go COMPATIBILITY.md
@@ -205,7 +205,7 @@ git commit -s -m "docs(compat): document and lock per-type-keyspace Redis diverg
 
 Local `make test` skips the `-tags alltest` command suite that CI runs. Add a convenience target so developers can run the same suite locally against a chosen backend.
 
-- [ ] **Step 1: Add the target to the Makefile**
+- [x] **Step 1: Add the target to the Makefile**
 
 After the existing `test:` target (`Makefile:68-69`), add:
 
@@ -216,12 +216,12 @@ test-compat:
 
 (`DRIVER` already defaults to `badger` at the top of the Makefile; override with e.g. `DRIVER=goleveldb make test-compat`.)
 
-- [ ] **Step 2: Verify the target runs the suite**
+- [x] **Step 2: Verify the target runs the suite**
 
 Run: `DRIVER=goleveldb make test-compat 2>&1 | tail -5`
 Expected: the alltest command suite (TestKV, TestHash, TestList, TestZSet, TestDBSet, TestScan, TestCompatCrossTypeKeyspaces, …) runs and ends with `ok  github.com/IceFireDB/IceFireDB`.
 
-- [ ] **Step 3: Document it in AGENTS.md**
+- [x] **Step 3: Document it in AGENTS.md**
 
 In the "Useful Commands Recap" table in `AGENTS.md` (section 5), add a row:
 
@@ -229,7 +229,7 @@ In the "Useful Commands Recap" table in `AGENTS.md` (section 5), add a row:
 | `DRIVER=goleveldb make test-compat` | Run the RESP command-compatibility suite (`-tags alltest`). |
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Makefile AGENTS.md
@@ -243,7 +243,7 @@ git commit -s -m "build(make): add test-compat target to run the alltest RESP su
 **Files:**
 - Modify: `docs/superpowers/plans/2026-06-28-nosql-1.0.0-readiness.md`
 
-- [ ] **Step 1: Update the Phase 2 bullet**
+- [x] **Step 1: Update the Phase 2 bullet**
 
 In the Phase 2 list, change the "supported-backend matrix" bullet to note it is now delivered:
 
@@ -256,7 +256,7 @@ with:
 - ~~Decide and document the **supported-backend matrix** for 1.0.0~~ — DONE: see `README.md` "Backend Support Matrix" and `COMPATIBILITY.md` (delivered by docs/superpowers/plans/2026-06-29-backend-matrix-redis-compat.md). GA: goleveldb, hybriddb; Beta: badger, ipfs-synckv; Experimental: ipfs, ipfs-log, oss, crdt.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-06-28-nosql-1.0.0-readiness.md
@@ -267,7 +267,7 @@ git commit -s -m "docs(plan): mark backend-support-matrix item delivered"
 
 ## Final Verification (after all tasks)
 
-- [ ] `DRIVER=goleveldb make test-compat` passes (includes the new compat test).
-- [ ] `DRIVER=badger go test -tags alltest -run TestCompatCrossTypeKeyspaces ./` passes (divergence is backend-independent).
-- [ ] `README.md` has the Backend Support Matrix; `COMPATIBILITY.md` exists and is linked from it.
-- [ ] `go build ./...` still clean (no source behavior changed).
+- [x] `DRIVER=goleveldb make test-compat` passes (includes the new compat test).
+- [x] `DRIVER=badger go test -tags alltest -run TestCompatCrossTypeKeyspaces ./` passes (divergence is backend-independent).
+- [x] `README.md` has the Backend Support Matrix; `COMPATIBILITY.md` exists and is linked from it.
+- [x] `go build ./...` still clean (no source behavior changed).
