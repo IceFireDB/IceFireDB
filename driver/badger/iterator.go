@@ -5,9 +5,10 @@ import (
 )
 
 type Iterator struct {
-	db  *badger.DB
-	txn *badger.Txn
-	it  *badger.Iterator
+	db      *badger.DB
+	txn     *badger.Txn
+	it      *badger.Iterator
+	ownsTxn bool // if false, Close() will not discard txn (txn owned by a Snapshot)
 }
 
 func (it *Iterator) Key() []byte {
@@ -29,7 +30,9 @@ func (it *Iterator) Close() error {
 	if it.it != nil {
 		it.it.Close()
 		it.it = nil
-		it.txn.Discard()
+		if it.ownsTxn {
+			it.txn.Discard()
+		}
 	}
 	return nil
 }

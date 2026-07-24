@@ -5,35 +5,40 @@ import (
 	"github.com/ledisdb/ledisdb/store/driver"
 )
 
+// Snapshot is a point-in-time read view of the database. The read transaction
+// is created at snapshot time and reused by both Get and iteration, so both
+// observe the same consistent state regardless of concurrent writes.
 type Snapshot struct {
-	db *badger.DB
+	db  *badger.DB
+	txn *badger.Txn
 }
 
 func (s *Snapshot) Get(key []byte) ([]byte, error) {
-	var val []byte
-	err := s.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(key)
-		if err != nil {
-			return err
-		}
-		val, err = item.ValueCopy(nil)
-		return err
-	})
+	item, err := s.txn.Get(key)
 	if err == badger.ErrKeyNotFound {
 		return nil, nil
 	}
-	return val, err
+	if err != nil {
+		return nil, err
+	}
+	return item.ValueCopy(nil)
 }
 
 func (s *Snapshot) NewIterator() driver.IIterator {
-	tnx := s.db.NewTransaction(false)
-	it := &Iterator{
-		db:  s.db,
-		it:  tnx.NewIterator(badger.DefaultIteratorOptions),
-		txn: tnx,
+	// Reuse the snapshot's pinned read transaction. ownsTxn is false so the
+	// iterator's Close() does not discard the txn that Get still relies on;
+	// Snapshot.Close() owns the txn lifecycle.
+	return &Iterator{
+		db:      s.db,
+		txn:     s.txn,
+		it:      s.txn.NewIterator(badger.DefaultIteratorOptions),
+		ownsTxn: false,
 	}
-	return it
 }
 
 func (s *Snapshot) Close() {
+	if s.txn != nil {
+		s.txn.Discard()
+		s.txn = nil
+	}
 }

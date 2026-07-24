@@ -87,18 +87,22 @@ func (db *DB) NewIterator() driver.IIterator {
 	opts := db.iteratorOpts
 	opts.PrefetchSize = 100 // Optimized prefetch
 	it := &Iterator{
-		db:  db.db,
-		it:  tnx.NewIterator(opts),
-		txn: tnx,
+		db:      db.db,
+		it:      tnx.NewIterator(opts),
+		txn:     tnx,
+		ownsTxn: true,
 	}
 	return it
 }
 
 func (db *DB) NewSnapshot() (driver.ISnapshot, error) {
-	s := &Snapshot{
-		db: db.db,
-	}
-	return s, nil
+	// A read transaction created now pins a point-in-time read timestamp, so
+	// Get and iteration observe a consistent state isolated from concurrent
+	// writes. (NewTransactionAt is unavailable outside managed mode.)
+	return &Snapshot{
+		db:  db.db,
+		txn: db.db.NewTransaction(false),
+	}, nil
 }
 
 // NewStream creates a new stream for bulk operations
@@ -107,6 +111,11 @@ func (db *DB) NewStream() *badger.Stream {
 }
 
 func (db *DB) Compact() error {
+	// badger auto-compacts the LSM tree. The driver-level Compact() reclaims
+	// value-log space via GC; ErrNoRewrite (nothing to reclaim) is not an error.
+	if err := db.db.RunValueLogGC(0.5); err != nil && err != badger.ErrNoRewrite {
+		return err
+	}
 	return nil
 }
 
