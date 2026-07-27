@@ -270,9 +270,9 @@ func (r partialMessageRouter) PeerRequestsPartial(peer peer.ID, topic string) bo
 // MeshPeers implements partialmessages.Router.
 func (r partialMessageRouter) MeshPeers(topic string) iter.Seq[peer.ID] {
 	return func(yield func(peer.ID) bool) {
-		peerSet, ok := r.gs.mesh[topic]
-		if !ok {
-			// Possibly a fanout topic
+		peerSet := r.gs.mesh[topic]
+		if len(peerSet) == 0 {
+			// Possibly a fanout topic, or no mesh peers are available yet.
 			peerSet = r.gs.getFanoutPeersForPublishing(topic)
 		}
 
