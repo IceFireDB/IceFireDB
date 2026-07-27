@@ -22,7 +22,7 @@ require (
 	github.com/spf13/cast v1.10.0
 	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d
-	github.com/tidwall/redcon v1.6.2
+	github.com/tidwall/redcon v1.6.4
 	github.com/tidwall/sds v0.3.0
 	github.com/tidwall/uhaha v0.11.3
 )
