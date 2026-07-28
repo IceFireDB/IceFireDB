@@ -154,7 +154,7 @@ type TopicScoreSnapshot struct {
 //     components for debugging peer scoring.
 //
 // This option must be passed _after_ the WithPeerScore option.
-func WithPeerScoreInspect(inspect interface{}, period time.Duration) Option {
+func WithPeerScoreInspect(inspect any, period time.Duration) Option {
 	return func(ps *PubSub) error {
 		gs, ok := ps.rt.(*GossipSubRouter)
 		if !ok {

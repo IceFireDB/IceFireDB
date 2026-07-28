@@ -380,14 +380,29 @@ func (pg *peerGater) OnNewOutboundStream(p peer.ID, proto protocol.ID) {
 }
 
 func (pg *peerGater) OnClosedOutboundStream(p peer.ID) {
+	pg.removePeerStats(p, true)
+}
+
+func (pg *peerGater) OnClosedIncomingStream(p peer.ID, _ protocol.ID) {
+	pg.removePeerStats(p, false)
+}
+
+func (pg *peerGater) removePeerStats(p peer.ID, outbound bool) {
 	pg.Lock()
 	defer pg.Unlock()
 
-	st := pg.getPeerStats(p)
-	st.connected--
-	st.expire = time.Now().Add(pg.params.RetainStats)
+	st, ok := pg.peerStats[p]
+	if !ok {
+		return
+	}
 
-	delete(pg.peerStats, p)
+	if outbound && st.connected > 0 {
+		st.connected--
+	}
+	if st.connected == 0 {
+		st.expire = time.Now().Add(pg.params.RetainStats)
+		delete(pg.peerStats, p)
+	}
 }
 
 func (pg *peerGater) Join(topic string)             {}

@@ -2,6 +2,8 @@ syntax = "proto2";
 
 package pubsub.pb;
 
+option go_package = "github.com/libp2p/go-libp2p-pubsub/pb;pubsub_pb";
+
 message RPC {
   repeated SubOpts subscriptions = 1;
   repeated Message publish = 2;

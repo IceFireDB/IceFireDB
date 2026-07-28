@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"slices"
 
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -12,7 +13,7 @@ import (
 func (ps *PubSub) watchForNewPeers(ctx context.Context) {
 	// We don't bother subscribing to "connectivity" events because we always run identify after
 	// every new connection.
-	sub, err := ps.host.EventBus().Subscribe([]interface{}{
+	sub, err := ps.host.EventBus().Subscribe([]any{
 		&event.EvtPeerIdentificationCompleted{},
 		&event.EvtPeerProtocolsUpdated{},
 	})
@@ -88,11 +89,8 @@ func (ps *PubSub) watchForNewPeers(ctx context.Context) {
 		// We don't bother checking connectivity (connected and non-"limited") here because
 		// we'll check when actually handling the new peer.
 
-		for _, p := range protos {
-			if supportsProtocol(p) {
-				ps.notifyNewPeer(peer)
-				break
-			}
+		if slices.ContainsFunc(protos, supportsProtocol) {
+			ps.notifyNewPeer(peer)
 		}
 	}
 
