@@ -8,81 +8,99 @@ import (
 	"errors"
 	"time"
 
-	dshelp "github.com/ipfs/boxo/datastore/dshelp"
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
+	"github.com/libp2p/go-libp2p-kad-dht/records"
 	record "github.com/libp2p/go-libp2p-record"
-	pb "github.com/libp2p/go-libp2p-record/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
-	"google.golang.org/protobuf/proto"
 )
 
 // ErrOffline is returned when trying to perform operations that
 // require connectivity.
 var ErrOffline = errors.New("routing system in offline mode")
 
-// NewOfflineRouter returns an Routing implementation which only performs
+// Option configures a router returned by NewOfflineRouter.
+type Option func(*offlineRouting)
+
+// WithMaxRecordAge caps how long a stored value record is served, measured from
+// the time the record was stored: once a record is older than age it is treated
+// as absent and dropped on the next read. This is independent of the record's
+// own validity, an IPNS record is dropped once it passes its EOL regardless of
+// this setting.
+//
+// The default is no cap: records are served for as long as they stay valid.
+// This fits the offline router's role as a local store of the node's own
+// records, which have no republisher to refresh their stored timestamps. Set a
+// cap to mirror the go-libp2p-kad-dht value store (amino.DefaultMaxRecordAge)
+// or to bound a datastore that nothing else garbage-collects. A value <= 0
+// keeps the no-cap default.
+func WithMaxRecordAge(age time.Duration) Option {
+	return func(r *offlineRouting) {
+		r.maxRecordAge = age
+	}
+}
+
+// NewOfflineRouter returns a Routing implementation which only performs
 // offline operations. It allows to Put and Get signed dht
 // records to and from the local datastore.
-func NewOfflineRouter(dstore ds.Datastore, validator record.Validator) routing.Routing {
-	return &offlineRouting{
-		datastore: dstore,
+//
+// Records are stored in the same datastore layout as the
+// go-libp2p-kad-dht value store (go-libp2p-kad-dht v0.42.0 and later),
+// so a node that shares dstore between this router and a DHT instance
+// can resolve records offline that were published online and vice
+// versa. Records stored by earlier versions of this package (root-level
+// base32 keys, the pre-v0.42.0 kad-dht layout) are not read anymore.
+//
+// A stored record is served for as long as it stays valid (for IPNS, until its
+// EOL); see WithMaxRecordAge to also cap retention by store age.
+func NewOfflineRouter(dstore ds.Datastore, validator record.Validator, opts ...Option) routing.Routing {
+	r := &offlineRouting{
 		validator: validator,
 	}
+	for _, opt := range opts {
+		opt(r)
+	}
+	r.valstore = records.NewValueStore(dstore, validator, r.maxRecordAge)
+	return r
 }
 
 // offlineRouting implements the Routing interface,
 // but only provides the capability to Put and Get signed dht
 // records to and from the local datastore.
 type offlineRouting struct {
-	datastore ds.Datastore
-	validator record.Validator
+	valstore     *records.ValueStore
+	validator    record.Validator
+	maxRecordAge time.Duration
 }
 
 func (c *offlineRouting) PutValue(ctx context.Context, key string, val []byte, _ ...routing.Option) error {
-	if err := c.validator.Validate(key, val); err != nil {
-		return err
-	}
-	if old, err := c.GetValue(ctx, key); err == nil {
+	rec := record.MakePutRecord(key, val)
+	// Validate and store the record.
+	err := c.valstore.Put(ctx, key, rec)
+	if errors.Is(err, records.ErrOldRecord) {
 		// be idempotent to be nice.
-		if bytes.Equal(old, val) {
+		if stored, gerr := c.valstore.Get(ctx, key); gerr == nil && stored != nil && bytes.Equal(stored.GetValue(), val) {
 			return nil
 		}
-		// check to see if the older record is better
-		i, err := c.validator.Select(key, [][]byte{val, old})
-		if err != nil {
-			// this shouldn't happen for validated records.
-			return err
-		}
-		if i != 0 {
-			return errors.New("can't replace a newer record with an older one")
-		}
 	}
-	rec := record.MakePutRecord(key, val)
-	data, err := proto.Marshal(rec)
-	if err != nil {
-		return err
-	}
-
-	return c.datastore.Put(ctx, dshelp.NewKeyFromBinary([]byte(key)), data)
+	return err
 }
 
 func (c *offlineRouting) GetValue(ctx context.Context, key string, _ ...routing.Option) ([]byte, error) {
-	buf, err := c.datastore.Get(ctx, dshelp.NewKeyFromBinary([]byte(key)))
+	rec, err := c.valstore.Get(ctx, key)
 	if err != nil {
 		return nil, err
+	}
+	if rec == nil {
+		return nil, routing.ErrNotFound
 	}
 
-	rec := new(pb.Record)
-	err = proto.Unmarshal(buf, rec)
-	if err != nil {
-		return nil, err
-	}
 	val := rec.GetValue()
-
-	err = c.validator.Validate(key, val)
-	if err != nil {
+	// The value store only age-checks records on read; run the validator
+	// so callers never see records that are expired by their own rules
+	// (e.g. IPNS EOL).
+	if err := c.validator.Validate(key, val); err != nil {
 		return nil, err
 	}
 	return val, nil

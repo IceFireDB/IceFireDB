@@ -16,7 +16,7 @@ package certmagic
 
 import (
 	"fmt"
-	weakrand "math/rand"
+	weakrand "math/rand/v2"
 	"strings"
 	"sync"
 	"time"
@@ -244,10 +244,10 @@ func (certCache *Cache) unsyncedCacheCertificate(cert Certificate) {
 		// map with less code, that is a heavily skewed eviction
 		// strategy; generating random numbers is cheap and
 		// ensures a much better distribution.
-		rnd := weakrand.Intn(cacheSize)
+		rnd := weakrand.IntN(cacheSize)
 		i := 0
 		for _, randomCert := range certCache.cache {
-			if i == rnd {
+			if i >= rnd && randomCert.managed { // don't evict manually-loaded certs
 				certCache.logger.Debug("cache full; evicting random certificate",
 					zap.Strings("removing_subjects", randomCert.Names),
 					zap.String("removing_hash", randomCert.hash),
@@ -364,6 +364,10 @@ func (certCache *Cache) getConfig(cert Certificate) (*Config, error) {
 	cfg, err := getCert(cert)
 	if err != nil {
 		return nil, err
+	}
+	if cfg == nil {
+		// this is bad if this happens, probably a programmer error (oops)
+		return nil, fmt.Errorf("no configuration associated with certificate: %v;", cert.Names)
 	}
 	if cfg.certCache == nil {
 		return nil, fmt.Errorf("config returned for certificate %v has nil cache; expected %p (this one)",

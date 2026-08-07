@@ -2,7 +2,7 @@ package session
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"slices"
 	"time"
 
@@ -174,7 +174,7 @@ func (sw *sessionWants) RandomLiveWant() cid.Cid {
 	}
 
 	// picking a random live want
-	i := rand.Intn(len(sw.liveWants))
+	i := rand.IntN(len(sw.liveWants))
 	for k := range sw.liveWants {
 		if i == 0 {
 			return k

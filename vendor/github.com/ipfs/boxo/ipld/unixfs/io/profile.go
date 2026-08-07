@@ -1,11 +1,20 @@
 package io
 
 import (
-	"github.com/alecthomas/units"
 	chunk "github.com/ipfs/boxo/chunker"
 	"github.com/ipfs/boxo/ipld/unixfs/importer/helpers"
 	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
+)
+
+const (
+	_       = iota
+	unitKiB = 1 << (10 * iota)
+	unitMiB
+	unitGiB
+	untiTiB
+	untiEiB
+	untiZiB
 )
 
 // UnixFSProfile defines a set of UnixFS import settings for CID determinism.
@@ -67,10 +76,10 @@ var (
 	UnixFS_v0_2015 = UnixFSProfile{
 		CIDVersion:         0,
 		MhType:             mh.SHA2_256,
-		ChunkSize:          int64(256 * units.KiB),
+		ChunkSize:          int64(256 * unitKiB),
 		FileDAGWidth:       174,
 		RawLeaves:          false, // dag-pb leaves for CIDv0
-		HAMTShardingSize:   int(256 * units.KiB),
+		HAMTShardingSize:   int(256 * unitKiB),
 		HAMTSizeEstimation: SizeEstimationLinks,
 		HAMTShardWidth:     256,
 	}
@@ -81,10 +90,10 @@ var (
 	UnixFS_v1_2025 = UnixFSProfile{
 		CIDVersion:         1,
 		MhType:             mh.SHA2_256,
-		ChunkSize:          int64(1 * units.MiB),
+		ChunkSize:          int64(1 * unitMiB),
 		FileDAGWidth:       1024,
 		RawLeaves:          true, // raw leaves for CIDv1
-		HAMTShardingSize:   int(256 * units.KiB),
+		HAMTShardingSize:   int(256 * unitKiB),
 		HAMTSizeEstimation: SizeEstimationBlock,
 		HAMTShardWidth:     256,
 	}

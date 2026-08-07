@@ -96,7 +96,10 @@ func DHTOption(opts ...dht.Option) Option {
 // the LAN-vs-WAN distinction.
 // Note: query or routing table functional options provided as arguments to this function
 // will be overridden by this constructor.
-func New(ctx context.Context, h host.Host, options ...Option) (*DHT, error) {
+//
+// The DHT runs until Close is called. Close blocks until both the WAN and
+// LAN DHTs have shut down.
+func New(h host.Host, options ...Option) (*DHT, error) {
 	var cfg config
 	err := cfg.apply(
 		WanDHTOption(
@@ -129,7 +132,7 @@ func New(ctx context.Context, h host.Host, options ...Option) (*DHT, error) {
 		return nil, err
 	}
 
-	wan, err := dht.New(ctx, h, cfg.wan...)
+	wan, err := dht.New(h, cfg.wan...)
 	if err != nil {
 		return nil, err
 	}
@@ -139,16 +142,18 @@ func New(ctx context.Context, h host.Host, options ...Option) (*DHT, error) {
 	if wan.Mode() != dht.ModeClient {
 		cfg.lan = append(cfg.lan, dht.Mode(dht.ModeServer))
 	}
-	lan, err := dht.New(ctx, h, cfg.lan...)
+	lan, err := dht.New(h, cfg.lan...)
 	if err != nil {
-		return nil, err
+		// the WAN DHT is already running, and the caller gets no handle to it
+		return nil, errors.Join(err, wan.Close())
 	}
 
 	impl := DHT{wan, lan}
 	return &impl, nil
 }
 
-// Close closes the DHT context.
+// Close shuts down both the WAN and LAN DHTs, blocking until they have
+// stopped.
 func (dht *DHT) Close() error {
 	return combineErrors(dht.WAN.Close(), dht.LAN.Close())
 }
@@ -353,11 +358,9 @@ func (d *DHT) GetValue(ctx context.Context, key string, opts ...routing.Option) 
 		lanErr    error
 		lanWaiter sync.WaitGroup
 	)
-	lanWaiter.Add(1)
-	go func() {
-		defer lanWaiter.Done()
+	lanWaiter.Go(func() {
 		lanVal, lanErr = d.LAN.GetValue(lanCtx, key, opts...)
-	}()
+	})
 
 	wanVal, wanErr := d.WAN.GetValue(ctx, key, opts...)
 	if wanErr == nil {

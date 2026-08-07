@@ -439,12 +439,10 @@ func addCacheControlHeaders(w http.ResponseWriter, r *http.Request, contentPath 
 	}
 
 	// Set Cache-Control and Last-Modified based on contentPath properties
+	if cc := contentCacheControl(contentPath.Mutable(), ttl); cc != "" {
+		w.Header().Set("Cache-Control", cc)
+	}
 	if contentPath.Mutable() {
-		if ttl > 0 {
-			// When we know the TTL, set the Cache-Control header and disable Last-Modified.
-			w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", int(ttl.Seconds())))
-		}
-
 		if lastMod.IsZero() {
 			// If no lastMod, set Last-Modified to the current time to leverage caching heuristics
 			// built into modern browsers: https://github.com/ipfs/kubo/pull/8074#pullrequestreview-645196768
@@ -454,10 +452,7 @@ func addCacheControlHeaders(w http.ResponseWriter, r *http.Request, contentPath 
 			// or the last time DNSLink / IPNS Record was modified / resoved or cache
 			modtime = lastMod
 		}
-
 	} else {
-		w.Header().Set("Cache-Control", immutableCacheControl)
-
 		if lastMod.IsZero() {
 			// (noop) skip Last-Modified on immutable response
 			modtime = noModtime
@@ -818,10 +813,20 @@ func (i *handler) handleIfNoneMatch(w http.ResponseWriter, r *http.Request, rq *
 		dirEtag := getDirListingEtag(pathCid)
 		dagEtag := getDagIndexEtag(pathCid)
 
-		if etagMatch(ifNoneMatch, cidEtag, dirEtag, dagEtag) {
-			// Finish early if client already has a matching Etag
-			w.WriteHeader(http.StatusNotModified)
-			return true
+		// Finish early if the client already has a matching Etag. The 304
+		// echoes the validator the client matched, paired with the
+		// Cache-Control its 200 counterpart sends: plain content, generated
+		// dir listing, or dag index HTML (which sends none).
+		mutable, ttl := rq.contentPath.Mutable(), rq.ttl
+		for _, c := range []struct{ etag, cacheControl string }{
+			{cidEtag, contentCacheControl(mutable, ttl)},
+			{dirEtag, dirListingCacheControl(mutable, ttl)},
+			{dagEtag, ""},
+		} {
+			if etagMatch(ifNoneMatch, c.etag) {
+				i.write304(w, c.etag, c.cacheControl)
+				return true
+			}
 		}
 
 		// Check if the resolvedPath is an immutable path.
@@ -867,7 +872,16 @@ func (i *handler) handleIfModifiedSince(w http.ResponseWriter, r *http.Request, 
 	// but other sources of this metadata could be added in the future
 	lastModified := pathMetadata.ModTime
 	if lastModifiedMatch(ifModifiedSince, lastModified) {
-		w.WriteHeader(http.StatusNotModified)
+		// Only files carry a Last-Modified (from UnixFS mtime), so only files
+		// reach this branch. Dir listings and dag-index HTML never set
+		// Last-Modified, so clients revalidate those through If-None-Match
+		// above, where each gets its own policy. That is why the plain-content
+		// Cache-Control is the right one to echo here.
+		//
+		// Omit Last-Modified on the 304, like http.ServeContent: the Etag is
+		// the stronger validator.
+		etag := getEtag(r, pathMetadata.LastSegment.RootCid(), rq.responseFormat)
+		i.write304(w, etag, contentCacheControl(rq.contentPath.Mutable(), rq.ttl))
 		return true
 	}
 
@@ -880,6 +894,52 @@ func (i *handler) handleIfModifiedSince(w http.ResponseWriter, r *http.Request, 
 
 	rq.pathMetadata = &pathMetadata
 	return false
+}
+
+// contentCacheControl returns the Cache-Control that a 200 response carrying
+// plain content sends (see addCacheControlHeaders). Empty means the header is
+// omitted: an unknown TTL (0) on a mutable path leaves freshness to client
+// heuristics.
+func contentCacheControl(mutable bool, ttl time.Duration) string {
+	if mutable {
+		if ttl > 0 {
+			return fmt.Sprintf("public, max-age=%d", int(ttl.Seconds()))
+		}
+		return ""
+	}
+	return immutableCacheControl
+}
+
+// dirListingCacheControl returns the Cache-Control that a 200 response with a
+// generated HTML dir listing sends (see serveDirectory). The generated HTML
+// changes between boxo versions, so even immutable paths get a bounded
+// lifetime instead of the immutable profile.
+func dirListingCacheControl(mutable bool, ttl time.Duration) string {
+	if ttl > 0 {
+		// Use known TTL from IPNS Record or DNSLink TXT Record
+		return fmt.Sprintf("public, max-age=%d, stale-while-revalidate=2678400", int(ttl.Seconds()))
+	}
+	if !mutable {
+		// Cache for 1 week, serve stale cache for up to a month
+		return "public, max-age=604800, stale-while-revalidate=2678400"
+	}
+	return ""
+}
+
+// write304 replies 304 Not Modified carrying the current validator and the
+// Cache-Control a 200 for the same representation would send (RFC 9110,
+// section 15.4.5), so a client cache can update its stored response
+// (RFC 9111, section 4.3.4). A bare 304 would leave the stored copy expired,
+// and the client would revalidate on every subsequent request even though the
+// resolution was just confirmed valid for another TTL.
+func (i *handler) write304(w http.ResponseWriter, etag, cacheControl string) {
+	if etag != "" {
+		w.Header().Set("Etag", etag)
+	}
+	if cacheControl != "" {
+		w.Header().Set("Cache-Control", cacheControl)
+	}
+	w.WriteHeader(http.StatusNotModified)
 }
 
 // check if request was for one of known explicit formats,
@@ -1124,4 +1184,39 @@ func (i *handler) getTemplateGlobalData(r *http.Request, contentPath path.Path) 
 
 func (i *handler) webError(w http.ResponseWriter, r *http.Request, err error, defaultCode int) {
 	webError(w, r, i.config, err, defaultCode)
+}
+
+// cacheControlSizeLimit is the Cache-Control header for responses rejected by
+// content size limits (MaxDeserializedResponseSize, MaxUnixFSDAGResponseSize).
+// Fresh for 1 week, serve stale for up to 31 days while revalidating in the
+// background. Uses 410 Gone which is heuristically cacheable per RFC 9110 and
+// cached by CDNs (Cloudflare, Fastly) by default.
+const cacheControlSizeLimit = "public, max-age=604800, stale-while-revalidate=2678400"
+
+// exceedsMaxUnixFSDAGResponseSize checks whether sz exceeds the configured
+// MaxUnixFSDAGResponseSize. If it does, it writes a cacheable 410 Gone
+// response and returns true. Returns false (no-op) when the limit is disabled
+// or not exceeded.
+func (i *handler) exceedsMaxUnixFSDAGResponseSize(w http.ResponseWriter, r *http.Request, sz int64) bool {
+	if i.config.MaxUnixFSDAGResponseSize > 0 && sz > i.config.MaxUnixFSDAGResponseSize {
+		err := fmt.Errorf("responses are not supported for content larger than %d bytes: for large content, run your own IPFS node (https://docs.ipfs.tech/install/)", i.config.MaxUnixFSDAGResponseSize)
+		w.Header().Set("Cache-Control", cacheControlSizeLimit)
+		i.webError(w, r, err, http.StatusGone)
+		return true
+	}
+	return false
+}
+
+// exceedsMaxDeserializedResponseSize checks whether sz exceeds the configured
+// MaxDeserializedResponseSize. If it does, it writes a cacheable 410 Gone
+// response and returns true. Returns false (no-op) when the limit is disabled
+// or not exceeded.
+func (i *handler) exceedsMaxDeserializedResponseSize(w http.ResponseWriter, r *http.Request, sz int64) bool {
+	if i.config.MaxDeserializedResponseSize > 0 && sz > i.config.MaxDeserializedResponseSize {
+		err := fmt.Errorf("deserialized responses are not supported for content larger than %d bytes: for large content, run your own IPFS node (https://docs.ipfs.tech/install/)", i.config.MaxDeserializedResponseSize)
+		w.Header().Set("Cache-Control", cacheControlSizeLimit)
+		i.webError(w, r, err, http.StatusGone)
+		return true
+	}
+	return false
 }

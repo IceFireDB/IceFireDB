@@ -17,7 +17,7 @@ import (
 )
 
 // BitSwapMessage is the basic interface for interacting building, encoding,
-// and decoding messages sent on the BitSwap protocol.
+// and decoding messages sent on the Bitswap protocol.
 type BitSwapMessage interface {
 	FillWantlist([]Entry) []Entry
 	// Wantlist returns a slice of unique keys that represent data wanted by

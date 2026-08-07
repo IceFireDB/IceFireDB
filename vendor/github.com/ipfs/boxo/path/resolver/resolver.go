@@ -9,6 +9,7 @@ import (
 	"github.com/ipfs/boxo/fetcher"
 	fetcherhelpers "github.com/ipfs/boxo/fetcher/helpers"
 	"github.com/ipfs/boxo/path"
+	"github.com/ipfs/boxo/retrieval"
 	cid "github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
@@ -81,8 +82,10 @@ func (r *basicResolver) ResolveToLastNode(ctx context.Context, fpath path.Immuta
 	defer span.End()
 
 	c, remainder := fpath.RootCid(), fpath.Segments()[2:]
+	enterPathResolution(ctx, c)
 
 	if len(remainder) == 0 {
+		setTerminalCid(ctx, c)
 		return c, nil, nil
 	}
 
@@ -121,6 +124,7 @@ func (r *basicResolver) ResolveToLastNode(ctx context.Context, fpath path.Immuta
 
 	// if last node is not a link, just return it's cid, add path to remainder and return
 	if nd.Kind() != ipld.Kind_Link {
+		setTerminalCid(ctx, lastCid)
 		// return the cid and the remainder of the path
 		return lastCid, remainder[len(remainder)-depth-1:], nil
 	}
@@ -135,6 +139,7 @@ func (r *basicResolver) ResolveToLastNode(ctx context.Context, fpath path.Immuta
 		return cid.Cid{}, nil, fmt.Errorf("path %v resolves to a link that is not a cid link: %v", fpath, lnk)
 	}
 
+	setTerminalCid(ctx, clnk.Cid)
 	return clnk.Cid, []string{}, nil
 }
 
@@ -147,6 +152,7 @@ func (r *basicResolver) ResolvePath(ctx context.Context, fpath path.ImmutablePat
 	defer span.End()
 
 	c, remainder := fpath.RootCid(), fpath.Segments()[2:]
+	enterPathResolution(ctx, c)
 
 	// create a selector to traverse all path segments but only match the last
 	pathSelector := pathLeafSelector(remainder)
@@ -158,6 +164,7 @@ func (r *basicResolver) ResolvePath(ctx context.Context, fpath path.ImmutablePat
 	if len(nodes) < 1 {
 		return nil, nil, fmt.Errorf("path %v did not resolve to a node", fpath)
 	}
+	setTerminalCid(ctx, c)
 	return nodes[len(nodes)-1], cidlink.Link{Cid: c}, nil
 }
 
@@ -172,11 +179,15 @@ func (r *basicResolver) ResolvePathComponents(ctx context.Context, fpath path.Im
 	defer log.Debugw("resolvePathComponents", "fpath", fpath, "error", err)
 
 	c, remainder := fpath.RootCid(), fpath.Segments()[2:]
+	enterPathResolution(ctx, c)
 
 	// create a selector to traverse and match all path segments
 	pathSelector := pathAllSelector(remainder)
 
-	nodes, _, _, err = r.resolveNodes(ctx, c, pathSelector)
+	nodes, terminal, _, err := r.resolveNodes(ctx, c, pathSelector)
+	if err == nil && terminal.Defined() {
+		setTerminalCid(ctx, terminal)
+	}
 	return nodes, err
 }
 
@@ -245,4 +256,28 @@ func pathSelector(path []string, ssb builder.SelectorSpecBuilder, reduce func(st
 
 func startSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	return otel.Tracer("boxo/path/resolver").Start(ctx, "Path."+name, opts...)
+}
+
+// enterPathResolution advances retrieval state into PhasePathResolution and
+// records the root CID, when a [retrieval.State] is attached to ctx. It is a
+// no-op otherwise. Calls are idempotent: SetPhase is monotonic, and SetRootCID
+// is last-write-wins under a mutex.
+func enterPathResolution(ctx context.Context, root cid.Cid) {
+	if rs := retrieval.StateFromContext(ctx); rs != nil {
+		rs.SetPhase(retrieval.PhasePathResolution)
+		if root.Defined() {
+			rs.SetRootCID(root)
+		}
+	}
+}
+
+// setTerminalCid records the CID of the terminating DAG entity on the resolved
+// path, when a [retrieval.State] is attached to ctx. Otherwise it is a no-op.
+func setTerminalCid(ctx context.Context, terminal cid.Cid) {
+	if !terminal.Defined() {
+		return
+	}
+	if rs := retrieval.StateFromContext(ctx); rs != nil {
+		rs.SetTerminalCID(terminal)
+	}
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -568,9 +569,9 @@ func (rt *RoutingTable) maxCommonPrefix() uint {
 	rt.tabLock.RLock()
 	defer rt.tabLock.RUnlock()
 
-	for i := len(rt.buckets) - 1; i >= 0; i-- {
-		if rt.buckets[i].len() > 0 {
-			return rt.buckets[i].maxCommonPrefix(rt.local)
+	for _, b := range slices.Backward(rt.buckets) {
+		if b.len() > 0 {
+			return b.maxCommonPrefix(rt.local)
 		}
 	}
 	return 0

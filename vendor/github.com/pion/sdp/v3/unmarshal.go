@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package sdp
@@ -21,7 +21,7 @@ var (
 
 	//nolint: gochecknoglobals
 	unmarshalCachePool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return &unmarshalCache{}
 		},
 	}
@@ -465,7 +465,8 @@ func unmarshalOrigin(lex *lexer) (stateFn, error) {
 		return nil, fmt.Errorf("%w `%v`", errSDPInvalidValue, lex.desc.Origin.NetworkType)
 	}
 
-	lex.desc.Origin.AddressType, err = lex.readField()
+	// Handle potentially missing AddressType field
+	err = handleAddressType(lex)
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +477,8 @@ func unmarshalOrigin(lex *lexer) (stateFn, error) {
 		return nil, fmt.Errorf("%w `%v`", errSDPInvalidValue, lex.desc.Origin.AddressType)
 	}
 
-	lex.desc.Origin.UnicastAddress, err = lex.readField()
+	// Handle potentially missing UnicastAddress field
+	err = handleUnicastAddress(lex)
 	if err != nil {
 		return nil, err
 	}
@@ -486,6 +488,49 @@ func unmarshalOrigin(lex *lexer) (stateFn, error) {
 	}
 
 	return s3, nil
+}
+
+// handleAddressType processes AddressType field with graceful handling for missing fields.
+func handleAddressType(lex *lexer) error {
+	addressType, err := lex.readRequiredField()
+	if err != nil {
+		if errors.Is(err, errFieldMissing) {
+			// Field missing - use defaults for camera compatibility
+			lex.desc.Origin.AddressType = "IP4"
+			lex.desc.Origin.UnicastAddress = "0.0.0.0"
+
+			return nil
+		}
+
+		return err
+	}
+
+	lex.desc.Origin.AddressType = addressType
+
+	return nil
+}
+
+// handleUnicastAddress processes UnicastAddress field with graceful handling for missing fields.
+func handleUnicastAddress(lex *lexer) error {
+	unicastAddress, err := lex.readRequiredField()
+	if err != nil {
+		if errors.Is(err, errFieldMissing) {
+			// Use appropriate default based on address type
+			if lex.desc.Origin.AddressType == "IP6" {
+				lex.desc.Origin.UnicastAddress = "::"
+			} else {
+				lex.desc.Origin.UnicastAddress = "0.0.0.0"
+			}
+
+			return nil
+		}
+
+		return err
+	}
+
+	lex.desc.Origin.UnicastAddress = unicastAddress
+
+	return nil
 }
 
 func unmarshalSessionName(l *lexer) (stateFn, error) {
@@ -850,6 +895,7 @@ func unmarshalMediaDescription(lex *lexer) (stateFn, error) { //nolint:cyclop
 			"UDT",
 			"IX",
 			"MRCPv2",
+			"FEC",
 		) {
 			return nil, fmt.Errorf("%w `%v`", errSDPInvalidNumericValue, field)
 		}

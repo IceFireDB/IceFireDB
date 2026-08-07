@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"hash/fnv"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -279,7 +279,7 @@ func (c *Client) selectURL() string {
 	if len(c.urls) == 1 {
 		return c.urls[0]
 	}
-	return c.urls[rand.Intn(len(c.urls))]
+	return c.urls[rand.IntN(len(c.urls))]
 }
 
 // readMetadata reads cached ETag and Last-Modified values
