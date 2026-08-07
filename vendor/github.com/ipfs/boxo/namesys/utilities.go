@@ -3,6 +3,7 @@ package namesys
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/ipfs/boxo/path"
 	"go.opentelemetry.io/otel"
@@ -46,6 +47,11 @@ func resolveAsync(ctx context.Context, r resolver, p path.Path, options ResolveO
 
 		var subCh <-chan AsyncResult
 		var cancelSub context.CancelFunc
+		// parentTTL is the TTL of the mutable result that started this recursion,
+		// for example a DNSLink that points at an IPNS name. Each sub-result's TTL
+		// is held to the shorter of the two, so a name is never cached past its
+		// shortest hop.
+		var parentTTL time.Duration
 		defer func() {
 			if cancelSub != nil {
 				cancelSub()
@@ -92,12 +98,17 @@ func resolveAsync(ctx context.Context, r resolver, p path.Path, options ResolveO
 				subCtx, cancelSub = context.WithCancel(ctx)
 				_ = cancelSub
 
+				parentTTL = res.TTL
 				subCh = resolveAsync(subCtx, r, res.Path, subOpts)
 			case res, ok := <-subCh:
 				if !ok {
 					subCh = nil
 					break
 				}
+
+				// Keep the shorter of the parent (e.g. DNSLink) and sub-result
+				// TTLs so the result is never cached past its shortest hop.
+				res.TTL = minNonZeroTTL(parentTTL, res.TTL)
 
 				// We don't bother returning here in case of context timeout as there is
 				// no good reason to do that, and we may still be able to emit a result
@@ -118,6 +129,17 @@ func emitResult(ctx context.Context, outCh chan<- AsyncResult, r AsyncResult) {
 	case outCh <- r:
 	case <-ctx.Done():
 	}
+}
+
+// minNonZeroTTL returns the shorter of two TTLs, treating a non-positive value
+// as unknown and ignoring it. If both are unknown it returns 0, and a negative
+// input is never returned.
+func minNonZeroTTL(a, b time.Duration) time.Duration {
+	ttl := min(a, b)
+	if ttl <= 0 {
+		ttl = max(0, a, b)
+	}
+	return ttl
 }
 
 func joinPaths(resolvedBase, unresolvedPath path.Path) (path.Path, error) {

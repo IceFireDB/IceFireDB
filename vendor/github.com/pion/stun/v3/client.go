@@ -17,24 +17,25 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v3"
-	"github.com/pion/transport/v3"
-	"github.com/pion/transport/v3/stdnet"
+	"github.com/pion/transport/v4"
+	"github.com/pion/transport/v4/stdnet"
 )
 
-// ErrUnsupportedURI is an error thrown if the user passes an unsupported STUN or TURN URI
+// ErrUnsupportedURI is an error thrown if the user passes an unsupported STUN or TURN URI.
 var ErrUnsupportedURI = fmt.Errorf("invalid schema or transport")
 
 // Dial connects to the address on the named network and then
 // initializes Client on that connection, returning error if any.
 func Dial(network, address string) (*Client, error) {
-	conn, err := net.Dial(network, address)
+	conn, err := net.Dial(network, address) //nolint: noctx
 	if err != nil {
 		return nil, err
 	}
+
 	return NewClient(conn)
 }
 
-// DialConfig is used to pass configuration to DialURI()
+// DialConfig is used to pass configuration to DialURI().
 type DialConfig struct {
 	DTLSConfig dtls.Config
 	TLSConfig  tls.Config
@@ -44,7 +45,7 @@ type DialConfig struct {
 
 // DialURI connect to the STUN/TURN URI and then
 // initializes Client on that connection, returning error if any.
-func DialURI(uri *URI, cfg *DialConfig) (*Client, error) {
+func DialURI(uri *URI, cfg *DialConfig) (*Client, error) { //nolint:cyclop
 	var conn Connection
 	var err error
 
@@ -93,7 +94,7 @@ func DialURI(uri *URI, cfg *DialConfig) (*Client, error) {
 		}
 
 	case (uri.Scheme == SchemeTypeTURNS || uri.Scheme == SchemeTypeSTUNS) && uri.Proto == ProtoTypeTCP:
-		tlsCfg := cfg.TLSConfig //nolint:govet
+		tlsCfg := cfg.TLSConfig //nolint:govet, copylocks
 		tlsCfg.ServerName = uri.Host
 
 		tcpConn, err := nw.Dial("tcp", addr)
@@ -203,7 +204,7 @@ const (
 // provide any API for it, so if you need to read application data, wrap the
 // connection with your (de-)multiplexer and pass the wrapper as conn.
 func NewClient(conn Connection, options ...ClientOption) (*Client, error) {
-	c := &Client{
+	client := &Client{
 		close:       make(chan struct{}),
 		c:           conn,
 		clock:       systemClock(),
@@ -214,32 +215,33 @@ func NewClient(conn Connection, options ...ClientOption) (*Client, error) {
 		closeConn:   true,
 	}
 	for _, o := range options {
-		o(c)
+		o(client)
 	}
-	if c.c == nil {
+	if client.c == nil {
 		return nil, ErrNoConnection
 	}
-	if c.a == nil {
-		c.a = NewAgent(nil)
+	if client.a == nil {
+		client.a = NewAgent(nil)
 	}
-	if err := c.a.SetHandler(c.handleAgentCallback); err != nil {
+	if err := client.a.SetHandler(client.handleAgentCallback); err != nil {
 		return nil, err
 	}
-	if c.collector == nil {
-		c.collector = &tickerCollector{
+	if client.collector == nil {
+		client.collector = &tickerCollector{
 			close: make(chan struct{}),
-			clock: c.clock,
+			clock: client.clock,
 		}
 	}
-	if err := c.collector.Start(c.rtoRate, func(t time.Time) {
-		closedOrPanic(c.a.Collect(t))
+	if err := client.collector.Start(client.rtoRate, func(t time.Time) {
+		closedOrPanic(client.a.Collect(t))
 	}); err != nil {
 		return nil, err
 	}
-	c.wg.Add(1)
-	go c.readUntilClosed()
-	runtime.SetFinalizer(c, clientFinalizer)
-	return c, nil
+	client.wg.Add(1)
+	go client.readUntilClosed()
+	runtime.SetFinalizer(client, clientFinalizer)
+
+	return client, nil
 }
 
 func clientFinalizer(c *Client) {
@@ -252,6 +254,7 @@ func clientFinalizer(c *Client) {
 	}
 	if err == nil {
 		log.Println("client: called finalizer on non-closed client") // nolint
+
 		return
 	}
 	log.Println("client: called finalizer on non-closed client:", err) // nolint
@@ -316,7 +319,7 @@ func (t *clientTransaction) handle(e Event) {
 }
 
 var clientTransactionPool = &sync.Pool{ //nolint:gochecknoglobals
-	New: func() interface{} {
+	New: func() any {
 		return &clientTransaction{
 			raw: make([]byte, 1500),
 		}
@@ -353,6 +356,7 @@ func (c *Client) start(t *clientTransaction) error {
 		return ErrTransactionExists
 	}
 	c.t[t.id] = t
+
 	return nil
 }
 
@@ -399,6 +403,7 @@ func sprintErr(err error) string {
 	if err == nil {
 		return "<nil>" //nolint:goconst
 	}
+
 	return err.Error()
 }
 
@@ -455,18 +460,21 @@ func (a *tickerCollector) Start(rate time.Duration, f func(now time.Time)) error
 			select {
 			case <-a.close:
 				t.Stop()
+
 				return
 			case <-t.C:
 				f(a.clock.Now())
 			}
 		}
 	}()
+
 	return nil
 }
 
 func (a *tickerCollector) Close() error {
 	close(a.close)
 	a.wg.Wait()
+
 	return nil
 }
 
@@ -481,6 +489,7 @@ func (c *Client) Close() error {
 	c.mux.Lock()
 	if c.closed {
 		c.mux.Unlock()
+
 		return ErrClientClosed
 	}
 	c.closed = true
@@ -498,6 +507,7 @@ func (c *Client) Close() error {
 	if agentErr == nil && connErr == nil {
 		return nil
 	}
+
 	return CloseErr{
 		AgentErr:      agentErr,
 		ConnectionErr: connErr,
@@ -552,7 +562,7 @@ func (s *callbackWaitHandler) setCallback(f func(event Event)) {
 }
 
 var callbackWaitHandlerPool = sync.Pool{ //nolint:gochecknoglobals
-	New: func() interface{} {
+	New: func() any {
 		return &callbackWaitHandler{
 			cond: sync.NewCond(new(sync.Mutex)),
 		}
@@ -566,6 +576,7 @@ func (c *Client) checkInit() error {
 	if c == nil || c.c == nil || c.a == nil || c.close == nil {
 		return ErrClientNotInitialized
 	}
+
 	return nil
 }
 
@@ -590,6 +601,7 @@ func (c *Client) Do(m *Message, f func(Event)) error {
 		return err
 	}
 	h.wait()
+
 	return nil
 }
 
@@ -606,85 +618,90 @@ type buffer struct {
 }
 
 var bufferPool = &sync.Pool{ //nolint:gochecknoglobals
-	New: func() interface{} {
+	New: func() any {
 		return &buffer{buf: make([]byte, 2048)}
 	},
 }
 
-func (c *Client) handleAgentCallback(e Event) {
+func (c *Client) handleAgentCallback(event Event) { //nolint:cyclop
 	c.mux.Lock()
 	if c.closed {
 		c.mux.Unlock()
+
 		return
 	}
-	t, found := c.t[e.TransactionID]
+	transaction, found := c.t[event.TransactionID]
 	if found {
-		delete(c.t, t.id)
+		delete(c.t, transaction.id)
 	}
 	c.mux.Unlock()
 	if !found {
-		if c.handler != nil && !errors.Is(e.Error, ErrTransactionStopped) {
-			c.handler(e)
+		if c.handler != nil && !errors.Is(event.Error, ErrTransactionStopped) {
+			c.handler(event)
 		}
 		// Ignoring.
 		return
 	}
-	if atomic.LoadInt32(&c.maxAttempts) <= t.attempt || e.Error == nil {
+	if atomic.LoadInt32(&c.maxAttempts) <= transaction.attempt || event.Error == nil {
 		// Transaction completed.
-		t.handle(e)
-		putClientTransaction(t)
+		transaction.handle(event)
+		putClientTransaction(transaction)
+
 		return
 	}
 	// Doing re-transmission.
-	t.attempt++
-	b := bufferPool.Get().(*buffer) //nolint:forcetypeassert
-	b.buf = b.buf[:copy(b.buf[:cap(b.buf)], t.raw)]
-	defer bufferPool.Put(b)
+	transaction.attempt++
+	buff := bufferPool.Get().(*buffer) //nolint:forcetypeassert
+	buff.buf = buff.buf[:copy(buff.buf[:cap(buff.buf)], transaction.raw)]
+	defer bufferPool.Put(buff)
 	var (
 		now     = c.clock.Now()
-		timeOut = t.nextTimeout(now)
-		id      = t.id
+		timeOut = transaction.nextTimeout(now)
+		id      = transaction.id
 	)
 	// Starting client transaction.
-	if startErr := c.start(t); startErr != nil {
+	if startErr := c.start(transaction); startErr != nil {
 		c.delete(id)
-		e.Error = startErr
-		t.handle(e)
-		putClientTransaction(t)
+		event.Error = startErr
+		transaction.handle(event)
+		putClientTransaction(transaction)
+
 		return
 	}
 	// Starting agent transaction.
 	if startErr := c.a.Start(id, timeOut); startErr != nil {
 		c.delete(id)
-		e.Error = startErr
-		t.handle(e)
-		putClientTransaction(t)
+		event.Error = startErr
+		transaction.handle(event)
+		putClientTransaction(transaction)
+
 		return
 	}
 	// Writing message to connection again.
-	_, writeErr := c.c.Write(b.buf)
+	_, writeErr := c.c.Write(buff.buf)
 	if writeErr != nil {
 		c.delete(id)
-		e.Error = writeErr
+		event.Error = writeErr
 		// Stopping agent transaction instead of waiting until it's deadline.
 		// This will call handleAgentCallback with "ErrTransactionStopped" error
 		// which will be ignored.
 		if stopErr := c.a.Stop(id); stopErr != nil {
 			// Failed to stop agent transaction. Wrapping the error in StopError.
-			e.Error = StopErr{
+			event.Error = StopErr{
 				Err:   stopErr,
 				Cause: writeErr,
 			}
 		}
-		t.handle(e)
-		putClientTransaction(t)
+		transaction.handle(event)
+		putClientTransaction(transaction)
+
 		return
 	}
 }
 
 // Start starts transaction (if h set) and writes message to server, handler
 // is called asynchronously.
-func (c *Client) Start(m *Message, h Handler) error {
+func (c *Client) Start(msg *Message, handler Handler) error {
 	if err := c.checkInit(); err != nil {
 		return err
 	}
@@ -694,34 +711,35 @@ func (c *Client) Start(m *Message, h Handler) error {
 	if closed {
 		return ErrClientClosed
 	}
-	if h != nil {
+	if handler != nil {
 		// Starting transaction only if h is set. Useful for indications.
 		t := acquireClientTransaction()
-		t.id = m.TransactionID
+		t.id = msg.TransactionID
 		t.start = c.clock.Now()
-		t.h = h
+		t.h = handler
 		t.rto = time.Duration(atomic.LoadInt64(&c.rto))
 		t.attempt = 0
-		t.raw = append(t.raw[:0], m.Raw...)
+		t.raw = append(t.raw[:0], msg.Raw...)
 		t.calls = 0
 		d := t.nextTimeout(t.start)
 		if err := c.start(t); err != nil {
 			return err
 		}
-		if err := c.a.Start(m.TransactionID, d); err != nil {
+		if err := c.a.Start(msg.TransactionID, d); err != nil {
 			return err
 		}
 	}
-	_, err := m.WriteTo(c.c)
-	if err != nil && h != nil {
-		c.delete(m.TransactionID)
+	_, err := msg.WriteTo(c.c)
+	if err != nil && handler != nil {
+		c.delete(msg.TransactionID)
 		// Stopping transaction instead of waiting until deadline.
-		if stopErr := c.a.Stop(m.TransactionID); stopErr != nil {
+		if stopErr := c.a.Stop(msg.TransactionID); stopErr != nil {
 			return StopErr{
 				Err:   stopErr,
 				Cause: err,
 			}
 		}
 	}
+
 	return err
 }

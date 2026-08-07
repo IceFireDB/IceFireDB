@@ -100,6 +100,10 @@ func (x *indexer) DeleteAll(ctx context.Context) (int, error) {
 }
 
 func (x *indexer) ForEach(ctx context.Context, key string, fn func(key, value string) bool) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	if key != "" {
 		key = encode(key)
 	}

@@ -3,13 +3,16 @@
 // IPNS path becomes an /ipfs/<cid> path.
 //
 // Traditionally, these paths would be in the form of /ipns/peer_id, which
-// references an IPNS record in a distributed ValueStore (usually the IPFS
+// references an [IPNS record] in a distributed ValueStore (usually the IPFS
 // DHT).
 //
 // Additionally, the /ipns/ namespace can also be used with domain names that
-// use DNSLink (/ipns/<dnslink_name>, https://docs.ipfs.io/concepts/dnslink/)
+// use [DNSLink].
 //
 // The package provides implementations for all three resolvers.
+//
+// [IPNS record]: https://specs.ipfs.tech/ipns/ipns-record/
+// [DNSLink]: https://docs.ipfs.tech/concepts/dnslink/
 package namesys
 
 import (
@@ -76,7 +79,10 @@ func WithCache(size int) Option {
 
 // WithMaxCacheTTL configures the maximum cache TTL. By default, if the cache is
 // enabled, the entry TTL will be used for caching. By setting this option, you
-// can limit how long that TTL is.
+// can limit how long that TTL is. A positive cap also applies to the TTL
+// reported in resolution results, so a gateway deriving Cache-Control max-age
+// from it stays within the configured bound. A cap of 0 or less only disables
+// the cache; the reported TTL still comes from the record.
 //
 // For example, if you configure a maximum cache TTL of 1 minute:
 //   - Entry TTL is 5 minutes -> Cache TTL is 1 minute
@@ -88,11 +94,34 @@ func WithMaxCacheTTL(dur time.Duration) Option {
 	}
 }
 
-// WithDNSResolver is an option that supplies a custom DNS resolver to use instead
-// of the system default.
+// WithDNSResolver sets a custom DNS resolver in place of the system default. If
+// that resolver also implements [madns.TXTWithTTLResolver], its TXT TTLs flow
+// into resolved results, and from there into the gateway's Cache-Control header.
+//
+// The OS resolver cannot report TTLs: Go's [net.Resolver] returns only record
+// values, and [madns.DefaultResolver] wraps it. TTLs flow only for domains
+// routed through a resolver that can report them, such as a DNS-over-HTTPS
+// resolver (go-doh-resolver). A [madns.Resolver] mixing DoH with the OS
+// default reports real TTLs only for the DoH-covered domains; make DoH the
+// default resolver to cover every domain.
 func WithDNSResolver(rslv madns.BasicResolver) Option {
 	return func(ns *namesys) error {
-		ns.dnsResolver = NewDNSResolver(rslv.LookupTXT)
+		// A resolver that reports TXT TTLs (such as a DoH resolver via
+		// multiformats/go-multiaddr-dns#75) carries the DNSLink TTL through.
+		if ttlRslv, ok := rslv.(madns.TXTWithTTLResolver); ok {
+			ns.dnsResolver = NewDNSResolverWithTTL(ttlRslv.LookupTXTWithTTL)
+		} else {
+			ns.dnsResolver = NewDNSResolver(rslv.LookupTXT)
+		}
+		return nil
+	}
+}
+
+// WithDNSResolverWithTTL is like [WithDNSResolver] but takes a lookup that
+// reports TXT TTLs directly.
+func WithDNSResolverWithTTL(lookup LookupTXTWithTTLFunc) Option {
+	return func(ns *namesys) error {
+		ns.dnsResolver = NewDNSResolverWithTTL(lookup)
 		return nil
 	}
 }
@@ -247,7 +276,7 @@ func (ns *namesys) resolveOnceAsync(ctx context.Context, p path.Path, options Re
 					res.Err = errors.Join(err, res.Err)
 				}
 
-				emitOnceResult(ctx, out, AsyncResult{Path: p, TTL: res.TTL, LastMod: res.LastMod, Err: res.Err})
+				emitOnceResult(ctx, out, AsyncResult{Path: p, TTL: ns.capTTL(res.TTL), LastMod: res.LastMod, Err: res.Err})
 			case <-ctx.Done():
 				return
 			}

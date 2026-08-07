@@ -5,10 +5,6 @@ import (
 	"math"
 )
 
-func (d *Encoder) emitLen(majorByte byte, length int) {
-	d.emitMajorPlusLen(majorByte, uint64(length))
-}
-
 func (d *Encoder) emitMajorPlusLen(majorByte byte, v uint64) {
 	if v <= 0x17 {
 		d.w.writen1(majorByte + byte(v))
@@ -30,10 +26,6 @@ func (d *Encoder) emitMajorPlusLen(majorByte byte, v uint64) {
 		binary.BigEndian.PutUint64(d.spareBytes, v)
 		d.w.writeb(d.spareBytes)
 	}
-}
-
-func (d *Encoder) encodeNull() {
-	d.w.writen1(cborSigilNil)
 }
 
 func (d *Encoder) encodeString(s string) {

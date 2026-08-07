@@ -201,6 +201,8 @@ func LibP2P(bcfg *BuildCfg, cfg *config.Config, userResourceOverrides rcmgr.Part
 		maybeProvide(libp2p.P2PForgeCertMgr(bcfg.Repo.Path(), cfg.AutoTLS, atlsLog), enableAutoTLS),
 		maybeInvoke(libp2p.StartP2PAutoTLS, enableAutoTLS),
 		fx.Provide(libp2p.AddrFilters(cfg.Swarm.AddrFilters)),
+		maybeInvoke(libp2p.MonitorDeadListeners(cfg.Addresses.Swarm, cfg.Swarm.AddrFilters, cfg.Addresses.NoAnnounce), cfg.Internal.DeadListenerCheck.WithDefault(config.DefaultDeadListenerCheck)),
+		maybeInvoke(libp2p.MonitorCGNAT(), cfg.Internal.CGNATCheck.WithDefault(config.DefaultCGNATCheck)),
 		fx.Provide(libp2p.AddrsFactory(cfg.Addresses.Announce, cfg.Addresses.AppendAnnounce, cfg.Addresses.NoAnnounce)),
 		fx.Provide(libp2p.SmuxTransport(cfg.Swarm.Transports)),
 		fx.Provide(libp2p.RelayTransport(enableRelayTransport)),
@@ -209,6 +211,7 @@ func LibP2P(bcfg *BuildCfg, cfg *config.Config, userResourceOverrides rcmgr.Part
 		fx.Provide(libp2p.ListenOn(cfg.Addresses.Swarm)),
 		fx.Invoke(libp2p.SetupDiscovery(cfg.Discovery.MDNS.Enabled)),
 		fx.Provide(libp2p.ForceReachability(cfg.Internal.Libp2pForceReachability)),
+		fx.Provide(libp2p.NonPublicAddrPublishing(cfg.Internal.NonPublicAddrPublishing)),
 		fx.Provide(libp2p.HolePunching(cfg.Swarm.EnableHolePunching, enableRelayClient)),
 
 		fx.Provide(libp2p.Security(!bcfg.DisableEncryptedConnections, cfg.Swarm.Transports)),
@@ -243,7 +246,9 @@ func Storage(bcfg *BuildCfg, cfg *config.Config) fx.Option {
 
 	finalBstore := fx.Provide(GcBlockstoreCtor)
 	if cfg.Experimental.FilestoreEnabled || cfg.Experimental.UrlstoreEnabled {
-		finalBstore = fx.Provide(FilestoreBlockstoreCtor)
+		finalBstore = fx.Provide(FilestoreBlockstoreCtor(
+			cfg.Provide.Strategy.WithDefault(config.DefaultProvideStrategy),
+		))
 	}
 
 	return fx.Options(
@@ -346,9 +351,11 @@ func Online(bcfg *BuildCfg, cfg *config.Config, userResourceOverrides rcmgr.Part
 	isBitswapServerEnabled := cfg.Bitswap.ServerEnabled.WithDefault(config.DefaultBitswapServerEnabled)
 	isHTTPRetrievalEnabled := cfg.HTTPRetrieval.Enabled.WithDefault(config.DefaultHTTPRetrievalEnabled)
 
-	// The Provide system handles both new CID announcements and periodic re-announcements.
-	// Disabling is controlled by Provide.Enabled=false or setting Interval to 0.
-	isProviderEnabled := cfg.Provide.Enabled.WithDefault(config.DefaultProvideEnabled) && cfg.Provide.DHT.Interval.WithDefault(config.DefaultProvideDHTInterval) != 0
+	// The Provide system handles both new CID announcements and periodic
+	// re-announcements. Provide.Enabled=false fully disables it.
+	// Provide.DHT.Interval=0 disables only the periodic reprovide schedule;
+	// new CIDs still announce via fast-provide-root and 'ipfs provide once'.
+	isProviderEnabled := cfg.Provide.Enabled.WithDefault(config.DefaultProvideEnabled)
 
 	return fx.Options(
 		fx.Provide(BitswapOptions(cfg)),
@@ -360,6 +367,7 @@ func Online(bcfg *BuildCfg, cfg *config.Config, userResourceOverrides rcmgr.Part
 		PeerWith(cfg.Peering.Peers...),
 
 		fx.Invoke(IpnsRepublisher(repubPeriod, recordLifetime)),
+		fx.Invoke(PurgeStaleDHTValueRecords),
 
 		fx.Provide(p2p.New),
 

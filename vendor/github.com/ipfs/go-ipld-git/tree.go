@@ -63,9 +63,14 @@ func DecodeTreeEntry(rd *bufio.Reader) (string, ipld.Node, error) {
 		return "", nil, err
 	}
 
+	c, err := shaToCid(sha)
+	if err != nil {
+		return "", nil, err
+	}
+
 	te := _TreeEntry{
 		mode: _String{data},
-		hash: _Link{cidlink.Link{Cid: shaToCid(sha)}},
+		hash: _Link{cidlink.Link{Cid: c}},
 	}
 	return name, &te, nil
 }
