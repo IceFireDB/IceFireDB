@@ -296,7 +296,6 @@ func (e *PartialMessagesExtension[PeerState]) EmitGossip(topic string, peers []p
 }
 
 func (e *PartialMessagesExtension[PeerState]) sendRPC(to peer.ID, rpc *pb.PartialMessagesExtension) {
-	e.Logger.Debug("Sending RPC", "to", to, "rpc", rpc)
 	e.router.SendRPC(to, rpc, false)
 }
 
@@ -305,7 +304,6 @@ func (e *PartialMessagesExtension[PeerState]) HandleRPC(from peer.ID, rpc *pb.Pa
 		return nil
 	}
 
-	e.Logger.Debug("Received RPC", "from", from, "rpc", rpc)
 	topic := rpc.GetTopicID()
 	groupID := rpc.GroupID
 

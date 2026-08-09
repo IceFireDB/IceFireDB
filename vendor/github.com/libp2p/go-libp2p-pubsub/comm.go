@@ -6,9 +6,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	pool "github.com/libp2p/go-buffer-pool"
 	"github.com/multiformats/go-varint"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -122,8 +122,17 @@ func (p *PubSub) handleNewStream(s network.Stream) {
 			continue
 		}
 
+		err = pb.ValidateRawRPCControlMessageSize(msgbytes, p.maxControlMessageSize)
+		if err != nil {
+			r.ReleaseMsg(msgbytes)
+			s.Reset()
+
+			p.rpcLogger.Warn("RPC's control message is too large. Disconnecting. If this is a mistake, you should increase `WithMaxControlMessageSize`", "peer", s.Conn().RemotePeer(), "err", err)
+			return
+		}
+
 		rpc := new(RPC)
-		err = rpc.Unmarshal(msgbytes)
+		err = proto.Unmarshal(msgbytes, &rpc.RPC)
 		r.ReleaseMsg(msgbytes)
 		if err != nil {
 			s.Reset()
@@ -209,13 +218,13 @@ func (p *PubSub) handlePeerDead(s network.Stream) {
 
 func (p *PubSub) handleSendingMessages(ctx context.Context, s network.Stream, outgoing *rpcQueue, firstMessage chan *RPC) {
 	writeRpc := func(rpc *RPC) error {
-		size := uint64(rpc.Size())
+		size := uint64(proto.Size(&rpc.RPC))
 
 		buf := pool.Get(varint.UvarintSize(size) + int(size))
 		defer pool.Put(buf)
 
 		n := binary.PutUvarint(buf, size)
-		_, err := rpc.MarshalTo(buf[n:])
+		out, err := proto.MarshalOptions{}.MarshalAppend(buf[:n], &rpc.RPC)
 		if err != nil {
 			return err
 		}
@@ -225,7 +234,7 @@ func (p *PubSub) handleSendingMessages(ctx context.Context, s network.Stream, ou
 			return err
 		}
 
-		_, err = s.Write(buf)
+		_, err = s.Write(out)
 		if err != nil {
 			p.rpcLogger.Debug("failed to send message", "peer", s.Conn().RemotePeer(), "rpc", rpc, "err", err)
 			return err
@@ -236,7 +245,7 @@ func (p *PubSub) handleSendingMessages(ctx context.Context, s network.Stream, ou
 
 	select {
 	case rpc := <-firstMessage:
-		if rpc.Size() > 0 {
+		if proto.Size(&rpc.RPC) > 0 {
 			err := writeRpc(rpc)
 			if err != nil {
 				s.Reset()
@@ -296,14 +305,4 @@ func rpcWithControl(msgs []*pb.Message,
 			},
 		},
 	}
-}
-
-func copyRPC(rpc *RPC) *RPC {
-	res := new(RPC)
-	*res = *rpc
-	if rpc.Control != nil {
-		res.Control = new(pb.ControlMessage)
-		*res.Control = *rpc.Control
-	}
-	return res
 }

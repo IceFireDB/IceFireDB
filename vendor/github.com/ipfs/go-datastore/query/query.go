@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -69,45 +70,46 @@ type Query struct {
 // String returns a string representation of the Query for debugging/validation
 // purposes. Do not use it for SQL queries.
 func (q Query) String() string {
-	s := "SELECT keys"
+	var s strings.Builder
+	s.WriteString("SELECT keys")
 	if !q.KeysOnly {
-		s += ",vals"
+		s.WriteString(",vals")
 	}
 	if q.ReturnExpirations {
-		s += ",exps"
+		s.WriteString(",exps")
 	}
 
-	s += " "
+	s.WriteString(" ")
 
 	if q.Prefix != "" {
-		s += fmt.Sprintf("FROM %q ", q.Prefix)
+		s.WriteString(fmt.Sprintf("FROM %q ", q.Prefix))
 	}
 
 	if len(q.Filters) > 0 {
-		s += fmt.Sprintf("FILTER [%s", q.Filters[0])
+		s.WriteString(fmt.Sprintf("FILTER [%s", q.Filters[0]))
 		for _, f := range q.Filters[1:] {
-			s += fmt.Sprintf(", %s", f)
+			s.WriteString(fmt.Sprintf(", %s", f))
 		}
-		s += "] "
+		s.WriteString("] ")
 	}
 
 	if len(q.Orders) > 0 {
-		s += fmt.Sprintf("ORDER [%s", q.Orders[0])
+		s.WriteString(fmt.Sprintf("ORDER [%s", q.Orders[0]))
 		for _, f := range q.Orders[1:] {
-			s += fmt.Sprintf(", %s", f)
+			s.WriteString(fmt.Sprintf(", %s", f))
 		}
-		s += "] "
+		s.WriteString("] ")
 	}
 
 	if q.Offset > 0 {
-		s += fmt.Sprintf("OFFSET %d ", q.Offset)
+		s.WriteString(fmt.Sprintf("OFFSET %d ", q.Offset))
 	}
 
 	if q.Limit > 0 {
-		s += fmt.Sprintf("LIMIT %d ", q.Limit)
+		s.WriteString(fmt.Sprintf("LIMIT %d ", q.Limit))
 	}
 	// Will always end with a space, strip it.
-	return s[:len(s)-1]
+	return s.String()[:len(s.String())-1]
 }
 
 // Entry is a query result entry.

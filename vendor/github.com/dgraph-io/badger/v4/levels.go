@@ -385,10 +385,26 @@ func (s *levelsController) levelTargets() targets {
 	for i := len(s.levels) - 1; i > 0; i-- {
 		ltarget := adjust(dbSize)
 		t.targetSz[i] = ltarget
-		if t.baseLevel == 0 && ltarget <= s.kv.opt.BaseLevelSize {
-			t.baseLevel = i
-		}
 		dbSize /= int64(s.kv.opt.LevelSizeMultiplier)
+	}
+
+	// Bring the base level down to the last empty level.
+	t.baseLevel = 1
+	for i := 1; i < len(s.levels)-1; i++ {
+		if s.levels[i].getTotalSize() > 0 {
+			break
+		}
+		t.baseLevel = i
+	}
+
+	// If the base level is empty and the next level size is less than the
+	// target size and less than base level size, pick the next level as the base level.
+	b := t.baseLevel
+	lvl := s.levels
+	baseLevelIsEmpty := lvl[b].getTotalSize() == 0
+	baseLevelIsNotLastLevel := b < len(lvl)-1
+	if baseLevelIsNotLastLevel && baseLevelIsEmpty && lvl[b+1].getTotalSize() < t.targetSz[b+1] && lvl[b+1].getTotalSize() < s.kv.opt.BaseLevelSize {
+		t.baseLevel++
 	}
 
 	tsz := s.kv.opt.BaseTableSize
@@ -407,30 +423,9 @@ func (s *levelsController) levelTargets() targets {
 		}
 	}
 
-	// Bring the base level down to the last empty level.
-	for i := t.baseLevel + 1; i < len(s.levels)-1; i++ {
-		if s.levels[i].getTotalSize() > 0 {
-			break
-		}
-		t.baseLevel = i
-	}
-
-	// If the base level is empty and the next level size is less than the
-	// target size, pick the next level as the base level.
-	b := t.baseLevel
-	lvl := s.levels
-	if b < len(lvl)-1 && lvl[b].getTotalSize() == 0 && lvl[b+1].getTotalSize() < t.targetSz[b+1] {
-		t.baseLevel++
-	}
-
-	// The base level must never be L0. For a very large LSM tree the size loop
-	// above can fail to assign a base level: it only sets baseLevel where
-	// adjust(dbSize) <= BaseLevelSize, and the smallest level it checks (L1)
-	// has dbSize = lastLevelSize / LevelSizeMultiplier^(MaxLevels-2). Once the
-	// last level exceeds that (~1TB with defaults), baseLevel stays 0, and a
-	// non-empty L1 prevents the "bring down" loop from fixing it. Clamp to L1
-	// (the topmost real level) so we never try to compact L0 into itself, which
-	// would otherwise panic in fillTablesL0ToLbase.
+	// The base level must never be L0. The base-level scan above starts at L1, so
+	// baseLevel is already >= 1; this is a defensive guard (added in #2296) against
+	// ever compacting L0 into itself, which would panic in fillTablesL0ToLbase.
 	if t.baseLevel == 0 {
 		t.baseLevel = 1
 	}
@@ -658,6 +653,20 @@ func (s *levelsController) subcompact(it y.Iterator, kr keyRange, cd compactDef,
 	// never discard any versions starting from above this timestamp, because
 	// that would affect the snapshot view guarantee provided by transactions.
 	discardTs := s.kv.orc.discardAtOrBelow()
+
+	// While a vlog GC rewrite is in flight, do not discard any version newer than
+	// the rewrite's start (gcDiscardTs is the DB's max committed version captured
+	// then). The rewrite may write a scanned value back, and a tombstone deleting
+	// that key — necessarily committed after the rewrite started, so with a version
+	// greater than gcDiscardTs — must survive to shadow the write-back; otherwise
+	// the deleted key reappears (#2286). The clamp is released when the rewrite
+	// finishes. Lowering discardTs only ever keeps more versions, so it is always
+	// safe; it costs deferred reclamation during a rewrite, nothing more.
+	if s.kv.gcActive.Load() {
+		if gcMax := s.kv.gcDiscardTs.Load(); gcMax > 0 && gcMax < discardTs {
+			discardTs = gcMax
+		}
+	}
 
 	// Try to collect stats so that we can inform value log about GC. That would help us find which
 	// value log file should be GCed.
@@ -1116,6 +1125,18 @@ func (cd *compactDef) allTables() []*table.Table {
 	return ret
 }
 
+// FUTURE WORK (parallel L0 drain): Today L0 compaction is serialized to a single
+// compactor. The cd.compactorId != 0 gate below and the infRange reservation in
+// both fillTablesL0ToL0 (cd.thisRange = infRange; thisLevel.ranges += infRange)
+// and fillTablesL0ToLbase are LOAD-BEARING for range-overlap correctness in
+// compactStatus: because L0 tables have overlapping key ranges, reserving the
+// whole keyspace (infRange) is the only safe way to prevent two concurrent
+// compactors from picking overlapping L0 tables. Allowing >1 compactor to drain
+// L0 in parallel would require partitioning L0->Lbase by key range (e.g. reusing
+// addSplits over L0's combined range) so disjoint compactors reserve disjoint
+// sub-ranges instead of infRange — a non-trivial change that must not ship
+// half-correct. It is intentionally NOT done here; this change only replaces the
+// busy-sleep backpressure with cond signalling and keeps L0 single-threaded.
 func (s *levelsController) fillTablesL0ToL0(cd *compactDef) bool {
 	if cd.compactorId != 0 {
 		// Only compactor zero can work on this.
@@ -1418,6 +1439,15 @@ func (s *levelsController) runCompactDef(id, l int, cd compactDef) (err error) {
 	if len(cd.t.fileSz) == 0 {
 		return errors.New("Filesizes cannot be zero. Targets are not set")
 	}
+
+	if cd.thisLevel.level == 0 {
+		for i := cd.nextLevel.level - 1; i > 0; i-- {
+			if s.levels[i].getTotalSize() > 0 {
+				return fmt.Errorf("there is a non-empty level %d above base level %d", i, cd.nextLevel.level)
+			}
+		}
+	}
+
 	timeStart := time.Now()
 
 	thisLevel := cd.thisLevel
@@ -1476,6 +1506,15 @@ func (s *levelsController) runCompactDef(id, l int, cd compactDef) (err error) {
 	}
 	if err := thisLevel.deleteTables(cd.top); err != nil {
 		return err
+	}
+
+	// If this compaction removed tables from L0, the L0 table count has dropped, so
+	// wake any flush goroutine stalled in addLevel0Table. Broadcasting after the
+	// deletion (and after releasing the level lock inside deleteTables) is safe:
+	// the waiter re-checks the stall predicate under the lock in a loop, so there
+	// is no lost-wakeup window.
+	if thisLevel.level == 0 && len(cd.top) > 0 {
+		thisLevel.signalL0Drained()
 	}
 
 	// Note: For level 0, while doCompact is running, it is possible that new tables are added.
@@ -1584,18 +1623,43 @@ func (s *levelsController) addLevel0Table(t *table.Table) error {
 		}
 	}
 
-	for !s.levels[0].tryAddLevel0Table(t) {
-		// Before we uninstall, we need to make sure that level 0 is healthy.
-		timeStart := time.Now()
-		for s.levels[0].numTables() >= s.kv.opt.NumLevelZeroTablesStall {
-			time.Sleep(10 * time.Millisecond)
+	// Wait (without busy-polling) until L0 is below the stall threshold, then add
+	// the table. We hold the L0 write lock, which is also the l0stall cond's
+	// Locker, so the predicate check and the transition into cond.Wait are atomic
+	// with respect to compaction removing L0 tables (which Broadcasts the cond).
+	// This replaces the previous 10ms Sleep polling loop.
+	l0 := s.levels[0]
+	l0.Lock()
+	timeStart := time.Now()
+	stalled := false
+	for l0.numTablesLocked() >= s.kv.opt.NumLevelZeroTablesStall {
+		// If the DB is shutting down, force-add the table even though we are above
+		// the stall threshold. Compactions are torn down after the flush goroutine
+		// is awaited during Close, so waiting for L0 to drain here could deadlock.
+		// The stall threshold is a flow-control heuristic, not an on-disk
+		// invariant, so temporarily exceeding it during shutdown is safe and lets
+		// the flush goroutine complete so flushChan can drain and close. We watch
+		// both IsClosed() (normal Close) and the flush goroutine's own closer
+		// (also covers the Open-error cleanup path, where IsClosed may be unset).
+		if s.kv.IsClosed() || s.kv.flushStopped() {
+			break
 		}
+		stalled = true
+		// cond.Wait atomically releases l0's write lock and re-acquires it on
+		// wake. Spurious wakeups are safe because we re-check the predicate in
+		// this loop. Wakeups arrive via signalL0Drained() on compaction progress
+		// and on Close.
+		l0.l0stall.Wait()
+	}
+	if stalled {
 		dur := time.Since(timeStart)
 		if dur > time.Second {
 			s.kv.opt.Infof("L0 was stalled for %s\n", dur.Round(time.Millisecond))
 		}
 		s.l0stallsMs.Add(int64(dur.Round(time.Millisecond)))
 	}
+	l0.addLevel0TableLocked(t)
+	l0.Unlock()
 
 	return nil
 }

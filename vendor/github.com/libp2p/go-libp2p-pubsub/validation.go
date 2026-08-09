@@ -27,12 +27,6 @@ func (e ValidationError) Error() string {
 	return e.Reason
 }
 
-type dupeErr struct{}
-
-func (dupeErr) Error() string {
-	return "duplicate message"
-}
-
 // Validator is a function that validates a message with a binary decision: accept or reject.
 type Validator func(context.Context, peer.ID, *Message) bool
 
@@ -112,7 +106,7 @@ type validatorImpl struct {
 // async request to add a topic validators
 type addValReq struct {
 	topic    string
-	validate interface{}
+	validate any
 	timeout  time.Duration
 	throttle int
 	inline   bool
@@ -309,9 +303,13 @@ func (v *validation) sendMsgBlocking(msg *Message) error {
 }
 
 // validate performs validation and only calls onValid if all validators succeed.
-// If synchronous is true, onValid will be called before this function returns
-// if the message is new and accepted.
-func (v *validation) validate(vals []*validatorImpl, src peer.ID, msg *Message, synchronous bool, onValid func(*Message) error) error {
+// If local is true,
+//  1. validation is run even if the message was seen before, and all validators are
+//     run synchronously in the calling goroutine.
+//  2. if the message is accepted, onValid is called before this function returns.
+func (v *validation) validate(
+	vals []*validatorImpl, src peer.ID, msg *Message, local bool, onValid func(*Message) error,
+) error {
 	// If signature verification is enabled, but signing is disabled,
 	// the Signature is required to be nil upon receiving the message in PubSub.pushMsg.
 	if msg.Signature != nil {
@@ -325,16 +323,20 @@ func (v *validation) validate(vals []*validatorImpl, src peer.ID, msg *Message, 
 	// we can mark the message as seen now that we have verified the signature
 	// and avoid invoking user validators more than once
 	id := v.p.idGen.ID(msg)
-	if !v.p.markSeen(id) {
+	// Validate again if it's a local publish that was seen but never delivered
+	// (ValidationIgnore), so the node can still forward it. Publishes of already
+	// delivered messages are a no-op; publishMessage dedups any that race past.
+	if (!v.p.markSeen(id) && !local) || v.p.deliveredMessages.Has(id) {
 		v.tracer.DuplicateMessage(msg)
-		return dupeErr{}
+		return nil
 	} else {
 		v.tracer.ValidateMessage(msg)
 	}
 
 	var inline, async []*validatorImpl
 	for _, val := range vals {
-		if val.validateInline || synchronous {
+		// run validation synchronously if it's a local publish.
+		if val.validateInline || local {
 			inline = append(inline, val)
 		} else {
 			async = append(async, val)
@@ -517,7 +519,7 @@ func (val *validatorImpl) validateMsg(ctx context.Context, src peer.ID, msg *Mes
 // WithDefaultValidator adds a validator that applies to all topics by default; it can be used
 // more than once and add multiple validators. Having a defult validator does not inhibit registering
 // a per topic validator.
-func WithDefaultValidator(val interface{}, opts ...ValidatorOpt) Option {
+func WithDefaultValidator(val any, opts ...ValidatorOpt) Option {
 	return func(ps *PubSub) error {
 		addVal := &addValReq{
 			validate: val,

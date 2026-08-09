@@ -1,28 +1,20 @@
 go-cid
 ==================
 
-[![](https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square)](http://ipn.io)
 [![](https://img.shields.io/badge/project-IPFS-blue.svg?style=flat-square)](http://ipfs.io/)
-[![](https://img.shields.io/badge/freenode-%23ipfs-blue.svg?style=flat-square)](http://webchat.freenode.net/?channels=%23ipfs)
-[![](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
-[![GoDoc](https://godoc.org/github.com/ipfs/go-cid?status.svg)](https://godoc.org/github.com/ipfs/go-cid)
+[![GoDoc](https://pkg.go.dev/badge/github.com/ipfs/go-cid)](https://pkg.go.dev/github.com/ipfs/go-cid)
 [![Coverage Status](https://coveralls.io/repos/github/ipfs/go-cid/badge.svg?branch=master)](https://coveralls.io/github/ipfs/go-cid?branch=master)
-[![Travis CI](https://travis-ci.org/ipfs/go-cid.svg?branch=master)](https://travis-ci.org/ipfs/go-cid)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/ipfs/go-cid/go-test.yml?branch=master)](https://github.com/ipfs/go-cid/actions)
 
 > A package to handle content IDs in Go.
 
 This is an implementation in Go of the [CID spec](https://github.com/ipld/cid).
 It is used in `go-ipfs` and related packages to refer to a typed hunk of data.
 
-## Lead Maintainer
-
-[Eric Myhre](https://github.com/warpfork)
-
 ## Table of Contents
 
 - [Install](#install)
 - [Usage](#usage)
-- [API](#api)
 - [Contribute](#contribute)
 - [License](#license)
 
@@ -112,4 +104,4 @@ Small note: If editing the Readme, please conform to the [standard-readme](https
 
 ## License
 
-MIT © Jeromy Johnson
+MIT

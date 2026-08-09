@@ -26,3 +26,6 @@ release_bin
 
 #vscode
 .vscode
+
+# Local environment file (never commit secrets/config)
+.env

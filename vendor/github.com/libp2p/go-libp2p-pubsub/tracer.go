@@ -18,8 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 
-	//lint:ignore SA1019 "github.com/libp2p/go-msgio/protoio" is deprecated
-	"github.com/libp2p/go-msgio/protoio"
+	"github.com/libp2p/go-msgio/pbio"
 )
 
 var TraceBufferSize = 1 << 16 // 64K ought to be enough for everyone; famous last words.
@@ -158,7 +157,7 @@ func OpenPBTracer(file string, flags int, perm os.FileMode, logger *slog.Logger)
 
 func (t *PBTracer) doWrite() {
 	var buf []*pb.TraceEvent
-	w := protoio.NewDelimitedWriter(t.w)
+	w := pbio.NewDelimitedWriter(t.w)
 	for {
 		_, ok := <-t.ch
 
@@ -215,7 +214,7 @@ func (t *RemoteTracer) doWrite() {
 	var batch pb.TraceEventBatch
 
 	gzipW := gzip.NewWriter(s)
-	w := protoio.NewDelimitedWriter(gzipW)
+	w := pbio.NewDelimitedWriter(gzipW)
 
 	for {
 		_, ok := <-t.ch

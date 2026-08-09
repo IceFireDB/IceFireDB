@@ -252,7 +252,7 @@ var ErrNotFound error = &dsError{error: errors.New("datastore: key not found"), 
 func GetBackedHas(ctx context.Context, ds Read, key Key) (bool, error) {
 	_, err := ds.Get(ctx, key)
 	if err != nil {
-		if err == ErrNotFound {
+		if errors.Is(err, ErrNotFound) {
 			return false, nil
 		}
 		return false, err

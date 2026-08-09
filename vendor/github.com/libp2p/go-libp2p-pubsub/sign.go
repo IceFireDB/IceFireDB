@@ -7,6 +7,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"google.golang.org/protobuf/proto"
 )
 
 // MessageSignaturePolicy describes if signatures are produced, expected, and/or verified.
@@ -52,10 +53,10 @@ func verifyMessageSignature(m *pb.Message) error {
 		return err
 	}
 
-	xm := *m
+	xm := proto.CloneOf(m)
 	xm.Signature = nil
 	xm.Key = nil
-	bytes, err := xm.Marshal()
+	bytes, err := proto.Marshal(xm)
 	if err != nil {
 		return err
 	}
@@ -107,7 +108,7 @@ func messagePubKey(m *pb.Message) (crypto.PubKey, error) {
 }
 
 func signMessage(pid peer.ID, key crypto.PrivKey, m *pb.Message) error {
-	bytes, err := m.Marshal()
+	bytes, err := proto.Marshal(m)
 	if err != nil {
 		return err
 	}
