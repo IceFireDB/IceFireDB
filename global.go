@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	lediscfg "github.com/ledisdb/ledisdb/config"
 
 	"github.com/ledisdb/ledisdb/ledis"
-	"github.com/syndtr/goleveldb/leveldb"
 	rafthub "github.com/tidwall/uhaha"
 )
 
@@ -18,12 +18,15 @@ var (
 )
 
 var (
-	db            *leveldb.DB
 	le            *ledis.Ledis
 	ldb           *ledis.DB
 	ldsCfg        *lediscfg.Config
 	serverInfo    *info
 	respClientNum int64
+	// storageReady reports whether the storage backend has finished
+	// initializing (set true in DataDirReady). Read concurrently by the
+	// observability readiness endpoint, so it must be atomic.
+	storageReady atomic.Bool
 )
 
 var conf rafthub.Config // raft config

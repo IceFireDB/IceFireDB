@@ -68,6 +68,29 @@ run_dev:
 test:
 	DRIVER=$(DRIVER) go test -v --v ./...
 
+test-compat:
+	DRIVER=$(DRIVER) go test -v -count=1 -tags alltest ./
+
+# Integration tests launch the real binary as subprocesses to exercise crash
+# recovery (SIGKILL) and multi-node Raft failover. Builds the binary first.
+test-integration:
+	go build -o /tmp/icefiredb-it .
+	IFDB_BIN=/tmp/icefiredb-it go test -v -count=1 -tags integration -run TestIntegration ./
+
+# Partition test runs a 3-node cluster in Docker containers and cuts the leader
+# off the inter-node network to verify Raft's no-split-brain guarantee. Requires
+# docker; builds a static linux binary for the containers.
+test-partition:
+	CGO_ENABLED=0 go build -o /tmp/icefiredb-static .
+	IFDB_STATIC=/tmp/icefiredb-static go test -v -count=1 -tags partition -run TestPartition ./
+
+# Sustained soak/load test against a 3-node cluster. Tune via environment:
+#   SOAK_DURATION (e.g. 10m), SOAK_WORKERS (e.g. 8), SOAK_CHAOS=1 (cycle leaders).
+# Example: SOAK_DURATION=10m SOAK_CHAOS=1 make soak
+soak:
+	go build -o /tmp/icefiredb-it .
+	IFDB_BIN=/tmp/icefiredb-it go test -v -count=1 -timeout 0 -tags integration -run TestIntegrationSoak ./
+
 bench-run:
 	rm -rf ./data
 	./bin/IceFireDB --nosync
