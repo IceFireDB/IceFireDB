@@ -1268,9 +1268,6 @@ github.com/pion/webrtc/v4/pkg/rtcerr
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
-# github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
-## explicit
-github.com/pmezard/go-difflib/difflib
 # github.com/polydawn/refmt v0.89.1-0.20231129105047-37766d95467a
 ## explicit; go 1.16
 github.com/polydawn/refmt
@@ -1408,10 +1405,12 @@ github.com/spf13/viper/internal/features
 # github.com/spinlock/jemalloc-go v0.0.0-20201010032256-e81523fb8524
 ## explicit
 github.com/spinlock/jemalloc-go
-# github.com/stretchr/testify v1.11.1
+# github.com/stretchr/testify v1.12.1
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
+github.com/stretchr/testify/internal/difflib
+github.com/stretchr/testify/internal/spew
 github.com/stretchr/testify/require
 # github.com/subosito/gotenv v1.6.0
 ## explicit; go 1.18
@@ -1640,7 +1639,7 @@ go.uber.org/zap/zapcore
 # go.uber.org/zap/exp v0.3.0
 ## explicit; go 1.19
 go.uber.org/zap/exp/zapslog
-# go.yaml.in/yaml/v3 v3.0.4
+# go.yaml.in/yaml/v3 v3.0.5
 ## explicit; go 1.16
 go.yaml.in/yaml/v3
 # go4.org v0.0.0-20230225012048-214862532bf5
