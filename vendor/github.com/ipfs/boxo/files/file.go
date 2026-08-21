@@ -32,12 +32,16 @@ type Node interface {
 	Size() (int64, error)
 }
 
-// Node represents a regular Unix file
+// File represents a regular Unix file.
+//
+// Implementations that support random access may also implement [io.Seeker].
+// Callers that need seeking should type-assert rather than assume all Files
+// are seekable, since some implementations (e.g. HTTP multipart streams)
+// only support sequential reads.
 type File interface {
 	Node
 
 	io.Reader
-	io.Seeker
 }
 
 // DirEntry exposes information about a directory entry

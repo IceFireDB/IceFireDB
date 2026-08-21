@@ -44,6 +44,7 @@ func (m *Message) Build(setters ...Setter) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -54,6 +55,7 @@ func (m *Message) Check(checkers ...Checker) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -64,6 +66,7 @@ func (m *Message) Parse(getters ...Getter) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -73,6 +76,7 @@ func MustBuild(setters ...Setter) *Message {
 	if err != nil {
 		panic(err) //nolint
 	}
+
 	return m
 }
 
@@ -82,6 +86,7 @@ func Build(setters ...Setter) (*Message, error) {
 	if err := m.Build(setters...); err != nil {
 		return nil, err
 	}
+
 	return m, nil
 }
 
@@ -105,5 +110,6 @@ func (m *Message) ForEach(t AttrType, f func(m *Message) error) error {
 			return err
 		}
 	}
+
 	return nil
 }

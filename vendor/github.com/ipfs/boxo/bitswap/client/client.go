@@ -1,5 +1,8 @@
-// Package client implements the IPFS exchange interface with the BitSwap
-// bilateral exchange protocol.
+// Package client implements the IPFS exchange interface with the [Bitswap]
+// bilateral exchange protocol (see [interaction pattern]).
+//
+// [Bitswap]: https://specs.ipfs.tech/bitswap-protocol/
+// [interaction pattern]: https://specs.ipfs.tech/bitswap-protocol/#bitswap-1-2-0-interaction-pattern
 package client
 
 import (
@@ -428,7 +431,7 @@ func (bs *Client) GetBlock(ctx context.Context, k cid.Cid) (blocks.Block, error)
 }
 
 // GetBlocks returns a channel where the caller may receive blocks that
-// correspond to the provided |keys|. Returns an error if BitSwap is unable to
+// correspond to the provided |keys|. Returns an error if Bitswap is unable to
 // begin this request within the deadline enforced by the context.
 //
 // If [WithTraceBlock] option is set true, then returns a channel of
