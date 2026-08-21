@@ -1,8 +1,9 @@
 Git ipld format
 ==================
 
-[![](https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square)](http://ipn.io)
 [![](https://img.shields.io/badge/project-IPFS-blue.svg?style=flat-square)](http://ipfs.io/)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/ipfs/go-ipld-git/go-test.yml?branch=master)](https://github.com/ipfs/go-ipld-git/actions)
+[![GoDoc](https://pkg.go.dev/badge/github.com/ipfs/go-ipld-git)](https://pkg.go.dev/github.com/ipfs/go-ipld-git)
 
 > An IPLD codec for git objects allowing path traversals across the git graph.
 

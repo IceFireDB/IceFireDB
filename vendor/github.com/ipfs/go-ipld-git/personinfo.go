@@ -3,6 +3,7 @@ package ipldgit
 import (
 	"bytes"
 	"fmt"
+	"strings"
 )
 
 func parsePersonInfo(line []byte) (PersonInfo, error) {
@@ -37,24 +38,27 @@ func parsePersonInfo(line []byte) (PersonInfo, error) {
 		pi.name = _String{name[:len(name)-1]}
 	}
 
-	var email string
+	var email strings.Builder
 	for {
 		if at == len(parts) {
 			return nil, fmt.Errorf("invalid personInfo: %q", line)
 		}
 		part := parts[at]
-		if part[0] == '<' {
+		// A part can be empty when the email contains repeated spaces, which
+		// git itself produces, so skip rather than index into it. The name loop
+		// above already treats that case the same way.
+		if len(part) > 0 && part[0] == '<' {
 			part = part[1:]
 		}
 
 		at++
-		if part[len(part)-1] == '>' {
-			email += string(part[:len(part)-1])
+		if len(part) > 0 && part[len(part)-1] == '>' {
+			email.WriteString(string(part[:len(part)-1]))
 			break
 		}
-		email += string(part) + " "
+		email.WriteString(string(part) + " ")
 	}
-	pi.email = _String{email}
+	pi.email = _String{email.String()}
 
 	if at == len(parts) {
 		return &pi, nil
@@ -71,7 +75,7 @@ func parsePersonInfo(line []byte) (PersonInfo, error) {
 
 func (p _PersonInfo) GitString() string {
 	f := "%s <%s>"
-	arg := []interface{}{p.name.x, p.email.x}
+	arg := []any{p.name.x, p.email.x}
 	if p.date.x != "" {
 		f = f + " %s"
 		arg = append(arg, p.date.x)

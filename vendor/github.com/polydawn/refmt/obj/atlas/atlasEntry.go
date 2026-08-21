@@ -5,22 +5,22 @@ import (
 )
 
 /*
-	The AtlasEntry is a declarative roadmap of what we should do for
-	marshal and unmarshal of a single object, keyed by type.
+The AtlasEntry is a declarative roadmap of what we should do for
+marshal and unmarshal of a single object, keyed by type.
 
-	There are a lot of paths your mappings might want to take:
+There are a lot of paths your mappings might want to take:
 
-	  - For a struct type, you may simply want to specify some alternate keys, or some to leave out, etc.
-	  - For an interface type, you probably want to specify one of our interface muxing strategies
-	     with a mapping between enumstr:typeinfo (and, what to do if we get a struct we don't recognize).
-	  - For a string, int, or other primitive, you don't need to say anything: defaults will DTRT.
-	  - For a typedef'd string, int, or other primitive, you *still* don't need to say anything: but,
-	     if you want custom behavior (say, transform the string to an int at the last second, and back again),
-		 you can specify transformer functions for that.
-	  - For a struct type that you want to turn into a whole different kind (like a string): use
-	     those same transform functions.  (You'll no longer need a FieldMap.)
-	  - For the most esoteric needs, you can fall all the way back to providing a custom MarshalMachine
-	     (but avoid that; it's a lot of work, and one of these other transform methods should suffice).
+  - For a struct type, you may simply want to specify some alternate keys, or some to leave out, etc.
+  - For an interface type, you probably want to specify one of our interface muxing strategies
+    with a mapping between enumstr:typeinfo (and, what to do if we get a struct we don't recognize).
+  - For a string, int, or other primitive, you don't need to say anything: defaults will DTRT.
+  - For a typedef'd string, int, or other primitive, you *still* don't need to say anything: but,
+    if you want custom behavior (say, transform the string to an int at the last second, and back again),
+    you can specify transformer functions for that.
+  - For a struct type that you want to turn into a whole different kind (like a string): use
+    those same transform functions.  (You'll no longer need a FieldMap.)
+  - For the most esoteric needs, you can fall all the way back to providing a custom MarshalMachine
+    (but avoid that; it's a lot of work, and one of these other transform methods should suffice).
 */
 type AtlasEntry struct {
 	// The reflect info of the type this morphism is regarding.
@@ -121,23 +121,22 @@ func BuildEntry(typeHintObj interface{}) *BuilderCore {
 }
 
 /*
-	Intermediate step in building an AtlasEntry: use `BuildEntry` to
-	get one of these to start with, then call one of the methods
-	on this type to get a specialized builder which has the methods
-	relevant for setting up that specific kind of mapping.
+Intermediate step in building an AtlasEntry: use `BuildEntry` to
+get one of these to start with, then call one of the methods
+on this type to get a specialized builder which has the methods
+relevant for setting up that specific kind of mapping.
 
-	One full example of using this builder may look like the following:
+One full example of using this builder may look like the following:
 
-		atlas.BuildEntry(Formula{}).StructMap().Autogenerate().Complete()
+	atlas.BuildEntry(Formula{}).StructMap().Autogenerate().Complete()
 
-	Some intermediate manipulations may be performed on this object,
-	for example setting the "tag" (if you want to use cbor tagging),
-	before calling the specializer method.
-	In this case, just keep chaining the configuration calls like so:
+Some intermediate manipulations may be performed on this object,
+for example setting the "tag" (if you want to use cbor tagging),
+before calling the specializer method.
+In this case, just keep chaining the configuration calls like so:
 
-		atlas.BuildEntry(Formula{}).UseTag(4000)
-			.StructMap().Autogenerate().Complete()
-
+	atlas.BuildEntry(Formula{}).UseTag(4000)
+		.StructMap().Autogenerate().Complete()
 */
 type BuilderCore struct {
 	entry *AtlasEntry

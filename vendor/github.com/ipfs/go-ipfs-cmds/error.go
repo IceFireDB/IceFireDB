@@ -6,10 +6,10 @@ import (
 	"fmt"
 )
 
-// ErrorType signfies a category of errors
+// ErrorType signifies a category of errors
 type ErrorType uint
 
-// ErrorTypes convey what category of error ocurred
+// ErrorTypes convey what category of error occurred
 const (
 	// ErrNormal is a normal error. The command failed for some reason that's not a bug.
 	ErrNormal ErrorType = iota
@@ -45,7 +45,7 @@ func (e ErrorType) String() string {
 	}
 }
 
-// Error is a struct for marshalling errors
+// Error is a struct for marshaling errors
 type Error struct {
 	Message string
 	Code    ErrorType

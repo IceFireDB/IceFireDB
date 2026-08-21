@@ -18,8 +18,6 @@ import (
 	"github.com/dunglas/httpsfv"
 )
 
-var errNoWebTransport = errors.New("server didn't enable WebTransport")
-
 type Dialer struct {
 	// TLSClientConfig is the TLS client config used when dialing the QUIC connection.
 	// It must set the h3 ALPN.
@@ -29,7 +27,7 @@ type Dialer struct {
 	QUICConfig *quic.Config
 
 	// ApplicationProtocols is a list of application protocols that can be negotiated,
-	// see section 3.3 of https://www.ietf.org/archive/id/draft-ietf-webtrans-http3-14 for details.
+	// see section 3.3 of https://www.ietf.org/archive/id/draft-ietf-webtrans-http3-15 for details.
 	ApplicationProtocols []string
 
 	// StreamReorderingTime is the time an incoming WebTransport stream that cannot be associated
@@ -103,7 +101,7 @@ func (d *Dialer) Dial(ctx context.Context, urlStr string, reqHdr http.Header) (*
 	req := &http.Request{
 		Method: http.MethodConnect,
 		Header: reqHdr,
-		Proto:  "webtransport",
+		Proto:  protocolHeader,
 		Host:   u.Host,
 		URL:    u,
 	}
@@ -118,12 +116,23 @@ func (d *Dialer) Dial(ctx context.Context, urlStr string, reqHdr http.Header) (*
 		return nil, nil, err
 	}
 
-	tr := &http3.Transport{EnableDatagrams: true}
+	// Per draft-ietf-webtrans-http3-15 sections 3.1 and 7.1, for draft versions of
+	// WebTransport the client MUST send SETTINGS_WT_ENABLED using the codepoint
+	// for its supported draft version, so the server can negotiate the version.
+	tr := &http3.Transport{
+		EnableDatagrams:    true,
+		AdditionalSettings: map[uint64]uint64{settingsWebTransportEnabled: 1},
+	}
 	rsp, sess, err := d.handleConn(ctx, tr, qconn, req)
 	if err != nil {
-		// TODO: use a more specific error code
-		// see https://github.com/ietf-wg-webtrans/draft-ietf-webtrans-http3/issues/245
-		qconn.CloseWithError(quic.ApplicationErrorCode(http3.ErrCodeNoError), "")
+		var msg string
+		code := quic.ApplicationErrorCode(http3.ErrCodeNoError)
+		var reqErr *RequirementsNotMetError
+		if errors.As(err, &reqErr) {
+			code = WTRequirementsNotMetErrorCode
+			msg = reqErr.Message
+		}
+		qconn.CloseWithError(code, msg)
 		tr.Close()
 		return rsp, nil, err
 	}
@@ -169,6 +178,10 @@ func (d *Dialer) handleConn(ctx context.Context, tr *http3.Transport, qconn *qui
 				if err != nil {
 					return
 				}
+				if !isValidSessionID(id) {
+					qconn.CloseWithError(quic.ApplicationErrorCode(http3.ErrCodeIDError), "")
+					return
+				}
 				sessMgr.AddStream(str, sessionID(id))
 			}()
 		}
@@ -200,6 +213,10 @@ func (d *Dialer) handleConn(ctx context.Context, tr *http3.Transport, qconn *qui
 					str.CancelRead(quic.StreamErrorCode(http3.ErrCodeGeneralProtocolError))
 					return
 				}
+				if !isValidSessionID(id) {
+					qconn.CloseWithError(quic.ApplicationErrorCode(http3.ErrCodeIDError), "")
+					return
+				}
 				sessMgr.AddUniStream(str, sessionID(id))
 			}()
 		}
@@ -214,17 +231,18 @@ func (d *Dialer) handleConn(ctx context.Context, tr *http3.Transport, qconn *qui
 	}
 	settings := conn.Settings()
 	if !settings.EnableExtendedConnect {
-		return nil, nil, errors.New("server didn't enable Extended CONNECT")
+		return nil, nil, &RequirementsNotMetError{Message: "server didn't enable Extended CONNECT"}
 	}
 	if !settings.EnableDatagrams {
-		return nil, nil, errors.New("server didn't enable HTTP/3 datagram support")
+		return nil, nil, &RequirementsNotMetError{Message: "server didn't enable HTTP/3 datagram support"}
 	}
 	if settings.Other == nil {
-		return nil, nil, errNoWebTransport
+		return nil, nil, &RequirementsNotMetError{Message: "server didn't enable WebTransport"}
 	}
-	s, ok := settings.Other[settingsEnableWebtransport]
-	if !ok || s != 1 {
-		return nil, nil, errNoWebTransport
+	// any non-zero value for SETTINGS_WT_ENABLED means that WebTransport is enabled
+	s, ok := settings.Other[settingsWebTransportEnabled]
+	if !ok || s == 0 {
+		return nil, nil, &RequirementsNotMetError{Message: "server didn't enable WebTransport"}
 	}
 
 	requestStr, err := conn.OpenRequestStream(ctx)
@@ -242,29 +260,37 @@ func (d *Dialer) handleConn(ctx context.Context, tr *http3.Transport, qconn *qui
 	if rsp.StatusCode < 200 || rsp.StatusCode >= 300 {
 		return rsp, nil, fmt.Errorf("received status %d", rsp.StatusCode)
 	}
-	var protocol string
-	if protocolHeader, ok := rsp.Header[http.CanonicalHeaderKey(wtProtocolHeader)]; ok {
-		protocol = d.negotiateProtocol(protocolHeader)
-	}
 	sessID := sessionID(requestStr.StreamID())
+	var protocol string
+	// Don't send WT_ALPN_ERROR if WT-Protocol is absent: the server didn't
+	// negotiate a protocol. Send it only when WT-Protocol is present but invalid.
+	if protocolHeader, ok := rsp.Header[http.CanonicalHeaderKey(wtProtocolHeader)]; ok {
+		var err error
+		protocol, err = d.negotiateProtocol(protocolHeader)
+		if err != nil {
+			sessErr := &SessionError{ErrorCode: WTALPNErrorCode, Message: err.Error()}
+			_ = closeSessionStream(requestStr, sessErr.ErrorCode, sessErr.Message)
+			return rsp, nil, sessErr
+		}
+	}
 	sess := newSession(context.WithoutCancel(ctx), sessID, qconn, requestStr, protocol)
 	sessMgr.AddSession(sessID, sess)
 	return rsp, sess, nil
 }
 
-func (d *Dialer) negotiateProtocol(theirs []string) string {
+func (d *Dialer) negotiateProtocol(theirs []string) (string, error) {
 	negotiatedProtocolItem, err := httpsfv.UnmarshalItem(theirs)
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("webtransport: invalid WT-Protocol header: %w", err)
 	}
 	negotiatedProtocol, ok := negotiatedProtocolItem.Value.(string)
 	if !ok {
-		return ""
+		return "", errors.New("webtransport: invalid WT-Protocol header: value is not a string")
 	}
 	if !slices.Contains(d.ApplicationProtocols, negotiatedProtocol) {
-		return ""
+		return "", fmt.Errorf("webtransport: server selected application protocol %q that wasn't offered", negotiatedProtocol)
 	}
-	return negotiatedProtocol
+	return negotiatedProtocol, nil
 }
 
 func (d *Dialer) Close() error {

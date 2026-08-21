@@ -1139,6 +1139,10 @@ type BatchReader interface {
 // for content-addressed storage where identical keys guarantee identical values.
 // For mutable data requiring last-writer-wins, use a different datastore.
 //
+// [Put] and [Delete] for same key:
+//   - Delete after Put: [Commit] removes Put and deletes item from datastore.
+//   - Put after Delete: Put removes Delete from batch and adds Put.
+//
 // Concurrency: Safe for concurrent calls to Put/Delete/Get/Has/GetSize/Query.
 // Not safe to call Commit or Discard concurrently with other operations.
 //
@@ -1227,6 +1231,9 @@ func (bt *flatfsBatch) Put(ctx context.Context, key datastore.Key, val []byte) e
 	}
 
 	bt.mu.Lock()
+
+	// Cancel any previous delete operation in this batch.
+	delete(bt.deletes, key)
 
 	// Skip duplicate keys to prevent concurrent goroutines from writing to the
 	// same temp file. Without this check, two Put calls with the same key
@@ -1614,6 +1621,9 @@ func (bt *flatfsBatch) Commit(ctx context.Context) error {
 
 	// First, ensure all destination directories exist
 	for _, key := range bt.puts {
+		if _, deleted := bt.deletes[key]; deleted {
+			continue
+		}
 		dir, _ := bt.ds.encode(key)
 		if _, err := bt.ds.makeDirNoSync(dir); err != nil {
 			return fmt.Errorf("failed to create directory: %w", err)
@@ -1623,6 +1633,9 @@ func (bt *flatfsBatch) Commit(ctx context.Context) error {
 
 	// Move all temp files to their final destinations
 	for _, key := range bt.puts {
+		if _, deleted := bt.deletes[key]; deleted {
+			continue
+		}
 		noslash := key.String()[1:]
 		fileName := noslash + extension
 		tempFile := filepath.Join(bt.tempDir, fileName)

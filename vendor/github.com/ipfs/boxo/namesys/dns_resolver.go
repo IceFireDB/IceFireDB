@@ -20,15 +20,31 @@ import (
 // LookupTXTFunc is a function that lookups TXT record values.
 type LookupTXTFunc func(ctx context.Context, name string) (txt []string, err error)
 
+// LookupTXTWithTTLFunc is like [LookupTXTFunc] but also returns how long the TXT
+// records may be cached. A TTL of 0 means the TTL is unknown.
+type LookupTXTWithTTLFunc func(ctx context.Context, name string) (txt []string, ttl time.Duration, err error)
+
 // DNSResolver implements [Resolver] on DNS domains.
 type DNSResolver struct {
-	lookupTXT LookupTXTFunc
+	lookupTXT LookupTXTWithTTLFunc
 }
 
 var _ Resolver = &DNSResolver{}
 
-// NewDNSResolver constructs a name resolver using DNS TXT records.
+// NewDNSResolver constructs a name resolver from DNS TXT records. It reports an
+// unknown TTL (0) for every result; use [NewDNSResolverWithTTL] when the lookup
+// can report real TTLs.
 func NewDNSResolver(lookup LookupTXTFunc) *DNSResolver {
+	return &DNSResolver{lookupTXT: func(ctx context.Context, name string) ([]string, time.Duration, error) {
+		txt, err := lookup(ctx, name)
+		return txt, 0, err
+	}}
+}
+
+// NewDNSResolverWithTTL is like [NewDNSResolver] but takes a lookup that reports
+// each record's TTL. The TTL flows into the resolved result, so a gateway can
+// set Cache-Control max-age from a DNSLink's TTL.
+func NewDNSResolverWithTTL(lookup LookupTXTWithTTLFunc) *DNSResolver {
 	return &DNSResolver{lookupTXT: lookup}
 }
 
@@ -85,7 +101,7 @@ func (r *DNSResolver) resolveOnceAsync(ctx context.Context, p path.Path, options
 			}
 			if subRes.Err == nil {
 				p, err := joinPaths(subRes.Path, p)
-				emitOnceResult(ctx, out, AsyncResult{Path: p, LastMod: time.Now(), Err: err})
+				emitOnceResult(ctx, out, AsyncResult{Path: p, TTL: subRes.TTL, LastMod: time.Now(), Err: err})
 				// Return without waiting for rootRes, since this result
 				// (for "_dnslink."+fqdn) takes precedence
 			} else {
@@ -107,7 +123,7 @@ func workDomain(ctx context.Context, r *DNSResolver, name string, res chan Async
 
 	defer close(res)
 
-	txt, err := r.lookupTXT(ctx, name)
+	txt, ttl, err := r.lookupTXT(ctx, name)
 	if err != nil {
 		var dnsErr *net.DNSError
 		if errors.As(err, &dnsErr) {
@@ -142,8 +158,8 @@ func workDomain(ctx context.Context, r *DNSResolver, name string, res chan Async
 		// There were no TXT records with a dnslink
 		res <- AsyncResult{Err: ErrMissingDNSLinkRecord}
 	case 1:
-		// Found 1 valid! Return it.
-		res <- AsyncResult{Path: paths[0]}
+		// Found 1 valid! Return it with the record TTL.
+		res <- AsyncResult{Path: paths[0], TTL: ttl}
 	default:
 		// Found more than 1 IPFS/IPNS path.
 		res <- AsyncResult{Err: ErrMultipleDNSLinkRecords}
