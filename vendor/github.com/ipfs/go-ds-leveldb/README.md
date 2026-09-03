@@ -3,16 +3,12 @@
 [![](https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square)](http://ipn.io)
 [![](https://img.shields.io/badge/project-IPFS-blue.svg?style=flat-square)](http://ipfs.io/)
 [![standard-readme compliant](https://img.shields.io/badge/standard--readme-OK-green.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
-[![GoDoc](https://godoc.org/github.com/ipfs/go-ds-leveldb?status.svg)](https://godoc.org/github.com/ipfs/go-ds-leveldb)
-[![Build Status](https://travis-ci.org/ipfs/go-ds-leveldb.svg?branch=master)](https://travis-ci.org/ipfs/go-ds-leveldb)
+[![GoDoc](https://pkg.go.dev/badge/github.com/ipfs/go-ds-leveldb)](https://pkg.go.dev/github.com/ipfs/go-ds-leveldb)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/ipfs/go-ds-leveldb/go-test.yml?branch=master)](https://github.com/ipfs/go-ds-leveldb/actions)
 
 > A go-datastore implementation using LevelDB
 
 `go-ds-leveldb` implements the [go-datastore](https://github.com/ipfs/go-datastore) interface using a LevelDB backend.
-
-## Lead Maintainer
-
-[Steven Allen](https://github.com/Stebalien)
 
 ## Table of Contents
 
@@ -29,15 +25,13 @@ This module can be installed like a regular go module:
 go get github.com/ipfs/go-ds-leveldb
 ```
 
-It uses [Gx](https://github.com/whyrusleeping/gx) to manage dependencies. You can use `make deps` to rewrite imports to the gx-specified versions.
-
 ## Usage
 
 ```
 import "github.com/ipfs/go-ds-leveldb"
 ```
 
-Check the [GoDoc documentation](https://godoc.org/github.com/ipfs/go-ds-leveldb)
+Check the [GoDoc documentation](https://pkg.go.dev/github.com/ipfs/go-ds-leveldb)
 
 
 ## Contribute
