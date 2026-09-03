@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 
 	mod "github.com/ipfs/boxo/ipld/unixfs/mod"
 	ipld "github.com/ipfs/go-ipld-format"
@@ -45,6 +46,11 @@ type fileDescriptor struct {
 	mod   *mod.DagModifier
 	flags Flags
 
+	// mu serializes all operations that access the underlying DagModifier,
+	// which is not safe for concurrent use. FUSE mounts and Kubo RPC
+	// commands (`ipfs files read/write`) may dispatch Read, Write, Seek,
+	// Flush, and Close from separate goroutines.
+	mu    sync.Mutex
 	state state
 }
 
@@ -70,11 +76,15 @@ func (fi *fileDescriptor) checkRead() error {
 
 // Size returns the size of the file referred to by this descriptor
 func (fi *fileDescriptor) Size() (int64, error) {
+	fi.mu.Lock()
+	defer fi.mu.Unlock()
 	return fi.mod.Size()
 }
 
 // Truncate truncates the file to size
 func (fi *fileDescriptor) Truncate(size int64) error {
+	fi.mu.Lock()
+	defer fi.mu.Unlock()
 	if err := fi.checkWrite(); err != nil {
 		return fmt.Errorf("truncate failed: %s", err)
 	}
@@ -84,6 +94,8 @@ func (fi *fileDescriptor) Truncate(size int64) error {
 
 // Write writes the given data to the file at its current offset
 func (fi *fileDescriptor) Write(b []byte) (int, error) {
+	fi.mu.Lock()
+	defer fi.mu.Unlock()
 	if err := fi.checkWrite(); err != nil {
 		return 0, fmt.Errorf("write failed: %s", err)
 	}
@@ -93,14 +105,19 @@ func (fi *fileDescriptor) Write(b []byte) (int, error) {
 
 // Read reads into the given buffer from the current offset
 func (fi *fileDescriptor) Read(b []byte) (int, error) {
+	fi.mu.Lock()
+	defer fi.mu.Unlock()
 	if err := fi.checkRead(); err != nil {
 		return 0, fmt.Errorf("read failed: %s", err)
 	}
 	return fi.mod.Read(b)
 }
 
-// Read reads into the given buffer from the current offset
+// CtxReadFull reads into the given buffer from the current offset,
+// using the provided context for cancellation of block fetches.
 func (fi *fileDescriptor) CtxReadFull(ctx context.Context, b []byte) (int, error) {
+	fi.mu.Lock()
+	defer fi.mu.Unlock()
 	if err := fi.checkRead(); err != nil {
 		return 0, fmt.Errorf("read failed: %s", err)
 	}
@@ -110,6 +127,8 @@ func (fi *fileDescriptor) CtxReadFull(ctx context.Context, b []byte) (int, error
 // Close flushes, then propagates the modified dag node up the directory structure
 // and signals a republish to occur
 func (fi *fileDescriptor) Close() error {
+	fi.mu.Lock()
+	defer fi.mu.Unlock()
 	if fi.state == stateClosed {
 		return ErrClosed
 	}
@@ -128,6 +147,11 @@ func (fi *fileDescriptor) Close() error {
 // the entry in the parent directory (setting `fullSync` to
 // propagate the update all the way to the root).
 func (fi *fileDescriptor) Flush() error {
+	fi.mu.Lock()
+	defer fi.mu.Unlock()
+	if fi.state == stateClosed {
+		return ErrClosed
+	}
 	return fi.flushUp(true)
 }
 
@@ -162,8 +186,9 @@ func (fi *fileDescriptor) flushUp(fullSync bool) error {
 		name := fi.inode.name
 		fi.inode.nodeLock.Unlock()
 
-		// Bubble up the update's to the parent, only if fullSync is set to true.
-		if fullSync {
+		// Bubble up the update to the parent, unless the file was
+		// unlinked (see inode.unlinked for details).
+		if fullSync && !fi.inode.unlinked.Load() {
 			if err := parent.updateChildEntry(child{name, nd}); err != nil {
 				return err
 			}
@@ -180,14 +205,18 @@ func (fi *fileDescriptor) flushUp(fullSync bool) error {
 
 // Seek implements io.Seeker
 func (fi *fileDescriptor) Seek(offset int64, whence int) (int64, error) {
+	fi.mu.Lock()
+	defer fi.mu.Unlock()
 	if fi.state == stateClosed {
 		return 0, fmt.Errorf("seek failed: %s", ErrClosed)
 	}
 	return fi.mod.Seek(offset, whence)
 }
 
-// Write At writes the given bytes at the offset 'at'
+// WriteAt writes the given bytes at the offset 'at'
 func (fi *fileDescriptor) WriteAt(b []byte, at int64) (int, error) {
+	fi.mu.Lock()
+	defer fi.mu.Unlock()
 	if err := fi.checkWrite(); err != nil {
 		return 0, fmt.Errorf("write-at failed: %s", err)
 	}

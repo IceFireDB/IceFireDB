@@ -71,14 +71,25 @@ func (i *handler) serveCodec(ctx context.Context, w http.ResponseWriter, r *http
 	}
 	defer data.Close()
 
-	setIpfsRootsHeader(w, rq, &pathMetadata)
-
 	blockSize, err := data.Size()
 	if !i.handleRequestErrors(w, r, rq.contentPath, err) {
 		return false
 	}
 
-	return i.renderCodec(ctx, w, r, rq, blockSize, data)
+	// Check size limit before setting response headers so 410 responses
+	// stay clean.
+	if i.exceedsMaxUnixFSDAGResponseSize(w, r, blockSize) {
+		return false
+	}
+
+	setIpfsRootsHeader(w, rq, &pathMetadata)
+
+	rsc, ok := data.(io.ReadSeekCloser)
+	if !ok {
+		i.webError(w, r, fmt.Errorf("block data does not support seeking"), http.StatusInternalServerError)
+		return false
+	}
+	return i.renderCodec(ctx, w, r, rq, blockSize, rsc)
 }
 
 func (i *handler) renderCodec(ctx context.Context, w http.ResponseWriter, r *http.Request, rq *requestData, blockSize int64, blockData io.ReadSeekCloser) bool {

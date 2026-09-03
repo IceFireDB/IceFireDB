@@ -175,7 +175,11 @@ func (bb *BlocksBackend) Get(ctx context.Context, path path.ImmutablePath, range
 		}
 
 		if rootCodec == uint64(mc.Raw) {
-			if err := seekToRangeStart(f, ra, fileSize); err != nil {
+			s, ok := f.(io.Seeker)
+			if !ok {
+				return ContentPathMetadata{}, nil, fmt.Errorf("file does not support seeking: %w", ErrInternalServerError)
+			}
+			if err := seekToRangeStart(s, ra, fileSize); err != nil {
 				return ContentPathMetadata{}, nil, err
 			}
 		}
@@ -216,8 +220,12 @@ func (bb *BlocksBackend) Get(ctx context.Context, path path.ImmutablePath, range
 			return ContentPathMetadata{}, nil, err
 		}
 
-		if err := seekToRangeStart(file, ra, fileSize); err != nil {
-			return ContentPathMetadata{}, nil, err
+		if seeker, ok := file.(io.Seeker); ok {
+			if err := seekToRangeStart(seeker, ra, fileSize); err != nil {
+				return ContentPathMetadata{}, nil, err
+			}
+		} else if ra != nil && ra.From != 0 {
+			return ContentPathMetadata{}, nil, fmt.Errorf("file does not support seeking: %w", ErrInternalServerError)
 		}
 
 		if s, ok := f.(*files.Symlink); ok {
@@ -279,7 +287,12 @@ func loadUnixFSFileWithLazyBlocks(ctx context.Context, path path.ImmutablePath, 
 	}
 
 	// Seek to the start of the requested range
-	if err := seekToRangeStart(file, ra, fileSize); err != nil {
+	seeker, ok := file.(io.Seeker)
+	if !ok {
+		log.Debugw("file does not support seeking, skipping range optimization", "path", path)
+		return nil
+	}
+	if err := seekToRangeStart(seeker, ra, fileSize); err != nil {
 		log.Debugw("failed to seek to range start",
 			"path", path,
 			"error", err)

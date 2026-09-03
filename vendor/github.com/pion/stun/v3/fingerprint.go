@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package stun
@@ -10,7 +10,7 @@ import (
 
 // FingerprintAttr represents FINGERPRINT attribute.
 //
-// RFC 5389 Section 15.5
+// RFC 5389 Section 15.5.
 type FingerprintAttr struct{}
 
 // ErrFingerprintMismatch means that computed fingerprint differs from expected.
@@ -50,6 +50,7 @@ func (FingerprintAttr) AddTo(m *Message) error {
 	bin.PutUint32(b, val)
 	m.Length = l
 	m.Add(AttrFingerprint, b)
+
 	return nil
 }
 
@@ -66,5 +67,6 @@ func (FingerprintAttr) Check(m *Message) error {
 	val := bin.Uint32(b)
 	attrStart := len(m.Raw) - (fingerprintSize + attributeHeaderSize)
 	expected := FingerprintValue(m.Raw[:attrStart])
+
 	return checkFingerprint(val, expected)
 }

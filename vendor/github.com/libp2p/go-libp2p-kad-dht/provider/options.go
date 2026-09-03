@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -32,6 +33,12 @@ const (
 	// how often such a check is performed.
 	DefaultConnectivityCheckOnlineInterval = 1 * time.Minute
 
+	// DefaultSendProviderRecordTimeout is the default per-peer timeout applied
+	// to a single ADD_PROVIDER RPC. Healthy peers complete the round-trip in
+	// well under a second; this leaves significant headroom for slow links
+	// while still bounding the time a hung peer can pin a provide worker.
+	DefaultSendProviderRecordTimeout = 10 * time.Second
+
 	// DefaultLoggerName is the default logger name for the DHT provider.
 	DefaultLoggerName = internal.DefaultLoggerName
 )
@@ -45,6 +52,8 @@ type config struct {
 	connectivityCheckOnlineInterval time.Duration
 	connectivityCallbacks           [3]func()
 
+	sendProviderRecordTimeout time.Duration
+
 	peerid peer.ID
 	host   host.Host
 	router KadClosestPeersRouter
@@ -54,7 +63,7 @@ type config struct {
 
 	msgSender      pb.MessageSender
 	selfAddrs      func() []ma.Multiaddr
-	addLocalRecord func(mh.Multihash) error
+	addLocalRecord func(context.Context, mh.Multihash) error
 
 	maxWorkers               int
 	dedicatedPeriodicWorkers int
@@ -77,6 +86,7 @@ func getOpts(opts []Option) (config, error) {
 		maxReprovideDelay:               DefaultMaxReprovideDelay,
 		offlineDelay:                    DefaultOfflineDelay,
 		connectivityCheckOnlineInterval: DefaultConnectivityCheckOnlineInterval,
+		sendProviderRecordTimeout:       DefaultSendProviderRecordTimeout,
 		loggerName:                      DefaultLoggerName,
 
 		maxWorkers:               4,
@@ -84,7 +94,7 @@ func getOpts(opts []Option) (config, error) {
 		dedicatedBurstWorkers:    1,
 		maxProvideConnsPerWorker: 20,
 
-		addLocalRecord: func(mh mh.Multihash) error { return nil },
+		addLocalRecord: func(context.Context, mh.Multihash) error { return nil },
 
 		resumeCycle: true,
 	}
@@ -132,10 +142,28 @@ func WithReplicationFactor(n int) Option {
 }
 
 // WithReprovideInterval sets the interval at which regions are reprovided.
+//
+// Set to 0 to disable the periodic reprovide schedule entirely. In that
+// no-schedule mode the SweepingProvider runs in burst-only operation:
+//
+//   - ProvideOnce and StartProviding continue to publish provider records
+//     to the DHT immediately, via the burst worker pool.
+//   - StartProviding collapses to ProvideOnce semantics: keys are
+//     published immediately but NOT persisted in the keystore. Without a
+//     schedule, persisting keys would only grow the keystore on disk
+//     without any reader to consume them.
+//   - No schedule is constructed, no periodic reprovide loop runs, and
+//     AddToSchedule and RefreshSchedule become no-ops.
+//
+// Use the no-schedule mode when an external system is responsible for
+// driving reprovides (for example, by calling ProvideOnce on a custom
+// schedule), or when only one-shot ad-hoc announcements are wanted.
+//
+// Negative durations are rejected.
 func WithReprovideInterval(d time.Duration) Option {
 	return func(cfg *config) error {
-		if d <= 0 {
-			return errors.New("provider config: reprovide interval must be greater than 0")
+		if d < 0 {
+			return errors.New("provider config: reprovide interval must be >= 0 (use 0 to disable the schedule)")
 		}
 		cfg.reprovideInterval = d
 		return nil
@@ -179,6 +207,20 @@ func WithOfflineDelay(d time.Duration) Option {
 func WithConnectivityCheckOnlineInterval(d time.Duration) Option {
 	return func(cfg *config) error {
 		cfg.connectivityCheckOnlineInterval = d
+		return nil
+	}
+}
+
+// WithSendProviderRecordTimeout sets the per-peer timeout applied to a single
+// ADD_PROVIDER RPC. A peer that accepts the libp2p stream but never reads the
+// request must not pin a provide worker goroutine indefinitely; this timeout
+// bounds the wait. Defaults to [DefaultSendProviderRecordTimeout].
+func WithSendProviderRecordTimeout(d time.Duration) Option {
+	return func(cfg *config) error {
+		if d <= 0 {
+			return errors.New("provider config: send provider record timeout must be greater than 0")
+		}
+		cfg.sendProviderRecordTimeout = d
 		return nil
 	}
 }
@@ -232,8 +274,8 @@ func WithSelfAddrs(f func() []ma.Multiaddr) Option {
 }
 
 // WithAddLocalRecord sets the function that adds a provider record to the
-// local provider record store.
-func WithAddLocalRecord(f func(mh.Multihash) error) Option {
+// local provider record store with the provider's lifecycle context.
+func WithAddLocalRecord(f func(context.Context, mh.Multihash) error) Option {
 	return func(cfg *config) error {
 		if f == nil {
 			return errors.New("provider config: add local record function cannot be nil")

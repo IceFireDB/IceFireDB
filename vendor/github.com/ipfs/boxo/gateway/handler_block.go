@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -19,6 +21,18 @@ func (i *handler) serveRawBlock(ctx context.Context, w http.ResponseWriter, r *h
 		return false
 	}
 	defer data.Close()
+
+	sz, err := data.Size()
+	if err != nil {
+		i.handleRequestErrors(w, r, rq.contentPath, err)
+		return false
+	}
+
+	// Check size limit before setting response headers so 410 responses
+	// stay clean.
+	if i.exceedsMaxUnixFSDAGResponseSize(w, r, sz) {
+		return false
+	}
 
 	setIpfsRootsHeader(w, rq, &pathMetadata)
 
@@ -38,13 +52,12 @@ func (i *handler) serveRawBlock(ctx context.Context, w http.ResponseWriter, r *h
 	w.Header().Set("Content-Type", rawResponseFormat)
 	w.Header().Set("X-Content-Type-Options", "nosniff") // no funny business in the browsers :^)
 
-	sz, err := data.Size()
-	if err != nil {
-		i.handleRequestErrors(w, r, rq.contentPath, err)
+	s, ok := data.(io.Seeker)
+	if !ok {
+		i.webError(w, r, fmt.Errorf("block data does not support seeking"), http.StatusInternalServerError)
 		return false
 	}
-
-	if !i.seekToStartOfFirstRange(w, r, data, sz) {
+	if !i.seekToStartOfFirstRange(w, r, s, sz) {
 		return false
 	}
 

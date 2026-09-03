@@ -1,28 +1,32 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package stun
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 // UnknownAttributes represents UNKNOWN-ATTRIBUTES attribute.
 //
-// RFC 5389 Section 15.9
+// RFC 5389 Section 15.9.
 type UnknownAttributes []AttrType
 
 func (a UnknownAttributes) String() string {
-	s := ""
+	var s strings.Builder
 	if len(a) == 0 {
 		return "<nil>"
 	}
 	last := len(a) - 1
 	for i, t := range a {
-		s += t.String()
+		s.WriteString(t.String())
 		if i != last {
-			s += ", "
+			s.WriteString(", ")
 		}
 	}
-	return s
+
+	return s.String()
 }
 
 // type size is 16 bit.
@@ -39,6 +43,7 @@ func (a UnknownAttributes) AddTo(m *Message) error {
 		bin.PutUint16(v[first:last], t.Value())
 	}
 	m.Add(AttrUnknownAttributes, v)
+
 	return nil
 }
 
@@ -62,5 +67,6 @@ func (a *UnknownAttributes) GetFrom(m *Message) error {
 		*a = append(*a, AttrType(bin.Uint16(v[first:last])))
 		first = last
 	}
+
 	return nil
 }

@@ -267,7 +267,7 @@ func traverse(ctx context.Context, ls *ipld.LinkSystem, root cid.Cid, s ipld.Nod
 	}
 	rootNode, err := ls.Load(ipld.LinkContext{}, lnk, rp)
 	if err != nil {
-		return fmt.Errorf("root blk load failed: %s", err)
+		return fmt.Errorf("root blk load failed: %w", err)
 	}
 	err = progress.WalkMatching(rootNode, sel, func(_ traversal.Progress, node ipld.Node) error {
 		if lbn, ok := node.(datamodel.LargeBytesNode); ok {
@@ -283,7 +283,7 @@ func traverse(ctx context.Context, ls *ipld.LinkSystem, root cid.Cid, s ipld.Nod
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("walk failed: %s", err)
+		return fmt.Errorf("walk failed: %w", err)
 	}
 	return nil
 }

@@ -64,8 +64,8 @@ func NewMarshallerAtlased(wr io.Writer, cfg EncodeOptions, atl atlas.Atlas) *Mar
 		encoder:    NewEncoder(wr, cfg),
 	}
 	x.pump = shared.TokenPump{
-		x.marshaller,
-		x.encoder,
+		TokenSource: x.marshaller,
+		TokenSink:   x.encoder,
 	}
 	return x
 }
@@ -99,8 +99,8 @@ func NewUnmarshallerAtlased(r io.Reader, atl atlas.Atlas) *Unmarshaller {
 		decoder:      NewDecoder(r),
 	}
 	x.pump = shared.TokenPump{
-		x.decoder,
-		x.unmarshaller,
+		TokenSource: x.decoder,
+		TokenSink:   x.unmarshaller,
 	}
 	return x
 }
