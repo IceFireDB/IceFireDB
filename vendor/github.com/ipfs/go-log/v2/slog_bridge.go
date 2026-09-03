@@ -76,6 +76,7 @@ func (h *subsystemAwareHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	}
 }
 
+// TODO: same no-op as zapToSlogBridge.WithGroup; see TODO there.
 func (h *subsystemAwareHandler) WithGroup(name string) slog.Handler {
 	return &subsystemAwareHandler{
 		bridge: &zapToSlogBridge{
@@ -191,9 +192,13 @@ func (h *zapToSlogBridge) WithAttrs(attrs []slog.Attr) slog.Handler {
 }
 
 // WithGroup implements slog.Handler.
+//
+// TODO: Handler.WithGroup is a no-op. Inline slog.Group(...) attrs render as
+// nested objects via slogGroup, but attrs added after a Handler.WithGroup
+// call are not nested under the group name. Full support needs deferred
+// attr conversion plus a group-frame stack walked at Handle time, with the
+// subsystem-key filter applied only at depth 0.
 func (h *zapToSlogBridge) WithGroup(name string) slog.Handler {
-	// Groups are currently not implemented - just return a handler preserving the subsystem.
-	// A more sophisticated implementation would nest fields under the group name.
 	return &zapToSlogBridge{
 		core:          h.core,
 		subsystemName: h.subsystemName, // Preserve subsystem
@@ -218,7 +223,8 @@ func slogLevelToZap(level slog.Level) zapcore.Level {
 // slogAttrToZapField converts slog.Attr to zapcore.Field.
 func slogAttrToZapField(attr slog.Attr) zapcore.Field {
 	key := attr.Key
-	value := attr.Value
+	// slog: handlers must resolve LogValuer at the leaf.
+	value := attr.Value.Resolve()
 
 	switch value.Kind() {
 	case slog.KindString:
@@ -235,11 +241,73 @@ func slogAttrToZapField(attr slog.Attr) zapcore.Field {
 		return zapcore.Field{Key: key, Type: zapcore.DurationType, Integer: value.Duration().Nanoseconds()}
 	case slog.KindTime:
 		return zapcore.Field{Key: key, Type: zapcore.TimeType, Integer: value.Time().UnixNano(), Interface: value.Time().Location()}
+	case slog.KindGroup:
+		g := value.Group()
+		if len(g) == 0 {
+			// slog: a Group with no Attrs is ignored.
+			return zap.Skip()
+		}
+		if key == "" {
+			// slog: a Group with an empty key is inlined into its parent.
+			return zap.Inline(slogGroup(g))
+		}
+		return zap.Object(key, slogGroup(g))
 	case slog.KindAny:
 		return zapcore.Field{Key: key, Type: zapcore.ReflectType, Interface: value.Any()}
 	default:
 		// Fallback for complex types
 		return zapcore.Field{Key: key, Type: zapcore.ReflectType, Interface: value.Any()}
+	}
+}
+
+// slogGroup adapts a slog group's attrs as a zapcore.ObjectMarshaler so nested
+// fields render as a structured object rather than reflected []slog.Attr.
+type slogGroup []slog.Attr
+
+func (g slogGroup) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	for _, attr := range g {
+		v := attr.Value.Resolve()
+		// slog inlines a Group whose key is empty into the enclosing object.
+		if attr.Key == "" && v.Kind() == slog.KindGroup {
+			if err := slogGroup(v.Group()).MarshalLogObject(enc); err != nil {
+				return err
+			}
+			continue
+		}
+		addSlogAttrToObjectEncoder(enc, slog.Attr{Key: attr.Key, Value: v})
+	}
+	return nil
+}
+
+// addSlogAttrToObjectEncoder mirrors slogAttrToZapField for nested object
+// encoding; keep the two switches in sync when adding new slog.Kind cases.
+func addSlogAttrToObjectEncoder(enc zapcore.ObjectEncoder, attr slog.Attr) {
+	key := attr.Key
+	// slog: handlers must resolve LogValuer at the leaf.
+	value := attr.Value.Resolve()
+	switch value.Kind() {
+	case slog.KindString:
+		enc.AddString(key, value.String())
+	case slog.KindInt64:
+		enc.AddInt64(key, value.Int64())
+	case slog.KindUint64:
+		enc.AddUint64(key, value.Uint64())
+	case slog.KindFloat64:
+		enc.AddFloat64(key, value.Float64())
+	case slog.KindBool:
+		enc.AddBool(key, value.Bool())
+	case slog.KindDuration:
+		enc.AddDuration(key, value.Duration())
+	case slog.KindTime:
+		enc.AddTime(key, value.Time())
+	case slog.KindGroup:
+		g := value.Group()
+		if len(g) == 0 {
+			return
+		}
+		_ = enc.AddObject(key, slogGroup(g))
+	default:
+		_ = enc.AddReflected(key, value.Any())
 	}
 }
 

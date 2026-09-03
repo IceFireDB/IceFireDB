@@ -6,9 +6,61 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 	ma "github.com/multiformats/go-multiaddr"
+	"google.golang.org/protobuf/encoding/protowire"
 )
 
 var log = logging.Logger("dht.pb")
+
+// MaxPeerRecordSize bounds the serialized size of a single Message_Peer on the
+// wire. A peer record needs only a peer ID, its multiaddrs and a connection
+// flag, so 8 KiB — the identify protocol's budget for a peer's entire signed
+// self-description — is a generous per-record ceiling: comfortably more than any
+// well-formed peer requires, while keeping records a predictable size both on
+// the wire and in the peerstore. Addresses past the limit are dropped; the peer
+// ID is always kept.
+const MaxPeerRecordSize = 8 << 10
+
+// Field numbers within Message.Peer (see pb/dht.proto), used to size a record's
+// framed contribution without marshalling it.
+const (
+	peerIDField         protowire.Number = 1
+	peerAddrsField      protowire.Number = 2
+	peerConnectionField protowire.Number = 3
+)
+
+// peerAddrsTagSize is a repeated address field's tag size, added once per
+// address when sizing a record.
+var peerAddrsTagSize = protowire.SizeTag(peerAddrsField)
+
+// boundPeerRecordAddrs trims pbp.Addrs in place, dropping trailing addresses
+// until the peer ID, addresses and connection flag serialize within
+// MaxPeerRecordSize. The peer ID and connection flag are always kept; a record
+// already within the limit is left untouched. Applied on both the send and
+// receive paths so a peer record keeps a predictable size on the wire and in
+// the peerstore. It sizes only these fields, so on a freshly built outbound
+// record that is exactly proto.Size; on a decoded inbound record it bounds the
+// address list, not any unknown fields present on the record.
+func boundPeerRecordAddrs(pbp *Message_Peer) {
+	if pbp == nil {
+		return
+	}
+	// SizeBytes covers each length-delimited field's length prefix and bytes;
+	// SizeTag covers its field tag. The connection flag is an open proto3 enum,
+	// so a remote peer can send a value that serializes to as many as 10 bytes;
+	// size it from the actual value rather than assuming a single byte. On the
+	// send path Connection is set after bounding, but only ever to a trusted
+	// single-byte value, so the finished record stays within the bound.
+	connectionFieldSize := protowire.SizeTag(peerConnectionField) +
+		protowire.SizeVarint(uint64(int64(pbp.Connection)))
+	size := protowire.SizeTag(peerIDField) + protowire.SizeBytes(len(pbp.Id)) + connectionFieldSize
+	for i, addr := range pbp.Addrs {
+		size += peerAddrsTagSize + protowire.SizeBytes(len(addr))
+		if size > MaxPeerRecordSize {
+			pbp.Addrs = pbp.Addrs[:i]
+			return
+		}
+	}
+}
 
 type PeerRoutingInfo struct {
 	peer.AddrInfo
@@ -34,6 +86,7 @@ func peerRoutingInfoToPBPeer(p PeerRoutingInfo) *Message_Peer {
 	}
 	pbp.Id = []byte(p.ID)
 	pbp.Connection = ConnectionType(p.Connectedness)
+	boundPeerRecordAddrs(pbp)
 	return pbp
 }
 
@@ -45,6 +98,7 @@ func peerInfoToPBPeer(p peer.AddrInfo) *Message_Peer {
 		pbp.Addrs[i] = maddr.Bytes() // Bytes, not String. Compressed.
 	}
 	pbp.Id = []byte(p.ID)
+	boundPeerRecordAddrs(pbp)
 	return pbp
 }
 
@@ -66,15 +120,23 @@ func RawPeerInfosToPBPeers(peers []peer.AddrInfo) []*Message_Peer {
 	return pbpeers
 }
 
-// PeersToPBPeers converts given []peer.Peer into a set of []*Message_Peer,
-// which can be written to a message and sent out. the key thing this function
-// does (in addition to PeersToPBPeers) is set the ConnectionType with
+// PeerInfoToPBPeer converts a single peer.AddrInfo into a *Message_Peer ready to
+// go out on the wire, setting the ConnectionType from the given network.Network.
+// It is the one-peer form of PeerInfosToPBPeers.
+func PeerInfoToPBPeer(n network.Network, p peer.AddrInfo) *Message_Peer {
+	pbp := peerInfoToPBPeer(p)
+	pbp.Connection = ConnectionType(n.Connectedness(p.ID))
+	return pbp
+}
+
+// PeerInfosToPBPeers converts given []peer.AddrInfo into a set of []*Message_Peer,
+// which can be written to a message and sent out. The key thing this function
+// does (in addition to RawPeerInfosToPBPeers) is set the ConnectionType with
 // information from the given network.Network.
 func PeerInfosToPBPeers(n network.Network, peers []peer.AddrInfo) []*Message_Peer {
-	pbps := RawPeerInfosToPBPeers(peers)
-	for i := range pbps {
-		c := ConnectionType(n.Connectedness(peers[i].ID))
-		pbps[i].Connection = c
+	pbps := make([]*Message_Peer, len(peers))
+	for i, p := range peers {
+		pbps[i] = PeerInfoToPBPeer(n, p)
 	}
 	return pbps
 }
@@ -87,11 +149,14 @@ func PeerRoutingInfosToPBPeers(peers []PeerRoutingInfo) []*Message_Peer {
 	return pbpeers
 }
 
-// PBPeersToPeerInfos converts given []*Message_Peer into []peer.AddrInfo
-// Invalid addresses will be silently omitted.
+// PBPeersToPeerInfos converts given []*Message_Peer into []peer.AddrInfo.
+// Invalid addresses will be silently omitted. Each record's address list is
+// bounded to MaxPeerRecordSize before conversion — trimming pbps[i].Addrs in
+// place — so a peer record keeps a predictable peerstore footprint.
 func PBPeersToPeerInfos(pbps []*Message_Peer) []*peer.AddrInfo {
 	peers := make([]*peer.AddrInfo, 0, len(pbps))
 	for _, pbp := range pbps {
+		boundPeerRecordAddrs(pbp)
 		ai := PBPeerToPeerInfo(pbp)
 		peers = append(peers, &ai)
 	}

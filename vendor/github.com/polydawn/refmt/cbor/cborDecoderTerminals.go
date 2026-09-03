@@ -7,6 +7,15 @@ import (
 	"math"
 )
 
+// Lower bound a CBOR head argument value must reach for its encoded width to
+// be minimal; values below the matching bound could have used a shorter form.
+const (
+	uintMinimalBoundary1 = 0x18
+	uintMinimalBoundary2 = 0x100
+	uintMinimalBoundary3 = 0x10000
+	uintMinimalBoundary4 = 0x1_0000_0000
+)
+
 const (
 	maxUint = ^uint(0)
 	maxInt  = int(maxUint >> 1)
@@ -17,13 +26,28 @@ func (d *Decoder) decodeFloat(majorByte byte) (f float64, err error) {
 	switch majorByte {
 	case cborSigilFloat16:
 		bs, err = d.r.Readnzc(2)
+		if err != nil {
+			return 0, err
+		}
 		f = float64(math.Float32frombits(halfFloatToFloatBits(binary.BigEndian.Uint16(bs))))
 	case cborSigilFloat32:
 		bs, err = d.r.Readnzc(4)
+		if err != nil {
+			return 0, err
+		}
 		f = float64(math.Float32frombits(binary.BigEndian.Uint32(bs)))
 	case cborSigilFloat64:
 		bs, err = d.r.Readnzc(8)
+		if err != nil {
+			return 0, err
+		}
 		f = math.Float64frombits(binary.BigEndian.Uint64(bs))
+	}
+	if d.cfg.RejectNaN && math.IsNaN(f) {
+		return 0, ErrFloatNaN
+	}
+	if d.cfg.RejectInfinity && math.IsInf(f, 0) {
+		return 0, ErrFloatInfinity
 	}
 	return
 }
@@ -39,19 +63,43 @@ func (d *Decoder) decodeUint(majorByte byte) (ui uint64, err error) {
 		if v == 0x18 {
 			var b byte
 			b, err = d.r.Readn1()
+			if err != nil {
+				return 0, err
+			}
 			ui = uint64(b)
+			if d.cfg.RejectNonMinimalInteger && ui < uintMinimalBoundary1 {
+				return 0, ErrNonMinimalInteger
+			}
 		} else if v == 0x19 {
 			var bs []byte
 			bs, err = d.r.Readnzc(2)
+			if err != nil {
+				return 0, err
+			}
 			ui = uint64(binary.BigEndian.Uint16(bs))
+			if d.cfg.RejectNonMinimalInteger && ui < uintMinimalBoundary2 {
+				return 0, ErrNonMinimalInteger
+			}
 		} else if v == 0x1a {
 			var bs []byte
 			bs, err = d.r.Readnzc(4)
+			if err != nil {
+				return 0, err
+			}
 			ui = uint64(binary.BigEndian.Uint32(bs))
+			if d.cfg.RejectNonMinimalInteger && ui < uintMinimalBoundary3 {
+				return 0, ErrNonMinimalInteger
+			}
 		} else if v == 0x1b {
 			var bs []byte
 			bs, err = d.r.Readnzc(8)
+			if err != nil {
+				return 0, err
+			}
 			ui = uint64(binary.BigEndian.Uint64(bs))
+			if d.cfg.RejectNonMinimalInteger && ui < uintMinimalBoundary4 {
+				return 0, ErrNonMinimalInteger
+			}
 		} else {
 			err = fmt.Errorf("decodeUint: Invalid descriptor: %v", majorByte)
 			return
@@ -139,6 +187,13 @@ func (d *Decoder) decodeBytesOrStringIndefinite(bs []byte, majorWanted byte) (bs
 		if n > 33554432 {
 			return nil, fmt.Errorf("cbor: decoding rejected oversized indefinite string/bytes field: %d is too large", n)
 		}
+		if newLen > d.cfg.maxIndefiniteSize() {
+			return nil, ErrIndefiniteSizeExceeded
+		}
+		chunk, err := d.r.Readn(n)
+		if err != nil {
+			return append(bs, chunk...), err
+		}
 		if newLen > cap(bs) {
 			bs2 := make([]byte, newLen, 2*cap(bs)+n)
 			copy(bs2, bs)
@@ -146,8 +201,7 @@ func (d *Decoder) decodeBytesOrStringIndefinite(bs []byte, majorWanted byte) (bs
 		} else {
 			bs = bs[:newLen]
 		}
-		// Read that hunk.
-		d.r.Readb(bs[oldLen:newLen])
+		copy(bs[oldLen:newLen], chunk)
 	}
 }
 
@@ -155,19 +209,19 @@ func (d *Decoder) decodeBytesOrStringIndefinite(bs []byte, majorWanted byte) (bs
 //
 // There are a number of ways this may try to conserve allocations:
 //
-// - If you say zerocopy=true, and the underlying reader system already has an
-//  appropriate byte slice available, then a slice from that will be returned.
+//   - If you say zerocopy=true, and the underlying reader system already has an
+//     appropriate byte slice available, then a slice from that will be returned.
 //
-// - If you provide a byte slice, we will attempt to use it.
-//  The byte slice is truncated and used for its capacity only -- not appended.
-//  The final returned slice may be a different one if the provided slice did not
-//  have sufficient capacity.
+//   - If you provide a byte slice, we will attempt to use it.
+//     The byte slice is truncated and used for its capacity only -- not appended.
+//     The final returned slice may be a different one if the provided slice did not
+//     have sufficient capacity.
 //
-// - If you say zerocopy=true, and the underlying read system doesn't have an
-//  efficient way to yield a slice of its internal buffer, and you provided no
-//  destination slice, then we will use a recycleable piece of memory in the Decoder
-//  state and return a slice viewing into it.  For small values this will
-//  likely save an alloc.
+//   - If you say zerocopy=true, and the underlying read system doesn't have an
+//     efficient way to yield a slice of its internal buffer, and you provided no
+//     destination slice, then we will use a recycleable piece of memory in the Decoder
+//     state and return a slice viewing into it.  For small values this will
+//     likely save an alloc.
 //
 // The above rules are resolved in this order; e.g. your byte slice is disregarded
 // if zerocopy=true and the underlying reader can do something even more efficient,

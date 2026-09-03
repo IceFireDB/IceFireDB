@@ -6,6 +6,7 @@ package dtls
 import (
 	"bytes"
 	"context"
+	"crypto/fips140"
 	"errors"
 	"fmt"
 	"io"
@@ -31,7 +32,6 @@ const (
 	initialTickerInterval = time.Second
 	cookieLength          = 20
 	sessionLength         = 32
-	defaultNamedCurve     = elliptic.X25519
 	inboundBufferSize     = 8192
 	// Default replay protection window is specified by RFC 6347 Section 4.1.2.6.
 	defaultReplayProtectionWindow = 64
@@ -180,6 +180,27 @@ func createConn(
 		curves = defaultCurves
 	}
 
+	if fips140.Enabled() {
+		// On FIPS systems, filter out non-approved curves
+		filtered := make([]elliptic.Curve, 0, len(curves))
+		for _, c := range curves {
+			if c != elliptic.X25519 {
+				filtered = append(filtered, c)
+			}
+		}
+		curves = filtered
+	}
+
+	minVersion := config.minVersion
+	if !minVersion.Equal(protocol.Version1_2) || !minVersion.Equal(protocol.Version1_3) {
+		minVersion = protocol.Version1_2
+	}
+
+	maxVersion := config.minVersion
+	if !maxVersion.Equal(protocol.Version1_2) || !maxVersion.Equal(protocol.Version1_3) {
+		maxVersion = protocol.Version1_2
+	}
+
 	handshakeConfig := &handshakeConfig{
 		localPSKCallback:              config.PSK,
 		localPSKIdentityHint:          config.PSKIdentityHint,
@@ -215,6 +236,8 @@ func createConn(
 		serverHelloMessageHook:        config.ServerHelloMessageHook,
 		certificateRequestMessageHook: config.CertificateRequestMessageHook,
 		resumeState:                   resumeState,
+		minVersion:                    minVersion,
+		maxVersion:                    maxVersion,
 	}
 
 	conn := &Conn{

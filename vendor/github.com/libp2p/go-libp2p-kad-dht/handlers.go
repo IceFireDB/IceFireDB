@@ -4,17 +4,16 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"time"
+	"iter"
 
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/proto"
 
-	ds "github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-kad-dht/internal"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
-	recpb "github.com/libp2p/go-libp2p-record/pb"
-	"github.com/multiformats/go-base32"
-	"google.golang.org/protobuf/proto"
 )
 
 // dhthandler specifies the signature of functions that handle DHT messages.
@@ -28,7 +27,7 @@ func (dht *IpfsDHT) handlerForMsgType(t pb.Message_MessageType) dhtHandler {
 		return dht.handlePing
 	}
 
-	if dht.enableValues {
+	if dht.valueStore != nil {
 		switch t {
 		case pb.Message_GET_VALUE:
 			return dht.handleGetValue
@@ -37,7 +36,7 @@ func (dht *IpfsDHT) handlerForMsgType(t pb.Message_MessageType) dhtHandler {
 		}
 	}
 
-	if dht.enableProviders {
+	if dht.providerStore != nil {
 		switch t {
 		case pb.Message_ADD_PROVIDER:
 			return dht.handleAddProvider
@@ -59,7 +58,11 @@ func (dht *IpfsDHT) handleGetValue(ctx context.Context, p peer.ID, pmes *pb.Mess
 	// setup response
 	resp := pb.NewMessage(pmes.GetType(), pmes.GetKey(), pmes.GetClusterLevel())
 
-	rec, err := dht.checkLocalDatastore(ctx, k)
+	// Get does not re-verify the record before serving it: it was validated when
+	// stored, and the requester validates whatever we return. The burden of
+	// checking a record stays on the requester, sparing the serve path a
+	// signature verification per GET_VALUE.
+	rec, err := dht.valueStore.Get(ctx, string(k))
 	if err != nil {
 		return nil, err
 	}
@@ -86,68 +89,20 @@ func (dht *IpfsDHT) handleGetValue(ctx context.Context, p peer.ID, pmes *pb.Mess
 	return resp, nil
 }
 
-func (dht *IpfsDHT) checkLocalDatastore(ctx context.Context, k []byte) (*recpb.Record, error) {
-	logger.Debugf("%s handleGetValue looking into ds", dht.self)
-	dskey := convertToDsKey(k)
-	buf, err := dht.datastore.Get(ctx, dskey)
-	logger.Debugf("%s handleGetValue looking into ds GOT %v", dht.self, buf)
-
-	if err == ds.ErrNotFound {
-		return nil, nil
-	}
-
-	// if we got an unexpected error, bail.
-	if err != nil {
-		return nil, err
-	}
-
-	// if we have the value, send it back
-	logger.Debugf("%s handleGetValue success!", dht.self)
-
-	rec := new(recpb.Record)
-	err = proto.Unmarshal(buf, rec)
-	if err != nil {
-		logger.Debug("failed to unmarshal DHT record from datastore")
-		return nil, err
-	}
-
-	var recordIsBad bool
-	recvtime, err := internal.ParseRFC3339(rec.GetTimeReceived())
-	if err != nil {
-		logger.Info("either no receive time set on record, or it was invalid: ", err)
-		recordIsBad = true
-	}
-
-	if time.Since(recvtime) > dht.maxRecordAge {
-		logger.Debug("old record found, tossing.")
-		recordIsBad = true
-	}
-
-	// NOTE: We do not verify the record here beyond checking these timestamps.
-	// we put the burden of checking the records on the requester as checking a record
-	// may be computationally expensive
-
-	if recordIsBad {
-		err := dht.datastore.Delete(ctx, dskey)
-		if err != nil {
-			logger.Error("Failed to delete bad record from datastore: ", err)
-		}
-
-		return nil, nil // can treat this as not having the record at all
-	}
-
-	return rec, nil
-}
-
-// Cleans the record (to avoid storing arbitrary data).
-func cleanRecord(rec *recpb.Record) {
-	rec.TimeReceived = ""
+// stripPeerRecords drops the peer-record-bearing fields of a message. The PING
+// and PUT_VALUE handlers echo the request back as their response; a peer could
+// stuff CloserPeers or ProviderPeers into such a request, and echoing them would
+// re-emit peer records that never passed boundPeerRecordAddrs. Neither response
+// carries peer records legitimately, so they are safe to drop.
+func stripPeerRecords(pmes *pb.Message) {
+	pmes.CloserPeers = nil
+	pmes.ProviderPeers = nil
 }
 
 // Store a value in this peer local storage
 func (dht *IpfsDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, err error) {
 	if len(pmes.GetKey()) == 0 {
-		return nil, errors.New("handleGetValue but no key was provided")
+		return nil, errors.New("handlePutValue but no key was provided")
 	}
 
 	rec := pmes.GetRecord()
@@ -160,92 +115,18 @@ func (dht *IpfsDHT) handlePutValue(ctx context.Context, p peer.ID, pmes *pb.Mess
 		return nil, errors.New("put key doesn't match record key")
 	}
 
-	cleanRecord(rec)
-
-	// Make sure the record is valid (not expired, valid signature etc)
-	if err = dht.Validator.Validate(string(rec.GetKey()), rec.GetValue()); err != nil {
-		logger.Infow("bad dht record in PUT", "from", p, "key", internal.LoggableRecordKeyBytes(rec.GetKey()), "error", err)
+	if err := dht.valueStore.Put(ctx, string(rec.GetKey()), rec); err != nil {
+		logger.Infow("failed to store PUT_VALUE record", "from", p, "key", internal.LoggableRecordKeyBytes(rec.GetKey()), "error", err)
 		return nil, err
 	}
 
-	dskey := convertToDsKey(rec.GetKey())
-
-	// fetch the striped lock for this key
-	var indexForLock byte
-	if len(rec.GetKey()) == 0 {
-		indexForLock = 0
-	} else {
-		indexForLock = rec.GetKey()[len(rec.GetKey())-1]
-	}
-	lk := &dht.stripedPutLocks[indexForLock]
-	lk.Lock()
-	defer lk.Unlock()
-
-	// Make sure the new record is "better" than the record we have locally.
-	// This prevents a record with for example a lower sequence number from
-	// overwriting a record with a higher sequence number.
-	existing, err := dht.getRecordFromDatastore(ctx, dskey)
-	if err != nil {
-		return nil, err
-	}
-
-	if existing != nil {
-		recs := [][]byte{rec.GetValue(), existing.GetValue()}
-		i, err := dht.Validator.Select(string(rec.GetKey()), recs)
-		if err != nil {
-			logger.Warnw("dht record passed validation but failed select", "from", p, "key", internal.LoggableRecordKeyBytes(rec.GetKey()), "error", err)
-			return nil, err
-		}
-		if i != 0 {
-			logger.Infow("DHT record in PUT older than existing record (ignoring)", "peer", p, "key", internal.LoggableRecordKeyBytes(rec.GetKey()))
-			return nil, errors.New("old record")
-		}
-	}
-
-	// record the time we receive every record
-	rec.TimeReceived = internal.FormatRFC3339(time.Now())
-
-	data, err := proto.Marshal(rec)
-	if err != nil {
-		return nil, err
-	}
-
-	err = dht.datastore.Put(ctx, dskey, data)
-	return pmes, err
-}
-
-// returns nil, nil when either nothing is found or the value found doesn't properly validate.
-// returns nil, some_error when there's a *datastore* error (i.e., something goes very wrong)
-func (dht *IpfsDHT) getRecordFromDatastore(ctx context.Context, dskey ds.Key) (*recpb.Record, error) {
-	buf, err := dht.datastore.Get(ctx, dskey)
-	if err == ds.ErrNotFound {
-		return nil, nil
-	}
-	if err != nil {
-		logger.Errorw("error retrieving record from datastore", "key", dskey, "error", err)
-		return nil, err
-	}
-	rec := new(recpb.Record)
-	err = proto.Unmarshal(buf, rec)
-	if err != nil {
-		// Bad data in datastore, log it but don't return an error, we'll just overwrite it
-		logger.Errorw("failed to unmarshal record from datastore", "key", dskey, "error", err)
-		return nil, nil
-	}
-
-	err = dht.Validator.Validate(string(rec.GetKey()), rec.GetValue())
-	if err != nil {
-		// Invalid record in datastore, probably expired but don't return an error,
-		// we'll just overwrite it
-		logger.Debugw("local record verify failed", "key", rec.GetKey(), "error", err)
-		return nil, nil
-	}
-
-	return rec, nil
+	stripPeerRecords(pmes)
+	return pmes, nil
 }
 
 func (dht *IpfsDHT) handlePing(_ context.Context, p peer.ID, pmes *pb.Message) (*pb.Message, error) {
 	logger.Debugf("%s Responding to ping from %s!\n", dht.self, p)
+	stripPeerRecords(pmes)
 	return pmes, nil
 }
 
@@ -283,6 +164,15 @@ func (dht *IpfsDHT) handleFindPeer(ctx context.Context, from peer.ID, pmes *pb.M
 	return resp, nil
 }
 
+// providerPeersField is the protobuf field number of Message.provider_peers
+// (see pb/dht.proto); used to size each provider record's framed contribution
+// when bounding a GET_PROVIDERS response to network.MessageSizeMax.
+const providerPeersField protowire.Number = 9
+
+// providerPeersTagSize is the (constant) serialized size of a provider_peers
+// field tag, added once per record alongside its length-prefixed bytes.
+var providerPeersTagSize = protowire.SizeTag(providerPeersField)
+
 func (dht *IpfsDHT) handleGetProviders(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, _err error) {
 	key := pmes.GetKey()
 	if len(key) > 80 {
@@ -293,30 +183,56 @@ func (dht *IpfsDHT) handleGetProviders(ctx context.Context, p peer.ID, pmes *pb.
 
 	resp := pb.NewMessage(pmes.GetType(), pmes.GetKey(), pmes.GetClusterLevel())
 
-	// setup providers
-	providers, err := dht.providerStore.GetProviders(ctx, key)
-	if err != nil {
-		return nil, err
-	}
-
-	filtered := make([]peer.AddrInfo, len(providers))
-	for i, provider := range providers {
-		filtered[i] = peer.AddrInfo{
-			ID:    provider.ID,
-			Addrs: dht.filterAddrs(provider.Addrs),
-		}
-	}
-
-	resp.ProviderPeers = pb.PeerInfosToPBPeers(dht.host.Network(), filtered)
-
-	// Also send closest dht servers we know about.
+	// Add the closest DHT servers we know about first and exactly once, so the
+	// provider-record budget below accounts for their serialized size.
 	closestPeers := dht.closestPeersToQuery(pmes, p, dht.bucketSize)
 	if closestPeers != nil {
 		infos := peerstore.AddrInfos(dht.peerstore, closestPeers)
 		resp.CloserPeers = pb.PeerInfosToPBPeers(dht.host.Network(), infos)
 	}
 
+	// setup providers
+	providers, err := dht.providerStore.GetProviders(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	// Append provider records until the next would push the serialized message
+	// past the transport's soft maximum. GetProviders returns providers in random
+	// order, so when the set doesn't all fit the records we keep are an arbitrary
+	// subset that varies between requests rather than a fixed prefix.
+	appendFittingProviderPeers(resp, func(yield func(*pb.Message_Peer) bool) {
+		for _, provider := range providers {
+			pbProv := pb.PeerInfoToPBPeer(dht.host.Network(), peer.AddrInfo{
+				ID:    provider.ID,
+				Addrs: dht.filterAddrs(provider.Addrs),
+			})
+			if !yield(pbProv) {
+				return
+			}
+		}
+	})
+
 	return resp, nil
+}
+
+// appendFittingProviderPeers appends records from recs to resp.ProviderPeers,
+// stopping at the first one that would push the serialized message past
+// network.MessageSizeMax. A record that does not fit is dropped rather than
+// served over-size, so a set that cannot fit at all yields no provider records.
+// recs is pulled lazily and the running size tracked incrementally (base plus
+// each record's framed contribution), so the append is O(n) and pulls nothing
+// past the cap.
+func appendFittingProviderPeers(resp *pb.Message, recs iter.Seq[*pb.Message_Peer]) {
+	size := proto.Size(resp) // key, type and CloserPeers already counted
+	for rec := range recs {
+		// A repeated embedded message adds its tag, a length prefix and its bytes.
+		size += providerPeersTagSize + protowire.SizeBytes(proto.Size(rec))
+		if size > network.MessageSizeMax {
+			return
+		}
+		resp.ProviderPeers = append(resp.ProviderPeers, rec)
+	}
 }
 
 func (dht *IpfsDHT) handleAddProvider(ctx context.Context, p peer.ID, pmes *pb.Message) (_ *pb.Message, _err error) {
@@ -349,7 +265,10 @@ func (dht *IpfsDHT) handleAddProvider(ctx context.Context, p peer.ID, pmes *pb.M
 		// transient nodes with varying /p2p-circuit addresses to still have their
 		// announcement go through.
 		addrs := dht.filterAddrs(pi.Addrs)
-		dht.providerStore.AddProvider(ctx, key, peer.AddrInfo{ID: pi.ID, Addrs: addrs})
+		if err := dht.providerStore.AddProvider(ctx, key, peer.AddrInfo{ID: pi.ID, Addrs: addrs}); err != nil {
+			logger.Warnw("failed to store provider record", "from", p, "key", internal.LoggableProviderRecordBytes(key), "error", err)
+			continue
+		}
 		success = true
 	}
 	if !success {
@@ -357,8 +276,4 @@ func (dht *IpfsDHT) handleAddProvider(ctx context.Context, p peer.ID, pmes *pb.M
 	}
 
 	return nil, nil
-}
-
-func convertToDsKey(s []byte) ds.Key {
-	return ds.NewKey(base32.RawStdEncoding.EncodeToString(s))
 }

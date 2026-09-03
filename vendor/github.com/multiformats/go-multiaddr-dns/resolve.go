@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"strings"
+	"time"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -311,4 +312,30 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 
 func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) {
 	return r.getResolver(txt).LookupTXT(ctx, txt)
+}
+
+// TXTWithTTLResolver is an optional interface a [BasicResolver] may implement to
+// report the TTL of a TXT record set alongside its values. Resolvers backed by
+// a protocol that carries TTLs (such as DNS-over-HTTPS) can implement it; the
+// default OS resolver cannot.
+type TXTWithTTLResolver interface {
+	LookupTXTWithTTL(ctx context.Context, name string) (txt []string, ttl time.Duration, err error)
+}
+
+// a Resolver routes TXT-with-TTL lookups, so it satisfies the interface too
+var _ TXTWithTTLResolver = (*Resolver)(nil)
+
+// LookupTXTWithTTL resolves the TXT records for a domain and, when the resolver
+// the lookup routes to (a matched per-domain resolver, or the default one
+// otherwise) implements [TXTWithTTLResolver], also returns their TTL. Resolvers
+// that cannot report a TTL (such as the default OS resolver) yield a TTL of 0,
+// meaning unknown.
+func (r *Resolver) LookupTXTWithTTL(ctx context.Context, domain string) ([]string, time.Duration, error) {
+	rslv := r.getResolver(domain)
+	if ttlRslv, ok := rslv.(TXTWithTTLResolver); ok {
+		return ttlRslv.LookupTXTWithTTL(ctx, domain)
+	}
+
+	txt, err := rslv.LookupTXT(ctx, domain)
+	return txt, 0, err
 }
