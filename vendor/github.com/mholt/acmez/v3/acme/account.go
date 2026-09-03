@@ -38,7 +38,7 @@ type Account struct {
 	// initiated deactivation.  See Section 7.1.6.
 	//
 	// The client need NOT set this field when creating a new account.
-	Status string `json:"status"`
+	Status string `json:"status,omitempty"`
 
 	// contact (optional, array of string):  An array of URLs that the
 	// server can use to contact the client for issues related to this
@@ -113,6 +113,15 @@ func (a *Account) SetExternalAccountBinding(ctx context.Context, client *Client,
 	a.ExternalAccountBinding = eabJWS
 
 	return nil
+}
+
+// Thumbprint returns the ACME account's thumbprint. The PrivateKey field
+// must be set so the public key can be derived for the thumbprint, or this
+// will panic.
+//
+// EXPERIMENTAL: Subject to change/removal.
+func (a *Account) Thumbprint() (string, error) {
+	return jwkThumbprint(a.PrivateKey.Public())
 }
 
 // NewAccount creates a new account on the ACME server.

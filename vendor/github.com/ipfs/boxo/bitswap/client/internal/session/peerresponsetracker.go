@@ -1,7 +1,7 @@
 package session
 
 import (
-	"math/rand"
+	"math/rand/v2"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 )

@@ -47,7 +47,7 @@ type SessionManager interface {
 	// RemoveSession removes a session (called when the session shuts down).
 	RemoveSession(sesid uint64)
 	// CancelSessionWants cancels the specified session's wants (called when a
-	// call to GetBlocks() is cancelled).
+	// call to GetBlocks() is canceled).
 	CancelSessionWants(sid uint64, wants []cid.Cid)
 }
 
@@ -328,7 +328,7 @@ func (s *Session) run(ctx context.Context) {
 				sessionSpan.AddEvent("Session.WantOp")
 				s.wantBlocks(ctx, oper.keys)
 			case opCancel:
-				// Wants were cancelled
+				// Wants were canceled
 				sessionSpan.AddEvent("Session.WantCancelOp")
 				s.sw.CancelPending(oper.keys)
 				s.sws.Cancel(oper.keys)

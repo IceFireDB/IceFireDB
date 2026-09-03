@@ -10,7 +10,7 @@ func NewUsername(username string) Username {
 
 // Username represents USERNAME attribute.
 //
-// RFC 5389 Section 15.3
+// RFC 5389 Section 15.3.
 type Username []byte
 
 func (u Username) String() string {
@@ -37,7 +37,7 @@ func NewRealm(realm string) Realm {
 
 // Realm represents REALM attribute.
 //
-// RFC 5389 Section 15.7
+// RFC 5389 Section 15.7.
 type Realm []byte
 
 func (n Realm) String() string {
@@ -60,7 +60,7 @@ const softwareRawMaxB = 763
 
 // Software is SOFTWARE attribute.
 //
-// RFC 5389 Section 15.10
+// RFC 5389 Section 15.10.
 type Software []byte
 
 func (s Software) String() string {
@@ -84,7 +84,7 @@ func (s *Software) GetFrom(m *Message) error {
 
 // Nonce represents NONCE attribute.
 //
-// RFC 5389 Section 15.8
+// RFC 5389 Section 15.8.
 type Nonce []byte
 
 // NewNonce returns new Nonce from string.
@@ -118,6 +118,7 @@ func (v TextAttribute) AddToAs(m *Message, t AttrType, maxLen int) error {
 		return err
 	}
 	m.Add(t, v)
+
 	return nil
 }
 
@@ -128,5 +129,6 @@ func (v *TextAttribute) GetFromAs(m *Message, t AttrType) error {
 		return err
 	}
 	*v = a
+
 	return nil
 }

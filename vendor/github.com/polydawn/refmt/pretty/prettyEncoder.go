@@ -22,10 +22,10 @@ func (d *Encoder) Reset() {
 }
 
 /*
-	A pretty.Encoder is a TokenSink that emits pretty-printed stuff.
+A pretty.Encoder is a TokenSink that emits pretty-printed stuff.
 
-	The default behavior is color coded with ANSI escape sequences, so it's
-	snazzy looking on your terminal.
+The default behavior is color coded with ANSI escape sequences, so it's
+snazzy looking on your terminal.
 */
 type Encoder struct {
 	wr io.Writer

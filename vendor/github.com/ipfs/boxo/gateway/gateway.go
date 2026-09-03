@@ -150,6 +150,31 @@ type Config struct {
 	// (e.g., Cloudflare's 5GB limit). A value of 0 disables this limit.
 	MaxRangeRequestFileSize int64
 
+	// MaxDeserializedResponseSize is the maximum file or directory DAG size
+	// in bytes for deserialized responses. When set to a value greater than 0,
+	// requests for UnixFS content larger than this limit will return
+	// 410 Gone, directing users to run their own IPFS node for large content.
+	// This applies to both regular and range requests: if the underlying file
+	// exceeds the limit, even a small range is rejected.
+	// No additional block fetches are needed; size is already available from
+	// the request's normal processing of the UnixFS root block.
+	// A value of 0 disables this limit. Only affects deserialized responses;
+	// trustless formats (application/vnd.ipld.raw, application/vnd.ipld.car)
+	// are not affected.
+	MaxDeserializedResponseSize int64
+
+	// MaxUnixFSDAGResponseSize is the maximum UnixFS file or directory DAG
+	// size in bytes, applied to all response formats: deserialized, raw
+	// blocks, CAR, and TAR. When set to a value greater than 0, any request
+	// whose resolved content exceeds this limit will return 410 Gone,
+	// regardless of response format. This allows gateway operators to cap
+	// bandwidth across all response types.
+	// Most handlers reuse the size already available from normal request
+	// processing; the CAR handler performs a lightweight Head call (root
+	// block is then cached for the subsequent CAR traversal).
+	// A value of 0 disables this limit.
+	MaxUnixFSDAGResponseSize int64
+
 	// MaxRequestDuration is the maximum total time a request can take.
 	// Unlike RetrievalTimeout (which resets on each data write and catches
 	// stalled transfers), this is an absolute deadline for the entire request.

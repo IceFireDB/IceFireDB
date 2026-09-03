@@ -7,6 +7,7 @@ import (
 
 	block "github.com/ipfs/go-block-format"
 	cid "github.com/ipfs/go-cid"
+	cborencoding "github.com/ipfs/go-ipld-cbor/encoding"
 	mh "github.com/multiformats/go-multihash"
 	recbor "github.com/polydawn/refmt/cbor"
 	atlas "github.com/polydawn/refmt/obj/atlas"
@@ -83,7 +84,7 @@ func (s *BasicIpldStore) decode(b []byte, out interface{}) error {
 	if s.Atlas == nil {
 		return DecodeInto(b, out)
 	} else {
-		return recbor.UnmarshalAtlased(recbor.DecodeOptions{}, b, out, *s.Atlas)
+		return recbor.UnmarshalAtlased(cborencoding.DAGCBORDecodeOptions(), b, out, *s.Atlas)
 	}
 }
 

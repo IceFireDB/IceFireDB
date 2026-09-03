@@ -9,9 +9,9 @@ import (
 )
 
 /*
-	A lovely mechanism to stash unmarshalMachine objects pre-allocated and avoid mallocs.
-	Works together with the Atlas: the Atlas says what kind of machinery is needed;
-	the unmarshalSlab "allocates" it and returns it upon your request.
+A lovely mechanism to stash unmarshalMachine objects pre-allocated and avoid mallocs.
+Works together with the Atlas: the Atlas says what kind of machinery is needed;
+the unmarshalSlab "allocates" it and returns it upon your request.
 */
 type unmarshalSlab struct {
 	atlas atlas.Atlas
@@ -33,11 +33,11 @@ type unmarshalSlabRow struct {
 }
 
 /*
-	Return a reference to a machine from the slab.
-	*You must release() when done.*
+Return a reference to a machine from the slab.
+*You must release() when done.*
 
-	Errors -- including "no info in Atlas for this type" -- are expressed by
-	returning a machine that is a constantly-erroring thunk.
+Errors -- including "no info in Atlas for this type" -- are expressed by
+returning a machine that is a constantly-erroring thunk.
 */
 func (slab *unmarshalSlab) requisitionMachine(rt reflect.Type) UnmarshalMachine {
 	// Acquire a row.
@@ -126,7 +126,7 @@ func _yieldUnmarshalMachinePtr(row *unmarshalSlabRow, atl atlas.Atlas, rt reflec
 	case reflect.Interface:
 		return &row.unmarshalMachineWildcard
 	case reflect.Func:
-		panic(fmt.Errorf("functions cannot be unmarshalled!"))
+		panic(fmt.Errorf("functions cannot be unmarshalled"))
 	case reflect.Ptr:
 		panic(fmt.Errorf("unreachable: ptrs must already be resolved"))
 	default:
@@ -162,7 +162,8 @@ func _yieldUnmarshalMachinePtrForAtlasEntry(row *unmarshalSlabRow, entry *atlas.
 }
 
 // Returns the top row of the slab.  Useful for machines that need to delegate
-//  to another type that's definitely not their own (comes up for the wildcard delegators).
+//
+//	to another type that's definitely not their own (comes up for the wildcard delegators).
 func (s *unmarshalSlab) tip() *unmarshalSlabRow {
 	return &s.rows[len(s.rows)-1]
 }

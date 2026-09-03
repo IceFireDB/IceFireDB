@@ -61,7 +61,7 @@ Responses have a method Next() that returns the next
 emitted value and an error value. If the last element has been
 received, the returned error value is io.EOF. If the
 application's code encounters a fatal error, it will call CloseWithError,
-and that the error value will be returned via subsiquent calls to Next().
+and that the error value will be returned via subsequent calls to Next().
 
 # Pipes
 

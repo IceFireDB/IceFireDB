@@ -7,9 +7,9 @@ import (
 )
 
 /*
-	A MarshalMachine that unwraps an `interface{}` value,
-	selects the correct machinery for handling its content,
-	and delegates immediately to that machine.
+A MarshalMachine that unwraps an `interface{}` value,
+selects the correct machinery for handling its content,
+and delegates immediately to that machine.
 */
 type marshalMachineWildcard struct {
 	delegate MarshalMachine
