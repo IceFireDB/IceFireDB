@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package sdp
@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,6 +26,7 @@ var (
 	errPayloadTypeNotFound = errors.New("payload type not found")
 	errCodecNotFound       = errors.New("codec not found")
 	errSyntaxError         = errors.New("SyntaxError")
+	errFieldMissing        = errors.New("field missing")
 )
 
 // ConnectionRole indicates which of the end points should initiate the connection establishment.
@@ -97,10 +99,8 @@ func (c Codec) String() string {
 }
 
 func (c *Codec) appendRTCPFeedback(rtcpFeedback string) {
-	for _, existingRTCPFeedback := range c.RTCPFeedback {
-		if existingRTCPFeedback == rtcpFeedback {
-			return
-		}
+	if slices.Contains(c.RTCPFeedback, rtcpFeedback) {
+		return
 	}
 
 	c.RTCPFeedback = append(c.RTCPFeedback, rtcpFeedback)
@@ -239,6 +239,11 @@ func (s *SessionDescription) buildCodecMap() map[uint8]Codec { //nolint:cyclop
 			Name:        "PCMA",
 			ClockRate:   8000,
 		},
+		9: {
+			PayloadType: 9,
+			Name:        "G722",
+			ClockRate:   8000,
+		},
 	}
 
 	wildcardRTCPFeedback := []string{}
@@ -329,6 +334,20 @@ func (s *SessionDescription) GetCodecForPayloadType(payloadType uint8) (Codec, e
 	}
 
 	return codec, errPayloadTypeNotFound
+}
+
+func (s *SessionDescription) GetCodecsForPayloadTypes(payloadTypes []uint8) ([]Codec, error) {
+	codecs := s.buildCodecMap()
+
+	result := make([]Codec, 0, len(payloadTypes))
+	for _, payloadType := range payloadTypes {
+		codec, ok := codecs[payloadType]
+		if ok {
+			result = append(result, codec)
+		}
+	}
+
+	return result, nil
 }
 
 // GetPayloadTypeForCodec scans the SessionDescription for a codec that matches the provided codec

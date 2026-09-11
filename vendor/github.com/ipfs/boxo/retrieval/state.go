@@ -1,8 +1,21 @@
-// Package retrieval provides state tracking for IPFS content retrieval operations.
-// It enables detailed diagnostics about the retrieval process, including which stage
-// failed (path resolution, provider discovery, connection, or block retrieval) and
-// statistics about provider interactions. This information is particularly useful
-// for debugging timeout errors and understanding retrieval performance.
+// Package retrieval tracks the state of an IPFS content retrieval as
+// it moves through path resolution, provider discovery, connection,
+// and data transfer. State lives on the request context and is
+// updated by boxo's path resolver, provider query manager, and
+// gateway middleware as the retrieval progresses.
+//
+// Typical consumers:
+//
+//   - boxo/gateway wraps timeout errors with the State (see
+//     [WrapWithState]) so 504 responses include which phase was
+//     active and how many providers were found.
+//
+//   - CLI tools like Kubo can mirror a daemon's State into a local
+//     one via the [State.Snapshot] / [State.Apply] / [State.Notify]
+//     pub/sub interface to drive a live progress bar during commands
+//     like cat, get, or dag export.
+//
+// Attach with [ContextWithState]; read with [StateFromContext].
 package retrieval
 
 import (
@@ -49,7 +62,9 @@ const (
 	PhaseDataRetrieval
 )
 
-// String returns a human-readable name for the retrieval phase.
+// String returns a human-readable name for the retrieval phase, used
+// in error messages and log output. JSON encoding of phases (in
+// [Snapshot]) uses the underlying int.
 func (p RetrievalPhase) String() string {
 	switch p {
 	case PhaseInitializing:
@@ -96,12 +111,20 @@ type State struct {
 	// For /ipfs/cid/path/to/file, rootCID is 'cid' and terminalCID is the CID of 'file'
 	rootCID     cid.Cid // First CID in the path
 	terminalCID cid.Cid // CID of terminating DAG entity on the path
+
+	// notify is a size-1, coalescing channel used to wake subscribers when
+	// the State changes. Writers do a non-blocking send; if a wake-up is
+	// already pending the send is dropped. Subscribers read the channel and
+	// then call Snapshot to read the latest values; intermediate updates
+	// between sends are coalesced into a single wake-up. Always non-nil
+	// after [NewState].
+	notify chan struct{}
 }
 
 // NewState creates a new State initialized to PhaseInitializing. The returned
 // state is safe for concurrent use.
 func NewState() *State {
-	rs := &State{}
+	rs := &State{notify: make(chan struct{}, 1)}
 	rs.phase.Store(int32(PhaseInitializing))
 	return rs
 }
@@ -120,6 +143,7 @@ func (rs *State) SetPhase(phase RetrievalPhase) {
 		}
 		// Try to update atomically
 		if rs.phase.CompareAndSwap(current, newPhase) {
+			rs.signal()
 			return
 		}
 		// If CAS failed, another goroutine updated it, loop will check again
@@ -135,23 +159,23 @@ func (rs *State) GetPhase() RetrievalPhase {
 // appendProviders is a helper to append providers to a sample list with size limit.
 // Only the first MaxProvidersSampleSize providers are kept to prevent unbounded memory growth.
 // Duplicate peer IDs are automatically filtered out to ensure each peer appears only once.
-// This follows the idiomatic append pattern but operates on internal state.
+// Signals subscribers if any peer was actually added.
 func (rs *State) appendProviders(list *[]peer.ID, peerIDs ...peer.ID) {
 	rs.mu.Lock()
-	defer rs.mu.Unlock()
-	if len(*list) >= MaxProvidersSampleSize {
-		return
-	}
+	prev := len(*list)
 	for _, peerID := range peerIDs {
-		// Skip if we already have this peer ID in the list
+		if len(*list) >= MaxProvidersSampleSize {
+			break
+		}
 		if slices.Contains(*list, peerID) {
 			continue
 		}
-		// Stop if we've reached the sample size limit
-		if len(*list) >= MaxProvidersSampleSize {
-			return
-		}
 		*list = append(*list, peerID)
+	}
+	changed := len(*list) != prev
+	rs.mu.Unlock()
+	if changed {
+		rs.signal()
 	}
 }
 
@@ -190,16 +214,24 @@ func (rs *State) GetFailedProviders() []peer.ID {
 // This method is safe for concurrent use.
 func (rs *State) SetRootCID(c cid.Cid) {
 	rs.mu.Lock()
-	defer rs.mu.Unlock()
+	changed := !rs.rootCID.Equals(c)
 	rs.rootCID = c
+	rs.mu.Unlock()
+	if changed {
+		rs.signal()
+	}
 }
 
 // SetTerminalCID sets the terminal CID (CID of terminating DAG entity).
 // This method is safe for concurrent use.
 func (rs *State) SetTerminalCID(c cid.Cid) {
 	rs.mu.Lock()
-	defer rs.mu.Unlock()
+	changed := !rs.terminalCID.Equals(c)
 	rs.terminalCID = c
+	rs.mu.Unlock()
+	if changed {
+		rs.signal()
+	}
 }
 
 // GetRootCID returns the root CID (first CID in the path).
@@ -216,6 +248,135 @@ func (rs *State) GetTerminalCID() cid.Cid {
 	rs.mu.RLock()
 	defer rs.mu.RUnlock()
 	return rs.terminalCID
+}
+
+// Snapshot is an immutable copy of a [State] at a point in time. It is
+// safe to share across goroutines and to serialize as JSON. Receivers
+// (e.g. CLIs reading from a streaming endpoint) reconstitute a local
+// State by calling [State.Apply] with the snapshot.
+//
+// JSON encoding uses Go's default field naming (PascalCase, matching
+// the struct fields verbatim). Phase is encoded as the underlying
+// integer of [RetrievalPhase] (type RetrievalPhase int). Receivers can
+// compare against the [PhaseInitializing] / [PhasePathResolution] /
+// etc. constants directly, or call [RetrievalPhase.String] for a
+// human-readable form.
+type Snapshot struct {
+	Phase              RetrievalPhase
+	ProvidersFound     int32
+	ProvidersAttempted int32
+	ProvidersConnected int32
+	FoundProviders     []peer.ID
+	FailedProviders    []peer.ID
+	RootCID            cid.Cid
+	TerminalCID        cid.Cid
+}
+
+// Snapshot returns the current state as an immutable value. Slice fields
+// are cloned, so callers may freely retain or modify the result without
+// affecting the live State.
+//
+// Consistency: the read takes the State's lock for slices and CIDs, but
+// counter fields ([State.ProvidersFound] etc.) are atomics that other
+// writers update without the lock. A concurrent writer that mutates an
+// atomic counter while Snapshot is running may produce a snapshot whose
+// counters are slightly newer than its slices (or vice versa). For
+// observability and progress UI use cases this eventual consistency is
+// fine; callers needing a single-instant atomic view across all fields
+// would need writers to also take the lock, which would slow them down.
+func (rs *State) Snapshot() Snapshot {
+	rs.mu.RLock()
+	defer rs.mu.RUnlock()
+	return Snapshot{
+		Phase:              RetrievalPhase(rs.phase.Load()),
+		ProvidersFound:     rs.ProvidersFound.Load(),
+		ProvidersAttempted: rs.ProvidersAttempted.Load(),
+		ProvidersConnected: rs.ProvidersConnected.Load(),
+		FoundProviders:     slices.Clone(rs.foundProviders),
+		FailedProviders:    slices.Clone(rs.failedProviders),
+		RootCID:            rs.rootCID,
+		TerminalCID:        rs.terminalCID,
+	}
+}
+
+// Apply mirrors a Snapshot onto this State. It is intended for
+// receivers that observe a remote State over a transport (e.g. NDJSON
+// over HTTP) and want to reflect the remote values into a local State
+// that some local UI is observing. Phase progression remains monotonic:
+// a snapshot with an earlier phase will not move the local phase
+// backwards. All writes happen under one critical section, so observers
+// either see the snapshot in full or not at all, and Apply emits
+// exactly one wake-up on [State.Notify].
+//
+// Apply assumes snapshots arrive in causal order from a single
+// producer. Out-of-order delivery (e.g. multiple producers, or a
+// transport that reorders) is unsupported: counters and CID/slice
+// fields are written unconditionally, so a stale snapshot can regress
+// them. The retrieval-state pipeline shipped in kubo (one daemon-side
+// State, one CLI-side subscriber, ordered NDJSON) satisfies this
+// assumption by construction.
+func (rs *State) Apply(s Snapshot) {
+	// Phase update via the same monotonic CAS loop SetPhase uses, so
+	// concurrent SetPhase callers cannot regress the phase via Apply
+	// even though SetPhase does not take rs.mu.
+	target := int32(s.Phase)
+	for {
+		cur := rs.phase.Load()
+		if target <= cur {
+			break
+		}
+		if rs.phase.CompareAndSwap(cur, target) {
+			break
+		}
+	}
+
+	rs.mu.Lock()
+	rs.ProvidersFound.Store(s.ProvidersFound)
+	rs.ProvidersAttempted.Store(s.ProvidersAttempted)
+	rs.ProvidersConnected.Store(s.ProvidersConnected)
+	rs.foundProviders = slices.Clone(s.FoundProviders)
+	rs.failedProviders = slices.Clone(s.FailedProviders)
+	rs.rootCID = s.RootCID
+	rs.terminalCID = s.TerminalCID
+	rs.mu.Unlock()
+	rs.signal()
+}
+
+// Notify returns a size-1 channel that is signalled when the State
+// changes. Writes are coalescing: if multiple updates happen between
+// successive receives, the receiver wakes once and should call
+// [State.Snapshot] to observe the latest values.
+//
+// Lifecycle: the channel never closes. Subscribers should stop
+// receiving by other means, typically a context cancellation in the
+// surrounding select:
+//
+//	for {
+//	    select {
+//	    case <-ctx.Done():
+//	        return
+//	    case <-state.Notify():
+//	        publish(state.Snapshot())
+//	    }
+//	}
+//
+// Single-subscriber: the channel is shared, not fan-out. If two
+// goroutines receive on it, each wake-up goes to one of them
+// non-deterministically and the other misses it. To support multiple
+// subscribers, fan out via your own goroutine: a single reader on
+// Notify that broadcasts to a slice of per-subscriber channels.
+func (rs *State) Notify() <-chan struct{} {
+	return rs.notify
+}
+
+// signal performs a non-blocking send on the notification channel. If the
+// channel is full (a wake-up is already pending) the send is dropped. Used
+// internally by every State write that observers might care about.
+func (rs *State) signal() {
+	select {
+	case rs.notify <- struct{}{}:
+	default:
+	}
 }
 
 // formatPeerIDs converts a slice of peer IDs to a formatted string with a prefix.

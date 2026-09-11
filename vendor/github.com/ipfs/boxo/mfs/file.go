@@ -272,6 +272,17 @@ func (fi *File) SetModTime(ts time.Time) error {
 
 func (fi *File) setNodeData(data []byte) error {
 	nd := dag.NodeWithData(data)
+
+	// Preserve the previous node's links (file content blocks) and
+	// CidBuilder. Without this, the new node would have the updated
+	// metadata (mode, mtime) but no content.
+	if oldNode, ok := fi.node.(*dag.ProtoNode); ok {
+		nd.SetLinks(oldNode.Links())
+		if builder := oldNode.CidBuilder(); builder != nil {
+			nd.SetCidBuilder(builder)
+		}
+	}
+
 	err := fi.dagService.Add(context.TODO(), nd)
 	if err != nil {
 		return err

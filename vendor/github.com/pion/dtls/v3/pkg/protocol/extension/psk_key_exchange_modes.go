@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package extension
@@ -63,11 +63,12 @@ func (p *PskKeyExchangeModes) Unmarshal(data []byte) error { //nolint:cyclop
 
 	var strModes cryptobyte.String
 
-	if !extData.ReadUint8LengthPrefixed(&strModes) {
+	if !extData.ReadUint8LengthPrefixed(&strModes) || strModes.Empty() {
 		return errPskKeyExchangeModesFormat
 	}
-	if strModes.Empty() {
-		return errPskKeyExchangeModesFormat
+
+	if !extData.Empty() {
+		return errLengthMismatch
 	}
 
 	p.KeModes = make([]PskKeyExchangeMode, 0)

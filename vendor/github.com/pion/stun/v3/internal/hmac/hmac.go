@@ -64,6 +64,7 @@ func (h *hmac) Sum(in []byte) []byte {
 		h.outer.Write(h.opad) //nolint:errcheck,gosec
 	}
 	h.outer.Write(in[origLen:]) //nolint:errcheck,gosec
+
 	return h.outer.Sum(in[:origLen])
 }
 
@@ -79,6 +80,7 @@ func (h *hmac) Reset() {
 		if err := h.inner.(marshalable).UnmarshalBinary(h.ipad); err != nil { //nolint:forcetypeassert
 			panic(err) //nolint
 		}
+
 		return
 	}
 

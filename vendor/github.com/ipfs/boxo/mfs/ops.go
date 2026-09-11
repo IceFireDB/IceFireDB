@@ -9,9 +9,6 @@ import (
 	"strings"
 	"time"
 
-	chunker "github.com/ipfs/boxo/chunker"
-	uio "github.com/ipfs/boxo/ipld/unixfs/io"
-	cid "github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
 )
 
@@ -120,23 +117,16 @@ func PutNode(r *Root, path string, nd ipld.Node) error {
 	return pdir.AddChild(filename, nd)
 }
 
-// MkdirOpts is used by Mkdir
+// MkdirOpts holds operation flags for [Mkdir].
 type MkdirOpts struct {
-	Mkparents          bool
-	Flush              bool
-	CidBuilder         cid.Builder
-	Mode               os.FileMode
-	ModTime            time.Time
-	MaxLinks           int
-	MaxHAMTFanout      int
-	HAMTShardingSize   int
-	SizeEstimationMode *uio.SizeEstimationMode
-	Chunker            chunker.SplitterGen // chunker factory for files created in this directory
+	Mkparents bool // create intermediate directories as needed
+	Flush     bool // flush the final directory after creation
 }
 
-// Mkdir creates a directory at 'path' under the directory 'd', creating
-// intermediary directories as needed if 'mkparents' is set to true
-func Mkdir(r *Root, pth string, opts MkdirOpts) error {
+// Mkdir creates a directory at 'path' under the root.
+// Any [Option] values not explicitly provided are inherited from the
+// root directory's current settings.
+func Mkdir(r *Root, pth string, opts MkdirOpts, dirOpts ...Option) error {
 	if pth == "" {
 		return errors.New("no path given to Mkdir")
 	}
@@ -160,40 +150,23 @@ func Mkdir(r *Root, pth string, opts MkdirOpts) error {
 
 	cur := r.GetDirectory()
 
-	// Inherit unset values from the root directory's underlying unixfs settings.
-	// This ensures that root-level config (WithMaxLinks, WithHAMTShardingSize, etc.)
-	// propagates to subdirectories created via Mkdir.
-	if opts.MaxLinks == 0 {
-		opts.MaxLinks = cur.unixfsDir.GetMaxLinks()
-	}
-	if opts.MaxHAMTFanout == 0 {
-		opts.MaxHAMTFanout = cur.unixfsDir.GetMaxHAMTFanout()
-	}
-	if opts.HAMTShardingSize == 0 {
-		opts.HAMTShardingSize = cur.unixfsDir.GetHAMTShardingSize()
-	}
+	// Resolve caller options, inheriting unset values from the root
+	// directory so that root-level config propagates to subdirectories.
+	o := resolveOpts(dirOpts)
+	o.fillFrom(cur)
 
-	// opts to make the parents leave MkParents and Flush as false.
-	parentsOpts := MkdirOpts{
-		MaxLinks:           opts.MaxLinks,
-		MaxHAMTFanout:      opts.MaxHAMTFanout,
-		HAMTShardingSize:   opts.HAMTShardingSize,
-		SizeEstimationMode: opts.SizeEstimationMode,
-		Chunker:            opts.Chunker,
-	}
+	// Intermediate directories get the same DAG-shape settings but
+	// not per-directory metadata (mode, modTime).
+	parentsCfg := o
+	parentsCfg.mode = 0
+	parentsCfg.modTime = time.Time{}
 
 	for i, d := range parts[:len(parts)-1] {
 		fsn, err := cur.Child(d)
 		if err == os.ErrNotExist && opts.Mkparents {
-
-			mkd, err := cur.MkdirWithOpts(d, parentsOpts)
+			mkd, err := cur.mkdirWithOpts(d, parentsCfg)
 			if err != nil {
 				return err
-			}
-			// MkdirWithOps uses cur.GetCidBuilder regardless of
-			// the option. So we must set it manually.
-			if opts.CidBuilder != nil {
-				mkd.SetCidBuilder(opts.CidBuilder)
 			}
 			fsn = mkd
 		} else if err != nil {
@@ -207,22 +180,15 @@ func Mkdir(r *Root, pth string, opts MkdirOpts) error {
 		cur = next
 	}
 
-	final, err := cur.MkdirWithOpts(parts[len(parts)-1], opts)
+	final, err := cur.mkdirWithOpts(parts[len(parts)-1], o)
 	if err != nil {
 		if !opts.Mkparents || err != os.ErrExist || final == nil {
 			return err
 		}
 	}
 
-	// Again, MkdirWithOpts ignores opts.CidBuilder so must be applied
-	// here.
-	if opts.CidBuilder != nil {
-		final.SetCidBuilder(opts.CidBuilder)
-	}
-
 	if opts.Flush {
-		err := final.Flush()
-		if err != nil {
+		if err := final.Flush(); err != nil {
 			return err
 		}
 	}

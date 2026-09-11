@@ -431,7 +431,7 @@ func (pwm *peerWantManager) sendCancels(cancelKs []cid.Cid) {
 		// Start from the broadcast cancels
 		toCancel := broadcastCancels
 
-		// For each key to be cancelled
+		// For each key to be canceled
 		for _, c := range cancelKs {
 			// Check if a want was sent for the key
 			if !pws.wantBlocks.Has(c) && !pws.wantHaves.Has(c) {
@@ -471,13 +471,13 @@ func (pwm *peerWantManager) sendCancels(cancelKs []cid.Cid) {
 	}
 
 	if len(broadcastCancels) > 0 {
-		// If a broadcast want is being cancelled, send the cancel to all
+		// If a broadcast want is being canceled, send the cancel to all
 		// peers
 		for _, pws := range pwm.peerWants {
 			send(pws)
 		}
 
-		// Remove cancelled broadcast wants
+		// Remove canceled broadcast wants
 		for _, c := range broadcastCancels {
 			pwm.broadcastWants.Remove(c)
 		}
