@@ -39,35 +39,51 @@ var (
 	ErrSizeMax  = fmt.Errorf("chunker parameters may not exceed the maximum chunk size of %d", ChunkSizeLimit)
 )
 
-// FromString returns a Splitter depending on the given string:
-// it supports "default" (""), "size-{size}", "rabin", "rabin-{blocksize}",
-// "rabin-{min}-{avg}-{max}" and "buzhash".
+// FromString returns a [Splitter] for the given chunker specification string.
+//
+// Built-in chunkers:
+//
+//   - "" or "default" -- fixed-size chunks using [DefaultBlockSize]
+//   - "size-{size}" -- fixed-size chunks of the given byte size
+//   - "rabin" -- Rabin fingerprint chunking with [DefaultBlockSize] average
+//   - "rabin-{avg}" -- Rabin fingerprint chunking with the given average size
+//   - "rabin-{min}-{avg}-{max}" -- Rabin with explicit bounds
+//   - "buzhash" -- Buzhash content-defined chunking
+//
+// Custom chunkers registered via [Register] are also available.
+// The name is extracted as everything before the first dash.
 func FromString(r io.Reader, chunker string) (Splitter, error) {
-	switch {
-	case chunker == "" || chunker == "default":
+	if chunker == "" || chunker == "default" {
 		return DefaultSplitter(r), nil
-
-	case strings.HasPrefix(chunker, "size-"):
-		sizeStr := strings.Split(chunker, "-")[1]
-		size, err := strconv.Atoi(sizeStr)
-		if err != nil {
-			return nil, err
-		} else if size <= 0 {
-			return nil, ErrSize
-		} else if size > ChunkSizeLimit {
-			return nil, ErrSizeMax
-		}
-		return NewSizeSplitter(r, int64(size)), nil
-
-	case strings.HasPrefix(chunker, "rabin"):
-		return parseRabinString(r, chunker)
-
-	case chunker == "buzhash":
-		return NewBuzhash(r), nil
-
-	default:
+	}
+	name, _, _ := strings.Cut(chunker, "-")
+	splittersMu.RLock()
+	ctor, ok := splitters[name]
+	splittersMu.RUnlock()
+	if !ok {
 		return nil, fmt.Errorf("unrecognized chunker option: %s", chunker)
 	}
+	return ctor(r, chunker)
+}
+
+func parseSizeString(r io.Reader, chunker string) (Splitter, error) {
+	parts := strings.Split(chunker, "-")
+	if len(parts) != 2 {
+		return nil, errors.New("incorrect chunker string format (expected size-{size})")
+	}
+	size, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return nil, err
+	} else if size <= 0 {
+		return nil, ErrSize
+	} else if size > ChunkSizeLimit {
+		return nil, ErrSizeMax
+	}
+	return NewSizeSplitter(r, int64(size)), nil
+}
+
+func parseBuzhashString(r io.Reader, _ string) (Splitter, error) {
+	return NewBuzhash(r), nil
 }
 
 func parseRabinString(r io.Reader, chunker string) (Splitter, error) {

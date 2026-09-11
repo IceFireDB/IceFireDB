@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	oldqueue "github.com/ipfs/boxo/provider/internal/queue"
 	"github.com/ipfs/boxo/verifcid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -147,18 +146,6 @@ func New(ds datastore.Batching, opts ...Option) (System, error) {
 	}
 
 	s.ds = namespace.Wrap(ds, s.keyPrefix)
-
-	// TODO: Remove this after kubo v0.39 is released.
-	//
-	// Remove any items from the old queue.
-	cleaned, err := oldqueue.ClearDatastore(s.ds)
-	if err != nil {
-		log.Error(err)
-	}
-	if cleaned != 0 {
-		log.Infof("removed %d cids from old provide queue", cleaned)
-	}
-
 	s.q = dsqueue.New(s.ds, "provide", dsqueue.WithDedupCacheSize(2048))
 
 	// This is after the options processing so we do not have to worry about leaking a context if there is an

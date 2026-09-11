@@ -1,6 +1,7 @@
 package json
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -193,7 +194,9 @@ func (d *Decoder) stepHelper_acceptKV(t string, majorByte byte, tokenSlot *Token
 		d.pushPhase(d.step_acceptArrValueOrBreak)
 		return false, nil
 	case 'n':
-		d.r.Readnzc(3) // FIXME must check these equal "ull"!
+		if err := d.readLiteralSuffix("ull"); err != nil {
+			return true, err
+		}
 		tokenSlot.Type = TNull
 		return true, nil
 	case '"':
@@ -201,12 +204,16 @@ func (d *Decoder) stepHelper_acceptKV(t string, majorByte byte, tokenSlot *Token
 		tokenSlot.Str, err = d.decodeString()
 		return true, err
 	case 'f':
-		d.r.Readnzc(4) // FIXME must check these equal "alse"!
+		if err := d.readLiteralSuffix("alse"); err != nil {
+			return true, err
+		}
 		tokenSlot.Type = TBool
 		tokenSlot.Bool = false
 		return true, nil
 	case 't':
-		d.r.Readnzc(3) // FIXME must check these equal "rue"!
+		if err := d.readLiteralSuffix("rue"); err != nil {
+			return true, err
+		}
 		tokenSlot.Type = TBool
 		tokenSlot.Bool = true
 		return true, nil
@@ -220,6 +227,17 @@ func (d *Decoder) stepHelper_acceptKV(t string, majorByte byte, tokenSlot *Token
 	default:
 		return true, fmt.Errorf("invalid char while expecting start of %s: %s", t, byteToString(majorByte))
 	}
+}
+
+func (d *Decoder) readLiteralSuffix(suffix string) error {
+	bs, err := d.r.Readnzc(len(suffix))
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(bs, []byte(suffix)) {
+		return fmt.Errorf("invalid literal suffix: expected %q, got %q", suffix, bs)
+	}
+	return nil
 }
 
 var byteToStringMap = map[byte]string{

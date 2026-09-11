@@ -3,13 +3,16 @@
 // IPNS path becomes an /ipfs/<cid> path.
 //
 // Traditionally, these paths would be in the form of /ipns/peer_id, which
-// references an IPNS record in a distributed ValueStore (usually the IPFS
+// references an [IPNS record] in a distributed ValueStore (usually the IPFS
 // DHT).
 //
 // Additionally, the /ipns/ namespace can also be used with domain names that
-// use DNSLink (/ipns/<dnslink_name>, https://docs.ipfs.io/concepts/dnslink/)
+// use [DNSLink].
 //
 // The package provides implementations for all three resolvers.
+//
+// [IPNS record]: https://specs.ipfs.tech/ipns/ipns-record/
+// [DNSLink]: https://docs.ipfs.tech/concepts/dnslink/
 package namesys
 
 import (

@@ -61,8 +61,8 @@ func New(d *dual.DHT, opts ...Option) (*SweepingProvider, error) {
 			provider.WithReplicationFactor(dht.BucketSize()),
 			provider.WithSelfAddrs(dht.FilteredAddrs),
 			provider.WithRouter(dht),
-			provider.WithAddLocalRecord(func(h mh.Multihash) error {
-				return dht.Provide(dht.Context(), cid.NewCidV1(cid.Raw, h), false)
+			provider.WithAddLocalRecord(func(ctx context.Context, h mh.Multihash) error {
+				return dht.Provide(ctx, cid.NewCidV1(cid.Raw, h), false)
 			}),
 			provider.WithResumeCycle(cfg.resumeCycle[i]),
 			provider.WithMessageSender(cfg.msgSenders[i]),
@@ -70,6 +70,7 @@ func New(d *dual.DHT, opts ...Option) (*SweepingProvider, error) {
 			provider.WithMaxReprovideDelay(cfg.maxReprovideDelay[i]),
 			provider.WithOfflineDelay(cfg.offlineDelay[i]),
 			provider.WithConnectivityCheckOnlineInterval(cfg.connectivityCheckOnlineInterval[i]),
+			provider.WithSendProviderRecordTimeout(cfg.sendProviderRecordTimeout[i]),
 			provider.WithMaxWorkers(cfg.maxWorkers[i]),
 			provider.WithDedicatedPeriodicWorkers(cfg.dedicatedPeriodicWorkers[i]),
 			provider.WithDedicatedBurstWorkers(cfg.dedicatedBurstWorkers[i]),

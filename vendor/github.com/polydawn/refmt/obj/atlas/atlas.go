@@ -39,7 +39,7 @@ func Build(entries ...*AtlasEntry) (Atlas, error) {
 		}
 		atl.mappings[rtid] = entry
 
-		if entry.Tagged == true {
+		if entry.Tagged {
 			if prev, exists := atl.tagMappings[entry.Tag]; exists {
 				return Atlas{}, fmt.Errorf("repeated tag %v on type %v (already mapped to type %v)", entry.Tag, entry.Type, prev.Type)
 			}

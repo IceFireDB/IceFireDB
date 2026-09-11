@@ -1,8 +1,7 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 //go:build !debug
-// +build !debug
 
 package stun
 
@@ -17,6 +16,7 @@ func CheckSize(_ AttrType, got, expected int) error {
 	if got == expected {
 		return nil
 	}
+
 	return ErrAttributeSizeInvalid
 }
 
@@ -24,6 +24,7 @@ func checkHMAC(got, expected []byte) error {
 	if hmac.Equal(got, expected) {
 		return nil
 	}
+
 	return ErrIntegrityMismatch
 }
 
@@ -31,6 +32,7 @@ func checkFingerprint(got, expected uint32) error {
 	if got == expected {
 		return nil
 	}
+
 	return ErrFingerprintMismatch
 }
 
@@ -40,10 +42,11 @@ func IsAttrSizeInvalid(err error) bool {
 }
 
 // CheckOverflow returns ErrAttributeSizeOverflow if got is bigger that max.
-func CheckOverflow(_ AttrType, got, max int) error {
-	if got <= max {
+func CheckOverflow(_ AttrType, got, maxVal int) error {
+	if got <= maxVal {
 		return nil
 	}
+
 	return ErrAttributeSizeOverflow
 }
 

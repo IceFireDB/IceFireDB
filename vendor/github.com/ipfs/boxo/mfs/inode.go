@@ -1,6 +1,8 @@
 package mfs
 
 import (
+	"sync/atomic"
+
 	"github.com/ipfs/boxo/provider"
 	ipld "github.com/ipfs/go-ipld-format"
 )
@@ -22,4 +24,19 @@ type inode struct {
 
 	// provider used to announce CIDs
 	prov provider.MultihashProvider
+
+	// unlinked prevents flushUp from re-adding this entry to the
+	// parent directory after Unlink removed it.
+	//
+	// This is not a problem for `ipfs files mv` (Mv in ops.go)
+	// because it adds the new name before removing the old one,
+	// and both happen synchronously in the same goroutine.
+	//
+	// With FUSE, the kernel sends RELEASE (triggers Close/flushUp)
+	// and RENAME (triggers Unlink) as separate concurrent requests.
+	// We cannot control the order, and serializing them at the FUSE
+	// layer would block all operations on the directory. This flag
+	// is checked once per file close in flushUp to skip propagation
+	// when the entry no longer exists in the parent.
+	unlinked atomic.Bool
 }
