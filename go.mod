@@ -50,7 +50,7 @@ require (
 	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed
 	github.com/spf13/viper v1.21.0
 	github.com/urfave/cli v1.22.17
-	go.uber.org/atomic v1.11.0
+	go.uber.org/atomic v1.12.0
 	go.uber.org/zap v1.28.0
 )
 
