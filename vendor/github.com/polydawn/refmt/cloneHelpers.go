@@ -33,7 +33,7 @@ func NewCloner(atl atlas.Atlas) Cloner {
 		marshaller:   obj.NewMarshaller(atl),
 		unmarshaller: obj.NewUnmarshaller(atl),
 	}
-	x.pump = shared.TokenPump{x.marshaller, x.unmarshaller}
+	x.pump = shared.TokenPump{TokenSource: x.marshaller, TokenSink: x.unmarshaller}
 	return x
 }
 

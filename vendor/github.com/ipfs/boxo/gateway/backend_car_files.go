@@ -102,9 +102,9 @@ func (b *backpressuredFile) Read(p []byte) (n int, err error) {
 			continue
 		}
 
-		f, ok := nd.(files.File)
+		f, ok := nd.(io.ReadSeeker)
 		if !ok {
-			return 0, fmt.Errorf("not a file, should be unreachable")
+			return 0, fmt.Errorf("not a seekable file, should be unreachable")
 		}
 
 		b.f = f

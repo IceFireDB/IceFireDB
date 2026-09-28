@@ -55,6 +55,10 @@ const (
 	// localhost, private IP or public IP address
 	recentlyConnectedPeerMaxAddrs = 20
 	connectedPeerMaxAddrs         = 500
+	// maxPeerProtocols is the maximum number of protocols we store for a
+	// remote peer. This bounds memory usage when a peer advertises an
+	// excessive number of protocols through chunked identify messages.
+	maxPeerProtocols = 1024
 )
 
 var (
@@ -563,7 +567,7 @@ func (ids *idService) handleIdentifyResponse(s network.Stream, isPush bool) erro
 
 func readAllIDMessages(r pbio.Reader, finalMsg proto.Message) error {
 	mes := &pb.Identify{}
-	for i := 0; i < maxMessages; i++ {
+	for range maxMessages {
 		switch err := r.ReadMsg(mes); err {
 		case io.EOF:
 			return nil
@@ -585,7 +589,7 @@ func (ids *idService) updateSnapshot() (updated bool) {
 	slices.SortFunc(addrs, func(a, b ma.Multiaddr) int { return bytes.Compare(a.Bytes(), b.Bytes()) })
 
 	usedSpace := len(ids.ProtocolVersion) + len(ids.UserAgent)
-	for i := 0; i < len(protos); i++ {
+	for i := range protos {
 		usedSpace += len(protos[i])
 	}
 	addrs = trimHostAddrList(addrs, maxOwnIdentifyMsgSize-usedSpace-256) // 256 bytes of buffer
@@ -702,11 +706,8 @@ func diff(a, b []protocol.ID) (added, removed []protocol.ID) {
 	// This is O(n^2), but it's fine because the slices are small.
 	for _, x := range b {
 		var found bool
-		for _, y := range a {
-			if x == y {
-				found = true
-				break
-			}
+		if slices.Contains(a, x) {
+			found = true
 		}
 		if !found {
 			added = append(added, x)
@@ -714,11 +715,8 @@ func diff(a, b []protocol.ID) (added, removed []protocol.ID) {
 	}
 	for _, x := range a {
 		var found bool
-		for _, y := range b {
-			if x == y {
-				found = true
-				break
-			}
+		if slices.Contains(b, x) {
+			found = true
 		}
 		if !found {
 			removed = append(removed, x)
@@ -732,6 +730,12 @@ func (ids *idService) consumeMessage(mes *pb.Identify, c network.Conn, isPush bo
 
 	supported, _ := ids.Host.Peerstore().GetProtocols(p)
 	mesProtocols := protocol.ConvertFromStrings(mes.Protocols)
+	if len(mesProtocols) > maxPeerProtocols {
+		log.Debug("peer advertises too many protocols, truncating",
+			"peer", p, "advertised", len(mesProtocols), "limit", maxPeerProtocols)
+		clear(mesProtocols[maxPeerProtocols:])
+		mesProtocols = mesProtocols[:maxPeerProtocols]
+	}
 	added, removed := diff(supported, mesProtocols)
 	ids.Host.Peerstore().SetProtocols(p, mesProtocols...)
 	if isPush {

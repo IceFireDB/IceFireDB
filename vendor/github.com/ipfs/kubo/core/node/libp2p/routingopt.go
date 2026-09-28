@@ -1,9 +1,9 @@
 package libp2p
 
 import (
-	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,10 +18,11 @@ import (
 	host "github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	routing "github.com/libp2p/go-libp2p/core/routing"
+	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 type RoutingOptionArgs struct {
-	Ctx                           context.Context
 	Host                          host.Host
 	Datastore                     datastore.Batching
 	Validator                     record.Validator
@@ -105,7 +106,7 @@ func collectAllEndpoints(cfg *config.Config) []EndpointSource {
 	return endpoints
 }
 
-func constructDefaultHTTPRouters(cfg *config.Config) ([]*routinghelpers.ParallelRouter, error) {
+func constructDefaultHTTPRouters(cfg *config.Config, addrFunc func() []ma.Multiaddr) ([]*routinghelpers.ParallelRouter, error) {
 	var routers []*routinghelpers.ParallelRouter
 	httpRetrievalEnabled := cfg.HTTPRetrieval.Enabled.WithDefault(config.DefaultHTTPRetrievalEnabled)
 
@@ -130,7 +131,7 @@ func constructDefaultHTTPRouters(cfg *config.Config) ([]*routinghelpers.Parallel
 	// Create single HTTP router and composer per origin
 	for baseURL, capabilities := range originCapabilities {
 		// Construct HTTP router using base URL (without path)
-		httpRouter, err := irouting.ConstructHTTPRouter(baseURL, cfg.Identity.PeerID, httpAddrsFromConfig(cfg.Addresses), cfg.Identity.PrivKey, httpRetrievalEnabled)
+		httpRouter, err := irouting.ConstructHTTPRouter(baseURL, cfg.Identity.PeerID, addrFunc, cfg.Identity.PrivKey, httpRetrievalEnabled)
 		if err != nil {
 			return nil, err
 		}
@@ -191,7 +192,8 @@ func ConstructDelegatedOnlyRouting(cfg *config.Config) RoutingOption {
 		var routers []*routinghelpers.ParallelRouter
 
 		// Add HTTP delegated routers (includes both router and publisher capabilities)
-		httpRouters, err := constructDefaultHTTPRouters(cfg)
+		addrFunc := httpRouterAddrFunc(args.Host, cfg.Addresses)
+		httpRouters, err := constructDefaultHTTPRouters(cfg, addrFunc)
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +227,8 @@ func ConstructDefaultRouting(cfg *config.Config, routingOpt RoutingOption) Routi
 			ExecuteAfter:            0,
 		})
 
-		httpRouters, err := constructDefaultHTTPRouters(cfg)
+		addrFunc := httpRouterAddrFunc(args.Host, cfg.Addresses)
+		httpRouters, err := constructDefaultHTTPRouters(cfg, addrFunc)
 		if err != nil {
 			return nil, err
 		}
@@ -244,6 +247,7 @@ func constructDHTRouting(mode dht.ModeOpt) RoutingOption {
 			dht.Concurrency(10),
 			dht.Mode(mode),
 			dht.Datastore(args.Datastore),
+			dht.ValueDatastore(irouting.DHTValueDatastore(args.Datastore)),
 			dht.Validator(args.Validator),
 		}
 		if args.OptimisticProvide {
@@ -255,33 +259,47 @@ func constructDHTRouting(mode dht.ModeOpt) RoutingOption {
 		wanOptions := []dht.Option{
 			dht.BootstrapPeers(args.BootstrapPeers...),
 		}
+		// In stub mode, allow loopback peers in the WAN routing
+		// table so Provide/PutValue work with ephemeral test peers.
+		if os.Getenv("TEST_DHT_STUB") != "" {
+			wanOptions = append(wanOptions,
+				dht.AddressFilter(nil),
+				dht.QueryFilter(func(_ any, _ peer.AddrInfo) bool { return true }),
+				dht.RoutingTableFilter(func(_ any, _ peer.ID) bool { return true }),
+				dht.RoutingTablePeerDiversityFilter(nil),
+			)
+		}
 		lanOptions := []dht.Option{}
 		if args.LoopbackAddressesOnLanDHT {
 			lanOptions = append(lanOptions, dht.AddressFilter(nil))
 		}
-		return dual.New(
-			args.Ctx, args.Host,
+		d, err := dual.New(
+			args.Host,
 			dual.DHTOption(dhtOpts...),
 			dual.WanDHTOption(wanOptions...),
 			dual.LanDHTOption(lanOptions...),
 		)
+		if err != nil {
+			return nil, err
+		}
+		return d, nil
 	}
 }
 
 // ConstructDelegatedRouting is used when Routing.Type = "custom"
 func ConstructDelegatedRouting(routers config.Routers, methods config.Methods, peerID string, addrs config.Addresses, privKey string, httpRetrieval bool) RoutingOption {
 	return func(args RoutingOptionArgs) (routing.Routing, error) {
+		addrFunc := httpRouterAddrFunc(args.Host, addrs)
 		return irouting.Parse(routers, methods,
 			&irouting.ExtraDHTParams{
 				BootstrapPeers: args.BootstrapPeers,
 				Host:           args.Host,
 				Validator:      args.Validator,
 				Datastore:      args.Datastore,
-				Context:        args.Ctx,
 			},
 			&irouting.ExtraHTTPParams{
 				PeerID:        peerID,
-				Addrs:         httpAddrsFromConfig(addrs),
+				AddrFunc:      addrFunc,
 				PrivKeyB64:    privKey,
 				HTTPRetrieval: httpRetrieval,
 			},
@@ -300,30 +318,76 @@ var (
 	NilRouterOption               = constructNilRouting
 )
 
-// httpAddrsFromConfig creates a list of addresses from the provided configuration to be used by HTTP delegated routers.
-func httpAddrsFromConfig(cfgAddrs config.Addresses) []string {
-	// Swarm addrs are announced by default
-	addrs := cfgAddrs.Swarm
-	// if Announce addrs are specified - override Swarm
+// httpRouterAddrFunc returns a function that resolves provider addresses for
+// HTTP routers at provide-time.
+//
+// Resolution logic:
+//   - If Announce is set, use it as a static override (no dynamic resolution).
+//   - Otherwise announce host.Addrs(), the same set identify sends to peers:
+//     0.0.0.0/:: Swarm binds resolved to concrete interface addresses, the
+//     libp2p AddrsFactory applied (Addresses.NoAnnounce, and the AutoTLS
+//     /tls/ws address, which only exists here), and certhashes attached.
+//   - Narrowed to globally routable addresses when the node has any, matching
+//     the DHT provide path (selfAddrsFunc in core/node/provider.go). A node
+//     with no public address keeps announcing what it has, so LAN-only setups
+//     pointing at a local router still publish something dialable.
+//   - AppendAnnounce addresses are always appended, exactly once, and are
+//     exempt from both NoAnnounce and the public-address narrowing: an
+//     explicit operator entry wins.
+//
+// Do not narrow this to AutoNAT V2 confirmed reachable addresses. AutoNAT only
+// ever sees listen addresses, so an address the AddrsFactory synthesizes (the
+// AutoTLS /tls/ws one) can never be confirmed, and browser clients that reach
+// us through a delegated router are left with nothing they can dial.
+// See https://github.com/ipfs/kubo/issues/11369.
+func httpRouterAddrFunc(h host.Host, cfgAddrs config.Addresses) func() []ma.Multiaddr {
+	appendAddrs := parseMultiaddrs(cfgAddrs.AppendAnnounce)
+
+	// If Announce is explicitly set, use it as a static override.
 	if len(cfgAddrs.Announce) > 0 {
-		addrs = cfgAddrs.Announce
-	} else if len(cfgAddrs.NoAnnounce) > 0 {
-		// if Announce adds are not specified - filter Swarm addrs with NoAnnounce list
-		maddrs := map[string]struct{}{}
-		for _, addr := range addrs {
-			maddrs[addr] = struct{}{}
-		}
-		for _, addr := range cfgAddrs.NoAnnounce {
-			delete(maddrs, addr)
-		}
-		addrs = make([]string, 0, len(maddrs))
-		for k := range maddrs {
-			addrs = append(addrs, k)
-		}
+		announceAddrs := parseMultiaddrs(cfgAddrs.Announce)
+		// Skip AppendAnnounce entries already listed in Announce,
+		// mirroring makeAddrsFactory (addrs.go).
+		extra := ma.FilterAddrs(appendAddrs, func(a ma.Multiaddr) bool {
+			return !ma.Contains(announceAddrs, a)
+		})
+		staticAddrs := slices.Concat(announceAddrs, extra)
+		return func() []ma.Multiaddr { return staticAddrs }
 	}
-	// append AppendAnnounce addrs to the result list
-	if len(cfgAddrs.AppendAnnounce) > 0 {
-		addrs = append(addrs, cfgAddrs.AppendAnnounce...)
+
+	return func() []ma.Multiaddr {
+		addrs := h.Addrs()
+		if len(appendAddrs) > 0 {
+			// The AddrsFactory (makeAddrsFactory in addrs.go) already injects
+			// AppendAnnounce into h.Addrs(). Take those out so the re-append
+			// below emits them exactly once, and so a public AppendAnnounce
+			// entry cannot trip the public-addr guard on a node whose own
+			// addresses are all private.
+			addrs = ma.FilterAddrs(addrs, func(a ma.Multiaddr) bool {
+				return !ma.Contains(appendAddrs, a)
+			})
+		}
+		// Delegated routers are public indexes, so keep loopback and LAN
+		// addresses out of the record whenever we have a routable one.
+		if public := ma.FilterAddrs(addrs, manet.IsPublicAddr); len(public) > 0 {
+			addrs = public
+		}
+		if len(appendAddrs) == 0 {
+			return addrs
+		}
+		return slices.Concat(addrs, appendAddrs)
+	}
+}
+
+func parseMultiaddrs(strs []string) []ma.Multiaddr {
+	addrs := make([]ma.Multiaddr, 0, len(strs))
+	for _, s := range strs {
+		a, err := ma.NewMultiaddr(s)
+		if err != nil {
+			log.Errorf("ignoring invalid multiaddr %q: %s", s, err)
+			continue
+		}
+		addrs = append(addrs, a)
 	}
 	return addrs
 }

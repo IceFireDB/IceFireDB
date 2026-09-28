@@ -141,8 +141,7 @@ func metricsErrStr(err error) string {
 	if err == nil {
 		return "None"
 	}
-	var httpErr *HTTPError
-	if errors.As(err, &httpErr) {
+	if _, ok := errors.AsType[*HTTPError](err); ok {
 		return "HTTP"
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
@@ -151,8 +150,7 @@ func metricsErrStr(err error) string {
 	if errors.Is(err, context.Canceled) {
 		return "Canceled"
 	}
-	var dnsErr *net.DNSError
-	if errors.As(err, &dnsErr) {
+	if dnsErr, ok := errors.AsType[*net.DNSError](err); ok {
 		if dnsErr.IsNotFound {
 			return "DNSNotFound"
 		}
@@ -162,8 +160,7 @@ func metricsErrStr(err error) string {
 		return "DNS"
 	}
 
-	var netErr net.Error
-	if errors.As(err, &netErr) {
+	if netErr, ok := errors.AsType[net.Error](err); ok {
 		if netErr.Timeout() {
 			return "NetTimeout"
 		}

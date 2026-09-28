@@ -5,10 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"sync/atomic"
-	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	blockstore "github.com/ipfs/boxo/blockstore"
@@ -140,7 +139,6 @@ func (l *cacheBlockStore) HashOnRead(enabled bool) {
 type remoteBlockstore struct {
 	httpClient *http.Client
 	gatewayURL []string
-	rand       *rand.Rand
 	validate   bool
 }
 
@@ -162,7 +160,6 @@ func NewRemoteBlockstore(gatewayURL []string, httpClient *http.Client) (blocksto
 	return &remoteBlockstore{
 		gatewayURL: gatewayURL,
 		httpClient: httpClient,
-		rand:       rand.New(rand.NewSource(time.Now().Unix())),
 		// Enables block validation by default. Important since we are
 		// proxying block requests to untrusted gateways.
 		validate: true,
@@ -250,5 +247,7 @@ func (c *remoteBlockstore) DeleteBlock(context.Context, cid.Cid) error {
 }
 
 func (ps *remoteBlockstore) getRandomGatewayURL() string {
-	return ps.gatewayURL[ps.rand.Intn(len(ps.gatewayURL))]
+	// The top-level math/rand/v2 functions are safe to call from the concurrent
+	// request handlers that reach here; a *rand.Rand field would not be.
+	return ps.gatewayURL[rand.IntN(len(ps.gatewayURL))]
 }

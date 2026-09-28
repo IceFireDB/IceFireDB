@@ -1,15 +1,31 @@
+// Package telemetry can report anonymized, aggregate usage data about a Kubo
+// node to an HTTP collector. Kubo ships with no collector, so a node collects
+// nothing and writes no identifier unless its operator sets
+// Plugins.Plugins.telemetry.Config.Endpoint. A report never carries anything
+// that identifies a person, a file, or a peer.
+//
+// Operators can turn it off at runtime with IPFS_TELEMETRY=off, with
+// DO_NOT_TRACK=1, with Plugins.Plugins.telemetry.Config.Mode, or by disabling
+// the plugin. A distributor who runs a collector for their own builds can set
+// it at link time:
+//
+//	go build -ldflags "-X github.com/ipfs/kubo/plugin/plugins/telemetry.defaultEndpoint=https://telemetry.example.com" ./cmd/ipfs
+//
+// See docs/telemetry.md for the operator-facing version of all this.
 package telemetry
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"path"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,13 +54,27 @@ var (
 )
 
 const (
-	modeEnvVar   = "IPFS_TELEMETRY"
-	uuidFilename = "telemetry_uuid"
-	endpoint     = "https://telemetry.ipshipyard.dev"
-	sendDelay    = 15 * time.Minute // delay before first telemetry collection after daemon start
-	sendInterval = 24 * time.Hour   // interval between telemetry collections after the first one
-	httpTimeout  = 30 * time.Second // timeout for telemetry HTTP requests
+	modeEnvVar       = "IPFS_TELEMETRY"
+	doNotTrackEnvVar = "DO_NOT_TRACK"   // opt-out convention shared with other CLI tools
+	uuidFilename     = "telemetry_uuid" // anonymous node identifier, kept in the repo directory
+	retiredFilename  = "telemetry_retired"
+	sendDelay        = 15 * time.Minute // delay before first telemetry collection after daemon start
+	sendInterval     = 24 * time.Hour   // interval between telemetry collections after the first one
+	httpTimeout      = 30 * time.Second // timeout for telemetry HTTP requests
 )
+
+// defaultEndpoint is the collector a node reports to when the operator has
+// not configured one. Kubo ships it empty: with no endpoint there is nowhere
+// to send to, so the node collects nothing and writes no identifier. It is a
+// var, not a const, so a distributor running their own collector can set it
+// at link time without patching source:
+//
+//	go build -ldflags "-X github.com/ipfs/kubo/plugin/plugins/telemetry.defaultEndpoint=https://telemetry.example.com" ./cmd/ipfs
+var defaultEndpoint = ""
+
+// errEndpointRetired means the collector asked to stop receiving reports. See
+// telemetryPlugin.retire.
+var errEndpointRetired = errors.New("telemetry endpoint retired")
 
 type pluginMode int
 
@@ -128,11 +158,13 @@ var Plugins = []plugin.Plugin{
 }
 
 type telemetryPlugin struct {
-	uuidFilename string
-	mode         pluginMode
-	endpoint     string
-	runOnce      bool // test-only flag: when true, sends telemetry immediately without delay
-	sendDelay    time.Duration
+	uuidFilename    string
+	retiredFilename string
+	mode            pluginMode
+	endpoint        string
+	optedIn         bool // operator asked for telemetry explicitly, rather than leaving the default
+	runOnce         bool // test-only flag: when true, sends telemetry immediately without delay
+	sendDelay       time.Duration
 
 	node      *core.IpfsNode
 	config    *config.Config
@@ -165,6 +197,24 @@ func readFromConfig(cfg any, key string) string {
 	return val
 }
 
+// doNotTrack reports whether the environment asks applications not to phone
+// home. DO_NOT_TRACK is a convention shared with other CLI tools, GitHub's
+// among them: the documented value is 1, and tools commonly accept true as
+// well, so both are honored here.
+func doNotTrack() bool {
+	v := strings.TrimSpace(os.Getenv(doNotTrackEnvVar))
+	if v == "" {
+		return false
+	}
+	// Spellings of false ("0", "false") are honored as such; anything else
+	// non-empty is read as opting out, since erring toward not sending is the
+	// safer way to guess.
+	if b, err := strconv.ParseBool(v); err == nil {
+		return b
+	}
+	return true
+}
+
 func (p *telemetryPlugin) Init(env *plugin.Environment) error {
 	// logging.SetLogLevel("telemetry", "DEBUG")
 	log.Debug("telemetry plugin Init()")
@@ -173,17 +223,79 @@ func (p *telemetryPlugin) Init(env *plugin.Environment) error {
 
 	repoPath := env.Repo
 	p.uuidFilename = path.Join(repoPath, uuidFilename)
+	p.retiredFilename = path.Join(repoPath, retiredFilename)
 
+	// Precedence, most specific first: IPFS_TELEMETRY, then the generic
+	// DO_NOT_TRACK, then the config file. Environment beats config either way,
+	// so IPFS_TELEMETRY=on is the way to keep telemetry on for one daemon on a
+	// machine that sets DO_NOT_TRACK globally.
 	v := os.Getenv(modeEnvVar)
-	if v != "" {
+	switch {
+	case v != "":
 		log.Debug("mode set from env-var")
-	} else if pmode := readFromConfig(env.Config, "Mode"); pmode != "" {
-		v = pmode
-		log.Debug("mode set from config")
+	case doNotTrack():
+		v = "off"
+		log.Debugf("mode set to off by %s", doNotTrackEnvVar)
+	default:
+		if pmode := readFromConfig(env.Config, "Mode"); pmode != "" {
+			v = pmode
+			log.Debug("mode set from config")
+		}
 	}
 
-	// read "Delay" from the config. Parse as duration. Set p.sendDelay to it
-	// or set default.
+	p.endpoint = defaultEndpoint
+	if ep := readFromConfig(env.Config, "Endpoint"); ep != "" {
+		log.Debugf("endpoint set from config: %s", ep)
+		p.endpoint = ep
+	}
+
+	switch v {
+	case "off":
+		p.mode = modeOff
+		log.Debug("telemetry disabled via opt-out")
+		p.removeUUID()
+		return nil
+	case "auto":
+		// Enabled, and the startup notice is shown on every run rather than
+		// only on the first one.
+		p.mode = modeAuto
+		p.optedIn = true
+	case "on":
+		p.mode = modeOn
+		p.optedIn = true
+	default:
+		// Unset, or a value we do not recognize: on, if there is an endpoint
+		// to send to. A node's first run prints a notice naming the endpoint
+		// and the ways to opt out, 15 minutes before anything is sent.
+		p.mode = modeOn
+	}
+
+	// No endpoint means nowhere to send. This is how Kubo ships, so collect
+	// nothing, and drop an identifier left behind by a version that had a
+	// built-in collector.
+	if p.endpoint == "" {
+		p.mode = modeOff
+		if p.optedIn {
+			log.Warn("telemetry is enabled but no endpoint is configured; set Plugins.Plugins.telemetry.Config.Endpoint to your collector URL (see docs/telemetry.md)")
+		} else {
+			log.Debug("no telemetry endpoint configured, sending nothing")
+		}
+		p.removeUUID()
+		return nil
+	}
+
+	// A collector can retire itself (see retire), which stops reports from
+	// every node still pointed at it without waiting for a Kubo release.
+	if p.endpointRetired() {
+		p.mode = modeOff
+		if p.optedIn {
+			log.Warnf("telemetry endpoint %s asked to stop receiving reports; delete %s or configure another Endpoint to retry", p.endpoint, p.retiredFilename)
+		} else {
+			log.Debugf("telemetry endpoint %s is retired, sending nothing", p.endpoint)
+		}
+		return nil
+	}
+
 	if delayStr := readFromConfig(env.Config, "Delay"); delayStr != "" {
 		delay, err := time.ParseDuration(delayStr)
 		if err != nil {
@@ -198,32 +310,57 @@ func (p *telemetryPlugin) Init(env *plugin.Environment) error {
 		p.sendDelay = sendDelay
 	}
 
-	p.endpoint = endpoint
-	if ep := readFromConfig(env.Config, "Endpoint"); ep != "" {
-		log.Debug("endpoint set from config", ep)
-		p.endpoint = ep
-	}
-
-	switch v {
-	case "off":
-		p.mode = modeOff
-		log.Debug("telemetry disabled via opt-out")
-		// Remove UUID file if it exists when user opts out
-		if _, err := os.Stat(p.uuidFilename); err == nil {
-			if err := os.Remove(p.uuidFilename); err != nil {
-				log.Debugf("failed to remove telemetry UUID file: %s", err)
-			} else {
-				log.Debug("removed existing telemetry UUID file due to opt-out")
-			}
-		}
-		return nil
-	case "auto":
-		p.mode = modeAuto
-	default:
-		p.mode = modeOn
-	}
-	log.Debug("telemetry mode: ", p.mode)
+	log.Debugf("telemetry enabled, endpoint: %q", p.endpoint)
 	return nil
+}
+
+// endpointRetired reports whether the endpoint this node would send to has
+// already told it to stop. The marker holds the endpoint it applies to, so
+// pointing the node at a different collector, or deleting the file, resumes
+// reporting.
+func (p *telemetryPlugin) endpointRetired() bool {
+	b, err := os.ReadFile(p.retiredFilename)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Debugf("error reading %s: %s", p.retiredFilename, err)
+		}
+		return false
+	}
+	// First line is the endpoint; anything after it is a note for whoever finds
+	// the file.
+	retired, _, _ := strings.Cut(string(b), "\n")
+	return strings.TrimSpace(retired) == p.endpoint
+}
+
+// retire records that the endpoint answered HTTP 410 Gone, which is how a
+// collector says it is permanently out of service.[^1] Kubo stops sending to
+// that endpoint, now and on later runs, and drops the node identifier since
+// nothing will use it again. This is the switch that turns telemetry off across
+// nodes that are already deployed, without shipping a new release.
+//
+// [^1]: RFC 9110, section 15.5.11 (https://httpwg.org/specs/rfc9110.html#status.410):
+// a 410 means the resource is intentionally unavailable, the condition is
+// likely permanent, and the server owners want remote references removed.
+func (p *telemetryPlugin) retire() {
+	log.Infof("telemetry endpoint %s returned HTTP 410 Gone: no further data will be sent", p.endpoint)
+
+	note := fmt.Sprintf("%s\n\n# Written by Kubo: the endpoint above returned HTTP 410 Gone.\n# Delete this file to start reporting to it again.\n", p.endpoint)
+	if err := os.WriteFile(p.retiredFilename, []byte(note), 0600); err != nil {
+		log.Debugf("failed to write %s: %s", p.retiredFilename, err)
+	}
+	p.removeUUID()
+}
+
+// removeUUID deletes the stored node identifier, if any. Nothing will use it
+// once the node stops reporting.
+func (p *telemetryPlugin) removeUUID() {
+	if err := os.Remove(p.uuidFilename); err != nil {
+		if !os.IsNotExist(err) {
+			log.Debugf("failed to remove telemetry UUID file: %s", err)
+		}
+		return
+	}
+	log.Debug("removed existing telemetry UUID file")
 }
 
 func (p *telemetryPlugin) loadUUID() error {
@@ -283,6 +420,7 @@ Kubo will collect anonymous usage data to help improve the software:
 
 No data sent yet. To opt-out before collection starts:
 • Set environment: %s=off
+• Or opt out of telemetry in every tool that honors it: %s=1
 • Or run: ipfs config Plugins.Plugins.telemetry.Config.Mode off
 • Then restart daemon
 
@@ -290,7 +428,7 @@ This message is shown only once.
 Learn more: https://github.com/ipfs/kubo/blob/master/docs/telemetry.md
 
 
-`, p.sendDelay, p.sendDelay, endpoint, p.event.UUID, modeEnvVar)
+`, p.sendDelay, p.sendDelay, p.endpoint, p.event.UUID, modeEnvVar, doNotTrackEnvVar)
 }
 
 // Start finishes telemetry initialization once the IpfsNode is ready,
@@ -336,14 +474,24 @@ func (p *telemetryPlugin) Start(n *core.IpfsNode) error {
 	// In production, this is always false, ensuring users get the 15-minute delay.
 	if p.runOnce {
 		p.prepareEvent()
-		return p.sendTelemetry()
+		err := p.sendTelemetry()
+		if errors.Is(err, errEndpointRetired) {
+			p.retire()
+			return nil
+		}
+		return err
 	}
 
 	go func() {
 		timer := time.NewTimer(p.sendDelay)
+		defer timer.Stop()
 		for range timer.C {
 			p.prepareEvent()
 			if err := p.sendTelemetry(); err != nil {
+				if errors.Is(err, errEndpointRetired) {
+					p.retire()
+					return
+				}
 				log.Warnf("telemetry submission failed: %s (will retry in %s)", err, sendInterval)
 			}
 			timer.Reset(sendInterval)
@@ -639,7 +787,8 @@ func (p *telemetryPlugin) sendTelemetry() error {
 	req.Header.Set("User-Agent", ipfs.GetUserAgentVersion())
 	req.Close = true
 
-	// Use client with timeout to prevent hanging
+	// Use client with timeout to prevent hanging. The default transport applies,
+	// so HTTP_PROXY, HTTPS_PROXY and NO_PROXY are respected.
 	client := &http.Client{
 		Timeout: httpTimeout,
 	}
@@ -649,6 +798,12 @@ func (p *telemetryPlugin) sendTelemetry() error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	// A collector says it is permanently out of service with 410 Gone, which
+	// stops this node for good. See retire.
+	if resp.StatusCode == http.StatusGone {
+		return errEndpointRetired
+	}
 
 	if resp.StatusCode >= 400 {
 		err := fmt.Errorf("telemetry endpoint returned HTTP %d", resp.StatusCode)

@@ -7,7 +7,7 @@ import (
 )
 
 // Fetcher is an interface for reading from a dag. Reads may be local or remote, and may employ data exchange
-// protocols like graphsync and bitswap
+// protocols like bitswap
 type Fetcher interface {
 	// NodeMatching traverses a node graph starting with the provided root node using the given selector node and
 	// possibly crossing block boundaries. Each matched node is passed as FetchResult to the callback. Errors returned

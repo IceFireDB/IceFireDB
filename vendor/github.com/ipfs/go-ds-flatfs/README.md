@@ -1,9 +1,7 @@
 # go-ds-flatfs
 
-[![](https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square)](http://ipn.io)
 [![](https://img.shields.io/badge/project-IPFS-blue.svg?style=flat-square)](http://ipfs.io/)
 [![](https://img.shields.io/badge/freenode-%23ipfs-blue.svg?style=flat-square)](http://webchat.freenode.net/?channels=%23ipfs)
-[![standard-readme compliant](https://img.shields.io/badge/standard--readme-OK-green.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 [![Coverage Status](https://img.shields.io/codecov/c/github/ipfs/go-ds-flatfs.svg)](https://codecov.io/gh/ipfs/go-ds-flatfs)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/ipfs/go-ds-flatfs/go-test.yml?branch=master)](https://github.com/ipfs/go-ds-flatfs/actions)
 [![GoDoc](https://pkg.go.dev/badge/github.com/ipfs/go-ds-flatfs)](https://pkg.go.dev/github.com/ipfs/go-ds-flatfs)

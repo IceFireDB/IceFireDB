@@ -37,6 +37,10 @@ func marshalInteger(b io.StringWriter, i int64) error {
 // parseNumber parses as defined in
 // https://httpwg.org/specs/rfc9651.html#parse-number.
 func parseNumber(s *scanner) (interface{}, error) {
+	if s.eof() {
+		return 0, &UnmarshalError{s.off, ErrUnexpectedEndOfString}
+	}
+
 	neg := isNeg(s)
 	if neg && s.eof() {
 		return 0, &UnmarshalError{s.off, ErrUnexpectedEndOfString}

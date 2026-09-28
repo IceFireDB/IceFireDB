@@ -96,10 +96,10 @@ func (c *rawConn) openControlStream(settings *settingsFrame) (*quic.SendStream, 
 			Other:               maps.Clone(settings.Other),
 		}
 		if settings.Datagram {
-			sf.Datagram = pointer(true)
+			sf.Datagram = new(true)
 		}
 		if settings.ExtendedConnect {
-			sf.ExtendedConnect = pointer(true)
+			sf.ExtendedConnect = new(true)
 		}
 		c.qlogger.RecordEvent(qlog.FrameCreated{
 			StreamID: str.StreamID(),
@@ -121,6 +121,16 @@ func (c *rawConn) TrackStream(str *quic.Stream) *stateTrackingStream {
 	c.qloggerWG.Add(1)
 	c.streamMx.Unlock()
 	return hstr
+}
+
+func (c *rawConn) UpdateStreamPriority(id quic.StreamID, urgency int8, incremental bool) {
+	c.streamMx.Lock()
+	str := c.streams[id]
+	c.streamMx.Unlock()
+	// A PRIORITY_UPDATE can arrive before its request stream. We deliberately ignore such reordered frames.
+	if str != nil {
+		str.SetPriority(urgency, incremental)
+	}
 }
 
 func (c *rawConn) RemoteAddr() net.Addr {
@@ -206,8 +216,12 @@ func (c *rawConn) handleControlStream(str *quic.ReceiveStream) {
 	fp := &frameParser{closeConn: c.conn.CloseWithError, r: str, streamID: str.StreamID()}
 	f, err := fp.ParseNext(c.qlogger)
 	if err != nil {
-		var serr *quic.StreamError
-		if err == io.EOF || errors.As(err, &serr) {
+		if errors.Is(err, errPriorityUpdateForPush) {
+			c.conn.CloseWithError(quic.ApplicationErrorCode(ErrCodeMissingSettings), "")
+			return
+		}
+		_, isStreamError := errors.AsType[*quic.StreamError](err)
+		if err == io.EOF || isStreamError {
 			c.conn.CloseWithError(quic.ApplicationErrorCode(ErrCodeClosedCriticalStream), "")
 			return
 		}
@@ -233,20 +247,15 @@ func (c *rawConn) handleControlStream(str *quic.ReceiveStream) {
 			c.CloseWithError(quic.ApplicationErrorCode(ErrCodeSettingsError), "missing QUIC Datagram support")
 			return
 		}
-		c.qloggerWG.Add(1)
-		go func() {
-			defer c.qloggerWG.Done()
-			if err := c.receiveDatagrams(); err != nil {
-				if c.logger != nil {
-					c.logger.Debug("receiving datagrams failed", "error", err)
-				}
+		c.qloggerWG.Go(func() {
+			err := c.receiveDatagrams()
+			if c.logger != nil {
+				c.logger.Debug("receiving datagrams failed", "error", err)
 			}
-		}()
+		})
 	}
 
-	if c.controlStrHandler != nil {
-		c.controlStrHandler(str, fp)
-	}
+	c.controlStrHandler(str, fp)
 }
 
 func (c *rawConn) sendDatagram(streamID quic.StreamID, b []byte) error {
@@ -257,7 +266,7 @@ func (c *rawConn) sendDatagram(streamID quic.StreamID, b []byte) error {
 	data = append(data, b...)
 	if c.qlogger != nil {
 		c.qlogger.RecordEvent(qlog.DatagramCreated{
-			QuaterStreamID: quarterStreamID,
+			QuarterStreamID: quarterStreamID,
 			Raw: qlog.RawInfo{
 				Length:        len(data),
 				PayloadLength: len(b),
@@ -280,7 +289,7 @@ func (c *rawConn) receiveDatagrams() error {
 		}
 		if c.qlogger != nil {
 			c.qlogger.RecordEvent(qlog.DatagramParsed{
-				QuaterStreamID: quarterStreamID,
+				QuarterStreamID: quarterStreamID,
 				Raw: qlog.RawInfo{
 					Length:        len(b),
 					PayloadLength: len(b) - n,

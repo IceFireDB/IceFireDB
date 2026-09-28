@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/quic-go/quic-go/internal/ackhandler"
-	"github.com/quic-go/quic-go/internal/flowcontrol"
 	"github.com/quic-go/quic-go/internal/monotime"
 	"github.com/quic-go/quic-go/internal/protocol"
 	"github.com/quic-go/quic-go/internal/wire"
@@ -27,7 +26,10 @@ var errDeadline net.Error = &deadlineError{}
 type streamSender interface {
 	onHasConnectionData()
 	onHasStreamData(protocol.StreamID, *SendStream)
+	onHasStreamRetransmission(protocol.StreamID, *SendStream)
 	onHasStreamControlFrame(protocol.StreamID, streamControlFrameGetter)
+	updateStreamPriority(protocol.StreamID)
+	recordStreamPriorityUpdated(protocol.StreamID, int8, bool)
 	// must be called without holding the mutex that is acquired by closeForShutdown
 	onStreamCompleted(protocol.StreamID)
 }
@@ -71,7 +73,7 @@ func newStream(
 	ctx context.Context,
 	streamID protocol.StreamID,
 	sender streamSender,
-	flowController flowcontrol.StreamFlowController,
+	flowController *streamFlowController,
 	supportsResetStreamAt bool,
 ) *Stream {
 	s := &Stream{sender: sender}
@@ -105,9 +107,15 @@ func newStream(
 }
 
 // StreamID returns the stream ID.
-func (s *Stream) StreamID() protocol.StreamID {
+func (s *Stream) StreamID() StreamID {
 	// the result is same for receiveStream and sendStream
 	return s.sendStr.StreamID()
+}
+
+// SetPriority sets the scheduling priority for data sent on the stream.
+// See [SendStream.SetPriority] for details.
+func (s *Stream) SetPriority(urgency int8, incremental bool) {
+	s.sendStr.SetPriority(urgency, incremental)
 }
 
 // Read reads data from the stream.
@@ -119,9 +127,9 @@ func (s *Stream) Read(p []byte) (int, error) {
 
 // Peek fills b with stream data, without consuming the stream data.
 // It blocks until len(b) bytes are available, or an error occurs.
-// It respects the stream deadline set by SetReadDeadline.
+// It respects the stream deadline set by [Stream.SetReadDeadline].
 // If the stream ends before len(b) bytes are available,
-// it returns the number of bytes peeked along with io.EOF.
+// it returns the number of bytes peeked along with [io.EOF].
 func (s *Stream) Peek(b []byte) (int, error) {
 	return s.receiveStr.Peek(b)
 }
@@ -131,6 +139,18 @@ func (s *Stream) Peek(b []byte) (int, error) {
 // If the stream was canceled, the error is a [StreamError].
 func (s *Stream) Write(p []byte) (int, error) {
 	return s.sendStr.Write(p)
+}
+
+// WriteWithLimit writes data to the stream, subject to an additional send limit.
+// See [SendStream.WriteWithLimit] for more details.
+func (s *Stream) WriteWithLimit(p []byte, limiter func(maxBytes int) int) (int, error) {
+	return s.sendStr.WriteWithLimit(p, limiter)
+}
+
+// TryWriteAll writes data to the stream if it can be queued immediately.
+// See [SendStream.TryWriteAll] for more details.
+func (s *Stream) TryWriteAll(p []byte) error {
+	return s.sendStr.TryWriteAll(p)
 }
 
 // SetReliableBoundary marks the data written to this stream so far as reliable.
@@ -151,6 +171,14 @@ func (s *Stream) CancelWrite(errorCode StreamErrorCode) {
 // See [ReceiveStream.CancelRead] for more details.
 func (s *Stream) CancelRead(errorCode StreamErrorCode) {
 	s.receiveStr.CancelRead(errorCode)
+}
+
+// SetReceiveFinalSizeCallback sets a callback that is called when the receive side's final size is known.
+// See [ReceiveStream.SetReceiveFinalSizeCallback] for more details.
+// Most applications don't need this. It is mainly useful for protocol layers
+// that need exact stream final sizes, such as WebTransport flow control accounting.
+func (s *Stream) SetReceiveFinalSizeCallback(callback func(int64)) {
+	s.receiveStr.SetReceiveFinalSizeCallback(callback)
 }
 
 // The Context is canceled as soon as the write-side of the stream is closed.
@@ -197,20 +225,20 @@ func (s *Stream) getControlFrame(now monotime.Time) (_ ackhandler.Frame, ok, has
 	return s.receiveStr.getControlFrame(now)
 }
 
-// SetReadDeadline sets the deadline for future Read calls.
+// SetReadDeadline sets the deadline for future [Stream.Read] calls.
 // See [ReceiveStream.SetReadDeadline] for more details.
 func (s *Stream) SetReadDeadline(t time.Time) error {
 	return s.receiveStr.SetReadDeadline(t)
 }
 
-// SetWriteDeadline sets the deadline for future Write calls.
+// SetWriteDeadline sets the deadline for future [Stream.Write] calls.
 // See [SendStream.SetWriteDeadline] for more details.
 func (s *Stream) SetWriteDeadline(t time.Time) error {
 	return s.sendStr.SetWriteDeadline(t)
 }
 
 // SetDeadline sets the read and write deadlines associated with the stream.
-// It is equivalent to calling both SetReadDeadline and SetWriteDeadline.
+// It is equivalent to calling both [Stream.SetReadDeadline] and [Stream.SetWriteDeadline].
 func (s *Stream) SetDeadline(t time.Time) error {
 	_ = s.receiveStr.SetReadDeadline(t) // SetReadDeadline never errors
 	_ = s.sendStr.SetWriteDeadline(t)   // SetWriteDeadline never errors

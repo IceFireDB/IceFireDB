@@ -37,7 +37,7 @@ type chanStream struct {
 	closed bool
 
 	// closeCh is closed when the stream is closed.
-	// Error checks if the stream has been closed by checking if this channes is closed.
+	// Error checks if the stream has been closed by checking if this channel is closed.
 	// Its closing is protected by wl.
 	closeCh chan struct{}
 

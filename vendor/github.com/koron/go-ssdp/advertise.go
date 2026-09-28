@@ -3,6 +3,7 @@ package ssdp
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -26,10 +27,9 @@ type Advertiser struct {
 	server  string
 	maxAge  int
 
+	mu   sync.Mutex
 	conn *multicast.Conn
-	ch   chan *message
 	wg   sync.WaitGroup
-	wgS  sync.WaitGroup
 
 	// addHost is an optional flag to add HOST header for M-SEARCH response.
 	// It is to support SmartThings.
@@ -60,16 +60,9 @@ func Advertise(st, usn string, location any, server string, maxAge int, opts ...
 		server:  server,
 		maxAge:  maxAge,
 		conn:    conn,
-		ch:      make(chan *message),
 		addHost: cfg.advertiseConfig.addHost,
 	}
-	a.wg.Add(2)
-	a.wgS.Add(1)
-	go func() {
-		a.sendMain()
-		a.wgS.Done()
-		a.wg.Done()
-	}()
+	a.wg.Add(1)
 	go func() {
 		a.recvMain()
 		a.wg.Done()
@@ -89,15 +82,6 @@ func (a *Advertiser) recvMain() error {
 		return err
 	}
 	return nil
-}
-
-func (a *Advertiser) sendMain() {
-	for msg := range a.ch {
-		_, err := a.conn.WriteTo(msg.data, msg.to)
-		if err != nil {
-			ssdplog.Printf("failed to send: %s", err)
-		}
-	}
 }
 
 func (a *Advertiser) handleRaw(from net.Addr, raw []byte) error {
@@ -131,8 +115,8 @@ func (a *Advertiser) handleRaw(from net.Addr, raw []byte) error {
 		host = addr.String()
 	}
 	msg := buildOK(a.st, a.usn, a.locProv.Location(from, nil), a.server, a.maxAge, host)
-	a.ch <- &message{to: from, data: multicast.BytesDataProvider(msg)}
-	return nil
+	_, err = a.conn.WriteTo(multicast.BytesDataProvider(msg), from)
+	return err
 }
 
 func buildOK(st, usn, location, server string, maxAge int, host string) []byte {
@@ -156,51 +140,61 @@ func buildOK(st, usn, location, server string, maxAge int, host string) []byte {
 	return b.Bytes()
 }
 
+var ErrAdvertiserClosedAlready = errors.New("advertiser closed already")
+
+func (a *Advertiser) connGuard(fn func() error) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.conn != nil {
+		return fn()
+	}
+	return ErrAdvertiserClosedAlready
+}
+
 // Close stops advertisement.
 func (a *Advertiser) Close() error {
-	if a.conn != nil {
-		// closing order is very important. be careful to change:
-		// stop sending loop by closing the channel and wait it.
-		close(a.ch)
-		a.wgS.Wait()
-		// stop receiving loop by closing the connection.
-		a.conn.Close()
-		a.wg.Wait()
+	return a.connGuard(func() error {
+		a.conn.Close() // 1. Interrupt ReadPackets in recvMain
+		a.wg.Wait()    // 2. Wait for termination of recvMain
 		a.conn = nil
-	}
-	return nil
+		return nil
+	})
 }
 
 // Alive announces ssdp:alive message.
 func (a *Advertiser) Alive() error {
-	addr, err := multicast.SendAddr()
-	if err != nil {
+	return a.connGuard(func() error {
+		addr, err := multicast.SendAddr()
+		if err != nil {
+			return err
+		}
+		msg := &aliveDataProvider{
+			host:     addr,
+			nt:       a.st,
+			usn:      a.usn,
+			location: a.locProv,
+			server:   a.server,
+			maxAge:   a.maxAge,
+		}
+		_, err = a.conn.WriteTo(msg, addr)
+		ssdplog.Printf("sent alive")
 		return err
-	}
-	msg := &aliveDataProvider{
-		host:     addr,
-		nt:       a.st,
-		usn:      a.usn,
-		location: a.locProv,
-		server:   a.server,
-		maxAge:   a.maxAge,
-	}
-	a.ch <- &message{to: addr, data: msg}
-	ssdplog.Printf("sent alive")
-	return nil
+	})
 }
 
 // Bye announces ssdp:byebye message.
 func (a *Advertiser) Bye() error {
-	addr, err := multicast.SendAddr()
-	if err != nil {
+	return a.connGuard(func() error {
+		addr, err := multicast.SendAddr()
+		if err != nil {
+			return err
+		}
+		msg, err := buildBye(addr, a.st, a.usn)
+		if err != nil {
+			return err
+		}
+		_, err = a.conn.WriteTo(multicast.BytesDataProvider(msg), addr)
+		ssdplog.Printf("sent bye")
 		return err
-	}
-	msg, err := buildBye(addr, a.st, a.usn)
-	if err != nil {
-		return err
-	}
-	a.ch <- &message{to: addr, data: multicast.BytesDataProvider(msg)}
-	ssdplog.Printf("sent bye")
-	return nil
+	})
 }

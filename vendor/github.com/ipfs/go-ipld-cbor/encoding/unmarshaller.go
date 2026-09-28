@@ -9,6 +9,17 @@ import (
 	"github.com/polydawn/refmt/obj/atlas"
 )
 
+// DAGCBORDecodeOptions returns the shared refmt decode strictness used for
+// DAG-CBOR data model decoding.
+func DAGCBORDecodeOptions() cbor.DecodeOptions {
+	return cbor.DecodeOptions{
+		CoerceUndefToNull: true,
+		RejectIndefinite:  true,
+		RejectNaN:         true,
+		RejectInfinity:    true,
+	}
+}
+
 type proxyReader struct {
 	r io.Reader
 }
@@ -26,7 +37,7 @@ type Unmarshaller struct {
 // NewUnmarshallerAtlased creates a new reusable unmarshaller.
 func NewUnmarshallerAtlased(atl atlas.Atlas) *Unmarshaller {
 	m := new(Unmarshaller)
-	m.unmarshal = cbor.NewUnmarshallerAtlased(cbor.DecodeOptions{CoerceUndefToNull: true}, &m.reader, atl)
+	m.unmarshal = cbor.NewUnmarshallerAtlased(DAGCBORDecodeOptions(), &m.reader, atl)
 	return m
 }
 

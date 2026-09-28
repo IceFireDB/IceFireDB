@@ -21,26 +21,41 @@ type Profile struct {
 	InitOnly bool
 }
 
-// defaultServerFilters has is a list of IPv4 and IPv6 prefixes that are private, local only, or unrouteable.
-// according to https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml
-// and https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml
+// defaultServerFilters lists IPv4 and IPv6 prefixes that are private,
+// local-only, or otherwise not "Globally Reachable" per the IANA
+// Special-Purpose Address Registries (RFC 6890):
+//
+//	https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml
+//	https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml
+//
+// The `server` profile appends this list to both `Addresses.NoAnnounce`
+// (strip from self-announce / identify / DHT self-record) and
+// `Swarm.AddrFilters` (refuse libp2p dial/accept involving these ranges).
+// See docs/config.md under "`server` profile" for the rendered table with
+// per-entry RFC references and guidance on optional entries (for example
+// loopback or IPv6 outside `2000::/3`) that operators may add manually.
+//
+// Keep this list stable; changes here affect every `server`-profile user.
 var defaultServerFilters = []string{
-	"/ip4/10.0.0.0/ipcidr/8",
-	"/ip4/100.64.0.0/ipcidr/10",
-	"/ip4/169.254.0.0/ipcidr/16",
-	"/ip4/172.16.0.0/ipcidr/12",
-	"/ip4/192.0.0.0/ipcidr/24",
-	"/ip4/192.0.2.0/ipcidr/24",
-	"/ip4/192.168.0.0/ipcidr/16",
-	"/ip4/198.18.0.0/ipcidr/15",
-	"/ip4/198.51.100.0/ipcidr/24",
-	"/ip4/203.0.113.0/ipcidr/24",
-	"/ip4/240.0.0.0/ipcidr/4",
-	"/ip6/100::/ipcidr/64",
-	"/ip6/2001:2::/ipcidr/48",
-	"/ip6/2001:db8::/ipcidr/32",
-	"/ip6/fc00::/ipcidr/7",
-	"/ip6/fe80::/ipcidr/10",
+	"/ip4/10.0.0.0/ipcidr/8",      // RFC 1918: private-use
+	"/ip4/100.64.0.0/ipcidr/10",   // RFC 6598: shared address space (CGNAT)
+	"/ip4/127.0.0.0/ipcidr/8",     // RFC 1122: IPv4 loopback
+	"/ip4/169.254.0.0/ipcidr/16",  // RFC 3927: link-local
+	"/ip4/172.16.0.0/ipcidr/12",   // RFC 1918: private-use
+	"/ip4/192.0.0.0/ipcidr/24",    // RFC 6890: IETF protocol assignments
+	"/ip4/192.0.2.0/ipcidr/24",    // RFC 5737: TEST-NET-1 (documentation)
+	"/ip4/192.168.0.0/ipcidr/16",  // RFC 1918: private-use
+	"/ip4/198.18.0.0/ipcidr/15",   // RFC 2544: benchmarking
+	"/ip4/198.51.100.0/ipcidr/24", // RFC 5737: TEST-NET-2 (documentation)
+	"/ip4/203.0.113.0/ipcidr/24",  // RFC 5737: TEST-NET-3 (documentation)
+	"/ip4/240.0.0.0/ipcidr/4",     // RFC 1112: reserved (covers broadcast 255.255.255.255)
+	"/ip6/::/ipcidr/3",            // RFC 4291 §2.4: IANA-reserved 0000::/3 block (unspecified, loopback, IPv4-mapped, NAT64, and unallocated space where 1e::/16 leaks)
+	"/ip6/::1/ipcidr/128",         // RFC 4291 §2.4: IPv6 loopback (subset of `::/3` above; kept for documentation)
+	"/ip6/100::/ipcidr/64",        // RFC 6666: discard-only (subset of `::/3` above; kept for documentation)
+	"/ip6/2001:2::/ipcidr/48",     // RFC 5180: BMWG benchmarking
+	"/ip6/2001:db8::/ipcidr/32",   // RFC 3849: documentation
+	"/ip6/fc00::/ipcidr/7",        // RFC 4193: unique local addresses (ULA)
+	"/ip6/fe80::/ipcidr/10",       // RFC 4291: link-local unicast
 }
 
 // Profiles is a map holding configuration transformers. Docs are in docs/config.md.
@@ -115,23 +130,29 @@ Inverse profile of the test profile.`,
 		},
 	},
 	"default-datastore": {
-		Description: `Configures the node to use the default datastore (flatfs).
+		Description: `Configures the node to use the default datastore layout: blocks in
+flatfs, everything else in leveldb. Same as the 'flatfs-levelds' profile.
 
-Read the "flatfs" profile description for more information on this datastore.
+Read the 'flatfs-levelds' profile description for more information on
+this datastore.
 
 This profile may only be applied when first initializing the node.
 `,
 
 		InitOnly: true,
 		Transform: func(c *Config) error {
-			c.Datastore.Spec = flatfsSpec()
+			c.Datastore.Spec = flatfsLeveldsSpec()
 			return nil
 		},
 	},
-	"flatfs": {
-		Description: `Configures the node to use the flatfs datastore.
+	"flatfs-levelds": {
+		Description: `The default datastore layout: blocks in flatfs, one file per block. All
+other keys (pins, MFS root, provider records, IPNS records) go to leveldb.
+flatfs holds only blocks because it is safe only for content-addressed
+data. 'flatfs' is an alias of this profile. 'flatfs-pebbleds' uses pebble
+instead of leveldb.
 
-This is the most battle-tested and reliable datastore.
+flatfs is the most battle-tested and reliable datastore.
 You should use this datastore if:
 
 * You need a very simple and very reliable datastore, and you trust your
@@ -144,6 +165,21 @@ You should use this datastore if:
 
 See configuration documentation at:
 https://github.com/ipfs/kubo/blob/master/docs/datastores.md#flatfs
+https://github.com/ipfs/kubo/blob/master/docs/datastores.md#levelds
+
+NOTE: This profile may only be applied when first initializing node at IPFS_PATH
+      via 'ipfs init --profile flatfs-levelds'
+`,
+
+		InitOnly: true,
+		Transform: func(c *Config) error {
+			c.Datastore.Spec = flatfsLeveldsSpec()
+			return nil
+		},
+	},
+	"flatfs": {
+		Description: `Alias of 'flatfs-levelds', the default datastore layout: blocks in flatfs,
+everything else in leveldb. See 'flatfs-levelds' for details.
 
 NOTE: This profile may only be applied when first initializing node at IPFS_PATH
       via 'ipfs init --profile flatfs'
@@ -151,13 +187,29 @@ NOTE: This profile may only be applied when first initializing node at IPFS_PATH
 
 		InitOnly: true,
 		Transform: func(c *Config) error {
-			c.Datastore.Spec = flatfsSpec()
+			c.Datastore.Spec = flatfsLeveldsSpec()
+			return nil
+		},
+	},
+	"flatfs-levelds-measure": {
+		Description: `Configures the node to store blocks in flatfs, everything else in leveldb,
+with metrics tracking wrapper.
+Additional '*_datastore_*' metrics will be exposed on /debug/metrics/prometheus
+The wrapper adds overhead to every datastore call. Use it for debugging,
+right-sizing, and testing.
+
+NOTE: This profile may only be applied when first initializing node at IPFS_PATH
+      via 'ipfs init --profile flatfs-levelds-measure'
+`,
+
+		InitOnly: true,
+		Transform: func(c *Config) error {
+			c.Datastore.Spec = flatfsLeveldsSpecMeasure()
 			return nil
 		},
 	},
 	"flatfs-measure": {
-		Description: `Configures the node to use the flatfs datastore with metrics tracking wrapper.
-Additional '*_datastore_*' metrics will be exposed on /debug/metrics/prometheus
+		Description: `Alias of 'flatfs-levelds-measure'.
 
 NOTE: This profile may only be applied when first initializing node at IPFS_PATH
       via 'ipfs init --profile flatfs-measure'
@@ -165,12 +217,62 @@ NOTE: This profile may only be applied when first initializing node at IPFS_PATH
 
 		InitOnly: true,
 		Transform: func(c *Config) error {
-			c.Datastore.Spec = flatfsSpecMeasure()
+			c.Datastore.Spec = flatfsLeveldsSpecMeasure()
+			return nil
+		},
+	},
+	"flatfs-pebbleds": {
+		Description: `EXPERIMENTAL: Configures the node to store blocks in flatfs and everything
+else in pebble. Opt-in. Pebble has less production use in Kubo than
+leveldb.
+
+Same as the 'flatfs-levelds' layout, with pebble in place of leveldb:
+blocks go to flatfs, one file per block. All other keys (pins, MFS root,
+provider records, IPNS records) go to pebble.
+
+You should use this profile if:
+
+- You want pebble instead of leveldb for the non-block keys. Pebble
+  compacts deleted keys promptly. leveldb can keep them long after bulk
+  deletes.
+- You want to keep blocks out of pebble, for example because large imports
+  into 'pebbleds' are slow on your disk.
+
+See configuration documentation at:
+https://github.com/ipfs/kubo/blob/master/docs/datastores.md#flatfs
+https://github.com/ipfs/kubo/blob/master/docs/datastores.md#pebbleds
+
+NOTE: This profile may only be applied when first initializing node at IPFS_PATH
+      via 'ipfs init --profile flatfs-pebbleds'
+`,
+
+		InitOnly: true,
+		Transform: func(c *Config) error {
+			c.Datastore.Spec = flatfsPebbledsSpec()
+			return nil
+		},
+	},
+	"flatfs-pebbleds-measure": {
+		Description: `EXPERIMENTAL: Configures the node to store blocks in flatfs, everything
+else in pebble, with metrics tracking wrapper.
+Additional '*_datastore_*' metrics will be exposed on /debug/metrics/prometheus
+The wrapper adds overhead to every datastore call. Use it for debugging,
+right-sizing, and testing.
+
+NOTE: This profile may only be applied when first initializing node at IPFS_PATH
+      via 'ipfs init --profile flatfs-pebbleds-measure'
+`,
+
+		InitOnly: true,
+		Transform: func(c *Config) error {
+			c.Datastore.Spec = flatfsPebbledsSpecMeasure()
 			return nil
 		},
 	},
 	"pebbleds": {
-		Description: `Configures the node to use the pebble high-performance datastore.
+		Description: `EXPERIMENTAL: Configures the node to use the pebble high-performance
+datastore for everything. Opt-in. Pebble has less production use in Kubo
+than leveldb.
 
 Pebble is a LevelDB/RocksDB inspired key-value store focused on performance
 and internal usage by CockroachDB.
@@ -196,8 +298,11 @@ NOTE: This profile may only be applied when first initializing node at IPFS_PATH
 		},
 	},
 	"pebbleds-measure": {
-		Description: `Configures the node to use the pebble datastore with metrics tracking wrapper.
+		Description: `EXPERIMENTAL: Configures the node to use the pebble datastore with metrics
+tracking wrapper.
 Additional '*_datastore_*' metrics will be exposed on /debug/metrics/prometheus
+The wrapper adds overhead to every datastore call. Use it for debugging,
+right-sizing, and testing.
 
 NOTE: This profile may only be applied when first initializing node at IPFS_PATH
       via 'ipfs init --profile pebbleds-measure'
@@ -232,8 +337,8 @@ move pinned data via 'ipfs dag export/import' or 'ipfs pin ls -t recursive|add',
 and decommission the old badger-based node.
 When it comes to block storage, use experimental 'pebbleds' only if you are sure
 modern 'flatfs' does not serve your use case (most users will be perfectly fine
-with flatfs, it is also possible to keep flatfs for blocks and replace leveldb
-with pebble if preferred over leveldb).
+with flatfs. The 'flatfs-pebbleds' profile keeps flatfs for blocks and
+replaces leveldb with pebble).
 
 See configuration documentation at:
 https://github.com/ipfs/kubo/blob/master/docs/datastores.md#badgerds
@@ -252,6 +357,8 @@ NOTE: This profile may only be applied when first initializing node at IPFS_PATH
 		Description: `DEPRECATED: Configures the node to use the legacy badgerv1 datastore with metrics wrapper.
 This profile will be removed in a future Kubo release.
 New deployments should use 'flatfs' or 'pebbleds' instead.
+The wrapper adds overhead to every datastore call. Use it for debugging,
+right-sizing, and testing.
 
 NOTE: This profile may only be applied when first initializing node at IPFS_PATH
       via 'ipfs init --profile badgerds-measure'
@@ -327,7 +434,7 @@ fetching may be degraded.
 		Description: `Legacy UnixFS import profile for backward-compatible CID generation.
 Produces CIDv0 with no raw leaves, sha2-256, 256 KiB chunks, and
 link-based HAMT size estimation. Use only when legacy CIDs are required.
-See https://github.com/ipfs/specs/pull/499. Alias: legacy-cid-v0`,
+See https://specs.ipfs.tech/ipips/ipip-0499/. Alias: legacy-cid-v0`,
 		Transform: applyUnixFSv02015,
 	},
 	"legacy-cid-v0": {
@@ -338,20 +445,8 @@ See https://github.com/ipfs/specs/pull/499. Alias: legacy-cid-v0`,
 		Description: `Recommended UnixFS import profile for cross-implementation CID determinism.
 Uses CIDv1, raw leaves, sha2-256, 1 MiB chunks, 1024 links per file node,
 256 HAMT fanout, and block-based size estimation for HAMT threshold.
-See https://github.com/ipfs/specs/pull/499`,
-		Transform: func(c *Config) error {
-			c.Import.CidVersion = *NewOptionalInteger(1)
-			c.Import.UnixFSRawLeaves = True
-			c.Import.UnixFSChunker = *NewOptionalString("size-1048576") // 1 MiB
-			c.Import.HashFunction = *NewOptionalString("sha2-256")
-			c.Import.UnixFSFileMaxLinks = *NewOptionalInteger(1024)
-			c.Import.UnixFSDirectoryMaxLinks = *NewOptionalInteger(0)
-			c.Import.UnixFSHAMTDirectoryMaxFanout = *NewOptionalInteger(256)
-			c.Import.UnixFSHAMTDirectorySizeThreshold = *NewOptionalBytes("256KiB")
-			c.Import.UnixFSHAMTDirectorySizeEstimation = *NewOptionalString(HAMTSizeEstimationBlock)
-			c.Import.UnixFSDAGLayout = *NewOptionalString(DAGLayoutBalanced)
-			return nil
-		},
+See https://specs.ipfs.tech/ipips/ipip-0499/`,
+		Transform: applyUnixFSv12025,
 	},
 	"autoconf-on": {
 		Description: `Sets configuration to use implicit defaults from remote autoconf service.
@@ -447,5 +542,22 @@ func applyUnixFSv02015(c *Config) error {
 	c.Import.UnixFSHAMTDirectorySizeThreshold = *NewOptionalBytes("256KiB")
 	c.Import.UnixFSHAMTDirectorySizeEstimation = *NewOptionalString(HAMTSizeEstimationLinks)
 	c.Import.UnixFSDAGLayout = *NewOptionalString(DAGLayoutBalanced)
+	c.Import.UnixFSPBNodeFieldOrder = *NewOptionalString(PBNodeFieldOrderLinksFirst)
+	return nil
+}
+
+// applyUnixFSv12025 applies the unixfs-v1-2025 import settings from IPIP-499.
+func applyUnixFSv12025(c *Config) error {
+	c.Import.CidVersion = *NewOptionalInteger(1)
+	c.Import.UnixFSRawLeaves = True
+	c.Import.UnixFSChunker = *NewOptionalString("size-1048576") // 1 MiB
+	c.Import.HashFunction = *NewOptionalString("sha2-256")
+	c.Import.UnixFSFileMaxLinks = *NewOptionalInteger(1024)
+	c.Import.UnixFSDirectoryMaxLinks = *NewOptionalInteger(0)
+	c.Import.UnixFSHAMTDirectoryMaxFanout = *NewOptionalInteger(256)
+	c.Import.UnixFSHAMTDirectorySizeThreshold = *NewOptionalBytes("256KiB")
+	c.Import.UnixFSHAMTDirectorySizeEstimation = *NewOptionalString(HAMTSizeEstimationBlock)
+	c.Import.UnixFSDAGLayout = *NewOptionalString(DAGLayoutBalanced)
+	c.Import.UnixFSPBNodeFieldOrder = *NewOptionalString(PBNodeFieldOrderLinksFirst)
 	return nil
 }

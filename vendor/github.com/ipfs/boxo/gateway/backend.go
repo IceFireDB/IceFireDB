@@ -25,6 +25,9 @@ type backendOptions struct {
 	// Only used by [BlocksBackend]:
 	r resolver.Resolver
 
+	// Only used by [BlocksBackend]:
+	maxTraversalDepth int
+
 	// Only used by [CarBackend]:
 	promRegistry    prometheus.Registerer
 	getBlockTimeout time.Duration
@@ -60,6 +63,26 @@ func WithResolver(r resolver.Resolver) BackendOption {
 func WithPrometheusRegistry(reg prometheus.Registerer) BackendOption {
 	return func(opts *backendOptions) error {
 		opts.promRegistry = reg
+		return nil
+	}
+}
+
+// DefaultMaxTraversalDepth is how deep a DAG traversal will descend before it
+// gives up. Traversal keeps per-level state, so its cost grows with depth. The
+// default is far above anything UnixFS produces: a file reaches terabytes by
+// depth 4, HAMT directories add about 4 levels per million entries, and
+// directory nesting follows the source tree.
+const DefaultMaxTraversalDepth = 1024
+
+// WithMaxTraversalDepth sets how deep [BlocksBackend] will descend into a DAG
+// before returning an error. By default, [DefaultMaxTraversalDepth] is used.
+// Pass 0 to remove the limit.
+func WithMaxTraversalDepth(depth int) BackendOption {
+	return func(opts *backendOptions) error {
+		if depth < 0 {
+			return fmt.Errorf("max traversal depth must not be negative; got %d", depth)
+		}
+		opts.maxTraversalDepth = depth
 		return nil
 	}
 }

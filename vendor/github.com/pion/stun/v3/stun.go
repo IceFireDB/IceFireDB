@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 // Package stun implements Session Traversal Utilities for NAT (STUN) RFC 5389.
@@ -27,6 +27,7 @@ func readFullOrPanic(r io.Reader, v []byte) int {
 	if err != nil {
 		panic(err) //nolint
 	}
+
 	return n
 }
 
@@ -35,6 +36,7 @@ func writeOrPanic(w io.Writer, v []byte) int {
 	if err != nil {
 		panic(err) //nolint
 	}
+
 	return n
 }
 

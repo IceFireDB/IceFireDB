@@ -28,7 +28,7 @@ func (api *NameAPI) Publish(ctx context.Context, p path.Path, opts ...caopts.Nam
 	ctx, span := tracing.Span(ctx, "CoreAPI.NameAPI", "Publish", trace.WithAttributes(attribute.String("path", p.String())))
 	defer span.End()
 
-	if err := api.checkPublishAllowed(); err != nil {
+	if err := api.checkPublishAllowed(ctx); err != nil {
 		return ipns.Name{}, err
 	}
 
@@ -125,13 +125,24 @@ func (api *NameAPI) Search(ctx context.Context, name string, opts ...caopts.Name
 		}
 	}
 
-	if !strings.HasPrefix(name, "/ipns/") {
-		name = "/ipns/" + name
-	}
-
-	p, err := path.NewPath(name)
+	// Accept a bare IPNS name (key or DNSLink), an /ipns/ path, or a native IPNS
+	// URI (ipns://name, ipns:name).
+	p, err := path.NewPathFromURI(name)
 	if err != nil {
-		return nil, err
+		// Wrap a bare name (no leading slash) as an /ipns/ path. Anything already
+		// in path form that failed to parse keeps its original error rather than
+		// being mangled by a second "/ipns/" prefix.
+		if strings.HasPrefix(name, "/") {
+			return nil, err
+		}
+		p, err = path.NewPath("/ipns/" + name)
+		if err != nil {
+			return nil, err
+		}
+	}
+	// name resolution is IPNS-only; reject immutable /ipfs and /ipld inputs.
+	if p.Namespace() != path.IPNSNamespace {
+		return nil, fmt.Errorf("%q is not an IPNS name", name)
 	}
 
 	out := make(chan coreiface.IpnsResult)
