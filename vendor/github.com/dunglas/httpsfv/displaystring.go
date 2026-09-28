@@ -46,7 +46,7 @@ func (s DisplayString) marshalSFV(b *strings.Builder) error {
 // parseDisplayString parses as defined in
 // https://httpwg.org/specs/rfc9651.html#parse-display.
 func parseDisplayString(s *scanner) (DisplayString, error) {
-	if s.eof() || len(s.data[s.off:]) < 2 || s.data[s.off:2] != `%"` {
+	if s.eof() || len(s.data[s.off:]) < 2 || s.data[s.off:s.off+2] != `%"` {
 		return "", &UnmarshalError{s.off, ErrInvalidDisplayString}
 	}
 	s.off += 2
@@ -61,13 +61,13 @@ func parseDisplayString(s *scanner) (DisplayString, error) {
 			if len(s.data[s.off:]) < 2 {
 				return "", &UnmarshalError{s.off, ErrInvalidDisplayString}
 			}
-			c0 := unhex(s.data[s.off])
-			if c0 == 0 {
+			c0, ok := unhex(s.data[s.off])
+			if !ok {
 				return "", &UnmarshalError{s.off, ErrInvalidDisplayString}
 			}
 
-			c1 := unhex(s.data[s.off+1])
-			if c1 == 0 {
+			c1, ok := unhex(s.data[s.off+1])
+			if !ok {
 				return "", &UnmarshalError{s.off, ErrInvalidDisplayString}
 			}
 
@@ -93,13 +93,13 @@ func parseDisplayString(s *scanner) (DisplayString, error) {
 	return "", &UnmarshalError{s.off, ErrInvalidDisplayString}
 }
 
-func unhex(c byte) byte {
+func unhex(c byte) (byte, bool) {
 	switch {
 	case '0' <= c && c <= '9':
-		return c - '0'
+		return c - '0', true
 	case 'a' <= c && c <= 'f':
-		return c - 'a' + 10
+		return c - 'a' + 10, true
 	default:
-		return 0
+		return 0, false
 	}
 }

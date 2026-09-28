@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"strings"
 
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
@@ -41,7 +41,11 @@ func DecodeTag(na ipld.NodeAssembler, rd *bufio.Reader) error {
 				return err
 			}
 
-			out.object = _Link{cidlink.Link{Cid: shaToCid(sha)}}
+			c, err := shaToCid(sha)
+			if err != nil {
+				return err
+			}
+			out.object = _Link{cidlink.Link{Cid: c}}
 		case bytes.HasPrefix(line, []byte("tag ")):
 			out.tag = _String{string(line[tagTagPrefixLen:])}
 		case bytes.HasPrefix(line, []byte("tagger ")):
@@ -54,7 +58,7 @@ func DecodeTag(na ipld.NodeAssembler, rd *bufio.Reader) error {
 		case bytes.HasPrefix(line, []byte("type ")):
 			out.typ = _String{string(line[tagTypePrefixLen:])}
 		case len(line) == 0:
-			rest, err := ioutil.ReadAll(rd)
+			rest, err := io.ReadAll(rd)
 			if err != nil {
 				return err
 			}
@@ -72,7 +76,11 @@ func DecodeTag(na ipld.NodeAssembler, rd *bufio.Reader) error {
 func readMergeTag(hash []byte, rd *bufio.Reader) (Tag, []byte, error) {
 	out := _Tag{}
 
-	out.object = _Link{cidlink.Link{Cid: shaToCid(hash)}}
+	objCid, err := shaToCid(hash)
+	if err != nil {
+		return nil, nil, err
+	}
+	out.object = _Link{cidlink.Link{Cid: objCid}}
 	for {
 		line, _, err := rd.ReadLine()
 		if err != nil {
@@ -94,17 +102,22 @@ func readMergeTag(hash []byte, rd *bufio.Reader) (Tag, []byte, error) {
 			}
 			out.tagger = *tagger
 		case string(line) == " ":
+			// Accumulate in a builder: the message has no fixed size, and
+			// repeated string concatenation would copy it on every line.
+			var msg strings.Builder
 			for {
 				line, _, err := rd.ReadLine()
 				if err != nil {
+					out.message.x = msg.String()
 					return nil, nil, err
 				}
 
 				if !bytes.HasPrefix(line, []byte(" ")) {
+					out.message.x = msg.String()
 					return &out, line, nil
 				}
 
-				out.message.x += string(line) + "\n"
+				msg.WriteString(string(line) + "\n")
 			}
 		}
 	}

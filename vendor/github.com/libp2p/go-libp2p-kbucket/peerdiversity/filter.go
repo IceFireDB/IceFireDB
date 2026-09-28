@@ -3,8 +3,9 @@ package peerdiversity
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"net"
-	"sort"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -241,19 +242,11 @@ func (f *Filter) GetDiversityStats() []CplDiversityStats {
 
 	stats := make([]CplDiversityStats, 0, len(f.cplPeerGroups))
 
-	var sortedCpls []int
-	for cpl := range f.cplPeerGroups {
-		sortedCpls = append(sortedCpls, cpl)
-	}
-	sort.Ints(sortedCpls)
-
-	for _, cpl := range sortedCpls {
+	for _, cpl := range slices.Sorted(maps.Keys(f.cplPeerGroups)) {
 		ps := make(map[peer.ID][]PeerIPGroupKey, len(f.cplPeerGroups[cpl]))
 		cd := CplDiversityStats{cpl, ps}
 
-		for p, groups := range f.cplPeerGroups[cpl] {
-			ps[p] = groups
-		}
+		maps.Copy(ps, f.cplPeerGroups[cpl])
 		stats = append(stats, cd)
 	}
 

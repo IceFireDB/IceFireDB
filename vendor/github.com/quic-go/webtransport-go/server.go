@@ -37,9 +37,15 @@ var quicConnKey = quicConnKeyType{}
 
 func ConfigureHTTP3Server(s *http3.Server) {
 	if s.AdditionalSettings == nil {
-		s.AdditionalSettings = make(map[uint64]uint64, 1)
+		s.AdditionalSettings = make(map[uint64]uint64, 3)
 	}
-	s.AdditionalSettings[settingsEnableWebtransport] = 1
+	// send the old setting for backwards compatibility with older clients
+	s.AdditionalSettings[settingsEnableWebtransportDraft06] = 1
+	s.AdditionalSettings[settingsWebTransportEnabled] = 1
+
+	// Safari requires SETTINGS_WT_MAX_SESSIONS >= 1 (draft-ietf-webtrans-http3-14)
+	s.AdditionalSettings[settingsWebTransportMaxSessions] = 1<<62 - 1
+
 	s.EnableDatagrams = true
 	origConnContext := s.ConnContext
 	s.ConnContext = func(ctx context.Context, conn *quic.Conn) context.Context {
@@ -54,8 +60,12 @@ func ConfigureHTTP3Server(s *http3.Server) {
 type Server struct {
 	H3 *http3.Server
 
+	// Config is the WebTransport configuration used for new sessions.
+	// If nil, the zero value is used.
+	Config *Config
+
 	// ApplicationProtocols is a list of application protocols that can be negotiated,
-	// see section 3.3 of https://www.ietf.org/archive/id/draft-ietf-webtrans-http3-14 for details.
+	// see section 3.3 of https://www.ietf.org/archive/id/draft-ietf-webtrans-http3-15 for details.
 	ApplicationProtocols []string
 
 	// ReorderingTimeout is the maximum time an incoming WebTransport stream that cannot be associated
@@ -78,9 +88,11 @@ type Server struct {
 
 	initOnce sync.Once
 	initErr  error
+	config   Config
 
 	connsMx sync.Mutex
 	conns   map[*quic.Conn]*sessionManager
+	closed  bool
 }
 
 func (s *Server) initialize() error {
@@ -99,6 +111,14 @@ func (s *Server) timeout() time.Duration {
 }
 
 func (s *Server) init() error {
+	if s.Config != nil {
+		s.config = *s.Config
+	}
+	if s.H3 != nil {
+		ConfigureHTTP3Server(s.H3)
+		s.config.addSettings(s.H3.AdditionalSettings)
+	}
+
 	s.ctx, s.ctxCancel = context.WithCancel(context.Background())
 
 	s.conns = make(map[*quic.Conn]*sessionManager)
@@ -112,6 +132,14 @@ func (s *Server) Serve(conn net.PacketConn) error {
 	if err := s.initialize(); err != nil {
 		return err
 	}
+
+	s.refCount.Add(1)
+	defer s.refCount.Done()
+
+	return s.serve(conn)
+}
+
+func (s *Server) serve(conn net.PacketConn) error {
 	var quicConf *quic.Config
 	if s.H3.QUICConfig != nil {
 		quicConf = s.H3.QUICConfig.Clone()
@@ -131,14 +159,21 @@ func (s *Server) Serve(conn net.PacketConn) error {
 		if err != nil {
 			return err
 		}
-		s.refCount.Add(1)
-		go func() {
-			defer s.refCount.Done()
 
-			if err := s.ServeQUICConn(qconn); err != nil {
+		if s.isClosed() {
+			// Do not accept a new connection during shutdown
+			qconn.CloseWithError(0, "")
+			continue
+		}
+
+		s.refCount.Go(func() {
+			err := s.ServeQUICConn(qconn)
+			if errors.Is(err, http.ErrServerClosed) {
+				return
+			} else if err != nil {
 				log.Printf("http3: error serving QUIC connection: %v", err)
 			}
-		}()
+		})
 	}
 }
 
@@ -156,6 +191,14 @@ func (s *Server) ServeQUICConn(conn *quic.Conn) error {
 	}
 
 	s.connsMx.Lock()
+
+	if s.closed {
+		// Shutting down, do not accept new connections
+		s.connsMx.Unlock()
+		conn.CloseWithError(0, "")
+		return http.ErrServerClosed
+	}
+
 	sessMgr, ok := s.conns[conn]
 	if !ok {
 		sessMgr = newSessionManager(s.timeout())
@@ -176,7 +219,7 @@ func (s *Server) ServeQUICConn(conn *quic.Conn) error {
 		return err
 	}
 
-	// slose the connection when the server context is cancelled.
+	// Close the connection when the server context is cancelled.
 	go func() {
 		select {
 		case <-s.ctx.Done():
@@ -197,10 +240,7 @@ func (s *Server) ServeQUICConn(conn *quic.Conn) error {
 				return
 			}
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-
+			wg.Go(func() {
 				typ, err := quicvarint.Peek(str)
 				if err != nil {
 					return
@@ -209,19 +249,24 @@ func (s *Server) ServeQUICConn(conn *quic.Conn) error {
 					http3Conn.HandleRequestStream(str)
 					return
 				}
+				r := &byteCountingReader{ByteReader: quicvarint.NewReader(str)}
 				// read the frame type (already peeked)
-				if _, err := quicvarint.Read(quicvarint.NewReader(str)); err != nil {
+				if _, err := quicvarint.Read(r); err != nil {
 					return
 				}
 				// read the session ID
-				id, err := quicvarint.Read(quicvarint.NewReader(str))
+				id, err := quicvarint.Read(r)
 				if err != nil {
 					str.CancelRead(quic.StreamErrorCode(http3.ErrCodeGeneralProtocolError))
 					str.CancelWrite(quic.StreamErrorCode(http3.ErrCodeGeneralProtocolError))
 					return
 				}
-				sessMgr.AddStream(str, sessionID(id))
-			}()
+				if !isValidSessionID(id) {
+					conn.CloseWithError(quic.ApplicationErrorCode(http3.ErrCodeIDError), "")
+					return
+				}
+				sessMgr.AddStream(str, sessionID(id), r.BytesRead)
+			})
 		}
 	}()
 
@@ -234,10 +279,7 @@ func (s *Server) ServeQUICConn(conn *quic.Conn) error {
 				return
 			}
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-
+			wg.Go(func() {
 				typ, err := quicvarint.Peek(str)
 				if err != nil {
 					return
@@ -247,7 +289,7 @@ func (s *Server) ServeQUICConn(conn *quic.Conn) error {
 					return
 				}
 				// read the stream type (already peeked) before passing to AddUniStream
-				r := quicvarint.NewReader(str)
+				r := &byteCountingReader{ByteReader: quicvarint.NewReader(str)}
 				if _, err := quicvarint.Read(r); err != nil {
 					return
 				}
@@ -257,8 +299,12 @@ func (s *Server) ServeQUICConn(conn *quic.Conn) error {
 					str.CancelRead(quic.StreamErrorCode(http3.ErrCodeGeneralProtocolError))
 					return
 				}
-				sessMgr.AddUniStream(str, sessionID(id))
-			}()
+				if !isValidSessionID(id) {
+					conn.CloseWithError(quic.ApplicationErrorCode(http3.ErrCodeIDError), "")
+					return
+				}
+				sessMgr.AddUniStream(str, sessionID(id), r.BytesRead)
+			})
 		}
 	}()
 
@@ -267,6 +313,12 @@ func (s *Server) ServeQUICConn(conn *quic.Conn) error {
 }
 
 func (s *Server) ListenAndServe() error {
+	if err := s.initialize(); err != nil {
+		return err
+	}
+	s.refCount.Add(1)
+	defer s.refCount.Done()
+
 	addr := s.H3.Addr
 	if addr == "" {
 		addr = ":https"
@@ -279,7 +331,9 @@ func (s *Server) ListenAndServe() error {
 	if err != nil {
 		return err
 	}
-	return s.Serve(conn)
+	defer conn.Close()
+
+	return s.serve(conn)
 }
 
 func (s *Server) ListenAndServeTLS(certFile, keyFile string) error {
@@ -294,23 +348,32 @@ func (s *Server) ListenAndServeTLS(certFile, keyFile string) error {
 	return s.ListenAndServe()
 }
 
-func (s *Server) Close() error {
-	// Make sure that ctxCancel is defined.
-	// This is expected to be uncommon.
-	// It only happens if the server is closed without Serve / ListenAndServe having been called.
-	s.initOnce.Do(func() {})
-
-	if s.ctxCancel != nil {
-		s.ctxCancel()
-	}
+func (s *Server) isClosed() bool {
 	s.connsMx.Lock()
+	defer s.connsMx.Unlock()
+
+	return s.closed
+}
+
+func (s *Server) Close() error {
+	_ = s.initialize()
+
+	// Close the established connections first, while the listener's socket is still
+	// open, so each CONNECTION_CLOSE frame is actually transmitted to the peer.
+	s.connsMx.Lock()
+	s.closed = true
 	if s.conns != nil {
-		for _, mgr := range s.conns {
+		for conn, mgr := range s.conns {
+			conn.CloseWithError(0, "")
 			mgr.Close()
 		}
 		s.conns = nil
 	}
 	s.connsMx.Unlock()
+
+	if s.ctxCancel != nil {
+		s.ctxCancel()
+	}
 
 	err := s.H3.Close()
 	s.refCount.Wait()
@@ -324,7 +387,7 @@ func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request) (*Session, erro
 	if r.Method != http.MethodConnect {
 		return nil, fmt.Errorf("expected CONNECT request, got %s", r.Method)
 	}
-	if r.Proto != protocolHeader {
+	if !isWebTransportProtocol(r.Proto) {
 		return nil, fmt.Errorf("unexpected protocol: %s", r.Proto)
 	}
 	if !s.CheckOrigin(r) {
@@ -345,6 +408,8 @@ func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request) (*Session, erro
 	defer timer.Stop()
 	select {
 	case <-settingser.ReceivedSettings():
+	case <-conn.Context().Done():
+		return nil, context.Cause(conn.Context())
 	case <-timer.C:
 		return nil, errors.New("webtransport: didn't receive the client's SETTINGS on time")
 	}
@@ -360,24 +425,47 @@ func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request) (*Session, erro
 		}
 		w.Header().Add(wtProtocolHeader, v)
 	}
-	w.WriteHeader(http.StatusOK)
-	w.(http.Flusher).Flush()
 
 	str := w.(http3.HTTPStreamer).HTTPStream()
 	sessID := sessionID(str.StreamID())
+	fc := s.config.sessionFlowControl(settings)
 
 	// The session manager should already exist because ServeQUICConn creates it
 	// before any HTTP requests can be processed on this connection.
 	s.connsMx.Lock()
-	defer s.connsMx.Unlock()
-
 	sessMgr, ok := s.conns[conn]
 	if !ok {
+		s.connsMx.Unlock()
 		return nil, errors.New("webtransport: connection session manager not found")
 	}
+	// Multiple sessions on one HTTP/3 connection require WebTransport flow control.
+	if !fc.Enabled {
+		sessMgr.mx.Lock()
+		for _, entry := range sessMgr.sessions {
+			if entry.Session != nil {
+				sessMgr.mx.Unlock()
+				s.connsMx.Unlock()
+				str.CancelRead(quic.StreamErrorCode(http3.ErrCodeRequestRejected))
+				str.CancelWrite(quic.StreamErrorCode(http3.ErrCodeRequestRejected))
+				return nil, errors.New("webtransport: multiple sessions require flow control")
+			}
+		}
+		sessMgr.mx.Unlock()
+	}
 
-	sess := newSession(context.WithoutCancel(r.Context()), sessID, conn, str, selectedProtocol)
+	sess := newSession(
+		context.WithoutCancel(r.Context()),
+		sessID,
+		conn,
+		str,
+		selectedProtocol,
+		fc,
+	)
 	sessMgr.AddSession(sessID, sess)
+	s.connsMx.Unlock()
+
+	w.WriteHeader(http.StatusOK)
+	w.(http.Flusher).Flush()
 	return sess, nil
 }
 

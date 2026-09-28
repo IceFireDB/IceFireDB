@@ -19,6 +19,7 @@ import (
 var (
 	ErrInvalidMultibase         = errors.New("invalid multibase on IPLD link")
 	ErrAllocationBudgetExceeded = errors.New("message structure demanded too many resources to process")
+	ErrDecodeDepthExceeded      = errors.New("message structure exceeded maximum nesting depth")
 	ErrTrailingBytes            = errors.New("unexpected content after end of cbor object")
 )
 
@@ -37,23 +38,14 @@ type DecodeOptions struct {
 	// If true, parse DAG-CBOR tag(42) as Link nodes, otherwise reject them
 	AllowLinks bool
 
-	// TODO: ExperimentalDeterminism enforces map key order, but not the other parts
-	// of the spec such as integers or floats. See the fuzz failures spotted in
-	// https://github.com/ipld/go-ipld-prime/pull/389.
-	// When we're done implementing strictness, deprecate the option in favor of
-	// StrictDeterminism, but keep accepting both for backwards compatibility.
-
-	// ExperimentalDeterminism requires decoded DAG-CBOR bytes to be canonical as per
-	// the spec. For example, this means that integers and floats be encoded in
-	// a particular way, and map keys be sorted.
+	// RelaxedDecode allows some legacy non-canonical CBOR forms that are not
+	// valid DAG-CBOR: non-minimal integer and length encodings, and NaN and
+	// Infinity values.
 	//
-	// The decoder does not enforce this requirement by default, as the codec
-	// was originally implemented without these rules. Because of that, there's
-	// a significant amount of published data that isn't canonical but should
-	// still decode with the default settings for backwards compatibility.
-	//
-	// Note that this option is experimental as it only implements partial strictness.
-	ExperimentalDeterminism bool
+	// Indefinite-length CBOR is always rejected, even in relaxed mode.
+	// Undefined values are coerced to null for compatibility with existing IPLD
+	// data. Non-64-bit floats, unsorted map keys, and duplicate map keys are accepted.
+	RelaxedDecode bool
 
 	// If true, the decoder stops reading from the stream at the end of a full,
 	// valid CBOR object. This may be useful for parsing a stream of undelimited
@@ -63,7 +55,7 @@ type DecodeOptions struct {
 	// extraneous data after the end of the object.
 	DontParseBeyondEnd bool
 
-	// AllowBudget sets the maximum budget for the decoder. The budget is
+	// AllocationBudget sets the maximum budget for the decoder. The budget is
 	// decremented as the decoder allocates resources (nodes, map entries, list
 	// elements, string/bytes content). If the budget is exhausted, the decoder
 	// returns ErrAllocationBudgetExceeded.
@@ -79,11 +71,19 @@ type DecodeOptions struct {
 	//
 	// When zero, a default of 1024 is used.
 	MaxCollectionPrealloc int64
+
+	// MaxDepth sets the maximum nesting depth for decoded structures. If the
+	// decoder encounters a map or list nested beyond this depth, it returns
+	// ErrDecodeDepthExceeded.
+	//
+	// When zero, a default of 1024 is used.
+	MaxDepth int64
 }
 
 const (
 	defaultAllocationBudget      int64 = 1048576 * 10
 	defaultMaxCollectionPrealloc int64 = 1024
+	defaultMaxDepth              int64 = 1024
 )
 
 // Decode deserializes data from the given io.Reader and feeds it into the given datamodel.NodeAssembler.
@@ -92,6 +92,10 @@ const (
 // The behavior of the decoder can be customized by setting fields in the DecodeOptions struct before calling this method.
 func (cfg DecodeOptions) Decode(na datamodel.NodeAssembler, r io.Reader) error {
 	// Probe for a builtin fast path.  Shortcut to that if possible.
+	// Note: when an assembler implements this interface, it receives only the
+	// reader and none of the fields set on cfg. Implementations are responsible
+	// for enforcing their own equivalents of AllocationBudget,
+	// MaxCollectionPrealloc, MaxDepth and the other DecodeOptions fields.
 	type detectFastPath interface {
 		DecodeDagCbor(io.Reader) error
 	}
@@ -99,9 +103,7 @@ func (cfg DecodeOptions) Decode(na datamodel.NodeAssembler, r io.Reader) error {
 		return na2.DecodeDagCbor(r)
 	}
 	// Okay, generic builder path.
-	err := Unmarshal(na, cbor.NewDecoder(cbor.DecodeOptions{
-		CoerceUndefToNull: true,
-	}, r), cfg)
+	err := Unmarshal(na, cbor.NewDecoder(cfg.refmtDecodeOptions(), r), cfg)
 
 	if err != nil {
 		return err
@@ -135,7 +137,20 @@ func Unmarshal(na datamodel.NodeAssembler, tokSrc shared.TokenSource, options De
 	if budget == 0 {
 		budget = defaultAllocationBudget
 	}
-	return unmarshal1(na, tokSrc, &budget, options)
+	return unmarshal1(na, tokSrc, &budget, 0, options)
+}
+
+func (cfg DecodeOptions) refmtDecodeOptions() cbor.DecodeOptions {
+	opts := cbor.DecodeOptions{
+		CoerceUndefToNull: true,
+		RejectIndefinite:  true,
+	}
+	if !cfg.RelaxedDecode {
+		opts.RejectNonMinimalInteger = true
+		opts.RejectNaN = true
+		opts.RejectInfinity = true
+	}
+	return opts
 }
 
 func (cfg DecodeOptions) maxPrealloc() int64 {
@@ -145,7 +160,14 @@ func (cfg DecodeOptions) maxPrealloc() int64 {
 	return defaultMaxCollectionPrealloc
 }
 
-func unmarshal1(na datamodel.NodeAssembler, tokSrc shared.TokenSource, budget *int64, options DecodeOptions) error {
+func (cfg DecodeOptions) maxDepth() int64 {
+	if cfg.MaxDepth > 0 {
+		return cfg.MaxDepth
+	}
+	return defaultMaxDepth
+}
+
+func unmarshal1(na datamodel.NodeAssembler, tokSrc shared.TokenSource, budget *int64, depth int64, options DecodeOptions) error {
 	var tk tok.Token
 	done, err := tokSrc.Step(&tk)
 	if err == io.EOF {
@@ -157,16 +179,19 @@ func unmarshal1(na datamodel.NodeAssembler, tokSrc shared.TokenSource, budget *i
 	if done && !tk.Type.IsValue() && tk.Type != tok.TNull {
 		return fmt.Errorf("unexpected eof")
 	}
-	return unmarshal2(na, tokSrc, &tk, budget, options)
+	return unmarshal2(na, tokSrc, &tk, budget, depth, options)
 }
 
 // starts with the first token already primed.  Necessary to get recursion
 //
 //	to flow right without a peek+unpeek system.
-func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.Token, budget *int64, options DecodeOptions) error {
+func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.Token, budget *int64, depth int64, options DecodeOptions) error {
 	// FUTURE: check for schema.TypedNodeBuilder that's going to parse a Link (they can slurp any token kind they want).
 	switch tk.Type {
 	case tok.TMapOpen:
+		if depth >= options.maxDepth() {
+			return ErrDecodeDepthExceeded
+		}
 		expectLen := int64(tk.Length)
 		allocLen := int64(tk.Length)
 		if tk.Length == -1 {
@@ -186,7 +211,7 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 			return err
 		}
 		var observedLen int64
-		lastKey := ""
+		var seenKeys map[string]struct{}
 		for {
 			_, err := tokSrc.Step(tk)
 			if err != nil {
@@ -211,17 +236,20 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 			if observedLen > expectLen {
 				return fmt.Errorf("unexpected continuation of map elements beyond declared length")
 			}
-			if observedLen > 1 && options.ExperimentalDeterminism {
-				if len(lastKey) > len(tk.Str) || lastKey > tk.Str {
-					return fmt.Errorf("map key %q is not after %q as per RFC7049", tk.Str, lastKey)
+			if !options.RelaxedDecode {
+				if seenKeys == nil {
+					seenKeys = make(map[string]struct{})
 				}
+				if _, exists := seenKeys[tk.Str]; exists {
+					return fmt.Errorf("duplicate map key %q", tk.Str)
+				}
+				seenKeys[tk.Str] = struct{}{}
 			}
-			lastKey = tk.Str
 			mva, err := ma.AssembleEntry(tk.Str)
 			if err != nil { // return in error if the key was rejected
 				return err
 			}
-			err = unmarshal1(mva, tokSrc, budget, options)
+			err = unmarshal1(mva, tokSrc, budget, depth+1, options)
 			if err != nil { // return in error if some part of the recursion errored
 				return err
 			}
@@ -229,6 +257,9 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 	case tok.TMapClose:
 		return fmt.Errorf("unexpected mapClose token")
 	case tok.TArrOpen:
+		if depth >= options.maxDepth() {
+			return ErrDecodeDepthExceeded
+		}
 		expectLen := int64(tk.Length)
 		allocLen := int64(tk.Length)
 		if tk.Length == -1 {
@@ -268,7 +299,7 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 				if observedLen > expectLen {
 					return fmt.Errorf("unexpected continuation of array elements beyond declared length")
 				}
-				err := unmarshal2(la.AssembleValue(), tokSrc, tk, budget, options)
+				err := unmarshal2(la.AssembleValue(), tokSrc, tk, budget, depth+1, options)
 				if err != nil { // return in error if some part of the recursion errored
 					return err
 				}

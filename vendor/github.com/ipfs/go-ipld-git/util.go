@@ -1,15 +1,28 @@
 package ipldgit
 
 import (
+	"fmt"
+
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	mh "github.com/multiformats/go-multihash"
 )
 
-func shaToCid(sha []byte) cid.Cid {
-	h, _ := mh.Encode(sha, mh.SHA1)
-	return cid.NewCidV1(cid.GitRaw, h)
+// gitSHALen is the length of a git object hash. A reference of any other length
+// cannot name a git object, and cidToSha assumes this width when it turns a CID
+// back into one.
+const gitSHALen = 20
+
+func shaToCid(sha []byte) (cid.Cid, error) {
+	if len(sha) != gitSHALen {
+		return cid.Undef, fmt.Errorf("invalid git sha of %d bytes, expected %d", len(sha), gitSHALen)
+	}
+	h, err := mh.Encode(sha, mh.SHA1)
+	if err != nil {
+		return cid.Undef, err
+	}
+	return cid.NewCidV1(cid.GitRaw, h), nil
 }
 
 func cidToSha(c cid.Cid) []byte {

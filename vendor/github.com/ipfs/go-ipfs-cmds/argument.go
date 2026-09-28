@@ -11,7 +11,7 @@ type Argument struct {
 	Name          string
 	Type          ArgumentType
 	Required      bool // error if no value is specified
-	Variadic      bool // unlimited values can be specfied
+	Variadic      bool // unlimited values can be specified
 	SupportsStdin bool // can accept stdin as a value
 	Recursive     bool // supports recursive file adding (with '-r' flag)
 	Description   string

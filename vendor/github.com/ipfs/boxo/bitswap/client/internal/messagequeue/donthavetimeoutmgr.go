@@ -104,7 +104,7 @@ type dontHaveTimeoutMgr struct {
 // newDontHaveTimeoutMgr creates a new dontHaveTimeoutMgr
 //
 // onDontHaveTimeout is the function called when pending keys expire (not
-// cancelled before timeout). If this is nil, then DontHaveTimeoutMgm is
+// canceled before timeout). If this is nil, then DontHaveTimeoutMgm is
 // disabled.
 func newDontHaveTimeoutMgr(pc PeerConnection, onDontHaveTimeout func([]cid.Cid, time.Duration), cfg *DontHaveTimeoutConfig) *dontHaveTimeoutMgr {
 	if onDontHaveTimeout == nil {
@@ -243,7 +243,7 @@ func (dhtm *dontHaveTimeoutMgr) checkForTimeouts() {
 			delete(dhtm.activeWants, pw.c)
 		}
 
-		// Remove expired or cancelled wants from the want queue
+		// Remove expired or canceled wants from the want queue
 		dhtm.wantQueue.PopFront()
 	}
 
@@ -285,8 +285,8 @@ func (dhtm *dontHaveTimeoutMgr) checkForTimeouts() {
 	}
 }
 
-// AddPending adds the given keys that will expire if not cancelled before
-// the timeout
+// AddPending adds the given keys that will expire if not canceled before the
+// timeout
 func (dhtm *dontHaveTimeoutMgr) AddPending(ks []cid.Cid) {
 	if len(ks) == 0 {
 		return
@@ -325,7 +325,7 @@ func (dhtm *dontHaveTimeoutMgr) CancelPending(ks []cid.Cid) {
 	dhtm.lk.Lock()
 	defer dhtm.lk.Unlock()
 
-	// Mark the wants as cancelled
+	// Mark the wants as canceled.
 	for _, c := range ks {
 		if pw, ok := dhtm.activeWants[c]; ok {
 			pw.active = false

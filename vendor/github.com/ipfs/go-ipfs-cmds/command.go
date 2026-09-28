@@ -2,8 +2,8 @@
 Package commands provides an API for defining and parsing commands.
 
 Supporting nested commands, options, arguments, etc.  The commands
-package also supports a collection of marshallers for presenting
-output to the user, including text, JSON, and XML marshallers.
+package also supports a collection of marshalers for presenting
+output to the user, including text, JSON, and XML marshalers.
 */
 
 package cmds
@@ -77,7 +77,7 @@ type Command struct {
 	// In precise terms, the value of Type is an instance of the return type of
 	// the Run Function.
 	//
-	// ie. If command Run returns &Block{}, then Command.Type == &Block{}
+	// i.e. If command Run returns &Block{}, then Command.Type == &Block{}
 	Type any
 
 	// Subcommands allow attaching sub commands to a command.
@@ -148,7 +148,7 @@ var (
 	// ErrNoFormatter signals that the command can not be formatted.
 	ErrNoFormatter = ClientError("this command cannot be formatted to plain text")
 
-	// ErrIncorrectType signales that the commands returned a value with unexpected type.
+	// ErrIncorrectType signals that the commands returned a value with unexpected type.
 	ErrIncorrectType = errors.New("the command returned a value with a different type than expected")
 )
 
@@ -158,7 +158,7 @@ func (c *Command) Call(req *Request, re ResponseEmitter, env Environment) {
 
 	err := c.call(req, re, env)
 	if err != nil {
-		log.Debugf("error occured in call, closing with error: %s", err)
+		log.Debugf("error occurred in call, closing with error: %s", err)
 	}
 
 	closeErr = re.CloseWithError(err)

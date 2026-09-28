@@ -231,8 +231,7 @@ func webError(w http.ResponseWriter, r *http.Request, c *Config, err error, defa
 	code := defaultCode
 
 	// Pass Retry-After hint to the client
-	var era *ErrorRetryAfter
-	if errors.As(err, &era) {
+	if era, ok := errors.AsType[*ErrorRetryAfter](err); ok {
 		if era.RetryAfter > 0 {
 			w.Header().Set("Retry-After", era.RetryAfterHeader())
 			// Adjust defaultCode if needed
@@ -256,8 +255,7 @@ func webError(w http.ResponseWriter, r *http.Request, c *Config, err error, defa
 	}
 
 	// Handle explicit code in ErrorResponse
-	var gwErr *ErrorStatusCode
-	if errors.As(err, &gwErr) {
+	if gwErr, ok := errors.AsType[*ErrorStatusCode](err); ok {
 		code = gwErr.StatusCode
 	}
 

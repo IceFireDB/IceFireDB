@@ -1,11 +1,7 @@
 Go-ipld-legacy
 =======================
 
-> A compatibility layer between go-ipld-prime and go-ipld-format
-
-## Lead Maintainer
-
-[Hannah Howard](https://github.com/hannahhoward)
+A compatibility layer between go-ipld-prime and go-ipld-format
 
 ## Contributing
 

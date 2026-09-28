@@ -145,7 +145,7 @@ func (sm *SessionManager) GetNextSessionID() uint64 {
 
 // ReceiveFrom is called when a new message is received.
 //
-// IMPORTANT: ReceiveFrom filters the given Cid slices in place, modifying
+// IMPORTANT: ReceiveFrom filters the given CID slices in place, modifying
 // their contents. If the caller needs to preserve a copy of the lists it
 // should make a copy before calling ReceiveFrom.
 func (sm *SessionManager) ReceiveFrom(ctx context.Context, p peer.ID, blks []cid.Cid, haves []cid.Cid, dontHaves []cid.Cid) {
@@ -174,7 +174,7 @@ func (sm *SessionManager) ReceiveFrom(ctx context.Context, p peer.ID, blks []cid
 }
 
 // CancelSessionWants is called when a session cancels wants because a call to
-// GetBlocks() is cancelled
+// GetBlocks() is canceled.
 func (sm *SessionManager) CancelSessionWants(sesid uint64, wants []cid.Cid) {
 	// Remove session's interest in the given blocks - returns the keys that no
 	// session is interested in anymore.

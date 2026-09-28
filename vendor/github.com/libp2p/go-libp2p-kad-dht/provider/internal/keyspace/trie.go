@@ -614,39 +614,38 @@ type Region struct {
 }
 
 // RegionsFromPeers returns the keyspace regions of size at least `regionSize`
-// from the given `peers` sorted according to `order` along with the Common
-// Prefix shared by all peers.
-func RegionsFromPeers(peers []peer.ID, regionSize int, order bit256.Key) ([]Region, bitstr.Key) {
+// from the given `peers` sorted according to `order`.
+//
+// Regions are rooted at `coveredPrefix`, the keyspace zone these peers are
+// responsible for, rather than at the peers' incidental common prefix. All
+// peers are expected to match `coveredPrefix`. This ensures region prefixes
+// describe the keyspace they cover, so that every key matching `coveredPrefix`
+// is assigned to exactly one region.
+func RegionsFromPeers(peers []peer.ID, regionSize int, order bit256.Key, coveredPrefix bitstr.Key) []Region {
 	if len(peers) == 0 {
-		return []Region{}, ""
+		return []Region{}
 	}
 	peersTrie := trie.New[bit256.Key, peer.ID]()
-	minCpl := KeyLen
-	firstPeerKey := PeerIDToBit256(peers[0])
 	peerEntries := make([]trie.Entry[bit256.Key, peer.ID], len(peers))
 	for i, p := range peers {
-		k := PeerIDToBit256(p)
-		peerEntries[i] = trie.Entry[bit256.Key, peer.ID]{Key: k, Data: p}
-		minCpl = min(minCpl, firstPeerKey.CommonPrefixLength(k))
+		peerEntries[i] = trie.Entry[bit256.Key, peer.ID]{Key: PeerIDToBit256(p), Data: p}
 	}
 	peersTrie.AddMany(peerEntries...)
-	commonPrefix := bitstr.Key(key.BitString(firstPeerKey)[:minCpl])
 
-	// Navigate to the subtrie at the common prefix depth before extracting regions.
-	// This ensures extractMinimalRegions checks branches at the correct depth.
-	subtrie := peersTrie
-	for i := range commonPrefix {
-		if subtrie.IsLeaf() {
+	// Navigate to the subtrie rooted at the covered prefix before extracting
+	// regions. This ensures extractMinimalRegions checks branches at the correct
+	// depth and that region prefixes are rooted at the covered keyspace zone.
+	for i := range coveredPrefix {
+		if peersTrie.IsLeaf() {
 			break
 		}
-		subtrie = subtrie.Branch(int(commonPrefix.Bit(i)))
-		if subtrie == nil || subtrie.IsEmptyLeaf() {
-			return nil, commonPrefix
+		peersTrie = peersTrie.Branch(int(coveredPrefix.Bit(i)))
+		if peersTrie == nil || peersTrie.IsEmptyLeaf() {
+			return nil
 		}
 	}
 
-	regions := extractMinimalRegions(subtrie, commonPrefix, regionSize, order)
-	return regions, commonPrefix
+	return extractMinimalRegions(peersTrie, coveredPrefix, regionSize, order)
 }
 
 // extractMinimalRegions returns the list of all non-overlapping subtries of
@@ -666,23 +665,50 @@ func extractMinimalRegions(t *trie.Trie[bit256.Key, peer.ID], path bitstr.Key, s
 }
 
 // AssignKeysToRegions assigns the provided keys to the regions based on their
-// kademlia identifier key.
+// kademlia identifier key. Each key is assigned to the region whose prefix it
+// matches, or, if it matches none, to the region whose prefix shares the
+// longest common prefix with it. This guarantees that no key is silently
+// dropped, even if the regions don't fully cover the key's keyspace zone.
 func AssignKeysToRegions(regions []Region, keys []mh.Multihash) []Region {
+	if len(regions) == 0 {
+		return regions
+	}
 	for i := range regions {
 		regions[i].Keys = trie.New[bit256.Key, mh.Multihash]()
 	}
 	keyEntriesByRegion := make(map[bitstr.Key][]trie.Entry[bit256.Key, mh.Multihash], len(regions))
+nextKey:
 	for _, k := range keys {
 		h := MhToBit256(k)
 		for _, r := range regions {
 			if IsPrefix(r.Prefix, h) {
 				keyEntriesByRegion[r.Prefix] = append(keyEntriesByRegion[r.Prefix], trie.Entry[bit256.Key, mh.Multihash]{Key: h, Data: k})
-				break
+				continue nextKey
 			}
 		}
+		// Key matches no region; assign it to the closest region so it isn't
+		// silently dropped.
+		prefix := closestRegionPrefix(regions, h)
+		keyEntriesByRegion[prefix] = append(keyEntriesByRegion[prefix], trie.Entry[bit256.Key, mh.Multihash]{Key: h, Data: k})
 	}
 	for _, r := range regions {
 		r.Keys.AddMany(keyEntriesByRegion[r.Prefix]...)
 	}
 	return regions
+}
+
+// closestRegionPrefix returns the prefix of the region sharing the longest
+// common prefix with `h`. It is used as a fallback for keys that match no
+// region, so they are assigned to the nearest region rather than dropped.
+func closestRegionPrefix(regions []Region, h bit256.Key) bitstr.Key {
+	best := regions[0].Prefix
+	bestCpl := -1
+	for _, r := range regions {
+		cpl := key.CommonPrefixLength(r.Prefix, h)
+		if cpl > bestCpl {
+			bestCpl = cpl
+			best = r.Prefix
+		}
+	}
+	return best
 }

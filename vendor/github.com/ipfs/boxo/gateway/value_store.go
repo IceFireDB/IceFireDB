@@ -5,10 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/ipfs/boxo/ipns"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -17,7 +16,6 @@ import (
 type remoteValueStore struct {
 	httpClient *http.Client
 	gatewayURL []string
-	rand       *rand.Rand
 }
 
 // NewRemoteValueStore creates a new [routing.ValueStore] backed by one or more
@@ -37,7 +35,6 @@ func NewRemoteValueStore(gatewayURL []string, httpClient *http.Client) (routing.
 	return &remoteValueStore{
 		gatewayURL: gatewayURL,
 		httpClient: httpClient,
-		rand:       rand.New(rand.NewSource(time.Now().Unix())),
 	}, nil
 }
 
@@ -119,5 +116,7 @@ func (ps *remoteValueStore) fetch(ctx context.Context, name ipns.Name) ([]byte, 
 }
 
 func (ps *remoteValueStore) getRandomGatewayURL() string {
-	return ps.gatewayURL[ps.rand.Intn(len(ps.gatewayURL))]
+	// The top-level math/rand/v2 functions are safe to call from the concurrent
+	// request handlers that reach here; a *rand.Rand field would not be.
+	return ps.gatewayURL[rand.IntN(len(ps.gatewayURL))]
 }

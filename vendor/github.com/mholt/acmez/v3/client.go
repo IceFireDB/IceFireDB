@@ -95,10 +95,14 @@ func (c *Client) ObtainCertificate(ctx context.Context, params OrderParameters) 
 	// create the ACME order
 	order := acme.Order{Profile: params.Profile, Identifiers: params.Identifiers}
 	if !params.NotBefore.IsZero() {
-		order.NotBefore = &params.NotBefore
+		// partial seconds are not permitted
+		trunc := params.NotBefore.Truncate(time.Second)
+		order.NotBefore = &trunc
 	}
 	if !params.NotAfter.IsZero() {
-		order.NotAfter = &params.NotAfter
+		// partial seconds are not permitted
+		trunc := params.NotAfter.Truncate(time.Second)
+		order.NotAfter = &trunc
 	}
 	if params.Replaces != nil {
 		certID, err := acme.ARIUniqueIdentifier(params.Replaces)
@@ -129,6 +133,15 @@ func (c *Client) ObtainCertificate(ctx context.Context, params OrderParameters) 
 		// create order for a new certificate
 		order, err = c.Client.NewOrder(ctx, params.Account, order)
 		if err != nil {
+			var problem acme.Problem
+			if errors.As(err, &problem) {
+				if problem.Type == acme.ProblemTypeAlreadyReplaced && order.Replaces != "" {
+					// retry without replace
+					// https://github.com/caddyserver/certmagic/issues/361
+					order.Replaces = ""
+					continue
+				}
+			}
 			return nil, fmt.Errorf("creating new order: %w", err)
 		}
 

@@ -111,6 +111,9 @@ func (w *requestWriter) encodeHeaders(req *http.Request, addGzipHeader bool, tra
 
 	// http.NewRequest sets this field to HTTP/1.1
 	isExtendedConnect := isExtendedConnectRequest(req)
+	if isExtendedConnect && !validExtendedConnectProtocol(req.Proto) {
+		return nil, fmt.Errorf("invalid request :protocol %q", req.Proto)
+	}
 
 	var path string
 	if req.Method != http.MethodConnect || isExtendedConnect {
@@ -137,7 +140,7 @@ func (w *requestWriter) encodeHeaders(req *http.Request, addGzipHeader bool, tra
 		}
 		for _, v := range vv {
 			if !httpguts.ValidHeaderFieldValue(v) {
-				return nil, fmt.Errorf("invalid HTTP header value %q for header %q", v, k)
+				return nil, fmt.Errorf("invalid HTTP header value for header %q", k)
 			}
 		}
 	}

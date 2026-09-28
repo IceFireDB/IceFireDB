@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime/debug"
 	"strings"
 
 	"github.com/ipfs/boxo/blockservice"
@@ -47,17 +48,18 @@ import (
 // BlocksBackend is an [IPFSBackend] implementation based on a [blockservice.BlockService].
 type BlocksBackend struct {
 	baseBackend
-	blockStore   blockstore.Blockstore
-	blockService blockservice.BlockService
-	dagService   format.DAGService
-	resolver     resolver.Resolver
+	blockStore        blockstore.Blockstore
+	blockService      blockservice.BlockService
+	dagService        format.DAGService
+	resolver          resolver.Resolver
+	maxTraversalDepth int
 }
 
 var _ IPFSBackend = (*BlocksBackend)(nil)
 
 // NewBlocksBackend creates a new [BlocksBackend] backed by a [blockservice.BlockService].
 func NewBlocksBackend(blockService blockservice.BlockService, opts ...BackendOption) (*BlocksBackend, error) {
-	var compiledOptions backendOptions
+	compiledOptions := backendOptions{maxTraversalDepth: DefaultMaxTraversalDepth}
 	for _, o := range opts {
 		if err := o(&compiledOptions); err != nil {
 			return nil, err
@@ -84,11 +86,12 @@ func NewBlocksBackend(blockService blockservice.BlockService, opts ...BackendOpt
 	}
 
 	return &BlocksBackend{
-		baseBackend:  baseBackend,
-		blockStore:   blockService.Blockstore(),
-		blockService: blockService,
-		dagService:   dagService,
-		resolver:     r,
+		baseBackend:       baseBackend,
+		blockStore:        blockService.Blockstore(),
+		blockService:      blockService,
+		dagService:        dagService,
+		resolver:          r,
+		maxTraversalDepth: compiledOptions.maxTraversalDepth,
 	}, nil
 }
 
@@ -175,7 +178,11 @@ func (bb *BlocksBackend) Get(ctx context.Context, path path.ImmutablePath, range
 		}
 
 		if rootCodec == uint64(mc.Raw) {
-			if err := seekToRangeStart(f, ra, fileSize); err != nil {
+			s, ok := f.(io.Seeker)
+			if !ok {
+				return ContentPathMetadata{}, nil, fmt.Errorf("file does not support seeking: %w", ErrInternalServerError)
+			}
+			if err := seekToRangeStart(s, ra, fileSize); err != nil {
 				return ContentPathMetadata{}, nil, err
 			}
 		}
@@ -216,8 +223,12 @@ func (bb *BlocksBackend) Get(ctx context.Context, path path.ImmutablePath, range
 			return ContentPathMetadata{}, nil, err
 		}
 
-		if err := seekToRangeStart(file, ra, fileSize); err != nil {
-			return ContentPathMetadata{}, nil, err
+		if seeker, ok := file.(io.Seeker); ok {
+			if err := seekToRangeStart(seeker, ra, fileSize); err != nil {
+				return ContentPathMetadata{}, nil, err
+			}
+		} else if ra != nil && ra.From != 0 {
+			return ContentPathMetadata{}, nil, fmt.Errorf("file does not support seeking: %w", ErrInternalServerError)
 		}
 
 		if s, ok := f.(*files.Symlink); ok {
@@ -279,7 +290,12 @@ func loadUnixFSFileWithLazyBlocks(ctx context.Context, path path.ImmutablePath, 
 	}
 
 	// Seek to the start of the requested range
-	if err := seekToRangeStart(file, ra, fileSize); err != nil {
+	seeker, ok := file.(io.Seeker)
+	if !ok {
+		log.Debugw("file does not support seeking, skipping range optimization", "path", path)
+		return nil
+	}
+	if err := seekToRangeStart(seeker, ra, fileSize); err != nil {
 		log.Debugw("failed to seek to range start",
 			"path", path,
 			"error", err)
@@ -378,7 +394,7 @@ func (bb *BlocksBackend) Head(ctx context.Context, path path.ImmutablePath) (Con
 // emptyRoot is a CAR root with the empty identity CID. CAR files are recommended
 // to always include a CID in their root, even if it's just the empty CID.
 // https://ipld.io/specs/transport/car/carv1/#number-of-roots
-var emptyRoot = []cid.Cid{cid.MustParse("bafkqaaa")}
+var emptyRoot = []cid.Cid{EmptyIdentityCID}
 
 func (bb *BlocksBackend) GetCAR(ctx context.Context, p path.ImmutablePath, params CarParams) (ContentPathMetadata, io.ReadCloser, error) {
 	pathMetadata, resolveErr := bb.ResolvePath(ctx, p)
@@ -402,7 +418,7 @@ func (bb *BlocksBackend) GetCAR(ctx context.Context, p path.ImmutablePath, param
 		}
 
 		// Setup the UnixFS resolver.
-		f := newNodeGetterFetcherSingleUseFactory(ctx, blockGetter)
+		f := newNodeGetterFetcherSingleUseFactory(ctx, blockGetter, bb.maxTraversalDepth)
 		pathResolver := resolver.NewBasicResolver(f)
 		_, _, err = pathResolver.ResolveToLastNode(ctx, p)
 
@@ -425,6 +441,18 @@ func (bb *BlocksBackend) GetCAR(ctx context.Context, p path.ImmutablePath, param
 
 	r, w := io.Pipe()
 	go func() {
+		// Traversal decodes blocks with whatever codec their CID names, so it
+		// runs third-party code this package does not control. The goroutine is
+		// detached from the request, and a panic on it would end the process
+		// rather than the response, so keep it contained here.
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Errorf("recovered from panic during CAR traversal of %s: %v\n%s", p, rec, debug.Stack())
+				// io.PipeWriter.CloseWithError always returns nil.
+				_ = w.CloseWithError(errors.New("internal error during CAR traversal"))
+			}
+		}()
+
 		cw, err := storage.NewWritable(
 			w,
 			[]cid.Cid{pathMetadata.LastSegment.RootCid()},
@@ -445,12 +473,12 @@ func (bb *BlocksBackend) GetCAR(ctx context.Context, p path.ImmutablePath, param
 		}
 
 		// Setup the UnixFS resolver.
-		f := newNodeGetterFetcherSingleUseFactory(ctx, blockGetter)
+		f := newNodeGetterFetcherSingleUseFactory(ctx, blockGetter, bb.maxTraversalDepth)
 		pathResolver := resolver.NewBasicResolver(f)
 
 		lsys := cidlink.DefaultLinkSystem()
 		unixfsnode.AddUnixFSReificationToLinkSystem(&lsys)
-		lsys.StorageReadOpener = blockOpener(ctx, blockGetter)
+		lsys.StorageReadOpener = blockOpener(ctx, blockGetter, bb.maxTraversalDepth)
 
 		// First resolve the path since we always need to.
 		lastCid, remainder, err := pathResolver.ResolveToLastNode(ctx, p)
@@ -476,8 +504,15 @@ func walkGatewaySimpleSelector(ctx context.Context, lastCid cid.Cid, terminalBlk
 	lctx := ipld.LinkContext{Ctx: ctx}
 	pathTerminalCidLink := cidlink.Link{Cid: lastCid}
 
-	// If the scope is the block, now we only need to retrieve the root block of the last element of the path.
+	// If the scope is the block, now we only need to retrieve the root block of
+	// the last element of the path. A caller that already resolved that block
+	// passes it in, and loading it again is not free: a link system reading a
+	// CAR stream in order has moved past it, and asking for it reports the
+	// stream as unexpectedly short even though the response is complete.
 	if params.Scope == DagScopeBlock {
+		if terminalBlk != nil {
+			return nil
+		}
 		_, err := lsys.LoadRaw(lctx, pathTerminalCidLink)
 		return err
 	}
@@ -858,10 +893,10 @@ type nodeGetterFetcherSingleUseFactory struct {
 	protoChooser traversal.LinkTargetNodePrototypeChooser
 }
 
-func newNodeGetterFetcherSingleUseFactory(ctx context.Context, ng format.NodeGetter) *nodeGetterFetcherSingleUseFactory {
+func newNodeGetterFetcherSingleUseFactory(ctx context.Context, ng format.NodeGetter, maxDepth int) *nodeGetterFetcherSingleUseFactory {
 	ls := cidlink.DefaultLinkSystem()
 	ls.TrustedStorage = true
-	ls.StorageReadOpener = blockOpener(ctx, ng)
+	ls.StorageReadOpener = blockOpener(ctx, ng, maxDepth)
 	ls.NodeReifier = unixfsnode.Reify
 
 	pc := dagpb.AddSupportToChooser(func(lnk ipld.Link, lnkCtx ipld.LinkContext) (ipld.NodePrototype, error) {
@@ -930,8 +965,26 @@ func (n *nodeGetterFetcherSingleUseFactory) blankProgress(ctx context.Context) t
 	}
 }
 
-func blockOpener(ctx context.Context, ng format.NodeGetter) ipld.BlockReadOpener {
-	return func(_ ipld.LinkContext, lnk ipld.Link) (io.Reader, error) {
+// ErrTraversalTooDeep is returned when a DAG is nested deeper than the
+// backend's configured limit. See [WithMaxTraversalDepth].
+var ErrTraversalTooDeep = errors.New("dag traversal exceeded maximum depth")
+
+// blockOpener loads blocks for a traversal, refusing to descend past maxDepth.
+// A maxDepth of 0 means no limit.
+func blockOpener(ctx context.Context, ng format.NodeGetter, maxDepth int) ipld.BlockReadOpener {
+	return func(lctx ipld.LinkContext, lnk ipld.Link) (io.Reader, error) {
+		// LinkPath is the traversal path this link was reached by, so its
+		// length is the current depth.
+		if maxDepth > 0 && lctx.LinkPath.Len() > maxDepth {
+			// Deliberately without the path: at this depth it is thousands of
+			// segments long, and callers embed this error in their own output.
+			err := fmt.Errorf("%w of %d", ErrTraversalTooDeep, maxDepth)
+			// The response is already streaming by now, so this is the only
+			// place an operator can see why it was cut short.
+			log.Errorw("dag traversal stopped at depth limit", "limit", maxDepth, "link", lnk.String(), "err", err)
+			return nil, err
+		}
+
 		cidLink, ok := lnk.(cidlink.Link)
 		if !ok {
 			return nil, fmt.Errorf("invalid link type for loading: %v", lnk)

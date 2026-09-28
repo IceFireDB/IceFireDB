@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -17,9 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/record"
-	"github.com/libp2p/go-libp2p/p2p/host/basic/internal/backoff"
 	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
-	"github.com/libp2p/go-netroute"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/prometheus/client_golang/prometheus"
@@ -74,10 +71,11 @@ type addrsManager struct {
 	addrsMx      sync.RWMutex
 	currentAddrs hostAddrs
 
-	signKey           crypto.PrivKey
-	addrStore         addrStore
-	signedRecordStore peerstore.CertifiedAddrBook
-	hostID            peer.ID
+	signKey                        crypto.PrivKey
+	addrStore                      addrStore
+	signedRecordStore              peerstore.CertifiedAddrBook
+	hostID                         peer.ID
+	disableNonPublicAddrPublishing bool
 
 	wg        sync.WaitGroup
 	ctx       context.Context
@@ -95,26 +93,28 @@ func newAddrsManager(
 	enableMetrics bool,
 	registerer prometheus.Registerer,
 	disableSignedPeerRecord bool,
+	disableNonPublicAddrPublishing bool,
 	signKey crypto.PrivKey,
 	addrStore addrStore,
 	hostID peer.ID,
 ) (*addrsManager, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	as := &addrsManager{
-		bus:                       bus,
-		listenAddrs:               listenAddrs,
-		addCertHashes:             addCertHashes,
-		observedAddrsManager:      observedAddrsManager,
-		natManager:                natmgr,
-		addrsFactory:              addrsFactory,
-		triggerAddrsUpdateChan:    make(chan chan struct{}, 1),
-		triggerReachabilityUpdate: make(chan struct{}, 1),
-		interfaceAddrs:            &interfaceAddrsCache{},
-		signKey:                   signKey,
-		addrStore:                 addrStore,
-		hostID:                    hostID,
-		ctx:                       ctx,
-		ctxCancel:                 cancel,
+		bus:                            bus,
+		listenAddrs:                    listenAddrs,
+		addCertHashes:                  addCertHashes,
+		observedAddrsManager:           observedAddrsManager,
+		natManager:                     natmgr,
+		addrsFactory:                   addrsFactory,
+		triggerAddrsUpdateChan:         make(chan chan struct{}, 1),
+		triggerReachabilityUpdate:      make(chan struct{}, 1),
+		interfaceAddrs:                 &interfaceAddrsCache{},
+		signKey:                        signKey,
+		addrStore:                      addrStore,
+		hostID:                         hostID,
+		disableNonPublicAddrPublishing: disableNonPublicAddrPublishing,
+		ctx:                            ctx,
+		ctxCancel:                      cancel,
 	}
 	unknownReachability := network.ReachabilityUnknown
 	as.hostReachability.Store(&unknownReachability)
@@ -346,8 +346,11 @@ func (a *addrsManager) updateAddrs(prevHostAddrs hostAddrs, relayAddrs []ma.Mult
 
 // updatePeerStore updates the peer store for the host
 func (a *addrsManager) updatePeerStore(currentAddrs []ma.Multiaddr, removedAddrs []ma.Multiaddr) {
-	// update host addresses in the peer store
-	a.addrStore.SetAddrs(a.hostID, currentAddrs, peerstore.PermanentAddrTTL)
+	publishedAddrs := currentAddrs
+	if a.disableNonPublicAddrPublishing {
+		publishedAddrs = filterPublicAddrs(currentAddrs)
+	}
+	a.addrStore.SetAddrs(a.hostID, publishedAddrs, peerstore.PermanentAddrTTL)
 	a.addrStore.SetAddrs(a.hostID, removedAddrs, 0)
 
 	var sr *record.Envelope
@@ -357,7 +360,7 @@ func (a *addrsManager) updatePeerStore(currentAddrs []ma.Multiaddr, removedAddrs
 		var err error
 		// add signed peer record to the event
 		// in case of an error drop this event.
-		sr, err = a.makeSignedPeerRecord(currentAddrs)
+		sr, err = a.makeSignedPeerRecord(publishedAddrs)
 		if err != nil {
 			log.Error("error creating a signed peer record from the set of current addresses", "err", err)
 			return
@@ -369,6 +372,39 @@ func (a *addrsManager) updatePeerStore(currentAddrs []ma.Multiaddr, removedAddrs
 	}
 }
 
+// filterPublicAddrs drops IP-based multiaddrs that are not in a globally
+// routable range. Addrs without an IP or DNS component (e.g. /p2p-circuit)
+// are kept as-is because manet.IsPublicAddr returns false for them.
+// DNS components are evaluated by manet.IsPublicAddr (special-use names
+// like .local, .invalid, .localhost are non-public).
+func filterPublicAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
+	filtered := make([]ma.Multiaddr, 0, len(addrs))
+	for _, addr := range addrs {
+		if hasIPOrDNSComponent(addr) && !manet.IsPublicAddr(addr) {
+			continue
+		}
+		filtered = append(filtered, addr)
+	}
+	return filtered
+}
+
+// hasIPOrDNSComponent reports whether addr's leading component is an IP,
+// DNS, or IP6ZONE wrapper. Transport multiaddrs encode their network layer
+// at the front, so the leading component is sufficient to tell whether
+// manet.IsPublicAddr can meaningfully evaluate the addr. Without this
+// guard, filterPublicAddrs would also drop multiaddrs that have no
+// network-layer address, such as /p2p-circuit/p2p/<id>.
+func hasIPOrDNSComponent(addr ma.Multiaddr) bool {
+	if len(addr) == 0 {
+		return false
+	}
+	switch addr[0].Protocol().Code {
+	case ma.P_IP4, ma.P_IP6, ma.P_IP6ZONE, ma.P_DNS, ma.P_DNS4, ma.P_DNS6, ma.P_DNSADDR:
+		return true
+	}
+	return false
+}
+
 func (a *addrsManager) notifyAddrsUpdated(emitter event.Emitter, localAddrsEmitter event.Emitter, previous, current hostAddrs) {
 	if areAddrsDifferent(previous.localAddrs, current.localAddrs) {
 		log.Debug("host local addresses updated", "addrs", current.localAddrs)
@@ -377,7 +413,7 @@ func (a *addrsManager) notifyAddrsUpdated(emitter event.Emitter, localAddrsEmitt
 		}
 	}
 	if areAddrsDifferent(previous.addrs, current.addrs) {
-		log.Debug("host addresses updated", "addrs", current.localAddrs)
+		log.Debug("host addresses updated", "addrs", current.addrs)
 		a.emitLocalAddrsUpdated(localAddrsEmitter, current.addrs, previous.addrs)
 	}
 
@@ -443,7 +479,7 @@ func (a *addrsManager) applyAddrsFactory(addrs []ma.Multiaddr) []ma.Multiaddr {
 	addrs = append(addrs[:0], af...)
 	// Add certhashes for the addresses provided by the user via address factory.
 	addrs = a.addCertHashes(ma.Unique(addrs))
-	slices.SortFunc(addrs, func(a, b ma.Multiaddr) int { return a.Compare(b) })
+	slices.SortFunc(addrs, ma.Multiaddr.Compare)
 	return addrs
 }
 
@@ -478,6 +514,12 @@ func (a *addrsManager) ConfirmedAddrs() (reachable []ma.Multiaddr, unreachable [
 
 func (a *addrsManager) getConfirmedAddrs(localAddrs []ma.Multiaddr) (reachableAddrs, unreachableAddrs, unknownAddrs []ma.Multiaddr) {
 	reachableAddrs, unreachableAddrs, unknownAddrs = a.addrsReachabilityTracker.ConfirmedAddrs()
+	// Don't rely on tracker's ordering. removeNotInSource here and removeInSource in
+	// getDialableAddrs require sorted input; unsorted input silently drops
+	// confirmed addrs.
+	slices.SortFunc(reachableAddrs, ma.Multiaddr.Compare)
+	slices.SortFunc(unreachableAddrs, ma.Multiaddr.Compare)
+	slices.SortFunc(unknownAddrs, ma.Multiaddr.Compare)
 	return removeNotInSource(reachableAddrs, localAddrs), removeNotInSource(unreachableAddrs, localAddrs), removeNotInSource(unknownAddrs, localAddrs)
 }
 
@@ -490,7 +532,7 @@ func (a *addrsManager) getLocalAddrs() []ma.Multiaddr {
 	}
 
 	finalAddrs := make([]ma.Multiaddr, 0, 8)
-	finalAddrs = a.appendPrimaryInterfaceAddrs(finalAddrs, listenAddrs)
+	finalAddrs = a.appendInterfaceAddrs(finalAddrs, listenAddrs)
 	if a.natManager != nil {
 		finalAddrs = a.appendNATAddrs(finalAddrs, listenAddrs)
 	}
@@ -515,15 +557,14 @@ func (a *addrsManager) getLocalAddrs() []ma.Multiaddr {
 	// using identify.
 	finalAddrs = a.addCertHashes(finalAddrs)
 	finalAddrs = ma.Unique(finalAddrs)
-	slices.SortFunc(finalAddrs, func(a, b ma.Multiaddr) int { return a.Compare(b) })
+	slices.SortFunc(finalAddrs, ma.Multiaddr.Compare)
 	return finalAddrs
 }
 
-// appendPrimaryInterfaceAddrs appends the primary interface addresses to `dst`.
-func (a *addrsManager) appendPrimaryInterfaceAddrs(dst []ma.Multiaddr, listenAddrs []ma.Multiaddr) []ma.Multiaddr {
-	// resolving any unspecified listen addressees to use only the primary
-	// interface to avoid advertising too many addresses.
-	if resolved, err := manet.ResolveUnspecifiedAddresses(listenAddrs, a.interfaceAddrs.Filtered()); err != nil {
+// appendInterfaceAddrs resolves any unspecified listen addresses to all interface addresses
+// and appends them to `dst`.
+func (a *addrsManager) appendInterfaceAddrs(dst []ma.Multiaddr, listenAddrs []ma.Multiaddr) []ma.Multiaddr {
+	if resolved, err := manet.ResolveUnspecifiedAddresses(listenAddrs, a.interfaceAddrs.All()); err != nil {
 		log.Warn("failed to resolve listen addrs", "err", err)
 	} else {
 		dst = append(dst, resolved...)
@@ -577,6 +618,13 @@ func (a *addrsManager) makeSignedPeerRecord(addrs []ma.Multiaddr) (*record.Envel
 	if a.signKey == nil {
 		return nil, errors.New("signKey is nil")
 	}
+	// Drop empty multiaddrs before sealing. A zero-component Multiaddr
+	// would otherwise enter the signed envelope and reach peers as "/"
+	// when they decode the wire bytes.
+	// See https://github.com/libp2p/js-libp2p/issues/3478#issuecomment-4322093929
+	addrs = slices.DeleteFunc(slices.Clone(addrs), func(m ma.Multiaddr) bool {
+		return len(m) == 0
+	})
 	// Limit the length of currentAddrs to ensure that our signed peer records aren't rejected
 	peerRecordSize := 64 // HostID
 	k, err := a.signKey.Raw()
@@ -649,8 +697,8 @@ func areAddrsDifferent(prev, current []ma.Multiaddr) bool {
 	if len(prev) != len(current) {
 		return true
 	}
-	slices.SortFunc(prev, func(a, b ma.Multiaddr) int { return a.Compare(b) })
-	slices.SortFunc(current, func(a, b ma.Multiaddr) int { return a.Compare(b) })
+	slices.SortFunc(prev, ma.Multiaddr.Compare)
+	slices.SortFunc(current, ma.Multiaddr.Compare)
 	for i := range prev {
 		if !prev[i].Equal(current[i]) {
 			return true
@@ -744,124 +792,46 @@ func trimHostAddrList(addrs []ma.Multiaddr, maxSize int) []ma.Multiaddr {
 const interfaceAddrsCacheTTL = time.Minute
 
 type interfaceAddrsCache struct {
-	mx                     sync.RWMutex
-	filtered               []ma.Multiaddr
-	all                    []ma.Multiaddr
-	updateLocalIPv4Backoff backoff.ExpBackoff
-	updateLocalIPv6Backoff backoff.ExpBackoff
-	lastUpdated            time.Time
-}
-
-func (i *interfaceAddrsCache) Filtered() []ma.Multiaddr {
-	i.mx.RLock()
-	if time.Now().After(i.lastUpdated.Add(interfaceAddrsCacheTTL)) {
-		i.mx.RUnlock()
-		return i.update(true)
-	}
-	defer i.mx.RUnlock()
-	return i.filtered
+	mx          sync.RWMutex
+	all         []ma.Multiaddr
+	lastUpdated time.Time
 }
 
 func (i *interfaceAddrsCache) All() []ma.Multiaddr {
 	i.mx.RLock()
 	if time.Now().After(i.lastUpdated.Add(interfaceAddrsCacheTTL)) {
 		i.mx.RUnlock()
-		return i.update(false)
+		return i.update()
 	}
 	defer i.mx.RUnlock()
 	return i.all
 }
 
-func (i *interfaceAddrsCache) update(filtered bool) []ma.Multiaddr {
+func (i *interfaceAddrsCache) update() []ma.Multiaddr {
 	i.mx.Lock()
 	defer i.mx.Unlock()
 	if !time.Now().After(i.lastUpdated.Add(interfaceAddrsCacheTTL)) {
-		if filtered {
-			return i.filtered
-		}
 		return i.all
 	}
 	i.updateUnlocked()
 	i.lastUpdated = time.Now()
-	if filtered {
-		return i.filtered
-	}
 	return i.all
 }
 
 func (i *interfaceAddrsCache) updateUnlocked() {
-	i.filtered = nil
 	i.all = nil
 
-	// Try to use the default ipv4/6 addresses.
-	// TODO: Remove this. We should advertise all interface addresses.
-	if r, err := netroute.New(); err != nil {
-		log.Debug("failed to build Router for kernel's routing table", "err", err)
-	} else {
-
-		var localIPv4 net.IP
-		var ran bool
-		err, ran = i.updateLocalIPv4Backoff.Run(func() error {
-			_, _, localIPv4, err = r.Route(net.IPv4zero)
-			return err
-		})
-
-		if ran && err != nil {
-			log.Debug("failed to fetch local IPv4 address", "err", err)
-		} else if ran && localIPv4.IsGlobalUnicast() {
-			maddr, err := manet.FromIP(localIPv4)
-			if err == nil {
-				i.filtered = append(i.filtered, maddr)
-			}
-		}
-
-		var localIPv6 net.IP
-		err, ran = i.updateLocalIPv6Backoff.Run(func() error {
-			_, _, localIPv6, err = r.Route(net.IPv6unspecified)
-			return err
-		})
-
-		if ran && err != nil {
-			log.Debug("failed to fetch local IPv6 address", "err", err)
-		} else if ran && localIPv6.IsGlobalUnicast() {
-			maddr, err := manet.FromIP(localIPv6)
-			if err == nil {
-				i.filtered = append(i.filtered, maddr)
-			}
-		}
-	}
-
-	// Resolve the interface addresses
 	ifaceAddrs, err := manet.InterfaceMultiaddrs()
 	if err != nil {
 		// This usually shouldn't happen, but we could be in some kind
 		// of funky restricted environment.
 		log.Error("failed to resolve local interface addresses", "err", err)
-
-		// Add the loopback addresses to the filtered addrs and use them as the non-filtered addrs.
-		// Then bail. There's nothing else we can do here.
-		i.filtered = append(i.filtered, manet.IP4Loopback, manet.IP6Loopback)
-		i.all = i.filtered
+		i.all = []ma.Multiaddr{manet.IP4Loopback, manet.IP6Loopback}
 		return
 	}
 
 	// remove link local ipv6 addresses
 	i.all = slices.DeleteFunc(ifaceAddrs, manet.IsIP6LinkLocal)
-
-	// If netroute failed to get us any interface addresses, use all of
-	// them.
-	if len(i.filtered) == 0 {
-		// Add all addresses.
-		i.filtered = i.all
-	} else {
-		// Only add loopback addresses. Filter these because we might
-		// not _have_ an IPv6 loopback address.
-		for _, addr := range i.all {
-			if manet.IsIPLoopback(addr) {
-				i.filtered = append(i.filtered, addr)
-			}
-		}
-	}
 }
 
 // removeNotInSource removes items from addrs that are not present in source.

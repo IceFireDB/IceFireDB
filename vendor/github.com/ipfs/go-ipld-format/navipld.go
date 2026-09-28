@@ -87,10 +87,7 @@ const preloadSize = 10
 // Preload at most `preloadSize` child nodes from `beg` through promises
 // created using this `ctx`.
 func (nn *NavigableIPLDNode) preload(ctx context.Context, beg uint) {
-	end := beg + preloadSize
-	if end >= uint(len(nn.childCIDs)) {
-		end = uint(len(nn.childCIDs))
-	}
+	end := min(beg+preloadSize, uint(len(nn.childCIDs)))
 
 	copy(nn.childPromises[beg:], GetNodes(ctx, nn.nodeGetter, nn.childCIDs[beg:end]))
 }
