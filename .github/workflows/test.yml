@@ -31,7 +31,20 @@ jobs:
       - name: Install dependencies
         run: go mod tidy && go mod vendor
       - name: Start MinIO
-        run: docker run -p 9000:9000 -p 9001:9001 -e "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE" -e "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" -d quay.io/minio/minio server /data --console-address ":9001"
+        run: |
+          # Pull the official MinIO image from Docker Hub. The previous `quay.io/minio/minio`
+          # image is no longer publicly available and caused "unauthorized" pull failures.
+          # Pin a specific release tag (not `:latest`) so CI stays reproducible across builds.
+          docker run -d --name minio \
+            -p 9000:9000 -p 9001:9001 \
+            -e "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE" \
+            -e "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" \
+            minio/minio:RELEASE.2024-09-13T20-26-02Z \
+            server /data --console-address ":9001"
+          # Wait for MinIO to be ready before tests connect to it.
+          for i in {1..30}; do
+            curl -sf http://localhost:9000/minio/health/ready && break || sleep 1
+          done
       - name: Test
         run: go test -v -count=1 -tags="alltest osstest"
 
