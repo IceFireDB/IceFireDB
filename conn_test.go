@@ -18,6 +18,8 @@ import (
 	lediscfg "github.com/ledisdb/ledisdb/config"
 	"github.com/redis/go-redis/v9"
 	"github.com/tidwall/uhaha"
+
+	"github.com/IceFireDB/IceFireDB/driver/oss"
 )
 
 var (
@@ -28,6 +30,21 @@ var (
 func getTestConn() *redis.Client {
 	log.SetOutput(os.Stderr)
 	f := func() {
+		// Allow tests to redirect the OSS storage backend at an arbitrary
+		// S3-compatible endpoint. The default in driver/oss/db.go is
+		// "http://localhost:9000" (MinIO), but CI may run LocalStack or
+		// MinIO on a different port. confInit() — which parses the
+		// --oss-endpoint flag — is only invoked from main() and tests go
+		// straight to uhaha.Main(), so we have to apply the override here.
+		if endpoint := os.Getenv("OSS_TEST_ENDPOINT"); endpoint != "" {
+			oss.OssDefaultConfig.EndPointConnection = endpoint
+		}
+		if accessKey := os.Getenv("OSS_TEST_ACCESS_KEY"); accessKey != "" {
+			oss.OssDefaultConfig.AccessKey = accessKey
+		}
+		if secretKey := os.Getenv("OSS_TEST_SECRET_KEY"); secretKey != "" {
+			oss.OssDefaultConfig.Secretkey = secretKey
+		}
 		conf.DataDir = "/tmp/icefiredb"
 		os.RemoveAll(conf.DataDir)
 		conf.DataDirReady = func(dir string) {
