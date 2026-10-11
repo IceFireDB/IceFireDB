@@ -1,7 +1,12 @@
 //go:build osstest
 // +build osstest
 
-package oss
+// Use an external test package so we can import the package under test
+// without creating an import cycle. The previous `package oss` form has
+// been broken since Go 1.22 (cannot import its own package), but it
+// never surfaced because the CI's `docker pull quay.io/minio/minio`
+// step was failing first.
+package oss_test
 
 import (
 	"log"
@@ -23,11 +28,22 @@ import (
 // For Minio Docker container.
 // See https://docs.minio.io/docs/minio-docker-quickstart-guide.html.
 const (
-	customEndpoint string = "http://localhost:9000"
-	accesskey      string = "AKIAIOSFODNN7EXAMPLE"
-	secretkey      string = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-	bucketname     string = "gokv"
+	defaultEndpoint = "http://localhost:9000"
+	accesskey       = "AKIAIOSFODNN7EXAMPLE"
+	secretkey       = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+	bucketname      = "gokv"
 )
+
+// customEndpoint points at the S3-compatible server the tests run against.
+// Defaults to the historical MinIO endpoint, but can be overridden via the
+// OSS_TEST_ENDPOINT environment variable so CI can use a different host/port
+// (e.g. LocalStack on :4566).
+var customEndpoint = func() string {
+	if v := os.Getenv("OSS_TEST_ENDPOINT"); v != "" {
+		return v
+	}
+	return defaultEndpoint
+}()
 
 // TestClient tests if reading from, writing to and deleting from the store works properly.
 // A struct is used as value. See TestTypes() for a test that is simpler but tests all types.
@@ -116,7 +132,7 @@ func TestErrors(t *testing.T) {
 		AWSsecretAccessKey: secretkey,
 	}
 	client, err = oss.NewClient(options)
-	if err.Error() != "The BucketName in the options must not be empty" {
+	if err.Error() != "the BucketName in the options must not be empty" {
 		t.Error("An error was expected, but didn't occur.")
 	}
 	options = oss.Options{
@@ -124,7 +140,7 @@ func TestErrors(t *testing.T) {
 		AWSaccessKeyID: accesskey,
 	}
 	client, err = oss.NewClient(options)
-	if err.Error() != "When passing credentials via options, you need to set BOTH AWSaccessKeyID AND AWSsecretAccessKey" {
+	if err.Error() != "when passing credentials via options, you need to set BOTH AWSaccessKeyID AND AWSsecretAccessKey" {
 		t.Error("An error was expected, but didn't occur.")
 	}
 	options = oss.Options{
@@ -132,7 +148,7 @@ func TestErrors(t *testing.T) {
 		AWSsecretAccessKey: secretkey,
 	}
 	client, err = oss.NewClient(options)
-	if err.Error() != "When passing credentials via options, you need to set BOTH AWSaccessKeyID AND AWSsecretAccessKey" {
+	if err.Error() != "when passing credentials via options, you need to set BOTH AWSaccessKeyID AND AWSsecretAccessKey" {
 		t.Error("An error was expected, but didn't occur.")
 	}
 	// Bad credentials on actual AWS S3 endpoint (no custom endpoint for local Docker container)

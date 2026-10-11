@@ -30,10 +30,34 @@ jobs:
         uses: actions/checkout@v7
       - name: Install dependencies
         run: go mod tidy && go mod vendor
-      - name: Start MinIO
-        run: docker run -p 9000:9000 -p 9001:9001 -e "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE" -e "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" -d quay.io/minio/minio server /data --console-address ":9001"
+      - name: Start LocalStack
+        # Use LocalStack as the S3-compatible test server. The previous MinIO
+        # image (quay.io/minio/minio) requires authentication and is no longer
+        # anonymously pullable, breaking this job across all architectures.
+        # LocalStack ships a built-in `awslocal` CLI we use to create the
+        # bucket the OSS driver test expects.
+        run: |
+          docker run -d --name localstack \
+            -p 4566:4566 \
+            -e "SERVICES=s3" \
+            -e "DEFAULT_REGION=us-east-1" \
+            localstack/localstack:3.0
+          # Wait for LocalStack's S3 to become available and create the bucket.
+          # awslocal itself retries, but we wrap it in a loop so a slow start
+          # doesn't crash the workflow.
+          for i in {1..60}; do
+            docker exec localstack awslocal s3 mb s3://gokv 2>/dev/null && break
+            sleep 1
+          done
       - name: Test
-        run: go test -v -count=1 -tags="alltest osstest"
+        # IceFireDB's FlushAll only wipes the local leveldb cache; the OSS
+        # driver reads straight back from S3, so stale objects from a
+        # previous run leak into the next run and break Set/Get/SetNX
+        # assertions. Clear the bucket right before tests execute so each
+        # CI run starts from a known-empty S3 state.
+        run: |
+          docker exec localstack awslocal s3 rm s3://gokv --recursive >/dev/null 2>&1 || true
+          OSS_TEST_ENDPOINT=http://localhost:4566 go test -v -count=1 -tags="alltest osstest"
 
   ipfstest:
     strategy:
