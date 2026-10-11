@@ -132,7 +132,7 @@ func TestErrors(t *testing.T) {
 		AWSsecretAccessKey: secretkey,
 	}
 	client, err = oss.NewClient(options)
-	if err.Error() != "The BucketName in the options must not be empty" {
+	if err.Error() != "the BucketName in the options must not be empty" {
 		t.Error("An error was expected, but didn't occur.")
 	}
 	options = oss.Options{
@@ -140,7 +140,7 @@ func TestErrors(t *testing.T) {
 		AWSaccessKeyID: accesskey,
 	}
 	client, err = oss.NewClient(options)
-	if err.Error() != "When passing credentials via options, you need to set BOTH AWSaccessKeyID AND AWSsecretAccessKey" {
+	if err.Error() != "when passing credentials via options, you need to set BOTH AWSaccessKeyID AND AWSsecretAccessKey" {
 		t.Error("An error was expected, but didn't occur.")
 	}
 	options = oss.Options{
@@ -148,7 +148,7 @@ func TestErrors(t *testing.T) {
 		AWSsecretAccessKey: secretkey,
 	}
 	client, err = oss.NewClient(options)
-	if err.Error() != "When passing credentials via options, you need to set BOTH AWSaccessKeyID AND AWSsecretAccessKey" {
+	if err.Error() != "when passing credentials via options, you need to set BOTH AWSaccessKeyID AND AWSsecretAccessKey" {
 		t.Error("An error was expected, but didn't occur.")
 	}
 	// Bad credentials on actual AWS S3 endpoint (no custom endpoint for local Docker container)
