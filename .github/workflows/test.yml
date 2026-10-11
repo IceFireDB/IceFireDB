@@ -50,7 +50,14 @@ jobs:
             sleep 1
           done
       - name: Test
-        run: OSS_TEST_ENDPOINT=http://localhost:4566 go test -v -count=1 -tags="alltest osstest"
+        # IceFireDB's FlushAll only wipes the local leveldb cache; the OSS
+        # driver reads straight back from S3, so stale objects from a
+        # previous run leak into the next run and break Set/Get/SetNX
+        # assertions. Clear the bucket right before tests execute so each
+        # CI run starts from a known-empty S3 state.
+        run: |
+          docker exec localstack awslocal s3 rm s3://gokv --recursive >/dev/null 2>&1 || true
+          OSS_TEST_ENDPOINT=http://localhost:4566 go test -v -count=1 -tags="alltest osstest"
 
   ipfstest:
     strategy:
