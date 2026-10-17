@@ -913,7 +913,7 @@ func (gs *GossipSubRouter) Preprocess(from peer.ID, msgs []*Message) {
 func (gs *GossipSubRouter) HandleRPC(rpc *RPC) {
 	err := gs.extensions.HandleRPC(rpc)
 	if err != nil {
-		gs.logger.Warn("error in handling RPC", "from", rpc.from, "err", err)
+		gs.logger.Debug("error in handling RPC", "from", rpc.from, "err", err)
 	}
 
 	ctl := rpc.GetControl()
