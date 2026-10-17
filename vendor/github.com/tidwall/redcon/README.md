@@ -18,6 +18,8 @@ Features
 - Compatible pub/sub support
 - Multithreaded
 
+*This library is also available for [Rust](https://github.com/tidwall/redcon.rs) and [C](https://github.com/tidwall/redcon.c).*
+
 Installing
 ----------
 
@@ -32,6 +34,7 @@ Here's a full example of a Redis clone that accepts:
 
 - SET key value
 - GET key
+- SETNX key value
 - DEL key
 - PING
 - QUIT
@@ -94,6 +97,22 @@ func main() {
 				} else {
 					conn.WriteBulk(val)
 				}
+			case "setnx":
+				if len(cmd.Args) != 3 {
+					conn.WriteError("ERR wrong number of arguments for '" + string(cmd.Args[0]) + "' command")
+					return
+				}
+				mu.RLock()
+				_, ok := items[string(cmd.Args[1])]
+				mu.RUnlock()
+				if ok {
+					conn.WriteInt(0)
+					return
+				}
+				mu.Lock()
+				items[string(cmd.Args[1])] = cmd.Args[2]
+				mu.Unlock()
+				conn.WriteInt(1)
 			case "del":
 				if len(cmd.Args) != 2 {
 					conn.WriteError("ERR wrong number of arguments for '" + string(cmd.Args[0]) + "' command")
