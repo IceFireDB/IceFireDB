@@ -321,10 +321,14 @@ func cmdZSCORE(m uhaha.Machine, args []string) (interface{}, error) {
 
 	n, err := ldb.ZScore([]byte(args[1]), []byte(args[2]))
 	if err != nil {
+		if err == ledis.ErrScoreMiss {
+			return nil, nil
+		}
 		return nil, err
 	}
 
-	return redcon.SimpleInt(n), nil
+	// Redis replies with a bulk string here, not an integer reply.
+	return []byte(strconv.FormatInt(n, 10)), nil
 }
 
 func cmdZINCRBY(m uhaha.Machine, args []string) (interface{}, error) {

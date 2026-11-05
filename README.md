@@ -33,6 +33,7 @@
 - [⚙️ System Design](#️-system-design)
 - [🚀 Quick Start](#-quick-start)
 - [📋 Command Support](#-command-support)
+- [🔍 SCAN](#-scan)
 - [🎯 Roadmap](#-roadmap)
 - [📄 License](#-license)
 
@@ -154,10 +155,12 @@ Core NoSQL database engine with multiple operational modes:
 
 ## 📋 Command Support
 
-IceFireDB provides comprehensive Redis-compatible command support across all major data types:
+IceFireDB provides comprehensive Redis-compatible command support across all major data types.
+[COMMAND-REFERENCE.md](COMMAND-REFERENCE.md) is the complete reference — syntax, arguments, returns and a production example for every command, in English and 中文. [COMMAND-AUDIT.md](COMMAND-AUDIT.md) records the audit trail: replication class, resource limits and the tests that pin each behaviour.
 
 ### 📝 Strings
 - **Basic Operations**: SET, GET, DEL, EXISTS, INCR, DECR, APPEND
+- **SET Options**: EX, PX, NX, XX, KEEPTTL
 - **Bit Operations**: SETBIT, GETBIT, BITCOUNT, BITOP, BITPOS
 - **Range Operations**: GETRANGE, SETRANGE, GETSET
 - **Expiration**: SETEX, SETEXAT, EXPIRE, EXPIREAT, TTL
@@ -168,17 +171,19 @@ IceFireDB provides comprehensive Redis-compatible command support across all maj
 - **Incremental**: HINCRBY
 - **Key Management**: HKEYS, HVALS, HLEN, HSTRLEN
 - **Batch Operations**: HMSET, HMGET
-- **Expiration**: HEXPIRE, HEXPIREAT, HTTL, HKEYEXIST
-- **Management**: HCLEAR, HMCLEAR, HSETEX
+- **Expiration**: HEXPIRE, HEXPIREAT, HTTL, HKEYEXISTS
+- **Management**: HCLEAR, HMCLEAR, HSETNX
 
 ### 📋 Lists
 - **Push/Pop**: LPUSH, RPUSH, LPOP, RPOP, RPOPLPUSH
 - **Access**: LINDEX, LRANGE, LSET, LLEN
+- **Insert/Remove**: LINSERT, LREM
 - **Management**: LTRIM, LCLEAR, LMCLEAR
 - **Expiration**: LEXPIRE, LEXPIREAT, LTTL, LKEYEXISTS
 
 ### 🔢 Sets
 - **Membership**: SADD, SREM, SISMEMBER, SMEMBERS
+- **Insert/Move/Pop**: SMOVE, SPOP, SRANDMEMBER
 - **Operations**: SINTER, SUNION, SDIFF
 - **Store Operations**: SINTERSTORE, SUNIONSTORE, SDIFFSTORE
 - **Management**: SCARD, SCLEAR, SMCLEAR
@@ -190,6 +195,14 @@ IceFireDB provides comprehensive Redis-compatible command support across all maj
 - **Rank Operations**: ZRANK, ZREVRANK
 - **Management**: ZCARD, ZCOUNT, ZREM, ZCLEAR
 - **Range Removal**: ZREMRANGEBYSCORE, ZREMRANGEBYRANK
+
+## 🔍 SCAN
+
+`SCAN cursor [MATCH pattern] [COUNT count] [TYPE type]` walks every key type through a single opaque
+cursor. `HSCAN`, `SSCAN` and `ZSCAN` accept the Redis cursor protocol (`0` to start, `MATCH`, `COUNT`),
+but the cursor they return is the last field/member name rather than a numeric offset, so client
+helpers that parse the cursor as an integer are not supported. The `XSCAN`/`XHSCAN`/`XSSCAN`/`XZSCAN`
+family keeps IceFireDB's own cursor semantics (empty cursor, `ASC`/`DESC`).
 
 ## ⚙️ System Design
 

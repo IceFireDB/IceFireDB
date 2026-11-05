@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **RESP compatibility**: `SET` accepts `EX`, `PX`, `NX`, `XX` and `KEEPTTL`; new `LINSERT`, `LREM`,
+  `SMOVE`, `SPOP`, `SRANDMEMBER` and the top-level `SCAN`; `HSCAN`/`SSCAN`/`ZSCAN` now follow the Redis
+  cursor protocol, while the native `XSCAN`/`XHSCAN`/`XSSCAN`/`XZSCAN` family keeps its contract.
+- **Docs**: [`COMMAND-REFERENCE.md`](COMMAND-REFERENCE.md) documents all 110 registered commands
+  (syntax, arguments, replies, examples, English + 中文); [`COMMAND-AUDIT.md`](COMMAND-AUDIT.md) records
+  the rules every command must satisfy (replication class, determinism, limits, tests).
+
+### Changed
+- **Scanning (breaking)**: `HSCAN`/`SSCAN`/`ZSCAN` answer Redis-style cursors (`0` starts, `0` finishes)
+  instead of the ledis-style cursor they used before. The cursor is the last field/member name, not an
+  integer, so client helpers that parse it as a number are not supported — use the generic command API.
+  The `X*SCAN` family keeps the previous behaviour.
+- **Limits**: `COUNT` on any scan is capped at 10000 (`COUNT` is a hint), and `SRANDMEMBER` rejects an
+  absolute count above 1048576 instead of materialising an unbounded reply. A scan page can be empty
+  while the cursor still advances, so loop until the cursor reports the end.
+
+### Fixed
+- **RESP compatibility**: `HGET` returns an empty bulk string for an existing empty field on the local
+  backends; `ZSCORE` returns a bulk string instead of an integer reply; `SPOP`/`SRANDMEMBER` answer a
+  single member for their bare form; `SMOVE` answers `1` when the destination already held the member.
+- **Semantics**: `SET ... NX/XX` answers a null bulk when the condition is not met, `KEEPTTL` keeps the
+  TTL it names, `PX` rounds up instead of asking for an expiry in the past, `LINSERT` answers the new
+  length and reports `0`/`-1` for a missing pivot/key, and `LINSERT`/`LREM` no longer reverse the list
+  or drop its TTL.
+- **Stability**: `SPOP` draws from the Raft machine's generator so every replica pops the same member;
+  `XHSCAN` no longer returns the page-ending field twice (it looped forever at `COUNT 1`); a negative
+  `SRANDMEMBER` count of `MinInt64` no longer panics the process; an unbounded scan `COUNT` no longer
+  allocates gigabytes; `go test ./...` compiles again (the `alltest` build tag is restored).
+
 ### Fixed
 - **hybriddb**: Fix cache invalidation after Delete operations
   - Added tombstone marker (nil value cacheItem) in Delete to prevent cache repopulation
