@@ -1,0 +1,171 @@
+/*
+From material design color palette:
+
+#dcedc8 - Light Green 100
+#9ccc65 - Light Green 400
+#558b2f - Light Green 800
+
+#bdbdbd - Gray 400
+#757575 - Gray 600
+#424242 - Gray 800
+
+#000000 - Black
+*/
+
+/* pure colors for hamburg-theme foreign HTML documents */
+.primary-color-very-light {
+	color: #dcedc8;
+}
+
+.primary-color {
+	color: #558b2f;
+}
+
+.gray-light {
+	color: #bdbdbd;
+}
+
+.gray-dark {
+	color: #757575;
+}
+
+.gray-very-dark {
+	color: #424242;
+}
+
+/*
+...1B - 10% transparent
+...4D - 30% transparent
+...80 - 50% transparent
+*/
+.delimiter{
+    border-bottom: 1px solid #0000001B;
+}
+
+.header-text {
+    background-color: #0000004d;
+    color: #fff;
+}
+
+.header-text .tag-line {
+    color: #fff;
+}
+
+.header-text h1 a {
+    color: #fff;
+}
+
+/* The social-icons */
+.global-footer .sns-links a {
+    border: 1px solid #757575;
+    color: #757575;
+}
+
+.global-footer .sns-links a:hover {
+    border: 1px solid #558b2f;
+    color: #558b2f;
+}
+
+/* The whole footer-area */
+.global-footer {
+    color: #757575;
+}
+
+.post-date {
+    color: #757575;
+}
+
+a:hover,
+a:focus {
+    color: #558b2f;
+}
+
+/* Tags of articles and pages */
+.post-tag a {
+  border: 1px solid #757575;
+  color: #757575;
+}
+
+.post-tag a:hover {
+	background-color: #dcedc8;
+}
+
+.not-found h1 {
+    color: #757575;
+}
+
+.author-bio {
+    color: #757575;
+}
+
+/* Color for e.g. headers and links */
+.text-primary, a {
+    color: #558b2f;
+}
+
+/* Primary buttons are the ones in the page (not in the header) */
+.btn-primary {
+    background-color: transparent;
+    border-color: #558b2f;
+    color: #558b2f;
+}
+
+.btn-primary:focus,
+.btn-primary:hover {
+    color: #558b2f;
+    background-color: #dcedc8;
+    border-color: #558b2f;
+}
+
+.btn-primary.disabled,
+.btn-primary.disabled:focus,
+a.btn-primary.disabled,
+a.btn-primary.disabled:focus {
+    color: #757575;
+    background-color: #fff;
+    border-color: #bdbdbd;
+}
+
+/* Default buttons are the ones in the header */
+.btn-default {
+  color: #fff;
+  background-color: transparent;
+  border-color: #fff;
+}
+
+.btn-default:focus,
+.btn-default:hover {
+    color: #fff;
+    background-color: #bdbdbd4d;
+    border-color: #fff;
+}
+
+.info {
+  background-color: #424242;
+  color: #fff;
+}
+
+.embedded-image {
+    border: 1px solid #dcedc8;
+}
+
+.embedded-image:hover,
+.embedded-image:focus {
+    border: 1px solid #9ccc65;
+}
+
+/* Bootstrap adjustions */
+blockquote {
+	border-left: 3px solid #bdbdbd;
+}
+
+/* Note box */
+.note {
+	border: 1px solid #dcedc8;
+	border-left: 3px solid #9ccc65;
+}
+
+/* Table */
+table, th, td {
+    border: 1px solid #bdbdbd;
+}

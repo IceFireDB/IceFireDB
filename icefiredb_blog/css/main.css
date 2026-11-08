@@ -1,0 +1,386 @@
+main {
+    max-width: 750px;
+    word-wrap: break-word;
+}
+
+/* Header */
+
+.global-header {
+    background-size: cover;
+    background-position-x: center;
+    min-height: 350px;
+}
+
+.header-text {
+    position: relative;
+    min-height: inherit;
+}
+
+.header-text .tag-line {
+    margin: 25px auto;
+    padding: 0 10px;
+    max-width: 430px;
+    text-align: center;
+    font-weight: 200;
+}
+
+.header-text h1 {
+    margin: 0 auto;
+    padding-top: 25px;
+    padding-bottom: 25px;
+    text-align: center;
+    font-weight: 100;
+    font-size: 52px;
+    border-bottom: 1px solid;
+    max-width: 550px;
+}
+
+.header-text h1 a {
+    text-decoration: none;
+}
+
+.btn-home {
+    position: absolute;
+    left: 20px;
+}
+
+/* Navbar */
+
+.navbar-container {
+    display: flex;
+    flex-direction: row-reverse;
+    position: absolute;
+    /* right: 20px; */
+    bottom: 20px;
+    width: 100%;
+    justify-content: center;
+}
+
+.navbar-item {
+    margin-left: 20px;
+    position: initial !important;
+}
+
+.navbar-item:last-child {
+    margin-left: 0px;
+}
+
+/* Language list */
+
+.language-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    position: absolute;
+    right: 20px;
+}
+
+.language-button {
+    margin-left: 5px;
+    position: initial !important;
+}
+
+@media (min-width: 900px) {
+  .language-container, .btn-home {
+    top: 20px;
+  }
+}
+
+/* Footer */
+
+.global-footer {
+    padding-top: 10px;
+    max-width: 750px;
+    height: 100px;
+}
+
+.global-footer .sns-links {
+    float: right;
+}
+
+.global-footer .sns-links a {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border-radius: 12px;
+    vertical-align: top;
+    text-align: center;
+    text-decoration: none;
+    font-size: 13px;
+    /*
+    XXX Maybe but this in? Somethimes it's not smooth and that makes it ugly...
+    transition: color,border-color 0.1s linear;
+    */
+}
+
+.global-footer .sns-links a i {
+    vertical-align: middle;
+}
+
+/* Article */
+
+.article-list h2 a {
+    text-decoration: none;
+    /*
+    XXX Maybe but this in? Somethimes it's not smooth and that makes it ugly...
+    transition: color 0.1s linear;
+    */
+}
+
+.article-title {
+    position: relative;
+}
+
+.article-title h1 {
+    font-size: 44px;
+}
+
+.article-title * {
+    text-align: center;
+}
+
+.post-tag a {
+    margin-left: 10px;
+    padding: 0 10px;
+    border-radius: 12px;
+    text-decoration: none;
+    /*
+    XXX Maybe but this in? Somethimes it's not smooth and that makes it ugly...
+    transition: color,border-color,background-color 0.1s linear;
+    */
+}
+
+.not-found h1 {
+    font-weight: 200;
+    font-size: 80px;
+}
+
+.not-found {
+    text-align: center;
+}
+
+.author-info {
+    overflow: auto;
+}
+
+.author-name {
+    margin: 0 0 5px 0;
+}
+
+.author-avatar img {
+    max-width: 100px;
+    max-height: 100px;
+    width: 100px;
+    height: 100px;
+}
+
+.author-contact {
+    margin-top: 10px;
+}
+
+/* Article list */
+
+.li-h1 {
+    margin-bottom: 2px;
+}
+
+.li-small {
+    font-size: 70%;
+    margin-top: 3px;
+    margin-bottom: 6px;
+}
+
+.li-content {
+    display: flex;
+}
+
+.li-content img {
+    width: 250px;
+    margin-left: 20px;
+}
+
+.summary-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+/* Tag list */
+
+#container-tags-title {
+    display: flex;
+    justify-content: space-between;
+}
+#btn-all-tags {
+    align-self: flex-end;
+    margin-bottom: 13px;
+}
+.list-group-item {
+  border-radius: 0px !important;
+}
+
+/* Bootstrap adjustions */
+
+h1,
+.h1 {
+  font-size: 36px;
+}
+h2,
+.h2 {
+  font-size: 30px;
+}
+h3,
+.h3 {
+  font-size: 24px;
+}
+h4,
+.h4 {
+  font-size: 18px;
+}
+h5,
+.h5 {
+  font-size: 14px;
+}
+h6,
+.h6 {
+  font-size: 12px;
+}
+
+pre {
+    font-size: 13px;
+}
+
+pre code {
+    overflow: auto;
+    white-space: pre;
+    word-wrap: normal;
+}
+
+blockquote {
+     font-style:italic;
+}
+
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
+    font-family: "Source Sans Pro", "Kozuka Gothic Pr6N", Meiryo, sans-serif !important;
+}
+
+small, .small {
+  font-size: 80%;
+}
+
+a > .btn:hover {
+  text-decoration: none;
+}
+
+article section img {
+    max-width: 100%;
+    height: auto;
+    margin: 13px auto;
+}
+
+.btn {
+    font-size: 13px;
+    line-height: 1.58823529;
+    /*
+    XXX Specify a radius for the buttons here
+    */
+    border-radius: 0px;
+}
+
+blockquote {
+	padding: 20px;
+	margin: 15px 0px;
+	font-size: unset;
+}
+
+/*
+XXX Maybe but this in? Somethimes it's not smooth and that makes it ugly...
+.btn, .btn-primary, a.btn-default, a {
+    transition: all 0.1s linear;
+}
+*/
+
+.btn-older-posts {
+    float: left;
+}
+
+.btn-newer-posts {
+    float: right;
+}
+
+/*
+Paging at the bottom
+
+I don't use the default pager-class because I want to use the normal buttons with my style
+*/
+.pager-container {
+    overflow: auto;
+}
+
+.delimiter {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.pagination {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    border-radius: unset;
+}
+
+.info {
+    position: fixed;
+    bottom:0%;
+    width:100%;
+    padding: 10px;
+    display: flex;
+    text-align: center;
+    flex-direction: column;
+}
+
+.info-content {
+  margin: auto;
+  padding: 10px;
+}
+
+@media (min-width: 768px) {
+  .info-content {
+    width: 750px;
+  }
+}
+@media (min-width: 992px) {
+  .info-content {
+    width: 970px;
+  }
+}
+@media (min-width: 1200px) {
+  .info-content {
+    width: 1170px;
+  }
+}
+
+/* Images */
+.embedded-image {
+	padding: 5px;
+}
+
+/* Note box */
+.note {
+	padding: 20px;
+	margin: 15px 0px;
+}
+
+/* Table */
+table {
+    width: 100%;
+	margin: 15px 0px;
+}
+
+table, th, td {
+    border: 1px solid black;
+    border-collapse: collapse;
+    padding: 5px;
+}
