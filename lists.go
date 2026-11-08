@@ -2,8 +2,11 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"hash/fnv"
+	"math"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,6 +54,8 @@ func init() {
 	conf.AddReadCommand("LKEYEXISTS", cmdLKEYEXISTS)
 
 	conf.AddWriteCommand("LTRIM", cmdLTRIM)
+	conf.AddWriteCommand("LINSERT", cmdLINSERT)
+	conf.AddWriteCommand("LREM", cmdLREM)
 }
 
 func cmdLTRIM(m uhaha.Machine, args []string) (interface{}, error) {
@@ -464,4 +469,151 @@ func lParseBPopArgs(argsOrigin []string) (keys [][]byte, timeout time.Duration, 
 
 	keys = args[0 : len(args)-1]
 	return
+}
+
+// replaceList rewrites the list stored at key while preserving its expiration:
+// clearing a list drops the key's TTL, and rebuilding with LPush would reverse
+// the element order.
+func replaceList(m uhaha.Machine, key []byte, members [][]byte) error {
+	ttl, err := ldb.LTTL(key)
+	if err != nil {
+		return err
+	}
+	if _, err := ldb.LClear(key); err != nil {
+		return err
+	}
+	if len(members) > 0 {
+		if _, err := ldb.RPush(key, members...); err != nil {
+			return err
+		}
+	}
+	if ttl > 0 {
+		if _, err := ldb.LExpireAt(key, m.Now().Unix()+ttl); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func cmdLINSERT(m uhaha.Machine, args []string) (interface{}, error) {
+	if len(args) != 5 {
+		return nil, uhaha.ErrWrongNumArgs
+	}
+
+	after := strings.ToUpper(args[2])
+	if after != "BEFORE" && after != "AFTER" {
+		return nil, fmt.Errorf("ERR syntax error")
+	}
+
+	key := []byte(args[1])
+	pivot := []byte(args[3])
+	value := []byte(args[4])
+
+	members, err := ldb.LRange(key, 0, -1)
+	if err != nil {
+		return nil, err
+	}
+	if len(members) == 0 {
+		// A missing key answers -1, a missing pivot answers 0 - the opposite of
+		// what the LINSERT implementation this replaces did.
+		return redcon.SimpleInt(-1), nil
+	}
+
+	pivotIndex := -1
+	for i := range members {
+		if bytes.Equal(members[i], pivot) {
+			pivotIndex = i
+			break
+		}
+	}
+	if pivotIndex < 0 {
+		return redcon.SimpleInt(0), nil
+	}
+
+	insertAt := pivotIndex
+	if after == "AFTER" {
+		insertAt++
+	}
+	newMembers := make([][]byte, 0, len(members)+1)
+	newMembers = append(newMembers, members[:insertAt]...)
+	newMembers = append(newMembers, value)
+	newMembers = append(newMembers, members[insertAt:]...)
+
+	if err := replaceList(m, key, newMembers); err != nil {
+		return nil, err
+	}
+
+	return redcon.SimpleInt(len(newMembers)), nil
+}
+
+func cmdLREM(m uhaha.Machine, args []string) (interface{}, error) {
+	if len(args) != 4 {
+		return nil, uhaha.ErrWrongNumArgs
+	}
+
+	key := []byte(args[1])
+	count, err := ledis.StrInt64([]byte(args[2]), nil)
+	if err != nil {
+		return nil, fmt.Errorf("ERR value is not an integer or out of range")
+	}
+	value := []byte(args[3])
+
+	if count == math.MinInt64 {
+		return nil, fmt.Errorf("ERR value is out of range")
+	}
+
+	members, err := ldb.LRange(key, 0, -1)
+	if err != nil {
+		return nil, err
+	}
+	if len(members) == 0 {
+		return redcon.SimpleInt(0), nil
+	}
+
+	// count > 0 removes from the head, count < 0 from the tail, count == 0 all.
+	remove := make([]bool, len(members))
+	remaining := count
+	if remaining < 0 {
+		remaining = -remaining
+	}
+	var removed int64
+
+	if count >= 0 {
+		for i := 0; i < len(members); i++ {
+			if count != 0 && remaining == 0 {
+				break
+			}
+			if !bytes.Equal(members[i], value) {
+				continue
+			}
+			remove[i] = true
+			removed++
+			remaining--
+		}
+	} else {
+		for i := len(members) - 1; i >= 0 && remaining > 0; i-- {
+			if !bytes.Equal(members[i], value) {
+				continue
+			}
+			remove[i] = true
+			removed++
+			remaining--
+		}
+	}
+
+	if removed == 0 {
+		return redcon.SimpleInt(0), nil
+	}
+
+	newMembers := make([][]byte, 0, len(members)-int(removed))
+	for i := range members {
+		if !remove[i] {
+			newMembers = append(newMembers, members[i])
+		}
+	}
+	if err := replaceList(m, key, newMembers); err != nil {
+		return nil, err
+	}
+
+	return redcon.SimpleInt(removed), nil
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -57,7 +58,7 @@ func handleExpiration(key []byte, timestamp int64) (interface{}, error) {
 		}
 		return redcon.SimpleInt(1), nil
 	}
-	
+
 	v, err := ldb.ExpireAt(key, timestamp)
 	if err != nil {
 		return nil, err
@@ -90,7 +91,7 @@ func cmdEXPIRE(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, fmt.Errorf("ERR invalid duration: %v", err)
 	}
 
-	return handleExpiration([]byte(args[1]), m.Now().Unix() + duration)
+	return handleExpiration([]byte(args[1]), m.Now().Unix()+duration)
 }
 
 // cmdSTRLEN returns the length of the string value stored at key.
@@ -658,14 +659,109 @@ func cmdBITCOUNT(m uhaha.Machine, args []string) (interface{}, error) {
 	return redcon.SimpleInt(n), nil
 }
 
-// This is different from the RESP standard. It needs to enrich the algorithm to support more atomic instructions.
+// expireSecondsFromMillis converts a millisecond TTL into the whole seconds the
+// storage layer keeps, rounding up so a key never expires earlier than asked for.
+func expireSecondsFromMillis(ms int64) int64 {
+	if ms <= 0 {
+		return 0
+	}
+	sec := ms / 1000
+	if ms%1000 != 0 {
+		sec++
+	}
+	return sec
+}
+
+// cmdSET implements the Redis SET command.
+// Syntax: SET key value [EX seconds | PX milliseconds | NX | XX | KEEPTTL]
+// EXAT/PXAT are not implemented; any other option is a syntax error.
 func cmdSET(m uhaha.Machine, args []string) (interface{}, error) {
-	if len(args) != 3 {
+	if len(args) < 3 {
 		return nil, uhaha.ErrWrongNumArgs
 	}
 
-	if err := ldb.Set([]byte(args[1]), []byte(args[2])); err != nil {
+	key := []byte(args[1])
+	value := []byte(args[2])
+
+	var exSeconds, pxMilliseconds int64
+	var nx, xx, keepttl bool
+
+	for i := 3; i < len(args); i++ {
+		switch strings.ToUpper(args[i]) {
+		case "NX":
+			nx = true
+		case "XX":
+			xx = true
+		case "KEEPTTL":
+			keepttl = true
+		case "EX", "PX":
+			if i+1 >= len(args) {
+				return nil, uhaha.ErrWrongNumArgs
+			}
+			n, err := ledis.StrInt64([]byte(args[i+1]), nil)
+			if err != nil {
+				return nil, fmt.Errorf("ERR value is not an integer or out of range")
+			}
+			if n <= 0 {
+				return nil, fmt.Errorf("ERR invalid expire time in 'set' command")
+			}
+			if strings.EqualFold(args[i], "EX") {
+				exSeconds = n
+			} else {
+				pxMilliseconds = n
+			}
+			i++
+		default:
+			return nil, fmt.Errorf("ERR syntax error")
+		}
+	}
+
+	// Contradictory options are a syntax error, as in Redis.
+	if (nx && xx) || (keepttl && (exSeconds > 0 || pxMilliseconds > 0)) || (exSeconds > 0 && pxMilliseconds > 0) {
+		return nil, fmt.Errorf("ERR syntax error")
+	}
+
+	exists, err := ldb.Exists(key)
+	if err != nil {
 		return nil, err
+	}
+	if (nx && exists > 0) || (xx && exists == 0) {
+		// Redis answers a null bulk when the NX/XX condition is not met.
+		return nil, nil
+	}
+
+	// Storage drops a key's expiration on every write, so KEEPTTL has to read
+	// the remaining time first and re-apply it after the write.
+	var keptTTL int64 = -1
+	if keepttl {
+		if keptTTL, err = ldb.TTL(key); err != nil {
+			return nil, err
+		}
+	}
+
+	ttl := keptTTL
+	switch {
+	case exSeconds > 0:
+		ttl = exSeconds
+	case pxMilliseconds > 0:
+		ttl = expireSecondsFromMillis(pxMilliseconds)
+	}
+
+	// Validate the expiry before writing: a rejected expiration must not leave the
+	// value stored without a TTL while the client is told the command failed.
+	now := m.Now().Unix()
+	if ttl > 0 && ttl > math.MaxInt64-now {
+		return nil, fmt.Errorf("ERR invalid expire time in 'set' command")
+	}
+
+	if err := ldb.Set(key, value); err != nil {
+		return nil, err
+	}
+
+	if ttl > 0 {
+		if _, err := ldb.ExpireAt(key, now+ttl); err != nil {
+			return nil, err
+		}
 	}
 
 	return redcon.SimpleString("OK"), nil

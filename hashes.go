@@ -63,11 +63,13 @@ func cmdHGET(m uhaha.Machine, args []string) (interface{}, error) {
 		return nil, err
 	}
 
-	if len(val) == 0 {
+	// A missing field yields a nil slice; a field holding an empty value yields
+	// an empty one and must stay an empty bulk string rather than a nil reply.
+	if val == nil {
 		return nil, nil
 	}
 
-	return redcon.SimpleString(val), nil
+	return val, nil
 }
 
 // HDEL key field [field ...]
