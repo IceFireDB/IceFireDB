@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
+// SPDX-FileCopyrightText: 2026 The Pion community <https://pion.ly>
 // SPDX-License-Identifier: MIT
 
 package stun
@@ -9,6 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
+
+	"github.com/pion/logging"
 )
 
 const (
@@ -32,6 +35,7 @@ const (
 // as source.
 func NewTransactionID() (b [TransactionIDSize]byte) {
 	readFullOrPanic(rand.Reader, b[:])
+
 	return b
 }
 
@@ -42,12 +46,26 @@ func IsMessage(b []byte) bool {
 	return len(b) >= messageHeaderSize && bin.Uint32(b[4:8]) == magicCookie
 }
 
+// MessageOption is a function that sets a Message option.
+type MessageOption func(*Message)
+
 // New returns *Message with pre-allocated Raw.
 func New() *Message {
 	const defaultRawCapacity = 120
+
 	return &Message{
 		Raw: make([]byte, messageHeaderSize, defaultRawCapacity),
 	}
+}
+
+// NewWithOptions returns *Message with pre-allocated Raw, applying the provided options.
+func NewWithOptions(options ...MessageOption) *Message {
+	m := New()
+	for _, option := range options {
+		option(m)
+	}
+
+	return m
 }
 
 // ErrDecodeToNil occurs on Decode(data, nil) call.
@@ -59,6 +77,7 @@ func Decode(data []byte, m *Message) error {
 		return ErrDecodeToNil
 	}
 	m.Raw = append(m.Raw[:0], data...)
+
 	return m.Decode()
 }
 
@@ -74,6 +93,22 @@ type Message struct {
 	TransactionID [TransactionIDSize]byte
 	Attributes    Attributes
 	Raw           []byte
+	logger        logging.LeveledLogger
+	strict        bool
+}
+
+// withMessageLogger sets the logger for the Message.
+func withMessageLogger(logger logging.LeveledLogger) MessageOption {
+	return func(m *Message) {
+		m.logger = logger
+	}
+}
+
+// WithStrict enables stricter RFC 5389 and RFC 8489 enforcement.
+func WithStrict(strict bool) MessageOption {
+	return func(m *Message) {
+		m.strict = strict
+	}
 }
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface.
@@ -82,6 +117,7 @@ func (m Message) MarshalBinary() (data []byte, err error) {
 	// contract induced by other implementations.
 	b := make([]byte, len(m.Raw))
 	copy(b, m.Raw)
+
 	return b, nil
 }
 
@@ -89,6 +125,7 @@ func (m Message) MarshalBinary() (data []byte, err error) {
 func (m *Message) UnmarshalBinary(data []byte) error {
 	// We can't retain data, copy is expected by interface contract.
 	m.Raw = append(m.Raw[:0], data...)
+
 	return m.Decode()
 }
 
@@ -108,6 +145,7 @@ func (m *Message) GobDecode(data []byte) error {
 func (m *Message) AddTo(b *Message) error {
 	b.TransactionID = m.TransactionID
 	b.WriteTransactionID()
+
 	return nil
 }
 
@@ -118,16 +156,18 @@ func (m *Message) NewTransactionID() error {
 	if err == nil {
 		m.WriteTransactionID()
 	}
+
 	return err
 }
 
 func (m *Message) String() string {
 	tID := base64.StdEncoding.EncodeToString(m.TransactionID[:])
-	aInfo := ""
+	var aInfo strings.Builder
 	for k, a := range m.Attributes {
-		aInfo += fmt.Sprintf("attr%d=%s ", k, a.Type)
+		fmt.Fprintf(&aInfo, "attr%d=%s ", k, a.Type)
 	}
-	return fmt.Sprintf("%s l=%d attrs=%d id=%s, %s", m.Type, m.Length, len(m.Attributes), tID, aInfo)
+
+	return fmt.Sprintf("%s l=%d attrs=%d id=%s, %s", m.Type, m.Length, len(m.Attributes), tID, aInfo.String())
 }
 
 // Reset resets Message, attributes and underlying buffer length.
@@ -144,6 +184,7 @@ func (m *Message) grow(n int) {
 	}
 	if cap(m.Raw) >= n {
 		m.Raw = m.Raw[:n]
+
 		return
 	}
 	m.Raw = append(m.Raw, make([]byte, n-len(m.Raw))...)
@@ -153,7 +194,7 @@ func (m *Message) grow(n int) {
 //
 // Value of attribute is copied to internal buffer so
 // it is safe to reuse v.
-func (m *Message) Add(t AttrType, v []byte) {
+func (m *Message) Add(attrType AttrType, val []byte) {
 	// Allocating buffer for TLV (type-length-value).
 	// T = t, L = len(v), V = v.
 	// m.Raw will look like:
@@ -163,31 +204,33 @@ func (m *Message) Add(t AttrType, v []byte) {
 	// [first:last]                         <- same as previous
 	// [0 1|2 3|4    4 + len(v)]            <- mapping for allocated buffer
 	//   T   L        V
-	allocSize := attributeHeaderSize + len(v)  // ~ len(TLV) = len(TL) + len(V)
-	first := messageHeaderSize + int(m.Length) // first byte number
-	last := first + allocSize                  // last byte number
-	m.grow(last)                               // growing cap(Raw) to fit TLV
-	m.Raw = m.Raw[:last]                       // now len(Raw) = last
-	m.Length += uint32(allocSize)              // rendering length change
+	allocSize := attributeHeaderSize + len(val) // ~ len(TLV) = len(TL) + len(V)
+	first := messageHeaderSize + int(m.Length)  // first byte number
+	last := first + allocSize                   // last byte number
+	m.grow(last)                                // growing cap(Raw) to fit TLV
+	m.Raw = m.Raw[:last]                        // now len(Raw) = last
+	//nolint:gosec // G115
+	m.Length += uint32(allocSize) // rendering length change
 
 	// Sub-slicing internal buffer to simplify encoding.
 	buf := m.Raw[first:last]           // slice for TLV
 	value := buf[attributeHeaderSize:] // slice for V
 	attr := RawAttribute{
-		Type:   t,              // T
-		Length: uint16(len(v)), // L
-		Value:  value,          // V
+		Type: attrType, // T
+		//nolint:gosec // G115
+		Length: uint16(len(val)), // L
+		Value:  value,            // V
 	}
 
 	// Encoding attribute TLV to allocated buffer.
 	bin.PutUint16(buf[0:2], attr.Type.Value()) // T
 	bin.PutUint16(buf[2:4], attr.Length)       // L
-	copy(value, v)                             // V
+	copy(value, val)                           // V
 
 	// Checking that attribute value needs padding.
 	if attr.Length%padding != 0 {
 		// Performing padding.
-		bytesToAdd := nearestPaddedValueLength(len(v)) - len(v)
+		bytesToAdd := nearestPaddedValueLength(len(val)) - len(val)
 		last += bytesToAdd
 		m.grow(last)
 		// setting all padding bytes to zero
@@ -197,7 +240,8 @@ func (m *Message) Add(t AttrType, v []byte) {
 		for i := range buf {
 			buf[i] = 0
 		}
-		m.Raw = m.Raw[:last]           // increasing buffer length
+		m.Raw = m.Raw[:last] // increasing buffer length
+		//nolint:gosec // G115
 		m.Length += uint32(bytesToAdd) // rendering length change
 	}
 	m.Attributes = append(m.Attributes, attr)
@@ -213,6 +257,7 @@ func attrSliceEqual(a, b Attributes) bool {
 			}
 			if attrB.Equal(attr) {
 				found = true
+
 				break
 			}
 		}
@@ -220,56 +265,59 @@ func attrSliceEqual(a, b Attributes) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
-func attrEqual(a, b Attributes) bool {
-	if a == nil && b == nil {
+func attrEqual(attrA, attrB Attributes) bool {
+	if attrA == nil && attrB == nil {
 		return true
 	}
-	if a == nil || b == nil {
+	if attrA == nil || attrB == nil {
 		return false
 	}
-	if len(a) != len(b) {
+	if len(attrA) != len(attrB) {
 		return false
 	}
-	if !attrSliceEqual(a, b) {
+	if !attrSliceEqual(attrA, attrB) {
 		return false
 	}
-	if !attrSliceEqual(b, a) {
+	if !attrSliceEqual(attrB, attrA) {
 		return false
 	}
+
 	return true
 }
 
-// Equal returns true if Message b equals to m.
+// Equal returns true if Message msg equals to m.
 // Ignores m.Raw.
-func (m *Message) Equal(b *Message) bool {
-	if m == nil && b == nil {
+func (m *Message) Equal(msg *Message) bool {
+	if m == nil && msg == nil {
 		return true
 	}
-	if m == nil || b == nil {
+	if m == nil || msg == nil {
 		return false
 	}
-	if m.Type != b.Type {
+	if m.Type != msg.Type {
 		return false
 	}
-	if m.TransactionID != b.TransactionID {
+	if m.TransactionID != msg.TransactionID {
 		return false
 	}
-	if m.Length != b.Length {
+	if m.Length != msg.Length {
 		return false
 	}
-	if !attrEqual(m.Attributes, b.Attributes) {
+	if !attrEqual(m.Attributes, msg.Attributes) {
 		return false
 	}
+
 	return true
 }
 
 // WriteLength writes m.Length to m.Raw.
 func (m *Message) WriteLength() {
 	m.grow(4)
-	bin.PutUint16(m.Raw[2:4], uint16(m.Length))
+	bin.PutUint16(m.Raw[2:4], uint16(m.Length)) //nolint:gosec // G115
 }
 
 // WriteHeader writes header to underlying buffer. Not goroutine-safe.
@@ -322,6 +370,7 @@ func (m *Message) Encode() {
 // call result.
 func (m *Message) WriteTo(w io.Writer) (int64, error) {
 	n, err := w.Write(m.Raw)
+
 	return int64(n), err
 }
 
@@ -340,37 +389,50 @@ func (m *Message) ReadFrom(r io.Reader) (int64, error) {
 		return int64(n), err
 	}
 	m.Raw = tBuf[:n]
-	return int64(n), m.Decode()
+
+	if err = m.Decode(); err != nil {
+		return int64(n), err
+	}
+	if m.strict && m.Type.Value() == 0 {
+		return int64(n), ErrInvalidType
+	}
+
+	return int64(n), nil
 }
 
 // ErrUnexpectedHeaderEOF means that there were not enough bytes in
 // m.Raw to read header.
 var ErrUnexpectedHeaderEOF = errors.New("unexpected EOF: not enough bytes to read header")
 
+// ErrInvalidType means that the message type is 0 (reserved).
+var ErrInvalidType = errors.New("STUN message type 0 is reserved")
+
 // Decode decodes m.Raw into m.
-func (m *Message) Decode() error {
+func (m *Message) Decode() error { //nolint:cyclop
 	// decoding message header
 	buf := m.Raw
 	if len(buf) < messageHeaderSize {
 		return ErrUnexpectedHeaderEOF
 	}
 	var (
-		t        = bin.Uint16(buf[0:2])      // first 2 bytes
+		msgType  = bin.Uint16(buf[0:2])      // first 2 bytes
 		size     = int(bin.Uint16(buf[2:4])) // second 2 bytes
 		cookie   = bin.Uint32(buf[4:8])      // last 4 bytes
 		fullSize = messageHeaderSize + size  // len(m.Raw)
 	)
 	if cookie != magicCookie {
 		msg := fmt.Sprintf("%x is invalid magic cookie (should be %x)", cookie, magicCookie)
+
 		return newDecodeErr("message", "cookie", msg)
 	}
 	if len(buf) < fullSize {
 		msg := fmt.Sprintf("buffer length %d is less than %d (expected message size)", len(buf), fullSize)
+
 		return newAttrDecodeErr("message", msg)
 	}
 	// saving header data
-	m.Type.ReadValue(t)
-	m.Length = uint32(size)
+	m.Type.ReadValue(msgType)
+	m.Length = uint32(size) //nolint:gosec // G115
 	copy(m.TransactionID[:], buf[8:messageHeaderSize])
 
 	m.Attributes = m.Attributes[:0]
@@ -378,32 +440,65 @@ func (m *Message) Decode() error {
 		offset = 0
 		b      = buf[messageHeaderSize:fullSize]
 	)
+	seenMI := false
+	seenMI256 := false
 	for offset < size {
 		// checking that we have enough bytes to read header
 		if len(b) < attributeHeaderSize {
 			msg := fmt.Sprintf("buffer length %d is less than %d (expected header size)", len(b), attributeHeaderSize)
+
 			return newAttrDecodeErr("header", msg)
 		}
 		var (
-			a = RawAttribute{
+			attr = RawAttribute{
 				Type:   compatAttrType(bin.Uint16(b[0:2])), // first 2 bytes
 				Length: bin.Uint16(b[2:4]),                 // second 2 bytes
 			}
-			aL     = int(a.Length)                // attribute length
+			aL     = int(attr.Length)             // attribute length
 			aBuffL = nearestPaddedValueLength(aL) // expected buffer length (with padding)
 		)
 		b = b[attributeHeaderSize:] // slicing again to simplify value read
 		offset += attributeHeaderSize
 		if len(b) < aBuffL { // checking size
-			msg := fmt.Sprintf("buffer length %d is less than %d (expected value size for %s)", len(b), aBuffL, a.Type)
+			msg := fmt.Sprintf("buffer length %d is less than %d (expected value size for %s)", len(b), aBuffL, attr.Type)
+
 			return newAttrDecodeErr("value", msg)
 		}
-		a.Value = b[:aL]
+		attr.Value = b[:aL]
 		offset += aBuffL
 		b = b[aBuffL:]
 
-		m.Attributes = append(m.Attributes, a)
+		// RFC 8489:
+		// - after MESSAGE-INTEGRITY, only MESSAGE-INTEGRITY-SHA256 and
+		//   FINGERPRINT may follow.
+		// - after MESSAGE-INTEGRITY-SHA256, if MESSAGE-INTEGRITY was absent,
+		//   only FINGERPRINT may follow.
+		isMI := attr.Type == AttrMessageIntegrity
+		isMI256 := attr.Type == AttrMessageIntegritySHA256
+		isFingerprint := attr.Type == AttrFingerprint
+		afterMI := seenMI && !isMI256 && !isFingerprint
+		afterMI256Only := !seenMI && seenMI256 && !isFingerprint
+		afterIntegrity := afterMI || afterMI256Only
+
+		if afterIntegrity && (m.logger != nil) {
+			action := "retained"
+			if m.strict {
+				action = "dropped"
+			}
+			m.logger.Warnf("attribute %s found after integrity attribute (%s)", attr.Type.String(), action)
+		}
+		if m.strict && afterIntegrity {
+			continue
+		}
+		m.Attributes = append(m.Attributes, attr)
+		if isMI {
+			seenMI = true
+		}
+		if isMI256 {
+			seenMI256 = true
+		}
 	}
+
 	return nil
 }
 
@@ -412,12 +507,14 @@ func (m *Message) Decode() error {
 // Any error is unrecoverable, but message could be partially decoded.
 func (m *Message) Write(tBuf []byte) (int, error) {
 	m.Raw = append(m.Raw[:0], tBuf...)
+
 	return len(tBuf), m.Decode()
 }
 
 // CloneTo clones m to b securing any further m mutations.
 func (m *Message) CloneTo(b *Message) error {
 	b.Raw = append(b.Raw[:0], m.Raw...)
+
 	return b.Decode()
 }
 
@@ -436,7 +533,7 @@ const (
 var (
 	// Binding request message type.
 	BindingRequest = NewType(MethodBinding, ClassRequest) //nolint:gochecknoglobals
-	// Binding success response message type
+	// Binding success response message type.
 	BindingSuccess = NewType(MethodBinding, ClassSuccessResponse) //nolint:gochecknoglobals
 	// Binding error response message type.
 	BindingError = NewType(MethodBinding, ClassErrorResponse) //nolint:gochecknoglobals
@@ -501,6 +598,7 @@ func (m Method) String() string {
 		// Falling back to hex representation.
 		s = fmt.Sprintf("0x%x", uint16(m))
 	}
+
 	return s
 }
 
@@ -513,6 +611,7 @@ type MessageType struct {
 // AddTo sets m type to t.
 func (t MessageType) AddTo(m *Message) error {
 	m.SetType(t)
+
 	return nil
 }
 
@@ -554,13 +653,13 @@ func (t MessageType) Value() uint16 {
 
 	// Warning: Abandon all hope ye who enter here.
 	// Splitting M into A(M0-M3), B(M4-M6), D(M7-M11).
-	m := uint16(t.Method)
-	a := m & methodABits // A = M * 0b0000000000001111 (right 4 bits)
-	b := m & methodBBits // B = M * 0b0000000001110000 (3 bits after A)
-	d := m & methodDBits // D = M * 0b0000111110000000 (5 bits after B)
+	msg := uint16(t.Method)
+	a := msg & methodABits // A = M * 0b0000000000001111 (right 4 bits)
+	b := msg & methodBBits // B = M * 0b0000000001110000 (3 bits after A)
+	d := msg & methodDBits // D = M * 0b0000111110000000 (5 bits after B)
 
 	// Shifting to add "holes" for C0 (at 4 bit) and C1 (8 bit).
-	m = a + (b << methodBShift) + (d << methodDShift)
+	msg = a + (b << methodBShift) + (d << methodDShift)
 
 	// C0 is zero bit of C, C1 is first bit.
 	// C0 = C * 0b01, C1 = (C * 0b10) >> 1
@@ -573,7 +672,7 @@ func (t MessageType) Value() uint16 {
 	c1 := (c & c1Bit) << classC1Shift
 	class := c0 + c1
 
-	return m + class
+	return msg + class
 }
 
 // ReadValue decodes uint16 into MessageType.
@@ -604,6 +703,7 @@ func (m *Message) Contains(t AttrType) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -618,5 +718,6 @@ func NewTransactionIDSetter(value [TransactionIDSize]byte) Setter {
 func (t transactionIDValueSetter) AddTo(m *Message) error {
 	m.TransactionID = t
 	m.WriteTransactionID()
+
 	return nil
 }

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Raised the toolchain to Go 1.27.3 (`go 1.26.0` / `toolchain go1.27.3`) and upgraded the dependency
+  set — `golang.org/x/net` 0.60.0, `google.golang.org/grpc` 1.83.2, `github.com/quic-go/quic-go`
+  0.60.0, `quic-go/webtransport-go` 0.11.1, `pion/dtls/v3` 3.1.4, `pion/stun/v3` 3.1.5,
+  `ipld/go-ipld-prime` 0.23.0, `go-jose/v4` 4.1.6, `klauspost/compress` 1.20.2 and the OpenTelemetry
+  exporters at 1.45.0. Reachable `govulncheck` findings drop from 14 to 2, and the two that remain —
+  `pion/dtls/v2` (no upstream fix) and `go-libp2p-kad-dht` (needs coordinated `kubo`/`ipfs-lite`/fork
+  releases) — are recorded as accepted risk in `SECURITY.md`.
+- `cockroachdb/pebble/v2` 2.1.4 → 2.1.7, which pulls a `cockroachdb/swiss` revision that no longer
+  uses runtime internals removed in Go 1.27; without it the tree does not compile on the new toolchain.
+
 ### Added
 - **RESP compatibility**: `SET` accepts `EX`, `PX`, `NX`, `XX` and `KEEPTTL`; new `LINSERT`, `LREM`,
   `SMOVE`, `SPOP`, `SRANDMEMBER` and the top-level `SCAN`; `HSCAN`/`SSCAN`/`ZSCAN` now follow the Redis

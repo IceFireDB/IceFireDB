@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -72,12 +73,8 @@ func parseHeaders(decodeFn qpack.DecodeFunc, isRequest bool, sizeLimit int, head
 		if sizeLimit < 0 {
 			return header{}, errHeaderTooLarge
 		}
-		// field names need to be lowercase, see section 4.2 of RFC 9114
-		if strings.ToLower(h.Name) != h.Name {
-			return header{}, fmt.Errorf("header field is not lower-case: %s", h.Name)
-		}
-		if !httpguts.ValidHeaderFieldValue(h.Value) {
-			return header{}, fmt.Errorf("invalid header field value for %s: %q", h.Name, h.Value)
+		if err := validateHeaderFieldNameAndValue(h); err != nil {
+			return header{}, err
 		}
 		if h.IsPseudo() {
 			if readFirstRegularHeader {
@@ -96,7 +93,7 @@ func parseHeaders(decodeFn qpack.DecodeFunc, isRequest bool, sizeLimit int, head
 			case ":authority":
 				isDuplicatePseudoHeader = hdr.Authority != ""
 				hdr.Authority = h.Value
-			case ":protocol":
+			case ":protocol": // RFC 9220
 				isDuplicatePseudoHeader = hdr.Protocol != ""
 				hdr.Protocol = h.Value
 			case ":scheme":
@@ -119,16 +116,8 @@ func parseHeaders(decodeFn qpack.DecodeFunc, isRequest bool, sizeLimit int, head
 				return header{}, fmt.Errorf("invalid response pseudo header: %s", h.Name)
 			}
 		} else {
-			if !httpguts.ValidHeaderFieldName(h.Name) {
-				return header{}, fmt.Errorf("invalid header field name: %q", h.Name)
-			}
-			for _, invalidField := range invalidHeaderFields {
-				if h.Name == invalidField {
-					return header{}, fmt.Errorf("invalid header field name: %q", h.Name)
-				}
-			}
-			if h.Name == "te" && h.Value != "trailers" {
-				return header{}, fmt.Errorf("invalid TE header field value: %q", h.Value)
+			if err := validateRegularHeaderField(h); err != nil {
+				return header{}, err
 			}
 			readFirstRegularHeader = true
 			switch h.Name {
@@ -159,7 +148,41 @@ func parseHeaders(decodeFn qpack.DecodeFunc, isRequest bool, sizeLimit int, head
 	return hdr, nil
 }
 
-func parseTrailers(decodeFn qpack.DecodeFunc, headerFields *[]qpack.HeaderField) (http.Header, error) {
+func validateHeaderFieldNameAndValue(h qpack.HeaderField) error {
+	// field names need to be lowercase, see section 4.2 of RFC 9114
+	if strings.ToLower(h.Name) != h.Name {
+		return fmt.Errorf("header field is not lower-case: %s", h.Name)
+	}
+	if !httpguts.ValidHeaderFieldValue(h.Value) {
+		return fmt.Errorf("invalid header field value for %s: %q", h.Name, h.Value)
+	}
+	return nil
+}
+
+func validateRegularHeaderField(h qpack.HeaderField) error {
+	if !httpguts.ValidHeaderFieldName(h.Name) {
+		return fmt.Errorf("invalid header field name: %q", h.Name)
+	}
+	if slices.Contains(invalidHeaderFields[:], h.Name) {
+		return fmt.Errorf("invalid header field name: %q", h.Name)
+	}
+	if h.Name == "te" && h.Value != "trailers" {
+		return fmt.Errorf("invalid TE header field value: %q", h.Value)
+	}
+	return nil
+}
+
+func validateTrailerHeaderField(h qpack.HeaderField) error {
+	if err := validateRegularHeaderField(h); err != nil {
+		return err
+	}
+	if !httpguts.ValidTrailerHeader(h.Name) {
+		return fmt.Errorf("invalid trailer field name: %q", h.Name)
+	}
+	return nil
+}
+
+func parseTrailers(decodeFn qpack.DecodeFunc, sizeLimit int, headerFields *[]qpack.HeaderField) (http.Header, error) {
 	h := make(http.Header)
 	for {
 		hf, err := decodeFn()
@@ -172,8 +195,21 @@ func parseTrailers(decodeFn qpack.DecodeFunc, headerFields *[]qpack.HeaderField)
 		if headerFields != nil {
 			*headerFields = append(*headerFields, hf)
 		}
+		// RFC 9114, section 4.2.2:
+		// The size of a field list is calculated based on the uncompressed size of fields,
+		// including the length of the name and value in bytes plus an overhead of 32 bytes for each field.
+		sizeLimit -= len(hf.Name) + len(hf.Value) + 32
+		if sizeLimit < 0 {
+			return nil, errHeaderTooLarge
+		}
+		if err := validateHeaderFieldNameAndValue(hf); err != nil {
+			return nil, err
+		}
 		if hf.IsPseudo() {
 			return nil, fmt.Errorf("http3: received pseudo header in trailer: %s", hf.Name)
+		}
+		if err := validateTrailerHeaderField(hf); err != nil {
+			return nil, err
 		}
 		h.Add(hf.Name, hf.Value)
 	}
@@ -194,6 +230,9 @@ func requestFromHeaders(decodeFn qpack.DecodeFunc, sizeLimit int, headerFields *
 	// Extended CONNECT, see https://datatracker.ietf.org/doc/html/rfc8441#section-4
 	isExtendedConnected := isConnect && hdr.Protocol != ""
 	if isExtendedConnected {
+		if !validExtendedConnectProtocol(hdr.Protocol) {
+			return nil, fmt.Errorf("invalid :protocol: %q", hdr.Protocol)
+		}
 		if hdr.Scheme == "" || hdr.Path == "" || hdr.Authority == "" {
 			return nil, errors.New("extended CONNECT: :scheme, :path and :authority must not be empty")
 		}
@@ -225,16 +264,16 @@ func requestFromHeaders(decodeFn qpack.DecodeFunc, sizeLimit int, headerFields *
 		} else {
 			u.Path = hdr.Path
 		}
-		u.Scheme = hdr.Scheme
-		u.Host = hdr.Authority
 		requestURI = hdr.Authority
 	} else {
 		u, err = url.ParseRequestURI(hdr.Path)
 		if err != nil {
-			return nil, fmt.Errorf("invalid content length: %w", err)
+			return nil, fmt.Errorf("invalid request URI: %w", err)
 		}
 		requestURI = hdr.Path
 	}
+	u.Scheme = hdr.Scheme
+	u.Host = hdr.Authority
 
 	req := &http.Request{
 		Method:        hdr.Method,
@@ -250,6 +289,14 @@ func requestFromHeaders(decodeFn qpack.DecodeFunc, sizeLimit int, headerFields *
 	}
 	req.Trailer = extractAnnouncedTrailers(req.Header)
 	return req, nil
+}
+
+func validExtendedConnectProtocol(protocol string) bool {
+	// RFC 9220 specifies that the semantics of the :protocol pseudo are the same as defined in RFC 8441.
+	// RFC 8441, Section 4 specifies that :protocol is a single value from the HTTP Upgrade Token Registry.
+	// RFC 9110, Section 16.7 specifies that HTTP Upgrade Token Registry uses token grammar.
+	// Therefore, ValidHeaderFieldName is the right syntax check here, despite the misleading name.
+	return httpguts.ValidHeaderFieldName(protocol)
 }
 
 // updateResponseFromHeaders sets up http.Response as an HTTP/3 response,
@@ -296,7 +343,7 @@ func extractAnnouncedTrailers(header http.Header) http.Header {
 
 	trailers := make(http.Header)
 	for _, rawVal := range rawTrailers {
-		for _, val := range strings.Split(rawVal, ",") {
+		for val := range strings.SplitSeq(rawVal, ",") {
 			trailers[http.CanonicalHeaderKey(textproto.TrimString(val))] = nil
 		}
 	}
@@ -365,10 +412,12 @@ func decodeTrailers(r io.Reader, hf *headersFrame, maxHeaderBytes int, decoder *
 	}
 	decodeFn := decoder.Decode(b)
 	var fields []qpack.HeaderField
+	var headerFields *[]qpack.HeaderField
 	if qlogger != nil {
 		fields = make([]qpack.HeaderField, 0, 16)
+		headerFields = &fields
 	}
-	trailers, err := parseTrailers(decodeFn, &fields)
+	trailers, err := parseTrailers(decodeFn, maxHeaderBytes, headerFields)
 	if err != nil {
 		maybeQlogInvalidHeadersFrame(qlogger, streamID, hf.Length)
 		return nil, err

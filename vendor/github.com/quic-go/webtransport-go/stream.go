@@ -74,12 +74,12 @@ func newSendStream(str quicSendStream, hdr []byte, onClose func()) *SendStream {
 // If the stream was canceled, the error is a [StreamError].
 func (s *SendStream) Write(b []byte) (int, error) {
 	n, err := s.write(b)
-	if err != nil && !isTimeoutError(err) {
-		s.onClose()
-	}
 	var strErr *quic.StreamError
 	if errors.As(err, &strErr) && strErr.ErrorCode == WTSessionGoneErrorCode {
-		return n, s.handleSessionGoneError()
+		err = s.handleSessionGoneError()
+	}
+	if err != nil && !isTimeoutError(err) {
+		s.onClose()
 	}
 	return n, maybeConvertStreamError(err)
 }
@@ -277,12 +277,12 @@ func newReceiveStream(str quicReceiveStream, onClose func()) *ReceiveStream {
 // If the stream was canceled, the error is a [StreamError].
 func (s *ReceiveStream) Read(b []byte) (int, error) {
 	n, err := s.str.Read(b)
-	if err != nil && !isTimeoutError(err) {
-		s.onClose()
-	}
 	var strErr *quic.StreamError
 	if errors.As(err, &strErr) && strErr.ErrorCode == WTSessionGoneErrorCode {
-		return n, s.handleSessionGoneError()
+		err = s.handleSessionGoneError()
+	}
+	if err != nil && !isTimeoutError(err) {
+		s.onClose()
 	}
 	return n, maybeConvertStreamError(err)
 }
