@@ -17,7 +17,7 @@ If you add or update dependencies, remember to:
 
 ## 3. Coding Conventions
 
-* Prefer Go 1.25+ syntax for new code.
+* Prefer Go 1.27+ syntax for new code (the module pins `go 1.26.0` / `toolchain go1.27.3`).
 * Use `sync.RWMutex` for thread-safe operations.
 * Follow write-through caching pattern for hybrid storage.
 * Follow existing naming patterns (e.g., `db`, `cfg`, `err`).

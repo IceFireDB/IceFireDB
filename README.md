@@ -4,7 +4,7 @@
 
 ### **Decentralized Database Infrastructure for Web2 & Web3**
 
-[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.27+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Tests](https://github.com/IceFireDB/IceFireDB/actions/workflows/test.yml/badge.svg)](https://github.com/IceFireDB/IceFireDB/actions/workflows/test.yml)
 [![Build](https://github.com/IceFireDB/IceFireDB/actions/workflows/build.yml/badge.svg)](https://github.com/IceFireDB/IceFireDB/actions/workflows/build.yml)

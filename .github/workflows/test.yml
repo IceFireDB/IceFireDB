@@ -11,7 +11,7 @@ jobs:
   osstest:
     strategy:
       matrix:
-        go-version: [1.25.2]
+        go-version: [1.27.3]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
@@ -62,7 +62,7 @@ jobs:
   ipfstest:
     strategy:
       matrix:
-        go-version: [1.25.2]
+        go-version: [1.27.3]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
@@ -95,7 +95,7 @@ jobs:
   ipfssynckvtest:
     strategy:
       matrix:
-        go-version: [1.25.2]
+        go-version: [1.27.3]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
@@ -128,7 +128,7 @@ jobs:
   goleveldbtest:
     strategy:
       matrix:
-        go-version: [1.25.2]
+        go-version: [1.27.3]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
@@ -153,7 +153,7 @@ jobs:
   crdtdbtest:
     strategy:
       matrix:
-        go-version: [1.25.2]
+        go-version: [1.27.3]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
@@ -178,7 +178,7 @@ jobs:
   ipfslogdbtest:
     strategy:
       matrix:
-        go-version: [1.25.2]
+        go-version: [1.27.3]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
@@ -203,7 +203,7 @@ jobs:
   badgerdbtest:
     strategy:
       matrix:
-        go-version: [1.25.2]
+        go-version: [1.27.3]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
@@ -228,7 +228,7 @@ jobs:
   hybriddbtest:
     strategy:
       matrix:
-        go-version: [1.25.2]
+        go-version: [1.27.3]
         os: [ubuntu-latest]
         arch: [amd64, arm64, armv5, armv6, armv7]
     runs-on: ${{ matrix.os }}
@@ -253,7 +253,7 @@ jobs:
   hybriddb-unit-test:
     strategy:
       matrix:
-        go-version: [1.25.2]
+        go-version: [1.27.3]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
@@ -271,7 +271,7 @@ jobs:
   sqlite-unit-test:
     strategy:
       matrix:
-        go-version: [1.25.2]
+        go-version: [1.27.3]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
