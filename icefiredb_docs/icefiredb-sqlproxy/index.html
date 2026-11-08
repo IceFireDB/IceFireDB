@@ -1,0 +1,146 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content='
+  IceFireDB-SQLProxy
+  #
+
+A MySQL-protocol proxy that sits in front of ordinary MySQL servers and replays statements to the
+other agents in the mesh, so several MySQL instances in different places stay in step without changing
+the application.
+cd IceFireDB-SQLProxy
+make                                   # → bin/IceFireDB-SQLProxy
+./bin/IceFireDB-SQLProxy -c ./config/config.yaml
+
+mysql -h 127.0.0.1 -P 33306 -u host1 -p    # a user from userlist
+
+  What it is
+  #
+
+
+  
+      
+          Property
+          Value
+      
+  
+  
+      
+          Protocol
+          MySQL wire protocol
+      
+      
+          Backend
+          MySQL (mysql.admin, mysql.readonly)
+      
+      
+          Replication
+          Statements propagated between agents over libp2p
+      
+      
+          Listener
+          server.addr, default :33306
+      
+      
+          Binary
+          bin/IceFireDB-SQLProxy (-c <config.yaml>)
+      
+  
+
+
+  Configuration (config/config.yaml)
+  #
+
+
+  
+      
+          Key
+          Meaning
+          Default in file
+      
+  
+  
+      
+          server.addr
+          Proxy listener
+          ":33306"
+      
+      
+          debug.enable / .port
+          Debug/pprof server
+          true / 17878
+      
+      
+          mysql.admin
+          Write connection pool: addr, user, password, dbname, minAlive, maxAlive, maxIdle
+          127.0.0.1:3306, admin_user
+      
+      
+          mysql.readonly
+          Read connection pool, same keys
+          127.0.0.1:3306, readonly_user
+      
+      
+          userlist
+          Client tenants (user/password)
+          host1 / host1
+      
+      
+          p2p.enable
+          Mesh replication
+          true
+      
+      
+          p2p.serviceDiscoveryId
+          Rendezvous name, must match peers
+          tanovo_sqlproxy_admin_service
+      
+      
+          p2p.serviceCommandTopic
+          Command channel
+          tanovo_sqlproxy_command_topic
+      
+      
+          p2p.adminTopic / p2p.readonlyTopic
+          Per-role channels
+          tanovo_sqlproxy_admin_topic / …_readonly_topic
+      
+      
+          p2p.serviceDiscoverMode
+          advertise or announce
+          advertise
+      
+      
+          p2p.nodeHostIp / nodeHostPort
+          Address peers should dial
+          127.0.0.1 / 0
+      
+  
+
+Note the camelCase keys in this component (serviceDiscoveryId, not service_discovery_id as in
+PubSub/SQLite). Copying a config between components silently gives you a default value.'><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="IceFireDB-SQLProxy"><meta property="og:description" content=' IceFireDB-SQLProxy # A MySQL-protocol proxy that sits in front of ordinary MySQL servers and replays statements to the other agents in the mesh, so several MySQL instances in different places stay in step without changing the application.
+cd IceFireDB-SQLProxy make # → bin/IceFireDB-SQLProxy ./bin/IceFireDB-SQLProxy -c ./config/config.yaml mysql -h 127.0.0.1 -P 33306 -u host1 -p # a user from userlist What it is # Property Value Protocol MySQL wire protocol Backend MySQL (mysql.admin, mysql.readonly) Replication Statements propagated between agents over libp2p Listener server.addr, default :33306 Binary bin/IceFireDB-SQLProxy (-c <config.yaml>) Configuration (config/config.yaml) # Key Meaning Default in file server.addr Proxy listener ":33306" debug.enable / .port Debug/pprof server true / 17878 mysql.admin Write connection pool: addr, user, password, dbname, minAlive, maxAlive, maxIdle 127.0.0.1:3306, admin_user mysql.readonly Read connection pool, same keys 127.0.0.1:3306, readonly_user userlist Client tenants (user/password) host1 / host1 p2p.enable Mesh replication true p2p.serviceDiscoveryId Rendezvous name, must match peers tanovo_sqlproxy_admin_service p2p.serviceCommandTopic Command channel tanovo_sqlproxy_command_topic p2p.adminTopic / p2p.readonlyTopic Per-role channels tanovo_sqlproxy_admin_topic / …_readonly_topic p2p.serviceDiscoverMode advertise or announce advertise p2p.nodeHostIp / nodeHostPort Address peers should dial 127.0.0.1 / 0 Note the camelCase keys in this component (serviceDiscoveryId, not service_discovery_id as in PubSub/SQLite). Copying a config between components silently gives you a default value.'><meta property="og:locale" content="en"><meta property="og:type" content="website"><title>IceFireDB-SQLProxy | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/ title=IceFireDB-SQLProxy><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/index.xml title="IceFireDB Documentation"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/ class=active>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>IceFireDB-SQLProxy</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#what-it-is>What it is</a></li><li><a href=#configuration-configconfigyaml>Configuration (<code>config/config.yaml</code>)</a></li><li><a href=#operational-notes>Operational notes</a></li><li><a href=#when-to-use-it>When to use it</a></li></ul></nav></aside></header><article class=markdown><h1 id=icefiredb-sqlproxy>IceFireDB-SQLProxy
+<a class=anchor href=#icefiredb-sqlproxy>#</a></h1><p>A <strong>MySQL-protocol proxy</strong> that sits in front of ordinary MySQL servers and replays statements to the
+other agents in the mesh, so several MySQL instances in different places stay in step without changing
+the application.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>cd IceFireDB-SQLProxy
+</span></span><span style=display:flex><span>make                                   <span style=color:#75715e># → bin/IceFireDB-SQLProxy</span>
+</span></span><span style=display:flex><span>./bin/IceFireDB-SQLProxy -c ./config/config.yaml
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>mysql -h 127.0.0.1 -P <span style=color:#ae81ff>33306</span> -u host1 -p    <span style=color:#75715e># a user from userlist</span>
+</span></span></code></pre></div><h2 id=what-it-is>What it is
+<a class=anchor href=#what-it-is>#</a></h2><table><thead><tr><th style=text-align:left>Property</th><th style=text-align:left>Value</th></tr></thead><tbody><tr><td style=text-align:left>Protocol</td><td style=text-align:left>MySQL wire protocol</td></tr><tr><td style=text-align:left>Backend</td><td style=text-align:left>MySQL (<code>mysql.admin</code>, <code>mysql.readonly</code>)</td></tr><tr><td style=text-align:left>Replication</td><td style=text-align:left>Statements propagated between agents over libp2p</td></tr><tr><td style=text-align:left>Listener</td><td style=text-align:left><code>server.addr</code>, default <code>:33306</code></td></tr><tr><td style=text-align:left>Binary</td><td style=text-align:left><code>bin/IceFireDB-SQLProxy</code> (<code>-c &lt;config.yaml></code>)</td></tr></tbody></table><h2 id=configuration-configconfigyaml>Configuration (<code>config/config.yaml</code>)
+<a class=anchor href=#configuration-configconfigyaml>#</a></h2><table><thead><tr><th style=text-align:left>Key</th><th style=text-align:left>Meaning</th><th style=text-align:left>Default in file</th></tr></thead><tbody><tr><td style=text-align:left><code>server.addr</code></td><td style=text-align:left>Proxy listener</td><td style=text-align:left><code>":33306"</code></td></tr><tr><td style=text-align:left><code>debug.enable</code> / <code>.port</code></td><td style=text-align:left>Debug/pprof server</td><td style=text-align:left><code>true</code> / <code>17878</code></td></tr><tr><td style=text-align:left><code>mysql.admin</code></td><td style=text-align:left>Write connection pool: <code>addr</code>, <code>user</code>, <code>password</code>, <code>dbname</code>, <code>minAlive</code>, <code>maxAlive</code>, <code>maxIdle</code></td><td style=text-align:left><code>127.0.0.1:3306</code>, <code>admin_user</code></td></tr><tr><td style=text-align:left><code>mysql.readonly</code></td><td style=text-align:left>Read connection pool, same keys</td><td style=text-align:left><code>127.0.0.1:3306</code>, <code>readonly_user</code></td></tr><tr><td style=text-align:left><code>userlist</code></td><td style=text-align:left>Client tenants (<code>user</code>/<code>password</code>)</td><td style=text-align:left><code>host1</code> / <code>host1</code></td></tr><tr><td style=text-align:left><code>p2p.enable</code></td><td style=text-align:left>Mesh replication</td><td style=text-align:left><code>true</code></td></tr><tr><td style=text-align:left><code>p2p.serviceDiscoveryId</code></td><td style=text-align:left>Rendezvous name, must match peers</td><td style=text-align:left><code>tanovo_sqlproxy_admin_service</code></td></tr><tr><td style=text-align:left><code>p2p.serviceCommandTopic</code></td><td style=text-align:left>Command channel</td><td style=text-align:left><code>tanovo_sqlproxy_command_topic</code></td></tr><tr><td style=text-align:left><code>p2p.adminTopic</code> / <code>p2p.readonlyTopic</code></td><td style=text-align:left>Per-role channels</td><td style=text-align:left><code>tanovo_sqlproxy_admin_topic</code> / <code>…_readonly_topic</code></td></tr><tr><td style=text-align:left><code>p2p.serviceDiscoverMode</code></td><td style=text-align:left><code>advertise</code> or <code>announce</code></td><td style=text-align:left><code>advertise</code></td></tr><tr><td style=text-align:left><code>p2p.nodeHostIp</code> / <code>nodeHostPort</code></td><td style=text-align:left>Address peers should dial</td><td style=text-align:left><code>127.0.0.1</code> / <code>0</code></td></tr></tbody></table><p>Note the camelCase keys in this component (<code>serviceDiscoveryId</code>, not <code>service_discovery_id</code> as in
+PubSub/SQLite). Copying a config between components silently gives you a default value.</p><h2 id=operational-notes>Operational notes
+<a class=anchor href=#operational-notes>#</a></h2><ul><li><strong>Read/write separation is a config choice, not routing magic</strong>: <code>mysql.readonly</code> is the pool used for
+read queries, <code>mysql.admin</code> for writes. Point them at the same server if you have no replica.</li><li>Sample credentials (<code>admin_pass</code>, <code>readonly_pass</code>, <code>host1</code>/<code>host1</code>) are placeholders — replace them.</li><li>Statements replay to every agent, so deterministic SQL only. <code>NOW()</code>/<code>RAND()</code>/<code>UUID()</code> can diverge.</li><li>No conflict resolution: the mesh is ordered by arrival, so two agents writing the same row concurrently
+converge on whichever statement applies last.</li><li>The debug server is <strong>enabled</strong> in the sample config on port <code>17878</code>; turn it off in production.</li></ul><h2 id=when-to-use-it>When to use it
+<a class=anchor href=#when-to-use-it>#</a></h2><p>You already run MySQL and want the same data available closer to users in other regions without moving
+the application to a new database. It is not a MySQL cluster replacement: it does not do automatic
+failover of the MySQL backend, and it does not guarantee cross-site consistency for conflicting writes.</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#what-it-is>What it is</a></li><li><a href=#configuration-configconfigyaml>Configuration (<code>config/config.yaml</code>)</a></li><li><a href=#operational-notes>Operational notes</a></li><li><a href=#when-to-use-it>When to use it</a></li></ul></nav></div></aside></main></body></html>

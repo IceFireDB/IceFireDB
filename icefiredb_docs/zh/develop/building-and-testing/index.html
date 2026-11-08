@@ -1,0 +1,103 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  构建与测试
+  #
+
+
+  构建
+  #
+
+make localbuild     # bin/IceFireDB for the host platform
+make run            # go run . (development)
+make run_dev        # same, for a dev setup
+make clean          # remove bin/ and installed copies
+发布与交叉编译目标确实存在（make all、make release、make build-linux-*），但在迭代代码时请用 run/localbuild——发布矩阵每次调用会构建五个 GOOS/GOARCH 变体。
+二进制里嵌入了自己的 git revision 和构建时间：
+go build -ldflags &#34;-X main.BuildVersion=$(git rev-parse --short HEAD) -X main.BuildDate=$(date '+%F %T')&#34; -o bin/IceFireDB .
+-h 会显示版本，并且在设置了 BuildVersion 时把它写进 banner。
+
+  测试套件
+  #
+
+
+  
+      
+          命令
+          跑什么
+      
+  
+  
+      
+          make test / go test ./...
+          单元测试，遵循 DRIVER
+      
+      
+          DRIVER=goleveldb make test-compat
+          RESP 兼容性套件，-tags alltest
+      
+      
+          make test-integration
+          先构建二进制，再跑崩溃恢复和多节点 Raft 故障切换测试（-tags integration）
+      
+      
+          make test-partition
+          基于 Docker 的脑裂测试：3 个节点，主节点被切断网络（-tags partition）
+      
+      
+          make soak
+          对 3 节点集群施加持续负载；SOAK_DURATION、SOAK_WORKERS、SOAK_CHAOS=1
+      
+  
+
+DRIVER 选择测试所针对的存储驱动（Makefile 的默认值是 badger）："><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="构建与测试"><meta property="og:description" content=" 构建与测试 # 构建 # make localbuild # bin/IceFireDB for the host platform make run # go run . (development) make run_dev # same, for a dev setup make clean # remove bin/ and installed copies 发布与交叉编译目标确实存在（make all、make release、make build-linux-*），但在迭代代码时请用 run/localbuild——发布矩阵每次调用会构建五个 GOOS/GOARCH 变体。
+二进制里嵌入了自己的 git revision 和构建时间：
+go build -ldflags &#34;-X main.BuildVersion=$(git rev-parse --short HEAD) -X main.BuildDate=$(date '+%F %T')&#34; -o bin/IceFireDB . -h 会显示版本，并且在设置了 BuildVersion 时把它写进 banner。
+测试套件 # 命令 跑什么 make test / go test ./... 单元测试，遵循 DRIVER DRIVER=goleveldb make test-compat RESP 兼容性套件，-tags alltest make test-integration 先构建二进制，再跑崩溃恢复和多节点 Raft 故障切换测试（-tags integration） make test-partition 基于 Docker 的脑裂测试：3 个节点，主节点被切断网络（-tags partition） make soak 对 3 节点集群施加持续负载；SOAK_DURATION、SOAK_WORKERS、SOAK_CHAOS=1 DRIVER 选择测试所针对的存储驱动（Makefile 的默认值是 badger）："><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="develop"><title>构建与测试 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/ title="Building and testing"><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle checked>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/ class=active>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>构建与测试</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#构建>构建</a></li><li><a href=#测试套件>测试套件</a></li><li><a href=#ci-跑什么>CI 跑什么</a></li><li><a href=#为一条命令写测试>为一条命令写测试</a></li><li><a href=#值得手动跑一遍的静态检查>值得手动跑一遍的静态检查</a></li></ul></nav></aside></header><article class=markdown><h1 id=构建与测试>构建与测试
+<a class=anchor href=#%e6%9e%84%e5%bb%ba%e4%b8%8e%e6%b5%8b%e8%af%95>#</a></h1><h2 id=构建>构建
+<a class=anchor href=#%e6%9e%84%e5%bb%ba>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>make localbuild     <span style=color:#75715e># bin/IceFireDB for the host platform</span>
+</span></span><span style=display:flex><span>make run            <span style=color:#75715e># go run . (development)</span>
+</span></span><span style=display:flex><span>make run_dev        <span style=color:#75715e># same, for a dev setup</span>
+</span></span><span style=display:flex><span>make clean          <span style=color:#75715e># remove bin/ and installed copies</span>
+</span></span></code></pre></div><p>发布与交叉编译目标确实存在（<code>make all</code>、<code>make release</code>、<code>make build-linux-*</code>），但在迭代代码时请用 <code>run</code>/<code>localbuild</code>——发布矩阵每次调用会构建五个 GOOS/GOARCH 变体。</p><p>二进制里嵌入了自己的 git revision 和构建时间：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>go build -ldflags <span style=color:#e6db74>&#34;-X main.BuildVersion=</span><span style=color:#66d9ef>$(</span>git rev-parse --short HEAD<span style=color:#66d9ef>)</span><span style=color:#e6db74> -X main.BuildDate=</span><span style=color:#66d9ef>$(</span>date <span style=color:#e6db74>&#39;+%F %T&#39;</span><span style=color:#66d9ef>)</span><span style=color:#e6db74>&#34;</span> -o bin/IceFireDB .
+</span></span></code></pre></div><p><code>-h</code> 会显示版本，并且在设置了 <code>BuildVersion</code> 时把它写进 banner。</p><h2 id=测试套件>测试套件
+<a class=anchor href=#%e6%b5%8b%e8%af%95%e5%a5%97%e4%bb%b6>#</a></h2><table><thead><tr><th style=text-align:left>命令</th><th style=text-align:left>跑什么</th></tr></thead><tbody><tr><td style=text-align:left><code>make test</code> / <code>go test ./...</code></td><td style=text-align:left>单元测试，遵循 <code>DRIVER</code></td></tr><tr><td style=text-align:left><code>DRIVER=goleveldb make test-compat</code></td><td style=text-align:left>RESP 兼容性套件，<code>-tags alltest</code></td></tr><tr><td style=text-align:left><code>make test-integration</code></td><td style=text-align:left>先构建二进制，再跑崩溃恢复和多节点 Raft 故障切换测试（<code>-tags integration</code>）</td></tr><tr><td style=text-align:left><code>make test-partition</code></td><td style=text-align:left>基于 Docker 的脑裂测试：3 个节点，主节点被切断网络（<code>-tags partition</code>）</td></tr><tr><td style=text-align:left><code>make soak</code></td><td style=text-align:left>对 3 节点集群施加持续负载；<code>SOAK_DURATION</code>、<code>SOAK_WORKERS</code>、<code>SOAK_CHAOS=1</code></td></tr></tbody></table><p><code>DRIVER</code> 选择测试所针对的存储驱动（Makefile 的默认值是 <code>badger</code>）：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>DRIVER<span style=color:#f92672>=</span>badger     make test
+</span></span><span style=display:flex><span>DRIVER<span style=color:#f92672>=</span>goleveldb  make test-compat
+</span></span><span style=display:flex><span>DRIVER<span style=color:#f92672>=</span>hybriddb   go test ./driver/hybriddb/...
+</span></span></code></pre></div><p>部分驱动的测试需要先有基础设施才能跑：</p><table><thead><tr><th style=text-align:left>驱动</th><th style=text-align:left>前置条件</th></tr></thead><tbody><tr><td style=text-align:left><code>oss</code></td><td style=text-align:left>S3 兼容端点；CI 会启动 LocalStack 并设置 <code>OSS_TEST_ENDPOINT</code></td></tr><tr><td style=text-align:left><code>ipfs</code>、<code>ipfs-synckv</code></td><td style=text-align:left>在 <code>--ipfs-endpoint</code> 处的 IPFS daemon</td></tr><tr><td style=text-align:left><code>crdt</code>、<code>ipfs-log</code></td><td style=text-align:left>测试节点之间的 libp2p 连通性</td></tr></tbody></table><h2 id=ci-跑什么>CI 跑什么
+<a class=anchor href=#ci-%e8%b7%91%e4%bb%80%e4%b9%88>#</a></h2><p><code>.github/workflows/test.yml</code> 对每个驱动各跑一次 <code>alltest</code> 套件——<code>oss</code>、<code>ipfs</code>、<code>ipfs-synckv</code>、
+<code>goleveldb</code>、<code>crdt</code>、<code>ipfs-log</code>、<code>badger</code>、<code>hybriddb</code>——另外还跑各驱动专属的包和 SQLite
+套件。<code>oss</code> 任务使用 LocalStack（MinIO 的公共镜像已经无法匿名拉取）。</p><p><code>.github/workflows/build.yml</code> 构建五个发布目标，这样只在 amd64 上能编译通过的改动就混不过去。</p><p>两个 workflow 都锁定模块声明的工具链：<code>go 1.26.0</code> 加 <code>toolchain go1.27.3</code>，CI 用 Go <strong>1.27.3</strong>。
+本地 <code>go</code> 低于该版本会在模块的 <code>toolchain</code> 指令处失败，而不是在代码处失败。</p><h2 id=为一条命令写测试>为一条命令写测试
+<a class=anchor href=#%e4%b8%ba%e4%b8%80%e6%9d%a1%e5%91%bd%e4%bb%a4%e5%86%99%e6%b5%8b%e8%af%95>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>//go:build alltest
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> (
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;context&#34;</span>
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;testing&#34;</span>
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>TestMyCommandContract</span>(<span style=color:#a6e22e>t</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>testing</span>.<span style=color:#a6e22e>T</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>c</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getTestConn</span>()              <span style=color:#75715e>// helper used by the compat suite
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>ctx</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>context</span>.<span style=color:#a6e22e>Background</span>()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// 1. the happy path
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// 2. the boundary the handler is supposed to enforce
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// 3. the reply type, not just the value
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_</span> = <span style=color:#a6e22e>c</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_</span> = <span style=color:#a6e22e>ctx</span>
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>凡是把"与 Redis 的偏差"固定下来的东西，都应该放进兼容性套件，因为 <code>compat_test.go</code> 正是这些偏差所指向的那份文档。</p><h2 id=值得手动跑一遍的静态检查>值得手动跑一遍的静态检查
+<a class=anchor href=#%e5%80%bc%e5%be%97%e6%89%8b%e5%8a%a8%e8%b7%91%e4%b8%80%e9%81%8d%e7%9a%84%e9%9d%99%e6%80%81%e6%a3%80%e6%9f%a5>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>go vet ./...
+</span></span><span style=display:flex><span>gofmt -l .            <span style=color:#75715e># expect no output outside vendor/</span>
+</span></span><span style=display:flex><span>go mod tidy <span style=color:#f92672>&amp;&amp;</span> go mod vendor   <span style=color:#75715e># after touching go.mod</span>
+</span></span></code></pre></div><p>注意 <code>go mod vendor</code> 会重写 <code>vendor/</code> 目录树——Raft/RESP 层和 ledis 都在里面，所以 vendor 更新是一次代码审查，不是走形式。</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#构建>构建</a></li><li><a href=#测试套件>测试套件</a></li><li><a href=#ci-跑什么>CI 跑什么</a></li><li><a href=#为一条命令写测试>为一条命令写测试</a></li><li><a href=#值得手动跑一遍的静态检查>值得手动跑一遍的静态检查</a></li></ul></nav></div></aside></main></body></html>

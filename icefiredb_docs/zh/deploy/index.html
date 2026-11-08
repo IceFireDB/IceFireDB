@@ -1,0 +1,74 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  部署
+  #
+
+在生产环境运行 NoSQL 引擎所需的全部内容，按你会用到的顺序排列：
+
+  
+      
+          页面
+          它回答的问题
+      
+  
+  
+      
+          
+  配置
+          有哪些 flag、默认值是什么、哪些是不起作用的？
+      
+      
+          
+  集群
+          Raft 集群如何工作；如何添加／移除／替换节点？
+      
+      
+          
+  存储驱动
+          该选哪个驱动；每个驱动保证什么？
+      
+      
+          
+  安全
+          TLS、集群认证令牌，以及哪些东西没有被保护。
+      
+      
+          
+  可观测性
+          /healthz、/readyz、/metrics、INFO 各节、pprof。
+      
+      
+          
+  运维
+          备份、恢复、滚动升级、灾难恢复。
+      
+      
+          
+  系统命令
+          RAFT …、CLUSTER …、MACHINE、BARRIER、TICK、AUTH。
+      
+  
+
+有两条性质贯穿全部内容，值得在这里说一次：
+
+每个节点一个数据目录。 存储驱动、Raft 日志与快照都位于
+<data-dir>/IceFireDB/<node-id>/ 之下。复制该目录就是一个自洽的备份原语；在已有目录上更换存储
+驱动则不受支持。
+管理接口面需要显式开启，且绑定在回环地址。 --metrics 与 --pprof 默认关闭，启用后若不额外
+传入地址，它们监听 127.0.0.1。
+"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="部署"><meta property="og:description" content=" 部署 # 在生产环境运行 NoSQL 引擎所需的全部内容，按你会用到的顺序排列：
+页面 它回答的问题 配置 有哪些 flag、默认值是什么、哪些是不起作用的？ 集群 Raft 集群如何工作；如何添加／移除／替换节点？ 存储驱动 该选哪个驱动；每个驱动保证什么？ 安全 TLS、集群认证令牌，以及哪些东西没有被保护。 可观测性 /healthz、/readyz、/metrics、INFO 各节、pprof。 运维 备份、恢复、滚动升级、灾难恢复。 系统命令 RAFT …、CLUSTER …、MACHINE、BARRIER、TICK、AUTH。 有两条性质贯穿全部内容，值得在这里说一次：
+每个节点一个数据目录。 存储驱动、Raft 日志与快照都位于 <data-dir>/IceFireDB/<node-id>/ 之下。复制该目录就是一个自洽的备份原语；在已有目录上更换存储 驱动则不受支持。 管理接口面需要显式开启，且绑定在回环地址。 --metrics 与 --pprof 默认关闭，启用后若不额外 传入地址，它们监听 127.0.0.1。 "><meta property="og:locale" content="zh"><meta property="og:type" content="website"><title>部署 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/ title=Deployment><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/index.xml title="IceFireDB 文档中心"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle checked>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/ class=active>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>部署</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents></nav></aside></header><article class=markdown><h1 id=部署>部署
+<a class=anchor href=#%e9%83%a8%e7%bd%b2>#</a></h1><p>在生产环境运行 NoSQL 引擎所需的全部内容，按你会用到的顺序排列：</p><table><thead><tr><th style=text-align:left>页面</th><th style=text-align:left>它回答的问题</th></tr></thead><tbody><tr><td style=text-align:left><a href=/icefiredb_docs/zh/deploy/configuration/>配置</a></td><td style=text-align:left>有哪些 flag、默认值是什么、哪些是不起作用的？</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/deploy/clustering/>集群</a></td><td style=text-align:left>Raft 集群如何工作；如何添加／移除／替换节点？</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></td><td style=text-align:left>该选哪个驱动；每个驱动保证什么？</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/deploy/security/>安全</a></td><td style=text-align:left>TLS、集群认证令牌，以及哪些东西<strong>没有</strong>被保护。</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/deploy/observability/>可观测性</a></td><td style=text-align:left><code>/healthz</code>、<code>/readyz</code>、<code>/metrics</code>、<code>INFO</code> 各节、pprof。</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/deploy/operations/>运维</a></td><td style=text-align:left>备份、恢复、滚动升级、灾难恢复。</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></td><td style=text-align:left><code>RAFT …</code>、<code>CLUSTER …</code>、<code>MACHINE</code>、<code>BARRIER</code>、<code>TICK</code>、<code>AUTH</code>。</td></tr></tbody></table><p>有两条性质贯穿全部内容，值得在这里说一次：</p><ul><li><strong>每个节点一个数据目录。</strong> 存储驱动、Raft 日志与快照都位于
+<code>&lt;data-dir>/IceFireDB/&lt;node-id>/</code> 之下。复制该目录就是一个自洽的备份原语；在已有目录上更换存储
+驱动则不受支持。</li><li><strong>管理接口面需要显式开启，且绑定在回环地址。</strong> <code>--metrics</code> 与 <code>--pprof</code> 默认关闭，启用后若不额外
+传入地址，它们监听 <code>127.0.0.1</code>。</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents></nav></div></aside></main></body></html>

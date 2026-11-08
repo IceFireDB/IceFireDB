@@ -1,0 +1,189 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  IceFireDB-Redis-Proxy
+  #
+
+一个挡在 Redis（单节点或集群）前面的 RESP 协议代理，它把命令重放给网络中的其他代理节点。已有的
+Redis 应用不必换数据库，就能获得多站点同步。
+cd IceFireDB-Redis-Proxy
+make                                   # → bin/IceFireDB-Redis-Proxy
+./bin/IceFireDB-Redis-Proxy -c ./config/config.yaml
+
+redis-cli -p 16379 SET k v
+
+  它是什么
+  #
+
+
+  
+      
+          属性
+          取值
+      
+  
+  
+      
+          协议
+          两侧都是 Redis RESP
+      
+      
+          后端
+          redisdb.type：node 或 cluster，redisdb.start_nodes
+      
+      
+          复制
+          命令经 libp2p 在各代理节点之间传播
+      
+      
+          监听
+          proxy.local_port，默认 16379
+      
+      
+          二进制
+          bin/IceFireDB-Redis-Proxy（-c <config.yaml>）
+      
+  
+
+
+  配置（config/config.yaml）
+  #
+
+
+  
+      
+          配置项
+          含义
+          文件中的默认值
+      
+  
+  
+      
+          proxy.local_port
+          RESP 监听端口
+          16379
+      
+      
+          proxy.enable_mtls
+          协议代理监听端的双向 TLS
+          false
+      
+      
+          redisdb.type
+          node 或 cluster
+          node
+      
+      
+          redisdb.start_nodes
+          逗号分隔的后端地址
+          127.0.0.1:6379
+      
+      
+          redisdb.conn_timeout / conn_read_timeout / conn_write_timeout / conn_alive_timeout
+          秒
+          5 / 1 / 1 / 60
+      
+      
+          redisdb.conn_pool_size
+          后端连接数（0 表示短连接）
+          80
+      
+      
+          p2p.enable、service_discovery_id、service_command_topic、service_discover_mode、node_host_ip、node_host_port
+          网络设置
+          形态与 PubSub 相同
+      
+      
+          pprof_debug.enable / .port
+          pprof 服务器
+          true / 16060
+      
+      
+          log.level
+          日志级别
+          debug
+      
+      
+          ip_white_list.enable / .list
+          客户端白名单
+          true / 回环地址
+      
+      
+          cache.enable / .max_items_size / .default_expiration（毫秒）/ .cleanup_interval（秒）
+          协议代理缓存
+          true / 2048 / 5000 / 120
+      
+      
+          ignore_cmd.enable / .cmd_list
+          要丢弃的命令
+          false / []
+      
+  
+
+
+  运维要点
+  #
+
+
+在客户端连接之前，redisdb.start_nodes 必须指向一个可达的后端；协议代理不是数据库，自己没有
+存储。
+命令会在对等节点上重放：非确定性的命令（SPOP、INCRBYFLOAT、任何使用服务器时间的命令、
+用了 math.random 的 EVAL）会在不同站点之间产生分歧。请尽量使用确定性操作，或者把这些键留在
+同一个站点。
+后端前面的缓存默认开启，过期时间为 5 秒 —— 从另一个客户端做写后读，最多可能读到这么久的旧数据。
+当你需要严格读时，请关闭 cache.enable。
+示例配置里 pprof_debug 是开着的（16060）；在开发环境之外请禁用它。
+与 PubSub 相同的发现 id 注意事项：两个部署使用同一个 id 就会共享一个网络。
+
+
+  协议代理还是引擎？
+  #
+
+
+  
+      
+          需求
+          选择
+      
+  
+  
+      
+          保留现有 Redis，加上多站点同步
+          IceFireDB-Redis-Proxy
+      
+      
+          用 Raft 复制、可插拔存储的引擎替换 Redis
+          
+  NoSQL 引擎
+      
+      
+          只需要消息扇出
+          
+  IceFireDB-PubSub
+      
+  
+"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="IceFireDB-Redis-Proxy"><meta property="og:description" content=" IceFireDB-Redis-Proxy # 一个挡在 Redis（单节点或集群）前面的 RESP 协议代理，它把命令重放给网络中的其他代理节点。已有的 Redis 应用不必换数据库，就能获得多站点同步。
+cd IceFireDB-Redis-Proxy make # → bin/IceFireDB-Redis-Proxy ./bin/IceFireDB-Redis-Proxy -c ./config/config.yaml redis-cli -p 16379 SET k v 它是什么 # 属性 取值 协议 两侧都是 Redis RESP 后端 redisdb.type：node 或 cluster，redisdb.start_nodes 复制 命令经 libp2p 在各代理节点之间传播 监听 proxy.local_port，默认 16379 二进制 bin/IceFireDB-Redis-Proxy（-c <config.yaml>） 配置（config/config.yaml） # 配置项 含义 文件中的默认值 proxy.local_port RESP 监听端口 16379 proxy.enable_mtls 协议代理监听端的双向 TLS false redisdb.type node 或 cluster node redisdb.start_nodes 逗号分隔的后端地址 127.0.0.1:6379 redisdb.conn_timeout / conn_read_timeout / conn_write_timeout / conn_alive_timeout 秒 5 / 1 / 1 / 60 redisdb.conn_pool_size 后端连接数（0 表示短连接） 80 p2p.enable、service_discovery_id、service_command_topic、service_discover_mode、node_host_ip、node_host_port 网络设置 形态与 PubSub 相同 pprof_debug.enable / .port pprof 服务器 true / 16060 log.level 日志级别 debug ip_white_list.enable / .list 客户端白名单 true / 回环地址 cache.enable / .max_items_size / .default_expiration（毫秒）/ .cleanup_interval（秒） 协议代理缓存 true / 2048 / 5000 / 120 ignore_cmd.enable / .cmd_list 要丢弃的命令 false / [] 运维要点 # 在客户端连接之前，redisdb.start_nodes 必须指向一个可达的后端；协议代理不是数据库，自己没有 存储。 命令会在对等节点上重放：非确定性的命令（SPOP、INCRBYFLOAT、任何使用服务器时间的命令、 用了 math.random 的 EVAL）会在不同站点之间产生分歧。请尽量使用确定性操作，或者把这些键留在 同一个站点。 后端前面的缓存默认开启，过期时间为 5 秒 —— 从另一个客户端做写后读，最多可能读到这么久的旧数据。 当你需要严格读时，请关闭 cache.enable。 示例配置里 pprof_debug 是开着的（16060）；在开发环境之外请禁用它。 与 PubSub 相同的发现 id 注意事项：两个部署使用同一个 id 就会共享一个网络。 协议代理还是引擎？ # 需求 选择 保留现有 Redis，加上多站点同步 IceFireDB-Redis-Proxy 用 Raft 复制、可插拔存储的引擎替换 Redis NoSQL 引擎 只需要消息扇出 IceFireDB-PubSub "><meta property="og:locale" content="zh"><meta property="og:type" content="website"><title>IceFireDB-Redis-Proxy | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/ title=IceFireDB-Redis-Proxy><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/index.xml title="IceFireDB 文档中心"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/ class=active>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>IceFireDB-Redis-Proxy</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#它是什么>它是什么</a></li><li><a href=#配置configconfigyaml>配置（<code>config/config.yaml</code>）</a></li><li><a href=#运维要点>运维要点</a></li><li><a href=#协议代理还是引擎>协议代理还是引擎？</a></li></ul></nav></aside></header><article class=markdown><h1 id=icefiredb-redis-proxy>IceFireDB-Redis-Proxy
+<a class=anchor href=#icefiredb-redis-proxy>#</a></h1><p>一个挡在 Redis（单节点或集群）前面的 <strong>RESP 协议代理</strong>，它把命令重放给网络中的其他代理节点。已有的
+Redis 应用不必换数据库，就能获得多站点同步。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>cd IceFireDB-Redis-Proxy
+</span></span><span style=display:flex><span>make                                   <span style=color:#75715e># → bin/IceFireDB-Redis-Proxy</span>
+</span></span><span style=display:flex><span>./bin/IceFireDB-Redis-Proxy -c ./config/config.yaml
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>16379</span> SET k v
+</span></span></code></pre></div><h2 id=它是什么>它是什么
+<a class=anchor href=#%e5%ae%83%e6%98%af%e4%bb%80%e4%b9%88>#</a></h2><table><thead><tr><th style=text-align:left>属性</th><th style=text-align:left>取值</th></tr></thead><tbody><tr><td style=text-align:left>协议</td><td style=text-align:left>两侧都是 Redis RESP</td></tr><tr><td style=text-align:left>后端</td><td style=text-align:left><code>redisdb.type</code>：<code>node</code> 或 <code>cluster</code>，<code>redisdb.start_nodes</code></td></tr><tr><td style=text-align:left>复制</td><td style=text-align:left>命令经 libp2p 在各代理节点之间传播</td></tr><tr><td style=text-align:left>监听</td><td style=text-align:left><code>proxy.local_port</code>，默认 <code>16379</code></td></tr><tr><td style=text-align:left>二进制</td><td style=text-align:left><code>bin/IceFireDB-Redis-Proxy</code>（<code>-c &lt;config.yaml></code>）</td></tr></tbody></table><h2 id=配置configconfigyaml>配置（<code>config/config.yaml</code>）
+<a class=anchor href=#%e9%85%8d%e7%bd%aeconfigconfigyaml>#</a></h2><table><thead><tr><th style=text-align:left>配置项</th><th style=text-align:left>含义</th><th style=text-align:left>文件中的默认值</th></tr></thead><tbody><tr><td style=text-align:left><code>proxy.local_port</code></td><td style=text-align:left>RESP 监听端口</td><td style=text-align:left><code>16379</code></td></tr><tr><td style=text-align:left><code>proxy.enable_mtls</code></td><td style=text-align:left>协议代理监听端的双向 TLS</td><td style=text-align:left><code>false</code></td></tr><tr><td style=text-align:left><code>redisdb.type</code></td><td style=text-align:left><code>node</code> 或 <code>cluster</code></td><td style=text-align:left><code>node</code></td></tr><tr><td style=text-align:left><code>redisdb.start_nodes</code></td><td style=text-align:left>逗号分隔的后端地址</td><td style=text-align:left><code>127.0.0.1:6379</code></td></tr><tr><td style=text-align:left><code>redisdb.conn_timeout</code> / <code>conn_read_timeout</code> / <code>conn_write_timeout</code> / <code>conn_alive_timeout</code></td><td style=text-align:left>秒</td><td style=text-align:left><code>5</code> / <code>1</code> / <code>1</code> / <code>60</code></td></tr><tr><td style=text-align:left><code>redisdb.conn_pool_size</code></td><td style=text-align:left>后端连接数（<code>0</code> 表示短连接）</td><td style=text-align:left><code>80</code></td></tr><tr><td style=text-align:left><code>p2p.enable</code>、<code>service_discovery_id</code>、<code>service_command_topic</code>、<code>service_discover_mode</code>、<code>node_host_ip</code>、<code>node_host_port</code></td><td style=text-align:left>网络设置</td><td style=text-align:left>形态与 PubSub 相同</td></tr><tr><td style=text-align:left><code>pprof_debug.enable</code> / <code>.port</code></td><td style=text-align:left>pprof 服务器</td><td style=text-align:left><code>true</code> / <code>16060</code></td></tr><tr><td style=text-align:left><code>log.level</code></td><td style=text-align:left>日志级别</td><td style=text-align:left><code>debug</code></td></tr><tr><td style=text-align:left><code>ip_white_list.enable</code> / <code>.list</code></td><td style=text-align:left>客户端白名单</td><td style=text-align:left><code>true</code> / 回环地址</td></tr><tr><td style=text-align:left><code>cache.enable</code> / <code>.max_items_size</code> / <code>.default_expiration</code>（毫秒）/ <code>.cleanup_interval</code>（秒）</td><td style=text-align:left>协议代理缓存</td><td style=text-align:left><code>true</code> / <code>2048</code> / <code>5000</code> / <code>120</code></td></tr><tr><td style=text-align:left><code>ignore_cmd.enable</code> / <code>.cmd_list</code></td><td style=text-align:left>要丢弃的命令</td><td style=text-align:left><code>false</code> / <code>[]</code></td></tr></tbody></table><h2 id=运维要点>运维要点
+<a class=anchor href=#%e8%bf%90%e7%bb%b4%e8%a6%81%e7%82%b9>#</a></h2><ul><li>在客户端连接之前，<code>redisdb.start_nodes</code> <strong>必须</strong>指向一个可达的后端；协议代理不是数据库，自己没有
+存储。</li><li>命令会在对等节点上重放：非确定性的命令（<code>SPOP</code>、<code>INCRBYFLOAT</code>、任何使用服务器时间的命令、
+用了 <code>math.random</code> 的 <code>EVAL</code>）会在不同站点之间产生分歧。请尽量使用确定性操作，或者把这些键留在
+同一个站点。</li><li>后端前面的缓存默认开启，过期时间为 5 秒 —— 从另一个客户端做写后读，最多可能读到这么久的旧数据。
+当你需要严格读时，请关闭 <code>cache.enable</code>。</li><li>示例配置里 <code>pprof_debug</code> 是开着的（<code>16060</code>）；在开发环境之外请禁用它。</li><li>与 PubSub 相同的发现 id 注意事项：两个部署使用同一个 id 就会共享一个网络。</li></ul><h2 id=协议代理还是引擎>协议代理还是引擎？
+<a class=anchor href=#%e5%8d%8f%e8%ae%ae%e4%bb%a3%e7%90%86%e8%bf%98%e6%98%af%e5%bc%95%e6%93%8e>#</a></h2><table><thead><tr><th style=text-align:left>需求</th><th style=text-align:left>选择</th></tr></thead><tbody><tr><td style=text-align:left>保留现有 Redis，加上多站点同步</td><td style=text-align:left><strong>IceFireDB-Redis-Proxy</strong></td></tr><tr><td style=text-align:left>用 Raft 复制、可插拔存储的引擎替换 Redis</td><td style=text-align:left><a href=/icefiredb_docs/zh/overview/>NoSQL 引擎</a></td></tr><tr><td style=text-align:left>只需要消息扇出</td><td style=text-align:left><a href=/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a></td></tr></tbody></table></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#它是什么>它是什么</a></li><li><a href=#配置configconfigyaml>配置（<code>config/config.yaml</code>）</a></li><li><a href=#运维要点>运维要点</a></li><li><a href=#协议代理还是引擎>协议代理还是引擎？</a></li></ul></nav></div></aside></main></body></html>

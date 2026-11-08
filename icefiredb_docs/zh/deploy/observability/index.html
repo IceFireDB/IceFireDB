@@ -1,0 +1,145 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  可观测性
+  #
+
+有三种方式能看到节点在做什么：HTTP 端点、INFO 命令和 pprof。三者都需要显式开启。
+
+  HTTP 端点
+  #
+
+./bin/IceFireDB --metrics --metrics-addr 127.0.0.1:11002 -d /var/lib/icefiredb
+
+  
+      
+          路径
+          响应
+          用途
+      
+  
+  
+      
+          /healthz
+          只要进程还活着就返回 200 ok
+          存活探针
+      
+      
+          /readyz
+          存储驱动初始化完成后返回 200 ready；在此之前返回 503 not ready
+          就绪探针 / 上线门禁
+      
+      
+          /metrics
+          Prometheus 文本格式
+          抓取
+      
+  
+
+服务端是一个普通的 http.Server，ReadHeaderTimeout 为 5 秒；它没有认证，所以留在回环地址或私有
+网卡上（见
+  安全）。
+
+  暴露的指标
+  #
+
+注册表不是全局那个——它注册的正好是：
+
+  
+      
+          指标
+          类型
+          含义
+      
+  
+  
+      
+          icefiredb_connected_clients
+          gauge
+          当前打开的 RESP 连接数
+      
+      
+          go_*
+          collector
+          Go 运行时（goroutine、GC、memstats……）
+      
+      
+          process_*
+          collector
+          进程 CPU、RSS、FD、启动时间
+      
+  
+
+没有 Raft 指标，没有按命令的计数器，也没有延迟直方图。命令和存储的计数器改放在 INFO 里（见
+下文）。抓取间隔和告警应当依赖 up、icefiredb_connected_clients 以及容器层面的信号。"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="可观测性"><meta property="og:description" content=" 可观测性 # 有三种方式能看到节点在做什么：HTTP 端点、INFO 命令和 pprof。三者都需要显式开启。
+HTTP 端点 # ./bin/IceFireDB --metrics --metrics-addr 127.0.0.1:11002 -d /var/lib/icefiredb 路径 响应 用途 /healthz 只要进程还活着就返回 200 ok 存活探针 /readyz 存储驱动初始化完成后返回 200 ready；在此之前返回 503 not ready 就绪探针 / 上线门禁 /metrics Prometheus 文本格式 抓取 服务端是一个普通的 http.Server，ReadHeaderTimeout 为 5 秒；它没有认证，所以留在回环地址或私有 网卡上（见 安全）。
+暴露的指标 # 注册表不是全局那个——它注册的正好是：
+指标 类型 含义 icefiredb_connected_clients gauge 当前打开的 RESP 连接数 go_* collector Go 运行时（goroutine、GC、memstats……） process_* collector 进程 CPU、RSS、FD、启动时间 没有 Raft 指标，没有按命令的计数器，也没有延迟直方图。命令和存储的计数器改放在 INFO 里（见 下文）。抓取间隔和告警应当依赖 up、icefiredb_connected_clients 以及容器层面的信号。"><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="deploy"><title>可观测性 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/ title=Observability><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle checked>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/ class=active>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>可观测性</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#http-端点>HTTP 端点</a><ul><li><a href=#暴露的指标>暴露的指标</a></li></ul></li><li><a href=#info><code>INFO</code></a></li><li><a href=#pprof>pprof</a></li><li><a href=#集群状态>集群状态</a></li><li><a href=#该对什么告警>该对什么告警</a></li></ul></nav></aside></header><article class=markdown><h1 id=可观测性>可观测性
+<a class=anchor href=#%e5%8f%af%e8%a7%82%e6%b5%8b%e6%80%a7>#</a></h1><p>有三种方式能看到节点在做什么：HTTP 端点、<code>INFO</code> 命令和 pprof。三者都需要显式开启。</p><h2 id=http-端点>HTTP 端点
+<a class=anchor href=#http-%e7%ab%af%e7%82%b9>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/IceFireDB --metrics --metrics-addr 127.0.0.1:11002 -d /var/lib/icefiredb
+</span></span></code></pre></div><table><thead><tr><th style=text-align:left>路径</th><th style=text-align:left>响应</th><th style=text-align:left>用途</th></tr></thead><tbody><tr><td style=text-align:left><code>/healthz</code></td><td style=text-align:left>只要进程还活着就返回 <code>200 ok</code></td><td style=text-align:left>存活探针</td></tr><tr><td style=text-align:left><code>/readyz</code></td><td style=text-align:left>存储驱动初始化完成后返回 <code>200 ready</code>；在此之前返回 <code>503 not ready</code></td><td style=text-align:left>就绪探针 / 上线门禁</td></tr><tr><td style=text-align:left><code>/metrics</code></td><td style=text-align:left>Prometheus 文本格式</td><td style=text-align:left>抓取</td></tr></tbody></table><p>服务端是一个普通的 <code>http.Server</code>，<code>ReadHeaderTimeout</code> 为 5 秒；它没有认证，所以留在回环地址或私有
+网卡上（见
+<a href=/icefiredb_docs/zh/deploy/security/>安全</a>）。</p><h3 id=暴露的指标>暴露的指标
+<a class=anchor href=#%e6%9a%b4%e9%9c%b2%e7%9a%84%e6%8c%87%e6%a0%87>#</a></h3><p>注册表不是全局那个——它注册的正好是：</p><table><thead><tr><th style=text-align:left>指标</th><th style=text-align:left>类型</th><th style=text-align:left>含义</th></tr></thead><tbody><tr><td style=text-align:left><code>icefiredb_connected_clients</code></td><td style=text-align:left>gauge</td><td style=text-align:left>当前打开的 RESP 连接数</td></tr><tr><td style=text-align:left><code>go_*</code></td><td style=text-align:left>collector</td><td style=text-align:left>Go 运行时（goroutine、GC、memstats……）</td></tr><tr><td style=text-align:left><code>process_*</code></td><td style=text-align:left>collector</td><td style=text-align:left>进程 CPU、RSS、FD、启动时间</td></tr></tbody></table><p><strong>没有</strong> Raft 指标，没有按命令的计数器，也没有延迟直方图。命令和存储的计数器改放在 <code>INFO</code> 里（见
+下文）。抓取间隔和告警应当依赖 <code>up</code>、<code>icefiredb_connected_clients</code> 以及容器层面的信号。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#75715e># prometheus.yml</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>scrape_configs</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#f92672>job_name</span>: <span style=color:#ae81ff>icefiredb</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>static_configs</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#f92672>targets</span>: [<span style=color:#e6db74>&#34;127.0.0.1:11002&#34;</span>]
+</span></span></code></pre></div><h2 id=info><code>INFO</code>
+<a class=anchor href=#info>#</a></h2><p><code>INFO</code> <strong>不接受参数</strong>——<code>INFO memory</code> 是参数错误，这点与 Redis 不同。它回复一个 bulk string，包含
+五个段，然后是为每个注册了额外指标的存储驱动追加的一段。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-text data-lang=text><span style=display:flex><span># Server
+</span></span><span style=display:flex><span>os:linux
+</span></span><span style=display:flex><span>arch:amd64
+</span></span><span style=display:flex><span>process_id:1
+</span></span><span style=display:flex><span>addr:127.0.0.1:11001
+</span></span><span style=display:flex><span>http_addr:
+</span></span><span style=display:flex><span>readonly:false
+</span></span><span style=display:flex><span>goroutine_num:38
+</span></span><span style=display:flex><span>gomaxprocs:8
+</span></span><span style=display:flex><span>thread_num:12
+</span></span><span style=display:flex><span>cgo_call_num:0
+</span></span><span style=display:flex><span>resp_client_num:1
+</span></span><span style=display:flex><span>ledisdb_version:...
+</span></span><span style=display:flex><span># Store
+</span></span><span style=display:flex><span>name:goleveldb
+</span></span><span style=display:flex><span>get:0
+</span></span><span style=display:flex><span>get_missing:0
+</span></span><span style=display:flex><span>put:0
+</span></span><span style=display:flex><span>delete:0
+</span></span><span style=display:flex><span>get_total_time:0s
+</span></span><span style=display:flex><span>iter:0
+</span></span><span style=display:flex><span>iter_seek:0
+</span></span><span style=display:flex><span>iter_close:0
+</span></span><span style=display:flex><span>batch_commit:0
+</span></span><span style=display:flex><span>batch_commit_total_time:0s
+</span></span><span style=display:flex><span># Mem
+</span></span><span style=display:flex><span>mem_alloc:... mem_sys:... mem_heap_alloc:... mem_head_objects:...
+</span></span><span style=display:flex><span># GC
+</span></span><span style=display:flex><span>gc_last_time:... gc_num:... gc_pause_total:... gc_pause_history:...
+</span></span></code></pre></div><table><thead><tr><th style=text-align:left>段</th><th style=text-align:left>字段</th><th style=text-align:left>说明</th></tr></thead><tbody><tr><td style=text-align:left><code>Server</code></td><td style=text-align:left><code>os</code>, <code>arch</code>, <code>process_id</code>, <code>addr</code>, <code>http_addr</code>, <code>readonly</code>, <code>goroutine_num</code>, <code>gomaxprocs</code>, <code>thread_num</code>, <code>cgo_call_num</code>, <code>resp_client_num</code>, <code>ledisdb_version</code></td><td style=text-align:left><code>addr</code> 是配置的绑定地址；<code>readonly</code> 来自 ledis 配置，在这里始终是 <code>false</code></td></tr><tr><td style=text-align:left><code>Store</code></td><td style=text-align:left><code>name</code>, <code>get</code>, <code>get_missing</code>, <code>put</code>, <code>delete</code>, <code>get_total_time</code>, <code>iter</code>, <code>iter_seek</code>, <code>iter_close</code>, <code>batch_commit</code>, <code>batch_commit_total_time</code></td><td style=text-align:left>计数器是进程级的，重启后清零</td></tr><tr><td style=text-align:left><code>Mem</code></td><td style=text-align:left><code>mem_alloc</code>, <code>mem_sys</code>, <code>mem_looksups</code>, <code>mem_mallocs</code>, <code>mem_frees</code>, <code>mem_total</code>, <code>mem_heap_alloc</code>, <code>mem_heap_sys</code>, <code>mem_head_idle</code>, <code>mem_head_inuse</code>, <code>mem_head_released</code>, <code>mem_head_objects</code></td><td style=text-align:left>人类可读的大小（<code>1.234G</code>）</td></tr><tr><td style=text-align:left><code>GC</code></td><td style=text-align:left><code>gc_last_time</code>, <code>gc_num</code>, <code>gc_pause_total</code>, <code>gc_pause_history</code></td><td style=text-align:left>最近五次暂停</td></tr><tr><td style=text-align:left>驱动段</td><td style=text-align:left>见下文</td><td style=text-align:left>仅适用于实现了 <code>Metrics()</code> 的后端</td></tr></tbody></table><p>由 <code>main.go</code> 追加的驱动段：</p><ul><li><code>hybriddb</code>：<code>read_operations</code>、<code>write_operations</code>、<code>delete_operations</code>、<code>bytes_read</code>、
+<code>bytes_written</code>、<code>errors</code>、<code>uptime</code>、<code>closed</code>。</li><li><code>ipfs</code>、<code>ipfs-synckv</code>、<code>oss</code>：一个 <code>hybriddb cache</code> 段（这个标题在驱动里是复制粘贴的），带
+Ristretto 计数器——<code>used_cost</code>、<code>cost_added</code>、<code>cost_evicted</code>、<code>hits</code>、<code>misses</code>、<code>ratio</code>、
+<code>keys_added</code>、<code>keys_evicted</code>、<code>keys_updated</code>、<code>gets_kept</code>、<code>gets_dropped</code>、<code>sets_dropped</code>、
+<code>sets_rejected</code>。</li></ul><p><code>INFO</code> 是一条<strong>读</strong>命令：由你请求的节点服务，从不复制，从节点在本地回复。</p><h2 id=pprof>pprof
+<a class=anchor href=#pprof>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/IceFireDB --pprof --pprof-addr 127.0.0.1:26063 -d /var/lib/icefiredb
+</span></span><span style=display:flex><span>go tool pprof http://127.0.0.1:26063/debug/pprof/heap
+</span></span></code></pre></div><p>标准 <code>net/http/pprof</code> 处理器：<code>/debug/pprof/{profile,heap,goroutine,block,mutex,trace}</code>。与
+<code>/metrics</code> 同样的注意事项——无认证，默认在回环地址上。</p><h2 id=集群状态>集群状态
+<a class=anchor href=#%e9%9b%86%e7%be%a4%e7%8a%b6%e6%80%81>#</a></h2><p>集群和 Raft 状态以命令而不是指标的形式暴露：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT LEADER       <span style=color:#75715e># advertise address of the current leader</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT INFO         <span style=color:#75715e># raft state/term/index snapshot</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SERVER LIST  <span style=color:#75715e># id, address, leader flag per member</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> CLUSTER INFO      <span style=color:#75715e># cluster_state:ok/fail, cluster_known_nodes, cluster_size</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> CLUSTER NODES     <span style=color:#75715e># redis-cluster-shaped node lines</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> MACHINE           <span style=color:#75715e># now / uptime / boottime from the Raft clock</span>
+</span></span></code></pre></div><p><code>MACHINE HUMAN</code> 以 RFC3339 时间戳和 Go duration 返回同样的值。见
+<a href=/icefiredb_docs/zh/deploy/system-commands/>系统命令</a>。</p><h2 id=该对什么告警>该对什么告警
+<a class=anchor href=#%e8%af%a5%e5%af%b9%e4%bb%80%e4%b9%88%e5%91%8a%e8%ad%a6>#</a></h2><table><thead><tr><th style=text-align:left>信号</th><th style=text-align:left>位置</th><th style=text-align:left>含义</th></tr></thead><tbody><tr><td style=text-align:left><code>/readyz</code> 非 200</td><td style=text-align:left>HTTP 探针</td><td style=text-align:left>存储没有初始化——节点不应接收流量</td></tr><tr><td style=text-align:left><code>up{job="icefiredb"}</code></td><td style=text-align:left>Prometheus</td><td style=text-align:left>节点或它的指标端点已消失</td></tr><tr><td style=text-align:left><code>-CLUSTERDOWN</code>、<code>-MOVED</code> 风暴</td><td style=text-align:left>你的客户端指标</td><td style=text-align:left>写路径找不到主节点；检查多数派</td></tr><tr><td style=text-align:left><code>resp_client_num</code> 增长</td><td style=text-align:left><code>INFO Server</code></td><td style=text-align:left>客户端连接池里的连接泄漏</td></tr><tr><td style=text-align:left><code>get_missing</code> / <code>put</code> 比例</td><td style=text-align:left><code>INFO Store</code></td><td style=text-align:left>读缺失占主导——缓存命中率或数据集问题</td></tr><tr><td style=text-align:left><code>gc_pause_total</code> 斜率</td><td style=text-align:left><code>INFO GC</code></td><td style=text-align:left>分配压力，通常是大的回复或大的 pipeline</td></tr></tbody></table></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#http-端点>HTTP 端点</a><ul><li><a href=#暴露的指标>暴露的指标</a></li></ul></li><li><a href=#info><code>INFO</code></a></li><li><a href=#pprof>pprof</a></li><li><a href=#集群状态>集群状态</a></li><li><a href=#该对什么告警>该对什么告警</a></li></ul></nav></div></aside></main></body></html>

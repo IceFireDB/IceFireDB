@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Develop on IceFireDB Documentation</title><link>https://docs.icefiredb.xyz/icefiredb_docs/develop/</link><description>Recent content in Develop on IceFireDB Documentation</description><generator>Hugo</generator><language>en</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/develop/index.xml" rel="self" type="application/rss+xml"/><item><title>Clients</title><link>https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/</guid><description>&lt;h1 id="clients">
+ Clients
+ &lt;a class="anchor" href="#clients">#&lt;/a>
+&lt;/h1>
+&lt;p>The server speaks RESP, so a Redis client works — with three adjustments: type mismatches never error,
+scan cursors must stay opaque, and there is no &lt;code>SELECT&lt;/code>/&lt;code>MULTI&lt;/code>.&lt;/p>
+&lt;h2 id="redis-cli">
+ redis-cli
+ &lt;a class="anchor" href="#redis-cli">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>redis-cli -h 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># with TLS and auth&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-cli --tls --cacert ./ca.crt -a &lt;span style="color:#e6db74">&amp;#34;&lt;/span>$ICEFIREDB_AUTH&lt;span style="color:#e6db74">&amp;#34;&lt;/span> -h db1.internal -p &lt;span style="color:#ae81ff">11001&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>SET user:1 &lt;span style="color:#e6db74">&amp;#39;{&amp;#34;name&amp;#34;:&amp;#34;ada&amp;#34;}&amp;#39;&lt;/span> EX &lt;span style="color:#ae81ff">300&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>HGETALL user:1
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>SCAN &lt;span style="color:#ae81ff">0&lt;/span> MATCH &lt;span style="color:#e6db74">&amp;#39;user:*&amp;#39;&lt;/span> COUNT &lt;span style="color:#ae81ff">100&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>XSCAN HASH &lt;span style="color:#e6db74">&amp;#34;&amp;#34;&lt;/span> MATCH &lt;span style="color:#e6db74">&amp;#39;^user:&amp;#39;&lt;/span> COUNT &lt;span style="color:#ae81ff">100&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>INFO
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>&lt;code>redis-cli --scan&lt;/code> works: it starts at &lt;code>0&lt;/code> and loops until the cursor is &lt;code>0&lt;/code> again.&lt;/p></description></item><item><title>Building and testing</title><link>https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/</guid><description>&lt;h1 id="building-and-testing">
+ Building and testing
+ &lt;a class="anchor" href="#building-and-testing">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="build">
+ Build
+ &lt;a class="anchor" href="#build">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>make localbuild &lt;span style="color:#75715e"># bin/IceFireDB for the host platform&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make run &lt;span style="color:#75715e"># go run . (development)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make run_dev &lt;span style="color:#75715e"># same, for a dev setup&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make clean &lt;span style="color:#75715e"># remove bin/ and installed copies&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>Release and cross-compilation targets exist (&lt;code>make all&lt;/code>, &lt;code>make release&lt;/code>, &lt;code>make build-linux-*&lt;/code>), but while
+iterating on the code use &lt;code>run&lt;/code>/&lt;code>localbuild&lt;/code> — the release matrix builds five GOOS/GOARCH variants per
+invocation.&lt;/p>
+&lt;p>The binary embeds its git revision and build time:&lt;/p></description></item><item><title>Benchmarking</title><link>https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/</guid><description>&lt;h1 id="benchmarking">
+ Benchmarking
+ &lt;a class="anchor" href="#benchmarking">#&lt;/a>
+&lt;/h1>
+&lt;p>This page describes &lt;strong>how&lt;/strong> to measure the engine. It deliberately contains no performance numbers:
+a number without the commit, hardware, backend and flags that produced it is noise.&lt;/p>
+&lt;h2 id="load-generators-that-work">
+ Load generators that work
+ &lt;a class="anchor" href="#load-generators-that-work">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>redis-benchmark&lt;/code> and &lt;code>memtier_benchmark&lt;/code> both work, because the wire protocol is RESP.&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># baseline: one connection per request, no pipeline&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-benchmark -h 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span> -t set,get -n &lt;span style="color:#ae81ff">200000&lt;/span> -c &lt;span style="color:#ae81ff">50&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># pipelined&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-benchmark -h 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span> -t set,get -n &lt;span style="color:#ae81ff">1000000&lt;/span> -c &lt;span style="color:#ae81ff">50&lt;/span> -P &lt;span style="color:#ae81ff">16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># mixed, with memtier&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>memtier_benchmark -s 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span> --protocol&lt;span style="color:#f92672">=&lt;/span>redis &lt;span style="color:#ae81ff">\
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#ae81ff">&lt;/span> --clients&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#ae81ff">50&lt;/span> --threads&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#ae81ff">4&lt;/span> --ratio&lt;span style="color:#f92672">=&lt;/span>1:1 --test-time&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#ae81ff">120&lt;/span> --key-pattern&lt;span style="color:#f92672">=&lt;/span>S:S
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>What they will &lt;strong>not&lt;/strong> exercise:&lt;/p></description></item><item><title>Ecosystem</title><link>https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/</guid><description>&lt;h1 id="ecosystem-libraries-and-components">
+ Ecosystem libraries and components
+ &lt;a class="anchor" href="#ecosystem-libraries-and-components">#&lt;/a>
+&lt;/h1>
+&lt;p>The engine is one piece. These are the libraries and services around it, all in the same GitHub
+organisation.&lt;/p>
+&lt;h2 id="libraries-used-by-the-storage-drivers">
+ Libraries used by the storage drivers
+ &lt;a class="anchor" href="#libraries-used-by-the-storage-drivers">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Project&lt;/th>
+ &lt;th style="text-align: left">Used by&lt;/th>
+ &lt;th style="text-align: left">What it does&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/icefiredb-crdt-kv">&lt;code>icefiredb-crdt-kv&lt;/code>&lt;/a>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>driver/crdt&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">CRDT key/value store over libp2p pubsub; merges concurrent writes without coordination&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/icefiredb-ipfs-log">&lt;code>icefiredb-ipfs-log&lt;/code>&lt;/a>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>driver/ipfs-log&lt;/code>, &lt;code>driver/ipfs-synckv&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Immutable, operation-based append-only log for distributed systems, stored in IPFS and merged through pubsub&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/uhaha">&lt;code>IceFireDB/uhaha&lt;/code>&lt;/a> (fork)&lt;/td>
+ &lt;td style="text-align: left">the binary&lt;/td>
+ &lt;td style="text-align: left">Raft application framework: RESP server, log, snapshots, &lt;code>RAFT&lt;/code>/&lt;code>CLUSTER&lt;/code> commands&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/ledisdb">&lt;code>IceFireDB/ledisdb&lt;/code>&lt;/a> (fork)&lt;/td>
+ &lt;td style="text-align: left">the binary&lt;/td>
+ &lt;td style="text-align: left">The data model: per-type keyspaces, TTLs, encodings&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>Two of these are forked and pinned in &lt;code>go.mod&lt;/code> via &lt;code>replace&lt;/code> directives. Vendor updates to them are
+behavioural changes to the engine, so &lt;code>go mod vendor&lt;/code> diffs deserve a real review.&lt;/p></description></item></channel></rss>

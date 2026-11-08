@@ -1,0 +1,112 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  集群
+  #
+
+集群是一组共享同一份 Raft 日志的节点。每条写命令都会追加到该日志，并由每个节点重放，因此所有节点
+收敛到同一状态；读命令由收到它的那个节点在本地应答。
+
+  引导与加入
+  #
+
+第一个节点不需要额外 flag：-j 为空即表示「开启一个新集群」。之后每个节点用
+-j <leader-or-any-node-address> 加入：
+./bin/IceFireDB -n 1 -a 127.0.0.1:11001 -d ./data
+./bin/IceFireDB -n 2 -a 127.0.0.1:11002 -d ./data -j 127.0.0.1:11001
+./bin/IceFireDB -n 3 -a 127.0.0.1:11003 -d ./data -j 127.0.0.1:11001
+加入时，节点用 AUTH（若设置了 --auth/ICEFIREDB_AUTH）和 TLS（若配置了证书）连接该地址，请求
+当前的集群状态，把自己加进去，然后从日志追赶。在同一数据目录上重启的节点不需要再次 -j —— 它会从
+已持久化的 Raft 状态重新加入。
+当绑定地址不是对等节点应当拨号的那个地址时（容器、NAT、多网卡），请使用 --advertise：
+./bin/IceFireDB -n 2 -a 0.0.0.0:11001 --advertise 10.0.0.12:11001 -d /var/lib/icefiredb -j 10.0.0.11:11001
+通告地址就是客户端在 -MOVED 重定向中收到的地址，也是其他节点写入 Raft 配置的地址，因此它必须
+对对等节点可达，也对客户端可达。
+
+  一致性模型
+  #
+
+
+  
+      
+          操作
+          在哪里执行
+          保证
+      
+  
+  
+      
+          写命令（SET、HSET、RPUSH、…）
+          只在主节点执行，经 Raft 日志
+          在每个节点上按相同顺序应用；写入在多数派提交后才被确认
+      
+      
+          读命令，未启用 --openreads
+          收到它的节点；在从节点上会被拒绝
+          从节点返回 -MOVED 0 <leader>；客户端向主节点重试
+      
+      
+          读命令，启用 --openreads
+          任意节点
+          可能返回陈旧数据（本地日志已应用到的状态）
+      
+      
+          RAFT …、CLUSTER …、MACHINE、BARRIER
+          收到它的节点
+          管理操作，不复制
+      
+  
+
+启用 --try-errors 后，重定向错误变成 -TRY <leader>，且 CLUSTER 命令被禁用；这是为那些需要
+区分「去别处重试」与「集群把我重定向了」的客户端准备的。"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="集群"><meta property="og:description" content=" 集群 # 集群是一组共享同一份 Raft 日志的节点。每条写命令都会追加到该日志，并由每个节点重放，因此所有节点 收敛到同一状态；读命令由收到它的那个节点在本地应答。
+引导与加入 # 第一个节点不需要额外 flag：-j 为空即表示「开启一个新集群」。之后每个节点用 -j <leader-or-any-node-address> 加入：
+./bin/IceFireDB -n 1 -a 127.0.0.1:11001 -d ./data ./bin/IceFireDB -n 2 -a 127.0.0.1:11002 -d ./data -j 127.0.0.1:11001 ./bin/IceFireDB -n 3 -a 127.0.0.1:11003 -d ./data -j 127.0.0.1:11001 加入时，节点用 AUTH（若设置了 --auth/ICEFIREDB_AUTH）和 TLS（若配置了证书）连接该地址，请求 当前的集群状态，把自己加进去，然后从日志追赶。在同一数据目录上重启的节点不需要再次 -j —— 它会从 已持久化的 Raft 状态重新加入。
+当绑定地址不是对等节点应当拨号的那个地址时（容器、NAT、多网卡），请使用 --advertise：
+./bin/IceFireDB -n 2 -a 0.0.0.0:11001 --advertise 10.0.0.12:11001 -d /var/lib/icefiredb -j 10.0.0.11:11001 通告地址就是客户端在 -MOVED 重定向中收到的地址，也是其他节点写入 Raft 配置的地址，因此它必须 对对等节点可达，也对客户端可达。
+一致性模型 # 操作 在哪里执行 保证 写命令（SET、HSET、RPUSH、…） 只在主节点执行，经 Raft 日志 在每个节点上按相同顺序应用；写入在多数派提交后才被确认 读命令，未启用 --openreads 收到它的节点；在从节点上会被拒绝 从节点返回 -MOVED 0 <leader>；客户端向主节点重试 读命令，启用 --openreads 任意节点 可能返回陈旧数据（本地日志已应用到的状态） RAFT …、CLUSTER …、MACHINE、BARRIER 收到它的节点 管理操作，不复制 启用 --try-errors 后，重定向错误变成 -TRY <leader>，且 CLUSTER 命令被禁用；这是为那些需要 区分「去别处重试」与「集群把我重定向了」的客户端准备的。"><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="deploy"><title>集群 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/ title=Clustering><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle checked>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/ class=active>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>集群</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#引导与加入>引导与加入</a></li><li><a href=#一致性模型>一致性模型</a></li><li><a href=#拓扑管理>拓扑管理</a></li><li><a href=#快照>快照</a></li><li><a href=#故障行为>故障行为</a></li><li><a href=#集群不做的事>集群<strong>不做</strong>的事</a></li></ul></nav></aside></header><article class=markdown><h1 id=集群>集群
+<a class=anchor href=#%e9%9b%86%e7%be%a4>#</a></h1><p>集群是一组共享同一份 Raft 日志的节点。每条写命令都会追加到该日志，并由每个节点重放，因此所有节点
+收敛到同一状态；读命令由收到它的那个节点在本地应答。</p><h2 id=引导与加入>引导与加入
+<a class=anchor href=#%e5%bc%95%e5%af%bc%e4%b8%8e%e5%8a%a0%e5%85%a5>#</a></h2><p>第一个节点不需要额外 flag：<code>-j</code> 为空即表示「开启一个新集群」。之后每个节点用
+<code>-j &lt;leader-or-any-node-address></code> 加入：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/IceFireDB -n <span style=color:#ae81ff>1</span> -a 127.0.0.1:11001 -d ./data
+</span></span><span style=display:flex><span>./bin/IceFireDB -n <span style=color:#ae81ff>2</span> -a 127.0.0.1:11002 -d ./data -j 127.0.0.1:11001
+</span></span><span style=display:flex><span>./bin/IceFireDB -n <span style=color:#ae81ff>3</span> -a 127.0.0.1:11003 -d ./data -j 127.0.0.1:11001
+</span></span></code></pre></div><p>加入时，节点用 <code>AUTH</code>（若设置了 <code>--auth</code>/<code>ICEFIREDB_AUTH</code>）和 TLS（若配置了证书）连接该地址，请求
+当前的集群状态，把自己加进去，然后从日志追赶。在同一数据目录上重启的节点不需要再次 <code>-j</code> —— 它会从
+已持久化的 Raft 状态重新加入。</p><p>当绑定地址不是对等节点应当拨号的那个地址时（容器、NAT、多网卡），请使用 <code>--advertise</code>：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/IceFireDB -n <span style=color:#ae81ff>2</span> -a 0.0.0.0:11001 --advertise 10.0.0.12:11001 -d /var/lib/icefiredb -j 10.0.0.11:11001
+</span></span></code></pre></div><p>通告地址就是客户端在 <code>-MOVED</code> 重定向中收到的地址，也是其他节点写入 Raft 配置的地址，因此它必须
+<strong>对对等节点可达，也对客户端可达</strong>。</p><h2 id=一致性模型>一致性模型
+<a class=anchor href=#%e4%b8%80%e8%87%b4%e6%80%a7%e6%a8%a1%e5%9e%8b>#</a></h2><table><thead><tr><th style=text-align:left>操作</th><th style=text-align:left>在哪里执行</th><th style=text-align:left>保证</th></tr></thead><tbody><tr><td style=text-align:left>写命令（<code>SET</code>、<code>HSET</code>、<code>RPUSH</code>、…）</td><td style=text-align:left>只在主节点执行，经 Raft 日志</td><td style=text-align:left>在每个节点上按相同顺序应用；写入在多数派提交后才被确认</td></tr><tr><td style=text-align:left>读命令，未启用 <code>--openreads</code></td><td style=text-align:left>收到它的节点；在从节点上会被拒绝</td><td style=text-align:left>从节点返回 <code>-MOVED 0 &lt;leader></code>；客户端向主节点重试</td></tr><tr><td style=text-align:left>读命令，启用 <code>--openreads</code></td><td style=text-align:left>任意节点</td><td style=text-align:left>可能返回陈旧数据（本地日志已应用到的状态）</td></tr><tr><td style=text-align:left><code>RAFT …</code>、<code>CLUSTER …</code>、<code>MACHINE</code>、<code>BARRIER</code></td><td style=text-align:left>收到它的节点</td><td style=text-align:left>管理操作，不复制</td></tr></tbody></table><p>启用 <code>--try-errors</code> 后，重定向错误变成 <code>-TRY &lt;leader></code>，且 <code>CLUSTER</code> 命令被禁用；这是为那些需要
+区分「去别处重试」与「集群把我重定向了」的客户端准备的。</p><p>只有在节点认为日志已基本加载完成后，才会提供从节点读；在那之前，它按非主节点身份应答。</p><h2 id=拓扑管理>拓扑管理
+<a class=anchor href=#%e6%8b%93%e6%89%91%e7%ae%a1%e7%90%86>#</a></h2><p>成员变更通过 Raft 配置进行，而不是配置文件。支持的两条路径是等价的 —— 第一条正是 <code>-j</code> 内部所做的
+事：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># path 1 — let the node add itself</span>
+</span></span><span style=display:flex><span>./bin/IceFireDB -n <span style=color:#ae81ff>4</span> -a 127.0.0.1:11004 -d ./data -j 127.0.0.1:11001
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># path 2 — add it from an existing node, then start it</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SERVER ADD <span style=color:#ae81ff>4</span> 127.0.0.1:11004
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SERVER LIST
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SERVER REMOVE <span style=color:#ae81ff>4</span>
+</span></span></code></pre></div><p>需要留意的规则：</p><ul><li><strong>替换节点时先添加、再移除。</strong> 移除成员会缩小多数派的要求，而两节点集群完全没有冗余 —— 在替换
+过程中，存活的多数派必须仍然足够选出主节点。</li><li><strong>绝不要把同一个节点 ID 配上不同的数据目录。</strong> 该 ID 就是 Raft 服务器 ID；
+<code>&lt;dir>/IceFireDB/&lt;id>/</code> 中的状态属于它。</li><li><strong>必须有大多数节点存活才能选出主节点。</strong> 失去多数派不会破坏数据，但写入会停止，需要主节点身份的
+读操作会以 <code>-CLUSTERDOWN</code> 失败。</li><li>完整的命令通道列表见
+<a href=/icefiredb_docs/zh/deploy/system-commands/>系统命令</a>。</li></ul><h2 id=快照>快照
+<a class=anchor href=#%e5%bf%ab%e7%85%a7>#</a></h2><p>Raft 会对状态机做快照，以便日志可以被截断。每个快照都写入
+<code>&lt;data-dir>/IceFireDB/&lt;node-id>/snapshots/&lt;snapshot-id>/state.bin</code>。这个文件是 gzip 压缩流：先是
+32 字节头（<code>SNAP0001</code> + 机器启动时间、时间戳、随机数种子），随后是 <code>snapshot.go</code> 中 <code>writeSnapshot</code>
+以 <code>sds</code> 帧格式写出的全部键/值对 —— 每条一个键/值对，与具体存储驱动无关。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SNAPSHOT NOW        <span style=color:#75715e># take one immediately</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SNAPSHOT LIST       <span style=color:#75715e># id, timestamp and size per snapshot</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SNAPSHOT FILE &lt;id&gt;  <span style=color:#75715e># path on the server that produced it</span>
+</span></span></code></pre></div><p>快照文件是备份与灾难恢复的单位；见
+<a href=/icefiredb_docs/zh/deploy/operations/>运维</a>。</p><h2 id=故障行为>故障行为
+<a class=anchor href=#%e6%95%85%e9%9a%9c%e8%a1%8c%e4%b8%ba>#</a></h2><table><thead><tr><th style=text-align:left>故障</th><th style=text-align:left>影响</th></tr></thead><tbody><tr><td style=text-align:left>一个从节点宕机（3 节点集群）</td><td style=text-align:left>对写入和主节点稳定性没有影响</td></tr><tr><td style=text-align:left>主节点宕机</td><td style=text-align:left>从节点选出新的主节点；在途未提交的写入可能丢失；客户端在重新发现主节点之前会看到 <code>-MOVED</code>/<code>-TRY</code></td></tr><tr><td style=text-align:left>少数派分区</td><td style=text-align:left>少数派一侧无法选举，其写入以 <code>-CLUSTERDOWN</code> 失败；多数派继续提供服务</td></tr><tr><td style=text-align:left>用同一数据目录重启的节点</td><td style=text-align:left>从持久化状态重新加入，从日志或快照追赶</td></tr><tr><td style=text-align:left>使用全新数据目录、但沿用已有节点 ID 启动的节点</td><td style=text-align:left>被集群以 ID 冲突拒绝 —— 清空该目录或换用新的 ID</td></tr></tbody></table><p>在启用 <code>--openreads</code> 的从节点上，读在主节点选举期间仍然可用，代价是提供的状态可能落后。</p><h2 id=集群不做的事>集群<strong>不做</strong>的事
+<a class=anchor href=#%e9%9b%86%e7%be%a4%e4%b8%8d%e5%81%9a%e7%9a%84%e4%ba%8b>#</a></h2><ul><li>没有分片：每个节点持有全量数据集。对能识别 redis-cluster 的客户端，<code>CLUSTER SLOTS</code> 会在主节点上
+报告完整的 <code>0-16383</code> 区间，但并不存在键的分布。</li><li>除 Raft 之外没有 read-repair 或 anti-entropy：已经追上的节点会通过日志保持同步。</li><li><code>ZINCRBY</code>、<code>ZREMRANGEBYRANK</code> 与 <code>ZREMRANGEBYSCORE</code> 被注册为<strong>读</strong>命令，因此不会复制。见
+<a href=/icefiredb_docs/zh/commands/compatibility/>兼容性</a>。</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#引导与加入>引导与加入</a></li><li><a href=#一致性模型>一致性模型</a></li><li><a href=#拓扑管理>拓扑管理</a></li><li><a href=#快照>快照</a></li><li><a href=#故障行为>故障行为</a></li><li><a href=#集群不做的事>集群<strong>不做</strong>的事</a></li></ul></nav></div></aside></main></body></html>

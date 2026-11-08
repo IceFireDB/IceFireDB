@@ -1,0 +1,123 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  系统命令
+  #
+
+
+  命令参考里的 110 条命令是数据面。在它们之下还有第二个面，由 Raft/RESP 层提供，运维
+依赖它。它不属于 Redis 命令集，所以记在这里。
+这些命令除非特别说明，否则都不经过 Raft 日志，并且 --try-errors 会禁用 CLUSTER 家族。
+
+  连接
+  #
+
+
+  
+      
+          命令
+          回复
+          说明
+      
+  
+  
+      
+          PING [message]
+          PONG，或该 message
+          在分发之前处理
+      
+      
+          ECHO message
+          该 message
+          —
+      
+      
+          AUTH token
+          OK / -unauthorized
+          设置 --auth 时必须最先发送
+      
+      
+          QUIT
+          OK，然后连接关闭
+          —
+      
+      
+          SHUTDOWN
+          （无——进程退出）
+          从客户端角度看等价于 SIGKILL；配置了 AUTH 时要求先认证
+      
+  
+
+
+  Machine
+  #
+
+
+  
+      
+          命令
+          回复
+          含义
+      
+  
+  
+      
+          VERSION
+          bulk string
+          引擎版本，例如 1.0.0-rc.1
+      
+      
+          MACHINE
+          now、uptime、boottime 的映射（纳秒）
+          时间来自 Raft 时钟，所以每个节点一致
+      
+      
+          MACHINE HUMAN
+          同样的键，RFC3339 / duration 形式
+          人类可读的变体
+      
+      
+          BARRIER
+          OK
+          一个空操作的写：它返回时，该客户端此前发出的每个写都已应用
+      
+  
+
+BARRIER 是跨客户端或跨节点获得读己之写（read-your-writes）保证的方式：在主节点上发送 BARRIER，
+然后用 --openreads 在从节点上读。"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="系统命令"><meta property="og:description" content=" 系统命令 # 命令参考里的 110 条命令是数据面。在它们之下还有第二个面，由 Raft/RESP 层提供，运维 依赖它。它不属于 Redis 命令集，所以记在这里。
+这些命令除非特别说明，否则都不经过 Raft 日志，并且 --try-errors 会禁用 CLUSTER 家族。
+连接 # 命令 回复 说明 PING [message] PONG，或该 message 在分发之前处理 ECHO message 该 message — AUTH token OK / -unauthorized 设置 --auth 时必须最先发送 QUIT OK，然后连接关闭 — SHUTDOWN （无——进程退出） 从客户端角度看等价于 SIGKILL；配置了 AUTH 时要求先认证 Machine # 命令 回复 含义 VERSION bulk string 引擎版本，例如 1.0.0-rc.1 MACHINE now、uptime、boottime 的映射（纳秒） 时间来自 Raft 时钟，所以每个节点一致 MACHINE HUMAN 同样的键，RFC3339 / duration 形式 人类可读的变体 BARRIER OK 一个空操作的写：它返回时，该客户端此前发出的每个写都已应用 BARRIER 是跨客户端或跨节点获得读己之写（read-your-writes）保证的方式：在主节点上发送 BARRIER， 然后用 --openreads 在从节点上读。"><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="deploy"><title>系统命令 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/ title="System commands"><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle checked>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/ class=active>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>系统命令</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#连接>连接</a></li><li><a href=#machine>Machine</a></li><li><a href=#raft>RAFT</a></li><li><a href=#cluster>CLUSTER</a></li><li><a href=#tick内部>TICK（内部）</a></li><li><a href=#安全地使用管理面>安全地使用管理面</a></li></ul></nav></aside></header><article class=markdown><h1 id=系统命令>系统命令
+<a class=anchor href=#%e7%b3%bb%e7%bb%9f%e5%91%bd%e4%bb%a4>#</a></h1><p><a href=/icefiredb_docs/zh/commands/>命令参考</a>里的 110 条命令是数据面。在它们之下还有第二个面，由 Raft/RESP 层提供，运维
+依赖它。它不属于 Redis 命令集，所以记在这里。</p><p>这些命令除非特别说明，否则都不经过 Raft 日志，并且 <code>--try-errors</code> 会禁用 <code>CLUSTER</code> 家族。</p><h2 id=连接>连接
+<a class=anchor href=#%e8%bf%9e%e6%8e%a5>#</a></h2><table><thead><tr><th style=text-align:left>命令</th><th style=text-align:left>回复</th><th style=text-align:left>说明</th></tr></thead><tbody><tr><td style=text-align:left><code>PING [message]</code></td><td style=text-align:left><code>PONG</code>，或该 message</td><td style=text-align:left>在分发之前处理</td></tr><tr><td style=text-align:left><code>ECHO message</code></td><td style=text-align:left>该 message</td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>AUTH token</code></td><td style=text-align:left><code>OK</code> / <code>-unauthorized</code></td><td style=text-align:left>设置 <code>--auth</code> 时必须最先发送</td></tr><tr><td style=text-align:left><code>QUIT</code></td><td style=text-align:left><code>OK</code>，然后连接关闭</td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>SHUTDOWN</code></td><td style=text-align:left><em>（无——进程退出）</em></td><td style=text-align:left>从客户端角度看等价于 <code>SIGKILL</code>；配置了 <code>AUTH</code> 时要求先认证</td></tr></tbody></table><h2 id=machine>Machine
+<a class=anchor href=#machine>#</a></h2><table><thead><tr><th style=text-align:left>命令</th><th style=text-align:left>回复</th><th style=text-align:left>含义</th></tr></thead><tbody><tr><td style=text-align:left><code>VERSION</code></td><td style=text-align:left>bulk string</td><td style=text-align:left>引擎版本，例如 <code>1.0.0-rc.1</code></td></tr><tr><td style=text-align:left><code>MACHINE</code></td><td style=text-align:left><code>now</code>、<code>uptime</code>、<code>boottime</code> 的映射（纳秒）</td><td style=text-align:left>时间来自 Raft 时钟，所以每个节点一致</td></tr><tr><td style=text-align:left><code>MACHINE HUMAN</code></td><td style=text-align:left>同样的键，RFC3339 / duration 形式</td><td style=text-align:left>人类可读的变体</td></tr><tr><td style=text-align:left><code>BARRIER</code></td><td style=text-align:left><code>OK</code></td><td style=text-align:left>一个空操作的<strong>写</strong>：它返回时，该客户端此前发出的每个写都已应用</td></tr></tbody></table><p><code>BARRIER</code> 是跨客户端或跨节点获得读己之写（read-your-writes）保证的方式：在主节点上发送 <code>BARRIER</code>，
+然后用 <code>--openreads</code> 在从节点上读。</p><h2 id=raft>RAFT
+<a class=anchor href=#raft>#</a></h2><table><thead><tr><th style=text-align:left>命令</th><th style=text-align:left>回复</th><th style=text-align:left>含义</th></tr></thead><tbody><tr><td style=text-align:left><code>RAFT HELP</code></td><td style=text-align:left>命令列表</td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>RAFT LEADER</code></td><td style=text-align:left>地址</td><td style=text-align:left>当前主节点的 advertise 地址</td></tr><tr><td style=text-align:left><code>RAFT INFO [pattern]</code></td><td style=text-align:left>状态映射</td><td style=text-align:left>Raft 状态、任期、已应用/已提交索引、主节点、对等节点</td></tr><tr><td style=text-align:left><code>RAFT SERVER LIST</code></td><td style=text-align:left><code>id</code>、<code>address</code>、<code>leader</code> 的数组</td><td style=text-align:left>集群成员</td></tr><tr><td style=text-align:left><code>RAFT SERVER ADD id address</code></td><td style=text-align:left><code>1</code></td><td style=text-align:left>添加（或提升）一个投票者；address 是其他节点拨号的地址</td></tr><tr><td style=text-align:left><code>RAFT SERVER REMOVE id</code></td><td style=text-align:left><code>1</code></td><td style=text-align:left>移除一个成员</td></tr><tr><td style=text-align:left><code>RAFT SNAPSHOT NOW</code></td><td style=text-align:left>快照 id</td><td style=text-align:left>立即做一次快照</td></tr><tr><td style=text-align:left><code>RAFT SNAPSHOT LIST</code></td><td style=text-align:left>id/size 数组</td><td style=text-align:left>本节点上的快照</td></tr><tr><td style=text-align:left><code>RAFT SNAPSHOT FILE id</code></td><td style=text-align:left>绝对路径</td><td style=text-align:left>快照文件在服务端的位置</td></tr><tr><td style=text-align:left><code>RAFT SNAPSHOT READ id [RANGE offset limit]</code></td><td style=text-align:left>bulk 字节</td><td style=text-align:left>读该文件，整体读或按窗口读</td></tr></tbody></table><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SERVER LIST
+</span></span><span style=display:flex><span>1<span style=color:#f92672>)</span> 1<span style=color:#f92672>)</span> <span style=color:#e6db74>&#34;id&#34;</span>
+</span></span><span style=display:flex><span>   2<span style=color:#f92672>)</span> <span style=color:#e6db74>&#34;1&#34;</span>
+</span></span><span style=display:flex><span>   3<span style=color:#f92672>)</span> <span style=color:#e6db74>&#34;address&#34;</span>
+</span></span><span style=display:flex><span>   4<span style=color:#f92672>)</span> <span style=color:#e6db74>&#34;127.0.0.1:11001&#34;</span>
+</span></span><span style=display:flex><span>   5<span style=color:#f92672>)</span> <span style=color:#e6db74>&#34;leader&#34;</span>
+</span></span><span style=display:flex><span>   6<span style=color:#f92672>)</span> <span style=color:#e6db74>&#34;true&#34;</span>
+</span></span><span style=display:flex><span>...
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SERVER ADD <span style=color:#ae81ff>4</span> 10.0.0.14:11001
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SERVER REMOVE <span style=color:#ae81ff>4</span>
+</span></span></code></pre></div><p>成员操作只在主节点上成功；在从节点上会以通常的重定向错误失败。</p><h2 id=cluster>CLUSTER
+<a class=anchor href=#cluster>#</a></h2><p>Redis Cluster 形状的内省，好让集群感知的客户端和代理能发现拓扑：</p><table><thead><tr><th style=text-align:left>命令</th><th style=text-align:left>回复</th><th style=text-align:left>含义</th></tr></thead><tbody><tr><td style=text-align:left><code>CLUSTER INFO</code></td><td style=text-align:left>多行字符串</td><td style=text-align:left><code>cluster_state:ok|fail</code>、<code>cluster_known_nodes</code>、<code>cluster_size</code>……</td></tr><tr><td style=text-align:left><code>CLUSTER NODES</code></td><td style=text-align:left>多行字符串</td><td style=text-align:left>每个成员一行：id、<code>host:port@port</code>、角色（<code>master</code>/<code>slave</code>）、主节点 id、<code>connected</code>、槽</td></tr><tr><td style=text-align:left><code>CLUSTER SLOTS</code></td><td style=text-align:left>数组</td><td style=text-align:left>一个覆盖 <code>0-16383</code> 指向主节点的范围</td></tr></tbody></table><p>整个键空间在主节点上报告为单个槽范围，因为没有分片。这些命令的意义是兼容性而不是分布——在一个主节点
+上看到 <code>0-16383</code> 的客户端行为是正确的，而且每个节点本来就持有每个键。</p><h2 id=tick内部>TICK（内部）
+<a class=anchor href=#tick%e5%86%85%e9%83%a8>#</a></h2><p><code>TICK &lt;timestamp> &lt;seed></code> 注册为<strong>写</strong>命令，通过日志复制，由引擎自己用来推进机器时钟和随机种子。处理器
+会拒绝格式错误的调用，但客户端没有理由发送它：Raft 层在每个 tick 间隔（默认 200 ms）注入一个，正是
+它让 <code>m.Now()</code> 和 <code>m.Rand()</code> 在各副本之间保持一致。写命令必须使用这两个函数而不是
+<code>time.Now()</code>/<code>math/rand</code>，原因正在于此——见仓库中的 <code>COMMAND-AUDIT.md</code>。</p><h2 id=安全地使用管理面>安全地使用管理面
+<a class=anchor href=#%e5%ae%89%e5%85%a8%e5%9c%b0%e4%bd%bf%e7%94%a8%e7%ae%a1%e7%90%86%e9%9d%a2>#</a></h2><ul><li>把管理命令包进你自己的工具里；它们接受真实参数（<code>RAFT SERVER REMOVE &lt;id></code> 是破坏性的），并且没有
+确认步骤。</li><li>设置 <code>--try-errors</code> 时 <code>CLUSTER</code> 会消失，所以不要为需要该参数的部署在它上面构建自动化。</li><li>这个面只由共享的 <code>--auth</code> token 保护。见
+<a href=/icefiredb_docs/zh/deploy/security/>安全</a>。</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#连接>连接</a></li><li><a href=#machine>Machine</a></li><li><a href=#raft>RAFT</a></li><li><a href=#cluster>CLUSTER</a></li><li><a href=#tick内部>TICK（内部）</a></li><li><a href=#安全地使用管理面>安全地使用管理面</a></li></ul></nav></div></aside></main></body></html>

@@ -1,0 +1,82 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  协议层
+  #
+
+引擎使用 RESP——Redis 序列化协议——所以任何 Redis 客户端都能直接用，不需要适配层。本页讲协议层在解析字节之外还做了什么。
+
+  一个 socket，两种协议
+  #
+
+全进程只有一个 TCP 监听（tcp4，地址来自 -a）。到达它上面的是两类连接：
+
+客户端连接：应用发来的 RESP。
+对等连接：节点之间的 Raft 传输。
+
+两者由一个嗅探式监听区分：对等节点建立连接时先写一个固定的 magic marker，再跟上集群认证 token（vendor/github.com/tidwall/uhaha 中的 transportMarker）；凡是不以该 marker 开头的，都会被当作 RESP 客户端。这就是 TLS、端口和 --advertise 由数据流量与复制流量共用的原因——也是 --advertise 必须写出对等节点可访问地址的原因。
+
+  请求处理
+  #
+
+
+  
+      
+          步骤
+          行为
+      
+  
+  
+      
+          解析
+          RESP 数组，另外支持内联（telnet 风格）命令
+      
+      
+          命令名
+          分发前统一转小写——命令名不区分大小写
+      
+      
+          流水线
+          支持：请求按顺序执行，回复按顺序写出
+      
+      
+          连接状态
+          每个连接只有 AUTH 状态；没有按连接隔离的数据库，没有 SELECT
+      
+      
+          内置命令
+          PING、ECHO、QUIT、AUTH、SHUTDOWN 在分发之前由服务器直接应答
+      
+      
+          其它一切
+          分发给命令表（110 条数据命令 + RAFT/CLUSTER/MACHINE/BARRIER/VERSION）
+      
+  
+
+未知命令回复 ERR unknown command '<name>'。
+
+  回复映射
+  #
+
+命令处理器返回 Go 值，RESP 写出器按固定规则机械映射："><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="协议"><meta property="og:description" content=" 协议层 # 引擎使用 RESP——Redis 序列化协议——所以任何 Redis 客户端都能直接用，不需要适配层。本页讲协议层在解析字节之外还做了什么。
+一个 socket，两种协议 # 全进程只有一个 TCP 监听（tcp4，地址来自 -a）。到达它上面的是两类连接：
+客户端连接：应用发来的 RESP。 对等连接：节点之间的 Raft 传输。 两者由一个嗅探式监听区分：对等节点建立连接时先写一个固定的 magic marker，再跟上集群认证 token（vendor/github.com/tidwall/uhaha 中的 transportMarker）；凡是不以该 marker 开头的，都会被当作 RESP 客户端。这就是 TLS、端口和 --advertise 由数据流量与复制流量共用的原因——也是 --advertise 必须写出对等节点可访问地址的原因。
+请求处理 # 步骤 行为 解析 RESP 数组，另外支持内联（telnet 风格）命令 命令名 分发前统一转小写——命令名不区分大小写 流水线 支持：请求按顺序执行，回复按顺序写出 连接状态 每个连接只有 AUTH 状态；没有按连接隔离的数据库，没有 SELECT 内置命令 PING、ECHO、QUIT、AUTH、SHUTDOWN 在分发之前由服务器直接应答 其它一切 分发给命令表（110 条数据命令 + RAFT/CLUSTER/MACHINE/BARRIER/VERSION） 未知命令回复 ERR unknown command '<name>'。
+回复映射 # 命令处理器返回 Go 值，RESP 写出器按固定规则机械映射："><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="architecture"><title>协议 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/ title=Protocol><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle checked>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/ class=active>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>协议</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#一个-socket两种协议>一个 socket，两种协议</a></li><li><a href=#请求处理>请求处理</a></li><li><a href=#回复映射>回复映射</a></li><li><a href=#线上的集群语义>线上的集群语义</a></li><li><a href=#错误>错误</a></li><li><a href=#协议层里没有的东西>协议层里没有的东西</a></li></ul></nav></aside></header><article class=markdown><h1 id=协议层>协议层
+<a class=anchor href=#%e5%8d%8f%e8%ae%ae%e5%b1%82>#</a></h1><p>引擎使用 <strong>RESP</strong>——Redis 序列化协议——所以任何 Redis 客户端都能直接用，不需要适配层。本页讲协议层在解析字节之外还做了什么。</p><h2 id=一个-socket两种协议>一个 socket，两种协议
+<a class=anchor href=#%e4%b8%80%e4%b8%aa-socket%e4%b8%a4%e7%a7%8d%e5%8d%8f%e8%ae%ae>#</a></h2><p>全进程只有一个 TCP 监听（<code>tcp4</code>，地址来自 <code>-a</code>）。到达它上面的是两类连接：</p><ol><li><strong>客户端连接</strong>：应用发来的 RESP。</li><li><strong>对等连接</strong>：节点之间的 Raft 传输。</li></ol><p>两者由一个嗅探式监听区分：对等节点建立连接时先写一个固定的 magic marker，再跟上集群认证 token（<code>vendor/github.com/tidwall/uhaha</code> 中的 <code>transportMarker</code>）；凡是不以该 marker 开头的，都会被当作 RESP 客户端。这就是 TLS、端口和 <code>--advertise</code> 由数据流量与复制流量共用的原因——也是 <code>--advertise</code> 必须写出对等节点可访问地址的原因。</p><h2 id=请求处理>请求处理
+<a class=anchor href=#%e8%af%b7%e6%b1%82%e5%a4%84%e7%90%86>#</a></h2><table><thead><tr><th style=text-align:left>步骤</th><th style=text-align:left>行为</th></tr></thead><tbody><tr><td style=text-align:left>解析</td><td style=text-align:left>RESP 数组，另外支持内联（telnet 风格）命令</td></tr><tr><td style=text-align:left>命令名</td><td style=text-align:left>分发前统一转小写——命令名不区分大小写</td></tr><tr><td style=text-align:left>流水线</td><td style=text-align:left>支持：请求按顺序执行，回复按顺序写出</td></tr><tr><td style=text-align:left>连接状态</td><td style=text-align:left>每个连接只有 <code>AUTH</code> 状态；没有按连接隔离的数据库，没有 <code>SELECT</code></td></tr><tr><td style=text-align:left>内置命令</td><td style=text-align:left><code>PING</code>、<code>ECHO</code>、<code>QUIT</code>、<code>AUTH</code>、<code>SHUTDOWN</code> 在分发之前由服务器直接应答</td></tr><tr><td style=text-align:left>其它一切</td><td style=text-align:left>分发给命令表（110 条数据命令 + <code>RAFT</code>/<code>CLUSTER</code>/<code>MACHINE</code>/<code>BARRIER</code>/<code>VERSION</code>）</td></tr></tbody></table><p>未知命令回复 <code>ERR unknown command '&lt;name>'</code>。</p><h2 id=回复映射>回复映射
+<a class=anchor href=#%e5%9b%9e%e5%a4%8d%e6%98%a0%e5%b0%84>#</a></h2><p>命令处理器返回 Go 值，RESP 写出器按固定规则机械映射：</p><table><thead><tr><th style=text-align:left>Go 值</th><th style=text-align:left>RESP</th></tr></thead><tbody><tr><td style=text-align:left><code>nil</code></td><td style=text-align:left>空批量 <code>$-1</code></td></tr><tr><td style=text-align:left><code>[]byte</code> / <code>string</code></td><td style=text-align:left>批量字符串 <code>$n</code></td></tr><tr><td style=text-align:left><code>[][]byte</code> / <code>[]string</code> / <code>[]interface{}</code></td><td style=text-align:left>数组 <code>*n</code></td></tr><tr><td style=text-align:left><code>redcon.SimpleString</code></td><td style=text-align:left>简单字符串 <code>+…</code></td></tr><tr><td style=text-align:left><code>redcon.SimpleInt</code>, <code>int64</code>, <code>int</code></td><td style=text-align:left>整数 <code>:n</code></td></tr><tr><td style=text-align:left><code>error</code></td><td style=text-align:left>错误 <code>-…</code></td></tr></tbody></table><p>值永远不会以简单字符串返回：简单字符串承载不了 <code>\r\n</code>，含 CRLF 的值会破坏数据流。</p><h2 id=线上的集群语义>线上的集群语义
+<a class=anchor href=#%e7%ba%bf%e4%b8%8a%e7%9a%84%e9%9b%86%e7%be%a4%e8%af%ad%e4%b9%89>#</a></h2><table><thead><tr><th style=text-align:left>情形</th><th style=text-align:left>回复</th></tr></thead><tbody><tr><td style=text-align:left>写命令或只允许主节点执行的读命令被发到从节点</td><td style=text-align:left><code>-MOVED 0 &lt;advertised-addr></code></td></tr><tr><td style=text-align:left>同上，但开启了 <code>--try-errors</code></td><td style=text-align:left><code>-TRY &lt;advertised-addr></code></td></tr><tr><td style=text-align:left>没有主节点（无多数派）</td><td style=text-align:left><code>-CLUSTERDOWN …</code></td></tr><tr><td style=text-align:left>集群感知的客户端询问拓扑</td><td style=text-align:left><code>CLUSTER SLOTS</code> → 主节点上的单段 <code>0-16383</code>；<code>CLUSTER NODES</code>/<code>INFO</code></td></tr></tbody></table><p><code>MOVED</code> 的槽位永远是 <code>0</code>：没有分片，所以每个键都"属于"唯一的主节点。跟随 <code>MOVED</code> 重定向的客户端最终会落到主节点上，这正是预期行为。</p><h2 id=错误>错误
+<a class=anchor href=#%e9%94%99%e8%af%af>#</a></h2><p>所有错误都是 RESP 错误，并且在客户端库会去识别的位置沿用 Redis 的前缀：</p><table><thead><tr><th style=text-align:left>前缀</th><th style=text-align:left>含义</th></tr></thead><tbody><tr><td style=text-align:left><code>-ERR …</code></td><td style=text-align:left>参数错误、语法错误、校验失败</td></tr><tr><td style=text-align:left><code>-MOVED …</code> / <code>-TRY …</code></td><td style=text-align:left>重定向到主节点</td></tr><tr><td style=text-align:left><code>-CLUSTERDOWN …</code></td><td style=text-align:left>无主节点 / 无多数派</td></tr><tr><td style=text-align:left><code>-unauthorized</code></td><td style=text-align:left><code>AUTH</code> 缺失或错误</td></tr><tr><td style=text-align:left><code>-ERR invalid key size</code> / <code>invalid value size</code></td><td style=text-align:left>ledis 限额：键 ≤ 1024 B，值 ≤ 1 GiB</td></tr></tbody></table><p>不会产生 <code>WRONGTYPE</code>——见
+<a href=/icefiredb_docs/zh/commands/compatibility/>兼容性</a>。</p><h2 id=协议层里没有的东西>协议层里没有的东西
+<a class=anchor href=#%e5%8d%8f%e8%ae%ae%e5%b1%82%e9%87%8c%e6%b2%a1%e6%9c%89%e7%9a%84%e4%b8%9c%e8%a5%bf>#</a></h2><p>没有 <code>MULTI</code>/<code>EXEC</code>，没有 <code>SUBSCRIBE</code>，没有 <code>WATCH</code>，也没有内联 <code>SELECT</code>。发布/订阅在另一个二进制里（
+<a href=/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a>）。</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#一个-socket两种协议>一个 socket，两种协议</a></li><li><a href=#请求处理>请求处理</a></li><li><a href=#回复映射>回复映射</a></li><li><a href=#线上的集群语义>线上的集群语义</a></li><li><a href=#错误>错误</a></li><li><a href=#协议层里没有的东西>协议层里没有的东西</a></li></ul></nav></div></aside></main></body></html>

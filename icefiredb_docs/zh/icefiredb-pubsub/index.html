@@ -1,0 +1,147 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  IceFireDB-PubSub
+  #
+
+运行在 libp2p 网络之上的 Redis PubSub 协议：客户端照旧使用 SUBSCRIBE/PUBLISH，而消息在各个
+节点之间跨越 NAT 和地域传输，不再局限在单个 Redis 实例内部。
+cd IceFireDB-PubSub
+make                                   # → bin/IceFireDB-PubSub
+./bin/IceFireDB-PubSub -c ./config/config.yaml
+
+redis-cli -p 16379 SUBSCRIBE name      # terminal 1
+redis-cli -p 16379 PUBLISH name hello  # terminal 2 (any node in the mesh)
+
+  它是什么
+  #
+
+
+  
+      
+          属性
+          取值
+      
+  
+  
+      
+          协议
+          Redis RESP —— SUBSCRIBE、UNSUBSCRIBE、PSUBSCRIBE、PUBLISH
+      
+      
+          节点间传输
+          libp2p pubsub（Kademlia DHT + IPFS 网络发现）
+      
+      
+          本地监听
+          proxy.local_port，默认 16379
+      
+      
+          二进制
+          bin/IceFireDB-PubSub（-c <config.yaml>）
+      
+      
+          状态
+          不做持久化：这是消息总线，不是数据库
+      
+  
+
+
+  配置（config/config.yaml）
+  #
+
+
+  
+      
+          配置项
+          含义
+          文件中的默认值
+      
+  
+  
+      
+          proxy.local_port
+          RESP 监听端口
+          16379
+      
+      
+          proxy.enable_mtls
+          协议代理之间的双向 TLS
+          false
+      
+      
+          p2p.enable
+          是否开启 libp2p 网络
+          true
+      
+      
+          p2p.service_discovery_id
+          会合名（rendezvous）—— 各对等节点之间必须一致
+          p2p_redis_proxy_service_test
+      
+      
+          p2p.service_command_topic
+          网络内部的命令频道
+          p2p_redis_proxy_service_topic_test
+      
+      
+          p2p.service_discover_mode
+          advertise 或 announce
+          advertise
+      
+      
+          p2p.node_host_ip / node_host_port
+          对等节点应当使用的地址（0 表示任意端口）
+          127.0.0.1 / 0
+      
+      
+          pprof_debug.enable / .port
+          /debug/pprof 服务器
+          true / 16060
+      
+      
+          log.level
+          debug、info、warn、error
+          debug
+      
+      
+          ip_white_list.enable / .list
+          客户端 IP 白名单
+          true / 回环地址条目
+      
+      
+          cache.enable / .max_items_size / .default_expiration（毫秒）/ .cleanup_interval（秒）
+          消息缓存
+          true / 2048 / 5000 / 120
+      
+      
+          ignore_cmd.enable / .cmd_list
+          丢弃选定的命令
+          false / []
+      
+  
+
+在真实部署里真的会咬人的几点："><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="IceFireDB-PubSub"><meta property="og:description" content=" IceFireDB-PubSub # 运行在 libp2p 网络之上的 Redis PubSub 协议：客户端照旧使用 SUBSCRIBE/PUBLISH，而消息在各个 节点之间跨越 NAT 和地域传输，不再局限在单个 Redis 实例内部。
+cd IceFireDB-PubSub make # → bin/IceFireDB-PubSub ./bin/IceFireDB-PubSub -c ./config/config.yaml redis-cli -p 16379 SUBSCRIBE name # terminal 1 redis-cli -p 16379 PUBLISH name hello # terminal 2 (any node in the mesh) 它是什么 # 属性 取值 协议 Redis RESP —— SUBSCRIBE、UNSUBSCRIBE、PSUBSCRIBE、PUBLISH 节点间传输 libp2p pubsub（Kademlia DHT + IPFS 网络发现） 本地监听 proxy.local_port，默认 16379 二进制 bin/IceFireDB-PubSub（-c <config.yaml>） 状态 不做持久化：这是消息总线，不是数据库 配置（config/config.yaml） # 配置项 含义 文件中的默认值 proxy.local_port RESP 监听端口 16379 proxy.enable_mtls 协议代理之间的双向 TLS false p2p.enable 是否开启 libp2p 网络 true p2p.service_discovery_id 会合名（rendezvous）—— 各对等节点之间必须一致 p2p_redis_proxy_service_test p2p.service_command_topic 网络内部的命令频道 p2p_redis_proxy_service_topic_test p2p.service_discover_mode advertise 或 announce advertise p2p.node_host_ip / node_host_port 对等节点应当使用的地址（0 表示任意端口） 127.0.0.1 / 0 pprof_debug.enable / .port /debug/pprof 服务器 true / 16060 log.level debug、info、warn、error debug ip_white_list.enable / .list 客户端 IP 白名单 true / 回环地址条目 cache.enable / .max_items_size / .default_expiration（毫秒）/ .cleanup_interval（秒） 消息缓存 true / 2048 / 5000 / 120 ignore_cmd.enable / .cmd_list 丢弃选定的命令 false / [] 在真实部署里真的会咬人的几点："><meta property="og:locale" content="zh"><meta property="og:type" content="website"><title>IceFireDB-PubSub | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/ title=IceFireDB-PubSub><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/index.xml title="IceFireDB 文档中心"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/ class=active>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>IceFireDB-PubSub</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#它是什么>它是什么</a></li><li><a href=#配置configconfigyaml>配置（<code>config/config.yaml</code>）</a></li><li><a href=#它不做什么>它不做什么</a></li><li><a href=#它适合放在哪里>它适合放在哪里</a></li></ul></nav></aside></header><article class=markdown><h1 id=icefiredb-pubsub>IceFireDB-PubSub
+<a class=anchor href=#icefiredb-pubsub>#</a></h1><p>运行在 libp2p 网络之上的 Redis <strong>PubSub</strong> 协议：客户端照旧使用 <code>SUBSCRIBE</code>/<code>PUBLISH</code>，而消息在各个
+节点之间跨越 NAT 和地域传输，不再局限在单个 Redis 实例内部。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>cd IceFireDB-PubSub
+</span></span><span style=display:flex><span>make                                   <span style=color:#75715e># → bin/IceFireDB-PubSub</span>
+</span></span><span style=display:flex><span>./bin/IceFireDB-PubSub -c ./config/config.yaml
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>16379</span> SUBSCRIBE name      <span style=color:#75715e># terminal 1</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>16379</span> PUBLISH name hello  <span style=color:#75715e># terminal 2 (any node in the mesh)</span>
+</span></span></code></pre></div><h2 id=它是什么>它是什么
+<a class=anchor href=#%e5%ae%83%e6%98%af%e4%bb%80%e4%b9%88>#</a></h2><table><thead><tr><th style=text-align:left>属性</th><th style=text-align:left>取值</th></tr></thead><tbody><tr><td style=text-align:left>协议</td><td style=text-align:left>Redis RESP —— <code>SUBSCRIBE</code>、<code>UNSUBSCRIBE</code>、<code>PSUBSCRIBE</code>、<code>PUBLISH</code></td></tr><tr><td style=text-align:left>节点间传输</td><td style=text-align:left>libp2p pubsub（Kademlia DHT + IPFS 网络发现）</td></tr><tr><td style=text-align:left>本地监听</td><td style=text-align:left><code>proxy.local_port</code>，默认 <code>16379</code></td></tr><tr><td style=text-align:left>二进制</td><td style=text-align:left><code>bin/IceFireDB-PubSub</code>（<code>-c &lt;config.yaml></code>）</td></tr><tr><td style=text-align:left>状态</td><td style=text-align:left>不做持久化：这是消息总线，不是数据库</td></tr></tbody></table><h2 id=配置configconfigyaml>配置（<code>config/config.yaml</code>）
+<a class=anchor href=#%e9%85%8d%e7%bd%aeconfigconfigyaml>#</a></h2><table><thead><tr><th style=text-align:left>配置项</th><th style=text-align:left>含义</th><th style=text-align:left>文件中的默认值</th></tr></thead><tbody><tr><td style=text-align:left><code>proxy.local_port</code></td><td style=text-align:left>RESP 监听端口</td><td style=text-align:left><code>16379</code></td></tr><tr><td style=text-align:left><code>proxy.enable_mtls</code></td><td style=text-align:left>协议代理之间的双向 TLS</td><td style=text-align:left><code>false</code></td></tr><tr><td style=text-align:left><code>p2p.enable</code></td><td style=text-align:left>是否开启 libp2p 网络</td><td style=text-align:left><code>true</code></td></tr><tr><td style=text-align:left><code>p2p.service_discovery_id</code></td><td style=text-align:left>会合名（rendezvous）—— 各对等节点之间<strong>必须一致</strong></td><td style=text-align:left><code>p2p_redis_proxy_service_test</code></td></tr><tr><td style=text-align:left><code>p2p.service_command_topic</code></td><td style=text-align:left>网络内部的命令频道</td><td style=text-align:left><code>p2p_redis_proxy_service_topic_test</code></td></tr><tr><td style=text-align:left><code>p2p.service_discover_mode</code></td><td style=text-align:left><code>advertise</code> 或 <code>announce</code></td><td style=text-align:left><code>advertise</code></td></tr><tr><td style=text-align:left><code>p2p.node_host_ip</code> / <code>node_host_port</code></td><td style=text-align:left>对等节点应当使用的地址（<code>0</code> 表示任意端口）</td><td style=text-align:left><code>127.0.0.1</code> / <code>0</code></td></tr><tr><td style=text-align:left><code>pprof_debug.enable</code> / <code>.port</code></td><td style=text-align:left><code>/debug/pprof</code> 服务器</td><td style=text-align:left><code>true</code> / <code>16060</code></td></tr><tr><td style=text-align:left><code>log.level</code></td><td style=text-align:left><code>debug</code>、<code>info</code>、<code>warn</code>、<code>error</code></td><td style=text-align:left><code>debug</code></td></tr><tr><td style=text-align:left><code>ip_white_list.enable</code> / <code>.list</code></td><td style=text-align:left>客户端 IP 白名单</td><td style=text-align:left><code>true</code> / 回环地址条目</td></tr><tr><td style=text-align:left><code>cache.enable</code> / <code>.max_items_size</code> / <code>.default_expiration</code>（毫秒）/ <code>.cleanup_interval</code>（秒）</td><td style=text-align:left>消息缓存</td><td style=text-align:left><code>true</code> / <code>2048</code> / <code>5000</code> / <code>120</code></td></tr><tr><td style=text-align:left><code>ignore_cmd.enable</code> / <code>.cmd_list</code></td><td style=text-align:left>丢弃选定的命令</td><td style=text-align:left><code>false</code> / <code>[]</code></td></tr></tbody></table><p>在真实部署里真的会咬人的几点：</p><ul><li>发现 id 和命令 topic 就是<strong>网络身份</strong>。把示例配置照抄过去却不改它们，你的集群就会和所有同样照抄的
+人处在同一个网络里。</li><li>示例配置里 <code>pprof_debug</code> 是开启的，并在 <code>16060</code> 上监听。请把它关掉，或者绑定到回环地址并加上防火墙。</li><li>IP 白名单默认开启，内容里只有 <code>127.0.0.1</code>，所以在你不把它的地址加进去之前，任何远程客户端都会被拒绝。</li></ul><h2 id=它不做什么>它不做什么
+<a class=anchor href=#%e5%ae%83%e4%b8%8d%e5%81%9a%e4%bb%80%e4%b9%88>#</a></h2><ul><li>没有消息持久化，没有重放，没有消费者组，没有流。</li><li>没有跨网络的桥接：两个不同的 <code>service_discovery_id</code> 就是两个互不相干的世界。</li><li>它不属于 NoSQL 引擎的命令面 —— 引擎根本没有 <code>SUBSCRIBE</code>。</li></ul><h2 id=它适合放在哪里>它适合放在哪里
+<a class=anchor href=#%e5%ae%83%e9%80%82%e5%90%88%e6%94%be%e5%9c%a8%e5%93%aa%e9%87%8c>#</a></h2><p>当你的 web2 客户端已经在通过 Redis 发布消息，而你又想让这条消息总线跨站点延伸、却不想重写它们时，就用
+它。如果你需要投递保证，请搭配一个真正的队列；PubSub 按设计就是尽力而为。</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#它是什么>它是什么</a></li><li><a href=#配置configconfigyaml>配置（<code>config/config.yaml</code>）</a></li><li><a href=#它不做什么>它不做什么</a></li><li><a href=#它适合放在哪里>它适合放在哪里</a></li></ul></nav></div></aside></main></body></html>

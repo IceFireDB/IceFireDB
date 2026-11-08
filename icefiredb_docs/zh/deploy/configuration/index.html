@@ -1,0 +1,139 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  配置
+  #
+
+NoSQL 引擎没有配置文件。每一项设置都是一个命令行 flag，在启动时由 flags.go 解析一次。（工作
+目录中的 .env 文件同样会被加载 —— 见
+  环境变量。）
+./bin/IceFireDB -h     # prints the usage block below
+
+  基本选项
+  #
+
+
+  
+      
+          Flag
+          含义
+          默认值
+      
+  
+  
+      
+          -a addr
+          绑定地址（host:port）
+          127.0.0.1:11001
+      
+      
+          -n id
+          节点 ID —— 同时也是 Raft 服务器 ID 和数据子目录名
+          1
+      
+      
+          -d dir
+          数据目录
+          data
+      
+      
+          -j addr
+          要加入的集群的主节点地址
+          (空 —— 引导新集群)
+      
+      
+          -l level
+          日志级别：debug、verb、info、warn、silent
+          info
+      
+      
+          -h
+          打印用法并退出
+          —
+      
+  
+
+-n 是标识符，不是端口。端口来自 -a。两个节点可以共享 -d，因为每个节点都写入
+<dir>/IceFireDB/<node-id>/；但两个节点不能共享同一个节点 ID。
+
+  安全选项
+  #
+
+
+  
+      
+          Flag
+          含义
+          默认值
+      
+  
+  
+      
+          --auth token
+          集群认证令牌，由所有节点和所有客户端共享
+          (空 —— 认证关闭)
+      
+      
+          --tls-cert path
+          TLS 证书（PEM）
+          (空)
+      
+      
+          --tls-key path
+          TLS 私钥（PEM）
+          (空)
+      
+  
+
+--tls-cert 与 --tls-key 必须成对提供；只提供其中一个会导致启动错误。--auth 也可以从
+ICEFIREDB_AUTH 读取，两者都设置时以命令行为准。完整行为，包括该令牌保护什么、不保护什么，见
+
+  安全。"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="配置"><meta property="og:description" content=" 配置 # NoSQL 引擎没有配置文件。每一项设置都是一个命令行 flag，在启动时由 flags.go 解析一次。（工作 目录中的 .env 文件同样会被加载 —— 见 环境变量。）
+./bin/IceFireDB -h # prints the usage block below 基本选项 # Flag 含义 默认值 -a addr 绑定地址（host:port） 127.0.0.1:11001 -n id 节点 ID —— 同时也是 Raft 服务器 ID 和数据子目录名 1 -d dir 数据目录 data -j addr 要加入的集群的主节点地址 (空 —— 引导新集群) -l level 日志级别：debug、verb、info、warn、silent info -h 打印用法并退出 — -n 是标识符，不是端口。端口来自 -a。两个节点可以共享 -d，因为每个节点都写入 <dir>/IceFireDB/<node-id>/；但两个节点不能共享同一个节点 ID。
+安全选项 # Flag 含义 默认值 --auth token 集群认证令牌，由所有节点和所有客户端共享 (空 —— 认证关闭) --tls-cert path TLS 证书（PEM） (空) --tls-key path TLS 私钥（PEM） (空) --tls-cert 与 --tls-key 必须成对提供；只提供其中一个会导致启动错误。--auth 也可以从 ICEFIREDB_AUTH 读取，两者都设置时以命令行为准。完整行为，包括该令牌保护什么、不保护什么，见 安全。"><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="deploy"><title>配置 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/ title=Configuration><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle checked>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/ class=active>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>配置</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#基本选项>基本选项</a></li><li><a href=#安全选项>安全选项</a></li><li><a href=#集群与网络选项>集群与网络选项</a></li><li><a href=#存储选项>存储选项</a></li><li><a href=#p2p-选项去中心化驱动>P2P 选项（去中心化驱动）</a></li><li><a href=#可观测性选项>可观测性选项</a></li><li><a href=#诊断选项>诊断选项</a></li><li><a href=#环境变量>环境变量</a></li><li><a href=#会打印出来但没有接线的-flag>会打印出来但没有接线的 flag</a></li><li><a href=#常用组合>常用组合</a></li></ul></nav></aside></header><article class=markdown><h1 id=配置>配置
+<a class=anchor href=#%e9%85%8d%e7%bd%ae>#</a></h1><p>NoSQL 引擎<strong>没有配置文件</strong>。每一项设置都是一个命令行 flag，在启动时由 <code>flags.go</code> 解析一次。（工作
+目录中的 <code>.env</code> 文件同样会被加载 —— 见
+<a href=/icefiredb_docs/zh/#%e7%8e%af%e5%a2%83%e5%8f%98%e9%87%8f>环境变量</a>。）</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/IceFireDB -h     <span style=color:#75715e># prints the usage block below</span>
+</span></span></code></pre></div><h2 id=基本选项>基本选项
+<a class=anchor href=#%e5%9f%ba%e6%9c%ac%e9%80%89%e9%a1%b9>#</a></h2><table><thead><tr><th style=text-align:left>Flag</th><th style=text-align:left>含义</th><th style=text-align:left>默认值</th></tr></thead><tbody><tr><td style=text-align:left><code>-a addr</code></td><td style=text-align:left>绑定地址（<code>host:port</code>）</td><td style=text-align:left><code>127.0.0.1:11001</code></td></tr><tr><td style=text-align:left><code>-n id</code></td><td style=text-align:left>节点 ID —— 同时也是 Raft 服务器 ID 和数据子目录名</td><td style=text-align:left><code>1</code></td></tr><tr><td style=text-align:left><code>-d dir</code></td><td style=text-align:left>数据目录</td><td style=text-align:left><code>data</code></td></tr><tr><td style=text-align:left><code>-j addr</code></td><td style=text-align:left>要加入的集群的主节点地址</td><td style=text-align:left><em>(空 —— 引导新集群)</em></td></tr><tr><td style=text-align:left><code>-l level</code></td><td style=text-align:left>日志级别：<code>debug</code>、<code>verb</code>、<code>info</code>、<code>warn</code>、<code>silent</code></td><td style=text-align:left><code>info</code></td></tr><tr><td style=text-align:left><code>-h</code></td><td style=text-align:left>打印用法并退出</td><td style=text-align:left>—</td></tr></tbody></table><p><code>-n</code> 是<strong>标识符，不是端口</strong>。端口来自 <code>-a</code>。两个节点可以共享 <code>-d</code>，因为每个节点都写入
+<code>&lt;dir>/IceFireDB/&lt;node-id>/</code>；但两个节点不能共享同一个节点 ID。</p><h2 id=安全选项>安全选项
+<a class=anchor href=#%e5%ae%89%e5%85%a8%e9%80%89%e9%a1%b9>#</a></h2><table><thead><tr><th style=text-align:left>Flag</th><th style=text-align:left>含义</th><th style=text-align:left>默认值</th></tr></thead><tbody><tr><td style=text-align:left><code>--auth token</code></td><td style=text-align:left>集群认证令牌，由所有节点和所有客户端共享</td><td style=text-align:left><em>(空 —— 认证关闭)</em></td></tr><tr><td style=text-align:left><code>--tls-cert path</code></td><td style=text-align:left>TLS 证书（PEM）</td><td style=text-align:left><em>(空)</em></td></tr><tr><td style=text-align:left><code>--tls-key path</code></td><td style=text-align:left>TLS 私钥（PEM）</td><td style=text-align:left><em>(空)</em></td></tr></tbody></table><p><code>--tls-cert</code> 与 <code>--tls-key</code> 必须成对提供；只提供其中一个会导致启动错误。<code>--auth</code> 也可以从
+<code>ICEFIREDB_AUTH</code> 读取，两者都设置时以命令行为准。完整行为，包括该令牌保护什么、不保护什么，见
+<a href=/icefiredb_docs/zh/deploy/security/>安全</a>。</p><h2 id=集群与网络选项>集群与网络选项
+<a class=anchor href=#%e9%9b%86%e7%be%a4%e4%b8%8e%e7%bd%91%e7%bb%9c%e9%80%89%e9%a1%b9>#</a></h2><table><thead><tr><th style=text-align:left>Flag</th><th style=text-align:left>含义</th><th style=text-align:left>默认值</th></tr></thead><tbody><tr><td style=text-align:left><code>--advertise addr</code></td><td style=text-align:left>其他节点访问本节点时应使用的地址</td><td style=text-align:left><em>(网络绑定地址)</em></td></tr><tr><td style=text-align:left><code>--openreads</code></td><td style=text-align:left>允许从节点提供读命令服务（数据可能陈旧）</td><td style=text-align:left><code>false</code></td></tr><tr><td style=text-align:left><code>--nosync</code></td><td style=text-align:left>跳过每次写入的磁盘同步（更快，但断电会丢失最近的写入）</td><td style=text-align:left><code>false</code></td></tr><tr><td style=text-align:left><code>--localtime</code></td><td style=text-align:left>从本地机器取 Raft 时钟，而不是用网络时间源</td><td style=text-align:left><code>false</code></td></tr><tr><td style=text-align:left><code>--try-errors</code></td><td style=text-align:left>非主节点读返回 <code>-TRY</code> 而不是 <code>-MOVED</code>，并禁用 <code>CLUSTER</code> 命令</td><td style=text-align:left><code>false</code></td></tr><tr><td style=text-align:left><code>--restore path</code></td><td style=text-align:left>从快照文件引导一个全新的单节点集群</td><td style=text-align:left><em>(空)</em></td></tr><tr><td style=text-align:left><code>--init-run-quit</code></td><td style=text-align:left>初始化引导状态后退出</td><td style=text-align:left><code>false</code></td></tr><tr><td style=text-align:left><code>--raft-backend name</code></td><td style=text-align:left>Raft 日志存储：<code>leveldb</code> 或 <code>bolt</code></td><td style=text-align:left><code>leveldb</code></td></tr></tbody></table><p><code>--advertise</code> 必须包含端口；不带端口（或端口非数字）的取值会在启动时被拒绝。<code>--restore</code> 不能与
+<code>-j</code> 组合使用，并且在数据目录已存在时会被忽略。见
+<a href=/icefiredb_docs/zh/deploy/clustering/>集群</a>与
+<a href=/icefiredb_docs/zh/deploy/operations/>运维</a>。</p><h2 id=存储选项>存储选项
+<a class=anchor href=#%e5%ad%98%e5%82%a8%e9%80%89%e9%a1%b9>#</a></h2><table><thead><tr><th style=text-align:left>Flag</th><th style=text-align:left>含义</th><th style=text-align:left>默认值</th></tr></thead><tbody><tr><td style=text-align:left><code>--storage-backend name</code></td><td style=text-align:left>ledis 数据模型之下的 KV 驱动</td><td style=text-align:left><code>goleveldb</code></td></tr><tr><td style=text-align:left><code>--ipfs-endpoint url</code></td><td style=text-align:left>IPFS API 端点（HTTP API，不是网关）</td><td style=text-align:left><code>http://localhost:5001</code></td></tr><tr><td style=text-align:left><code>--ipfs-synckv-key key</code></td><td style=text-align:left><code>ipfs-synckv</code> 驱动的加密密钥（AES-256：32 字节）</td><td style=text-align:left><em>(空 —— 不加密)</em></td></tr><tr><td style=text-align:left><code>--ipfs-log-dbname name</code></td><td style=text-align:left>由 <code>ipfs-log</code> 各节点共享的数据库名／标识</td><td style=text-align:left><code>ifdb-event-kv-ipfs-log</code></td></tr><tr><td style=text-align:left><code>--oss-endpoint url</code></td><td style=text-align:left>兼容 S3 的端点</td><td style=text-align:left><code>http://localhost:9000</code></td></tr><tr><td style=text-align:left><code>--oss-ak key</code></td><td style=text-align:left>Access key</td><td style=text-align:left>驱动默认值中的占位值</td></tr><tr><td style=text-align:left><code>--oss-sk secret</code></td><td style=text-align:left>Secret key</td><td style=text-align:left>驱动默认值中的占位值</td></tr></tbody></table><p>支持的 <code>--storage-backend</code> 取值：<code>goleveldb</code>、<code>badger</code>、<code>hybriddb</code>、<code>oss</code>、<code>ipfs</code>、<code>ipfs-synckv</code>、
+<code>crdt</code>、<code>ipfs-log</code>。<code>leveldb</code>（cgo 驱动）与 <code>orbitdb</code> <strong>没有</strong>编译进二进制。各驱动具体保证什么，见
+<a href=/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a>。</p><h2 id=p2p-选项去中心化驱动>P2P 选项（去中心化驱动）
+<a class=anchor href=#p2p-%e9%80%89%e9%a1%b9%e5%8e%bb%e4%b8%ad%e5%bf%83%e5%8c%96%e9%a9%b1%e5%8a%a8>#</a></h2><p>这些选项配置 <code>crdt</code> 与 <code>ipfs-log</code> 驱动所使用的 libp2p 层。它们对本地存储驱动和对象存储驱动没有
+影响。</p><table><thead><tr><th style=text-align:left>Flag</th><th style=text-align:left>含义</th><th style=text-align:left>默认值</th></tr></thead><tbody><tr><td style=text-align:left><code>--servicename name</code></td><td style=text-align:left>服务发现标识</td><td style=text-align:left><code>icefiredb</code></td></tr><tr><td style=text-align:left><code>--nettopic topic</code></td><td style=text-align:left>节点发现 pubsub 频道</td><td style=text-align:left><code>icefiredb-net</code></td></tr><tr><td style=text-align:left><code>--datatopic topic</code></td><td style=text-align:left>数据同步 pubsub 频道</td><td style=text-align:left><code>icefiredb-data</code></td></tr></tbody></table><p>只有<strong>这三项</strong>全部一致时，节点之间才会交换数据。在一个运行中的集群里改动它们，会把集群割裂开。</p><h2 id=可观测性选项>可观测性选项
+<a class=anchor href=#%e5%8f%af%e8%a7%82%e6%b5%8b%e6%80%a7%e9%80%89%e9%a1%b9>#</a></h2><table><thead><tr><th style=text-align:left>Flag</th><th style=text-align:left>含义</th><th style=text-align:left>默认值</th></tr></thead><tbody><tr><td style=text-align:left><code>--metrics</code></td><td style=text-align:left>启用 HTTP 端点 <code>/healthz</code>、<code>/readyz</code>、<code>/metrics</code></td><td style=text-align:left><code>false</code></td></tr><tr><td style=text-align:left><code>--metrics-addr addr</code></td><td style=text-align:left>这些端点的绑定地址</td><td style=text-align:left><code>127.0.0.1:11002</code></td></tr><tr><td style=text-align:left><code>--pprof</code></td><td style=text-align:left>启用 pprof 性能分析服务器</td><td style=text-align:left><code>false</code></td></tr><tr><td style=text-align:left><code>--pprof-addr addr</code></td><td style=text-align:left>pprof 绑定地址</td><td style=text-align:left><code>127.0.0.1:26063</code></td></tr></tbody></table><p>两个服务器默认关闭，并且是刻意绑定在回环地址上的。见
+<a href=/icefiredb_docs/zh/deploy/observability/>可观测性</a>。</p><h2 id=诊断选项>诊断选项
+<a class=anchor href=#%e8%af%8a%e6%96%ad%e9%80%89%e9%a1%b9>#</a></h2><table><thead><tr><th style=text-align:left>Flag</th><th style=text-align:left>含义</th><th style=text-align:left>默认值</th></tr></thead><tbody><tr><td style=text-align:left><code>-t 1..9</code></td><td style=text-align:left>测试辅助：由一位数字推导出地址与节点 ID（节点 <code>1</code> 引导，其余节点加入它）</td><td style=text-align:left><em>(未设置)</em></td></tr><tr><td style=text-align:left><code>--debug</code></td><td style=text-align:left>已注册，但目前<strong>未被使用</strong></td><td style=text-align:left><code>false</code></td></tr></tbody></table><p><code>-t</code> 只是搭建本地集群的便利手段；它不属于本文档记录的接口，并且会改写 <code>-a</code>、<code>-n</code> 与 <code>-j</code>。</p><h2 id=环境变量>环境变量
+<a class=anchor href=#%e7%8e%af%e5%a2%83%e5%8f%98%e9%87%8f>#</a></h2><table><thead><tr><th style=text-align:left>变量</th><th style=text-align:left>由谁读取</th><th style=text-align:left>作用</th></tr></thead><tbody><tr><td style=text-align:left><code>ICEFIREDB_AUTH</code></td><td style=text-align:left><code>flags.go</code></td><td style=text-align:left>命令行未给出 <code>--auth</code> 时作为集群认证令牌</td></tr><tr><td style=text-align:left><code>IPFS_LOG_DBNAME</code></td><td style=text-align:left><code>driver/ipfs-log</code></td><td style=text-align:left>在打开时覆盖 ipfs-log 的数据库名</td></tr></tbody></table><p>二进制在启动时还会调用 <code>godotenv.Load()</code>，所以工作目录中的 <code>.env</code> 文件可以设置上面这些变量。请把
+密钥放在 <code>ICEFIREDB_AUTH</code> 或 <code>.env</code> 里，而不是放在命令行上 —— 在大多数系统上进程列表是全局可读的。</p><h2 id=会打印出来但没有接线的-flag>会打印出来但没有接线的 flag
+<a class=anchor href=#%e4%bc%9a%e6%89%93%e5%8d%b0%e5%87%ba%e6%9d%a5%e4%bd%86%e6%b2%a1%e6%9c%89%e6%8e%a5%e7%ba%bf%e7%9a%84-flag>#</a></h2><p><code>-h</code> 会为 <code>--hot-cache-size</code> 打印一行 <code>Store options</code>。<strong>该 flag 并没有注册</strong>，也没有任何效果：
+<code>oss</code>、<code>ipfs</code> 与 <code>ipfs-synckv</code> 驱动的热缓存容量就是驱动默认的 1024 MB，设置在 <code>driver/*/db.go</code>
+中。<code>--pubsub-id</code> 同理：它出现在用法文本里，但随被禁用的 OrbitDB 驱动一起被注释掉了。</p><p>传入未注册的 flag，会让 Go 的 <code>flag</code> 包以 <code>flag provided but not defined</code> 终止，所以这一点会立刻
+暴露出来，而不是被静默忽略。</p><p><code>--debug</code> 是相反的情况：它已注册，但没有任何代码读取它设置的变量，因此它同样不改变任何行为。</p><h2 id=常用组合>常用组合
+<a class=anchor href=#%e5%b8%b8%e7%94%a8%e7%bb%84%e5%90%88>#</a></h2><p><strong>本地开发，单节点</strong></p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/IceFireDB -a 127.0.0.1:11001 -n <span style=color:#ae81ff>1</span> -d ./data -l debug --nosync
+</span></span></code></pre></div><p><strong>三节点集群，启用认证，指标绑定在回环地址</strong></p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>export ICEFIREDB_AUTH<span style=color:#f92672>=</span>change-me
+</span></span><span style=display:flex><span>./bin/IceFireDB -n <span style=color:#ae81ff>1</span> -a 0.0.0.0:11001 --advertise 10.0.0.1:11001 -d /var/lib/icefiredb --metrics
+</span></span><span style=display:flex><span>./bin/IceFireDB -n <span style=color:#ae81ff>2</span> -a 0.0.0.0:11001 --advertise 10.0.0.2:11001 -d /var/lib/icefiredb --metrics -j 10.0.0.1:11001
+</span></span><span style=display:flex><span>./bin/IceFireDB -n <span style=color:#ae81ff>3</span> -a 0.0.0.0:11001 --advertise 10.0.0.3:11001 -d /var/lib/icefiredb --metrics -j 10.0.0.1:11001
+</span></span></code></pre></div><p><strong>Badger、TLS 与从节点读</strong></p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/IceFireDB --storage-backend badger --tls-cert ./cert.pem --tls-key ./key.pem <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --openreads -a 0.0.0.0:11001 -d /var/lib/icefiredb
+</span></span></code></pre></div><p><strong>去中心化 CRDT 驱动</strong></p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/IceFireDB --storage-backend crdt <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --servicename my-service --nettopic my-net --datatopic my-data <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  -d /var/lib/icefiredb
+</span></span></code></pre></div></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#基本选项>基本选项</a></li><li><a href=#安全选项>安全选项</a></li><li><a href=#集群与网络选项>集群与网络选项</a></li><li><a href=#存储选项>存储选项</a></li><li><a href=#p2p-选项去中心化驱动>P2P 选项（去中心化驱动）</a></li><li><a href=#可观测性选项>可观测性选项</a></li><li><a href=#诊断选项>诊断选项</a></li><li><a href=#环境变量>环境变量</a></li><li><a href=#会打印出来但没有接线的-flag>会打印出来但没有接线的 flag</a></li><li><a href=#常用组合>常用组合</a></li></ul></nav></div></aside></main></body></html>

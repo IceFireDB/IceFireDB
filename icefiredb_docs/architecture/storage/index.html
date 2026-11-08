@@ -1,0 +1,96 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  Storage layer
+  #
+
+Under the command handlers sits ledis: a data model that turns five Redis types into key/value
+operations over a single driver.IDB. It is the reason the same commands work on a local LevelDB file
+and on IPFS.
+
+  Per-type keyspaces
+  #
+
+ledis does not store &ldquo;a key with a type&rdquo;. It stores separate physical keys per type, each prefixed with
+a type byte:
+
+  
+      
+          Type
+          Prefix bytes
+          Physical keys per logical key
+      
+  
+  
+      
+          String
+          KVType
+          the value
+      
+      
+          Hash
+          HashType, HSizeType
+          one entry per field + a size counter
+      
+      
+          List
+          ListType, LMetaType
+          one entry per index + a meta record (head/tail/size)
+      
+      
+          Set
+          SetType, SSizeType
+          one entry per member + a size counter
+      
+      
+          Sorted set
+          ZSetType, ZSizeType, ZScoreType
+          one entry per member + size counter + one index entry per (score, member)
+      
+  
+
+Expirations are separate records too (ExpMetaType, ExpTimeType), which is why a TTL belongs to the
+type it was set on rather than to the key name."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Storage"><meta property="og:description" content=" Storage layer # Under the command handlers sits ledis: a data model that turns five Redis types into key/value operations over a single driver.IDB. It is the reason the same commands work on a local LevelDB file and on IPFS.
+Per-type keyspaces # ledis does not store “a key with a type”. It stores separate physical keys per type, each prefixed with a type byte:
+Type Prefix bytes Physical keys per logical key String KVType the value Hash HashType, HSizeType one entry per field + a size counter List ListType, LMetaType one entry per index + a meta record (head/tail/size) Set SetType, SSizeType one entry per member + a size counter Sorted set ZSetType, ZSizeType, ZScoreType one entry per member + size counter + one index entry per (score, member) Expirations are separate records too (ExpMetaType, ExpTimeType), which is why a TTL belongs to the type it was set on rather than to the key name."><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="article:section" content="architecture"><title>Storage | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/ title=存储><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle checked>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/ class=active>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Storage</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#per-type-keyspaces>Per-type keyspaces</a></li><li><a href=#physical-key-encoding>Physical key encoding</a></li><li><a href=#limits-enforced-here-not-in-the-handlers>Limits enforced here, not in the handlers</a></li><li><a href=#expiry>Expiry</a></li><li><a href=#backends-and-durability>Backends and durability</a></li><li><a href=#why-the-design-holds-together>Why the design holds together</a></li></ul></nav></aside></header><article class=markdown><h1 id=storage-layer>Storage layer
+<a class=anchor href=#storage-layer>#</a></h1><p>Under the command handlers sits <strong>ledis</strong>: a data model that turns five Redis types into key/value
+operations over a single <code>driver.IDB</code>. It is the reason the same commands work on a local LevelDB file
+and on IPFS.</p><h2 id=per-type-keyspaces>Per-type keyspaces
+<a class=anchor href=#per-type-keyspaces>#</a></h2><p>ledis does not store &ldquo;a key with a type&rdquo;. It stores separate physical keys per type, each prefixed with
+a type byte:</p><table><thead><tr><th style=text-align:left>Type</th><th style=text-align:left>Prefix bytes</th><th style=text-align:left>Physical keys per logical key</th></tr></thead><tbody><tr><td style=text-align:left>String</td><td style=text-align:left><code>KVType</code></td><td style=text-align:left>the value</td></tr><tr><td style=text-align:left>Hash</td><td style=text-align:left><code>HashType</code>, <code>HSizeType</code></td><td style=text-align:left>one entry per field + a size counter</td></tr><tr><td style=text-align:left>List</td><td style=text-align:left><code>ListType</code>, <code>LMetaType</code></td><td style=text-align:left>one entry per index + a meta record (head/tail/size)</td></tr><tr><td style=text-align:left>Set</td><td style=text-align:left><code>SetType</code>, <code>SSizeType</code></td><td style=text-align:left>one entry per member + a size counter</td></tr><tr><td style=text-align:left>Sorted set</td><td style=text-align:left><code>ZSetType</code>, <code>ZSizeType</code>, <code>ZScoreType</code></td><td style=text-align:left>one entry per member + size counter + one index entry per (score, member)</td></tr></tbody></table><p>Expirations are separate records too (<code>ExpMetaType</code>, <code>ExpTimeType</code>), which is why a TTL belongs to the
+type it was set on rather than to the key name.</p><p>Consequences you can observe from the client side:</p><ul><li>Two types can coexist at the same name (see
+<a href=/icefiredb_docs/commands/compatibility/>Compatibility</a>).</li><li><code>SCAN</code> has to walk five keyspaces; its cursor carries five sub-cursors.</li><li>Deleting a hash (<code>HCLEAR</code>) removes many physical keys; <code>DEL</code> removes only the string&rsquo;s.</li></ul><h2 id=physical-key-encoding>Physical key encoding
+<a class=anchor href=#physical-key-encoding>#</a></h2><p>Composite keys are length-prefixed and separator-delimited rather than hashed:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-text data-lang=text><span style=display:flex><span>hash:   [index][HashType][uint16 keyLen][key][&#39;:&#39;][field]
+</span></span><span style=display:flex><span>list:   [index][ListType][uint16 keyLen][key][uint32 index]
+</span></span><span style=display:flex><span>zset:   [index][ZScoreType][uint16 keyLen][key][sep][score][member]
+</span></span></code></pre></div><p><code>sep</code> for sorted sets is one of two bytes depending on the score&rsquo;s sign, so the byte order of the index
+matches numeric score order — that is what makes <code>ZRANGEBYSCORE</code> a range scan instead of a full sort.
+Member entries are sorted by encoded key, so <code>SMEMBERS</code>/<code>HKEYS</code> order is storage order, not insertion
+order.</p><h2 id=limits-enforced-here-not-in-the-handlers>Limits enforced here, not in the handlers
+<a class=anchor href=#limits-enforced-here-not-in-the-handlers>#</a></h2><table><thead><tr><th style=text-align:left>Limit</th><th style=text-align:left>Value</th><th style=text-align:left>Error</th></tr></thead><tbody><tr><td style=text-align:left>Key size</td><td style=text-align:left>1024 bytes, non-empty</td><td style=text-align:left><code>invalid key size</code></td></tr><tr><td style=text-align:left>Hash field size</td><td style=text-align:left>1024 bytes, non-empty</td><td style=text-align:left><code>invalid hash field size</code></td></tr><tr><td style=text-align:left>Set member size</td><td style=text-align:left>1024 bytes</td><td style=text-align:left><code>invalid set member size</code></td></tr><tr><td style=text-align:left>Sorted-set member size</td><td style=text-align:left>1024 bytes</td><td style=text-align:left><code>invalid zset member size</code></td></tr><tr><td style=text-align:left>Value size</td><td style=text-align:left>1 GiB</td><td style=text-align:left><code>invalid value size</code></td></tr><tr><td style=text-align:left>Expiry timestamp in the past</td><td style=text-align:left>—</td><td style=text-align:left><code>invalid expire value</code></td></tr></tbody></table><p>These come from <code>vendor/github.com/ledisdb/ledisdb/ledis/const.go</code>; changing them means changing ledis.
+Note that they are much tighter than Redis&rsquo; 512 MB values and effectively unlimited keys — a 1 KiB key
+budget is the constraint most applications hit first.</p><h2 id=expiry>Expiry
+<a class=anchor href=#expiry>#</a></h2><ul><li>Expirations are stored in <strong>whole seconds</strong> and keyed per type.</li><li>Timestamps are computed from the Raft clock by the handler and validated by ledis against the local
+clock; a timestamp <code>&lt;= now</code> is rejected.</li><li>Expired keys are reaped lazily/asynchronously, so a logically expired key can still be observed by an
+existence check on another replica. See
+<a href=/icefiredb_docs/commands/compatibility/>Compatibility</a>.</li><li><code>TTL</code>/<code>HTTL</code>/<code>LTTL</code>/<code>STTL</code> subtract the local clock from the stored timestamp and return <code>-1</code> both for
+&ldquo;no expiry&rdquo; and &ldquo;already expired&rdquo;.</li></ul><h2 id=backends-and-durability>Backends and durability
+<a class=anchor href=#backends-and-durability>#</a></h2><p>The driver contract is deliberately small (see
+<a href=/icefiredb_docs/deploy/storage-backends/>Storage backends</a>). Above it:</p><ul><li><strong>Writes</strong> go through ledis and then the driver&rsquo;s <code>Put</code>/<code>WriteBatch</code>; <code>--nosync</code> disables the
+per-write disk sync in the Raft log layer, not in the driver.</li><li><strong>Compaction</strong> is delegated to the driver (<code>Compact()</code>); for <code>goleveldb</code>/<code>badger</code> that is normal LSM
+compaction, for <code>crdt</code>/<code>ipfs-log</code> it is a no-op.</li><li><strong>Snapshots</strong> iterate the driver and stream key/value pairs in <code>sds</code> format inside a gzip container,
+so they are backend-independent — see
+<a href=/icefiredb_docs/deploy/operations/>Operations</a>.</li></ul><h2 id=why-the-design-holds-together>Why the design holds together
+<a class=anchor href=#why-the-design-holds-together>#</a></h2><p>The command layer never assumes a specific store. It asks ledis for operations (<code>HSet</code>, <code>LPush</code>,
+<code>ZRangeByScore</code>, …), and ledis maps them onto prefixed key operations. Everything that makes the engine
+a <em>database</em> — structures, ordering, expiry — lives in that mapping, so a new backend only has to be a
+correct ordered KV store.</p><p>The cost is at the edges: no cross-type atomicity, O(n) list rebuilds, name-based scan cursors, and the
+1024-byte key budget. Those are documented as limitations rather than papered over.</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#per-type-keyspaces>Per-type keyspaces</a></li><li><a href=#physical-key-encoding>Physical key encoding</a></li><li><a href=#limits-enforced-here-not-in-the-handlers>Limits enforced here, not in the handlers</a></li><li><a href=#expiry>Expiry</a></li><li><a href=#backends-and-durability>Backends and durability</a></li><li><a href=#why-the-design-holds-together>Why the design holds together</a></li></ul></nav></div></aside></main></body></html>

@@ -1,0 +1,114 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content='
+  扫描
+  #
+
+8 条命令，分两族，两套不同的游标契约。把它们搞混是使用本引擎时最常见的集成错误。
+
+  
+      
+          命令
+          读写
+          语法
+          返回
+          示例 → 回复
+      
+  
+  
+      
+          SCAN
+          R
+          SCAN cursor [MATCH glob] [COUNT n] [TYPE type]
+          array [cursor, keys]，游标为 0 表示结束
+          SCAN 0 MATCH user:* COUNT 100 → [cursor, [user:1, user:2]]
+      
+      
+          HSCAN
+          R
+          HSCAN KEY cursor [MATCH glob] [COUNT n]
+          array [cursor, [field, value, ...]]
+          HSCAN user:1 0 COUNT 10 → [0, [name, ada]]
+      
+      
+          SSCAN
+          R
+          SSCAN KEY cursor [MATCH glob] [COUNT n]
+          array [cursor, [member, ...]]
+          SSCAN tags 0 → [0, [go]]
+      
+      
+          ZSCAN
+          R
+          ZSCAN KEY cursor [MATCH glob] [COUNT n]
+          array [cursor, [member, score, ...]]
+          ZSCAN board 0 → [0, [ada, 105]]
+      
+      
+          XSCAN
+          R
+          XSCAN type cursor [MATCH regex] [COUNT n] [ASC|DESC]
+          array [cursor, keys]，空游标表示结束
+          XSCAN KV "" COUNT 5 → [key:5, [...]]
+      
+      
+          XHSCAN
+          R
+          XHSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]
+          array [cursor, [field, value, ...]]
+          XHSCAN user:1 "" COUNT 5 → [name, [name, ada]]
+      
+      
+          XSSCAN
+          R
+          XSSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]
+          array [cursor, [member, ...]]
+          XSSCAN tags "" → [go, [go]]
+      
+      
+          XZSCAN
+          R
+          XZSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]
+          array [cursor, [member, score, ...]]
+          XZSCAN board "" → [ada, [ada, 105]]
+      
+  
+
+
+  Redis 族
+  #
+
+SCAN / HSCAN / SSCAN / ZSCAN 沿用 Redis 的形态，但不沿用 Redis 的游标编码。'><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="扫描"><meta property="og:description" content=' 扫描 # 8 条命令，分两族，两套不同的游标契约。把它们搞混是使用本引擎时最常见的集成错误。
+命令 读写 语法 返回 示例 → 回复 SCAN R SCAN cursor [MATCH glob] [COUNT n] [TYPE type] array [cursor, keys]，游标为 0 表示结束 SCAN 0 MATCH user:* COUNT 100 → [cursor, [user:1, user:2]] HSCAN R HSCAN KEY cursor [MATCH glob] [COUNT n] array [cursor, [field, value, ...]] HSCAN user:1 0 COUNT 10 → [0, [name, ada]] SSCAN R SSCAN KEY cursor [MATCH glob] [COUNT n] array [cursor, [member, ...]] SSCAN tags 0 → [0, [go]] ZSCAN R ZSCAN KEY cursor [MATCH glob] [COUNT n] array [cursor, [member, score, ...]] ZSCAN board 0 → [0, [ada, 105]] XSCAN R XSCAN type cursor [MATCH regex] [COUNT n] [ASC|DESC] array [cursor, keys]，空游标表示结束 XSCAN KV "" COUNT 5 → [key:5, [...]] XHSCAN R XHSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC] array [cursor, [field, value, ...]] XHSCAN user:1 "" COUNT 5 → [name, [name, ada]] XSSCAN R XSSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC] array [cursor, [member, ...]] XSSCAN tags "" → [go, [go]] XZSCAN R XZSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC] array [cursor, [member, score, ...]] XZSCAN board "" → [ada, [ada, 105]] Redis 族 # SCAN / HSCAN / SSCAN / ZSCAN 沿用 Redis 的形态，但不沿用 Redis 的游标编码。'><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="commands"><title>扫描 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/ title=Scan><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle checked>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/ class=active>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>扫描</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#redis-族>Redis 族</a></li><li><a href=#x-族>X 族</a></li><li><a href=#两族通用的规则>两族通用的规则</a></li><li><a href=#循环写法>循环写法</a></li></ul></nav></aside></header><article class=markdown><h1 id=扫描>扫描
+<a class=anchor href=#%e6%89%ab%e6%8f%8f>#</a></h1><p>8 条命令，分两族，<strong>两套不同的游标契约</strong>。把它们搞混是使用本引擎时最常见的集成错误。</p><table><thead><tr><th style=text-align:left>命令</th><th style=text-align:left>读写</th><th style=text-align:left>语法</th><th style=text-align:left>返回</th><th style=text-align:left>示例 → 回复</th></tr></thead><tbody><tr><td style=text-align:left><code>SCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SCAN cursor [MATCH glob] [COUNT n] [TYPE type]</code></td><td style=text-align:left><code>array</code> <code>[cursor, keys]</code>，游标为 <code>0</code> 表示结束</td><td style=text-align:left><code>SCAN 0 MATCH user:* COUNT 100</code> → <code>[cursor, [user:1, user:2]]</code></td></tr><tr><td style=text-align:left><code>HSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>HSCAN KEY cursor [MATCH glob] [COUNT n]</code></td><td style=text-align:left><code>array</code> <code>[cursor, [field, value, ...]]</code></td><td style=text-align:left><code>HSCAN user:1 0 COUNT 10</code> → <code>[0, [name, ada]]</code></td></tr><tr><td style=text-align:left><code>SSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SSCAN KEY cursor [MATCH glob] [COUNT n]</code></td><td style=text-align:left><code>array</code> <code>[cursor, [member, ...]]</code></td><td style=text-align:left><code>SSCAN tags 0</code> → <code>[0, [go]]</code></td></tr><tr><td style=text-align:left><code>ZSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>ZSCAN KEY cursor [MATCH glob] [COUNT n]</code></td><td style=text-align:left><code>array</code> <code>[cursor, [member, score, ...]]</code></td><td style=text-align:left><code>ZSCAN board 0</code> → <code>[0, [ada, 105]]</code></td></tr><tr><td style=text-align:left><code>XSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>XSCAN type cursor [MATCH regex] [COUNT n] [ASC|DESC]</code></td><td style=text-align:left><code>array</code> <code>[cursor, keys]</code>，空游标表示结束</td><td style=text-align:left><code>XSCAN KV "" COUNT 5</code> → <code>[key:5, [...]]</code></td></tr><tr><td style=text-align:left><code>XHSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>XHSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]</code></td><td style=text-align:left><code>array</code> <code>[cursor, [field, value, ...]]</code></td><td style=text-align:left><code>XHSCAN user:1 "" COUNT 5</code> → <code>[name, [name, ada]]</code></td></tr><tr><td style=text-align:left><code>XSSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>XSSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]</code></td><td style=text-align:left><code>array</code> <code>[cursor, [member, ...]]</code></td><td style=text-align:left><code>XSSCAN tags ""</code> → <code>[go, [go]]</code></td></tr><tr><td style=text-align:left><code>XZSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>XZSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]</code></td><td style=text-align:left><code>array</code> <code>[cursor, [member, score, ...]]</code></td><td style=text-align:left><code>XZSCAN board ""</code> → <code>[ada, [ada, 105]]</code></td></tr></tbody></table><h2 id=redis-族>Redis 族
+<a class=anchor href=#redis-%e6%97%8f>#</a></h2><p><code>SCAN</code> / <code>HSCAN</code> / <code>SSCAN</code> / <code>ZSCAN</code> 沿用 Redis 的形态，但不沿用 Redis 的游标编码。</p><ul><li>从游标 <code>0</code> 开始；当回复中的游标为 <code>0</code> 时遍历结束。</li><li><code>SCAN</code> 的游标是一个不透明的 base64 字符串，携带<strong>五个子游标</strong>，每个键空间一个（<code>string</code>、<code>hash</code>、<code>list</code>、<code>set</code>、<code>zset</code>）。它不是数字，也不是键偏移。</li><li><code>HSCAN</code> / <code>SSCAN</code> / <code>ZSCAN</code> 把<strong>最后一个字段名或成员名</strong>作为游标返回。后果：<ul><li>名字恰好是 <code>0</code> 的字段会与结束标记冲突。</li><li>把游标当整数解析的客户端助手（例如 go-redis 的类型化 <code>HScan</code>）会拒绝它。请使用通用命令接口：<code>redis-cli</code>、<code>Do("hscan", …)</code>、<code>execute_command</code>。</li></ul></li><li><code>MATCH</code> 接受 <strong>Redis glob</strong>（<code>*</code>、<code>?</code>、<code>[abc]</code>、<code>\\</code> 转义），会被转成正则，由处理器在有限的一页上应用。</li><li><code>SCAN</code> 支持 <code>TYPE string|hash|list|set|zset</code>；未知类型返回空结果。</li><li>省略时 <code>COUNT</code> 默认为 10。</li></ul><h2 id=x-族>X 族
+<a class=anchor href=#x-%e6%97%8f>#</a></h2><p><code>XSCAN</code> / <code>XHSCAN</code> / <code>XSSCAN</code> / <code>XZSCAN</code> 是引擎原生的扫描：</p><ul><li>从<strong>空游标</strong> <code>""</code> 开始；当返回空游标时遍历结束。</li><li><code>MATCH</code> 是<strong>正则表达式</strong>，不是 glob，会传给存储层。</li><li><code>ASC</code> / <code>DESC</code> 选择方向（<code>DESC</code> 用 <code>RevScan</code> 遍历）。</li><li><code>XSCAN</code> 的第一个参数是<strong>类型名</strong>：<code>KV</code>、<code>HASH</code>、<code>LIST</code>、<code>SET</code>、<code>ZSET</code>（不区分大小写；其他任何值都会报 <code>invalid key type</code> 错误）。</li></ul><h2 id=两族通用的规则>两族通用的规则
+<a class=anchor href=#%e4%b8%a4%e6%97%8f%e9%80%9a%e7%94%a8%e7%9a%84%e8%a7%84%e5%88%99>#</a></h2><ul><li><code>COUNT</code> 只是提示，上限 <strong>10000</strong>。它限制的是内存分配，而不是返回的条目数。</li><li><strong>一页可能返回空结果，但游标仍然前进。</strong> 绝不要在短页或空页上停下；要循环到游标为 <code>0</code>（Redis 族）或 <code>""</code>（X 族）。</li><li>扫描不取快照：遍历期间新增或删除的键可能出现，也可能不出现。这与 Redis 给出的保证相同。</li><li>两族都是读命令，因此在从节点上需要 <code>--openreads</code>（或重定向到主节点）。</li></ul><h2 id=循环写法>循环写法
+<a class=anchor href=#%e5%be%aa%e7%8e%af%e5%86%99%e6%b3%95>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#75715e># Redis family — go-redis&#39;s typed HScan does not work; use the generic API</span>
+</span></span><span style=display:flex><span>cursor <span style=color:#f92672>=</span> <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>while</span> <span style=color:#66d9ef>True</span>:
+</span></span><span style=display:flex><span>    cursor, keys <span style=color:#f92672>=</span> r<span style=color:#f92672>.</span>execute_command(<span style=color:#e6db74>&#34;SCAN&#34;</span>, cursor, <span style=color:#e6db74>&#34;MATCH&#34;</span>, <span style=color:#e6db74>&#34;user:*&#34;</span>, <span style=color:#e6db74>&#34;COUNT&#34;</span>, <span style=color:#ae81ff>500</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>for</span> k <span style=color:#f92672>in</span> keys:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> cursor <span style=color:#f92672>==</span> <span style=color:#e6db74>b</span><span style=color:#e6db74>&#34;0&#34;</span> <span style=color:#f92672>or</span> cursor <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;0&#34;</span>:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>break</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># X family — empty cursor terminates</span>
+</span></span><span style=display:flex><span>cursor <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>while</span> <span style=color:#66d9ef>True</span>:
+</span></span><span style=display:flex><span>    cursor, items <span style=color:#f92672>=</span> r<span style=color:#f92672>.</span>execute_command(<span style=color:#e6db74>&#34;XSCAN&#34;</span>, <span style=color:#e6db74>&#34;HASH&#34;</span>, cursor, <span style=color:#e6db74>&#34;MATCH&#34;</span>, <span style=color:#e6db74>&#34;^user:&#34;</span>, <span style=color:#e6db74>&#34;COUNT&#34;</span>, <span style=color:#ae81ff>500</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>for</span> k <span style=color:#f92672>in</span> items:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#f92672>not</span> cursor:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>break</span>
+</span></span></code></pre></div><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># redis-cli drives the cursor for you on SCAN</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> --scan --pattern <span style=color:#e6db74>&#39;user:*&#39;</span> | head
+</span></span></code></pre></div></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#redis-族>Redis 族</a></li><li><a href=#x-族>X 族</a></li><li><a href=#两族通用的规则>两族通用的规则</a></li><li><a href=#循环写法>循环写法</a></li></ul></nav></div></aside></main></body></html>

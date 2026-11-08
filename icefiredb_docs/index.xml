@@ -1,0 +1,1642 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Documentation on IceFireDB Documentation</title><link>https://docs.icefiredb.xyz/icefiredb_docs/</link><description>Recent content in Documentation on IceFireDB Documentation</description><generator>Hugo</generator><language>en</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/index.xml" rel="self" type="application/rss+xml"/><item><title>Clients</title><link>https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/</guid><description>&lt;h1 id="clients">
+ Clients
+ &lt;a class="anchor" href="#clients">#&lt;/a>
+&lt;/h1>
+&lt;p>The server speaks RESP, so a Redis client works — with three adjustments: type mismatches never error,
+scan cursors must stay opaque, and there is no &lt;code>SELECT&lt;/code>/&lt;code>MULTI&lt;/code>.&lt;/p>
+&lt;h2 id="redis-cli">
+ redis-cli
+ &lt;a class="anchor" href="#redis-cli">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>redis-cli -h 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># with TLS and auth&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-cli --tls --cacert ./ca.crt -a &lt;span style="color:#e6db74">&amp;#34;&lt;/span>$ICEFIREDB_AUTH&lt;span style="color:#e6db74">&amp;#34;&lt;/span> -h db1.internal -p &lt;span style="color:#ae81ff">11001&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>SET user:1 &lt;span style="color:#e6db74">&amp;#39;{&amp;#34;name&amp;#34;:&amp;#34;ada&amp;#34;}&amp;#39;&lt;/span> EX &lt;span style="color:#ae81ff">300&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>HGETALL user:1
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>SCAN &lt;span style="color:#ae81ff">0&lt;/span> MATCH &lt;span style="color:#e6db74">&amp;#39;user:*&amp;#39;&lt;/span> COUNT &lt;span style="color:#ae81ff">100&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>XSCAN HASH &lt;span style="color:#e6db74">&amp;#34;&amp;#34;&lt;/span> MATCH &lt;span style="color:#e6db74">&amp;#39;^user:&amp;#39;&lt;/span> COUNT &lt;span style="color:#ae81ff">100&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>INFO
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>&lt;code>redis-cli --scan&lt;/code> works: it starts at &lt;code>0&lt;/code> and loops until the cursor is &lt;code>0&lt;/code> again.&lt;/p></description></item><item><title>Configuration</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/</guid><description>&lt;h1 id="configuration">
+ Configuration
+ &lt;a class="anchor" href="#configuration">#&lt;/a>
+&lt;/h1>
+&lt;p>The NoSQL engine has &lt;strong>no configuration file&lt;/strong>. Every setting is a command-line flag, parsed once at
+startup in &lt;code>flags.go&lt;/code>. (A &lt;code>.env&lt;/code> file in the working directory is loaded as well — see
+
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/#environment-variables">Environment variables&lt;/a>.)&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -h &lt;span style="color:#75715e"># prints the usage block below&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="basic-options">
+ Basic options
+ &lt;a class="anchor" href="#basic-options">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Flag&lt;/th>
+ &lt;th style="text-align: left">Meaning&lt;/th>
+ &lt;th style="text-align: left">Default&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-a addr&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Bind address (&lt;code>host:port&lt;/code>)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>127.0.0.1:11001&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-n id&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Node ID — also the Raft server ID and the data subdirectory name&lt;/td>
+ &lt;td style="text-align: left">&lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-d dir&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Data directory&lt;/td>
+ &lt;td style="text-align: left">&lt;code>data&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-j addr&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Leader address of a cluster to join&lt;/td>
+ &lt;td style="text-align: left">&lt;em>(empty — bootstrap)&lt;/em>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-l level&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Log level: &lt;code>debug&lt;/code>, &lt;code>verb&lt;/code>, &lt;code>info&lt;/code>, &lt;code>warn&lt;/code>, &lt;code>silent&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>info&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-h&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Print usage and exit&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>-n&lt;/code> is an &lt;strong>identifier, not a port&lt;/strong>. Ports come from &lt;code>-a&lt;/code>. Two nodes may share &lt;code>-d&lt;/code> because each one
+writes to &lt;code>&amp;lt;dir&amp;gt;/IceFireDB/&amp;lt;node-id&amp;gt;/&lt;/code>, but two nodes must not share a node ID.&lt;/p></description></item><item><title>Overview</title><link>https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/</guid><description>&lt;h1 id="engine-overview">
+ Engine overview
+ &lt;a class="anchor" href="#engine-overview">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="startup-sequence">
+ Startup sequence
+ &lt;a class="anchor" href="#startup-sequence">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>main()&lt;/code> does a small, fixed amount of work, and the ordering matters:&lt;/p>
+&lt;ol>
+&lt;li>&lt;code>godotenv.Load()&lt;/code> — pick up &lt;code>.env&lt;/code> if present.&lt;/li>
+&lt;li>&lt;code>confInit(&amp;amp;conf)&lt;/code> — parse flags, resolve &lt;code>--auth&lt;/code> from the environment, validate TLS pairing and
+&lt;code>--advertise&lt;/code>, map &lt;code>--raft-backend&lt;/code> to &lt;code>leveldb&lt;/code>/&lt;code>bolt&lt;/code>.&lt;/li>
+&lt;li>&lt;code>conf.DataDirReady&lt;/code> is registered as a callback: when the Raft layer has prepared the node
+directory it opens the storage backend (&lt;code>openStorage&lt;/code>) and publishes &lt;code>ldb&lt;/code>. &lt;strong>The command handlers
+only work after this point&lt;/strong>, which is why &lt;code>/readyz&lt;/code> exists.&lt;/li>
+&lt;li>Backend metrics are registered with the &lt;code>INFO&lt;/code> collector (&lt;code>hybriddb&lt;/code>, &lt;code>ipfs&lt;/code>, &lt;code>ipfs-synckv&lt;/code>).&lt;/li>
+&lt;li>&lt;code>--pprof&lt;/code> and &lt;code>--metrics&lt;/code> servers start, if enabled — both are plain &lt;code>net/http&lt;/code> servers in
+goroutines.&lt;/li>
+&lt;li>&lt;code>conf.Snapshot&lt;/code>/&lt;code>Restore&lt;/code> are wired to &lt;code>snapshot.go&lt;/code>, connection hooks to the client counter, and
+&lt;code>rafthub.Main(conf)&lt;/code> takes over: recover the log, join a cluster if &lt;code>-j&lt;/code> was given, serve RESP.&lt;/li>
+&lt;/ol>
+&lt;h2 id="request-path">
+ Request path
+ &lt;a class="anchor" href="#request-path">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;strong>Writes&lt;/strong> (the 56 commands registered with &lt;code>AddWriteCommand&lt;/code>):&lt;/p></description></item><item><title>Strings</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/</guid><description>&lt;h1 id="strings">
+ Strings
+ &lt;a class="anchor" href="#strings">#&lt;/a>
+&lt;/h1>
+&lt;p>26 commands: the &lt;code>SET&lt;/code> family, counters, bit operations and string expiry.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SET KEY VALUE [EX seconds] [PX milliseconds] [NX] [XX] [KEEPTTL]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>, or &lt;code>null&lt;/code> when &lt;code>NX&lt;/code>/&lt;code>XX&lt;/code> blocks the write&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SET user:1 '{&amp;quot;n&amp;quot;:&amp;quot;ada&amp;quot;}' EX 60&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETNX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETNX KEY VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 written, 0 already exists&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETNX job:42 1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETEX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEX KEY seconds VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEX session:9 60 tok&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETEXAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEXAT KEY unixTime VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEXAT session:9 1767225600 tok&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GETSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETSET KEY VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> old value, &lt;code>null&lt;/code> if absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETSET counter 0&lt;/code> → &lt;code>&amp;quot;7&amp;quot;&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GET KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code>, &lt;code>null&lt;/code> if absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GET user:1&lt;/code> → &lt;code>{&amp;quot;n&amp;quot;:&amp;quot;ada&amp;quot;}&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MGET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MGET KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> of bulk/null&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MGET a b&lt;/code> → &lt;code>[val, null]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MSET KEY VALUE [KEY VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MSET a 1 b 2&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>APPEND&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>APPEND KEY VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new length&lt;/td>
+ &lt;td style="text-align: left">&lt;code>APPEND log &amp;quot;x\n&amp;quot;&lt;/code> → &lt;code>5&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>STRLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STRLEN KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> length in bytes&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STRLEN user:1&lt;/code> → &lt;code>13&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>INCR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new value&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCR hits&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>INCRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCRBY KEY increment&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new value&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCRBY hits 5&lt;/code> → &lt;code>6&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DECR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new value&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECR hits&lt;/code> → &lt;code>5&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DECRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECRBY KEY decrement&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new value&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECRBY hits 5&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GETRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETRANGE KEY start end&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> substring (inclusive, negative offsets from the end)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETRANGE user:1 0 3&lt;/code> → &lt;code>{&amp;quot;n&amp;quot;&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETRANGE KEY offset VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new length&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETRANGE user:1 0 '{&amp;quot;m&amp;quot;'&lt;/code> → &lt;code>13&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GETBIT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETBIT KEY offset&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETBIT bitmap 7&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETBIT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETBIT KEY offset value&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> previous bit&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETBIT bitmap 7 1&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BITCOUNT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITCOUNT KEY [start end [BYTE|BIT]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> number of set bits&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITCOUNT bitmap 0 0&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BITOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITOP AND|OR|XOR|NOT destKey KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> length of the result&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITOP AND out a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BITPOS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITPOS KEY bit [start [end [BYTE|BIT]]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> position, &lt;code>-1&lt;/code> if not found&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITPOS bitmap 1&lt;/code> → &lt;code>7&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DEL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DEL KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> keys removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DEL a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXISTS KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> number of existing keys&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXISTS a b&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 set, 0 key absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIRE session:9 60&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 set, 0 key absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIREAT session:9 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>TTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>TTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> seconds left, &lt;code>-1&lt;/code> no expiration&lt;/td>
+ &lt;td style="text-align: left">&lt;code>TTL session:9&lt;/code> → &lt;code>59&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="notes">
+ Notes
+ &lt;a class="anchor" href="#notes">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>SET&lt;/code> clears an existing expiration unless &lt;code>KEEPTTL&lt;/code> is given. &lt;code>PX&lt;/code> is rounded &lt;strong>up&lt;/strong> to the next
+second because expirations are stored in whole seconds, so &lt;code>PX 500&lt;/code> keeps the key 1 s and &lt;code>PX 1500&lt;/code>
+keeps it 2 s — never less than asked.&lt;/li>
+&lt;li>&lt;code>SET ... NX&lt;/code>/&lt;code>XX&lt;/code> answers a &lt;strong>null bulk&lt;/strong> when the condition blocks the write, not an error.&lt;/li>
+&lt;li>There is &lt;strong>no string &lt;code>PERSIST&lt;/code>&lt;/strong>: the handler exists but is commented out and not registered. To keep
+a value and change its lifetime, &lt;code>EXPIRE&lt;/code> again or use &lt;code>SET … KEEPTTL&lt;/code>.&lt;/li>
+&lt;li>&lt;code>EXISTS&lt;/code> counts keys in the &lt;strong>string&lt;/strong> keyspace only; it will not see a hash with the same name. Use
+&lt;code>HKEYEXISTS&lt;/code>, &lt;code>LKEYEXISTS&lt;/code>, &lt;code>SKEYEXISTS&lt;/code> for the other types.&lt;/li>
+&lt;li>&lt;code>DEL&lt;/code> deletes the string at those keys, not the same-named hash/list/set.&lt;/li>
+&lt;li>&lt;code>INCR&lt;/code>/&lt;code>DECR&lt;/code> on a non-numeric value answer &lt;code>-ERR&lt;/code>, like Redis; a missing key is treated as &lt;code>0&lt;/code>.&lt;/li>
+&lt;li>&lt;code>BITCOUNT&lt;/code>/&lt;code>BITPOS&lt;/code> accept the optional &lt;code>BYTE&lt;/code>/&lt;code>BIT&lt;/code> unit as in Redis 7.&lt;/li>
+&lt;li>Expiry arithmetic uses the Raft clock, so a short TTL can be rejected on a node whose Raft clock lags
+its local clock. See 
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/commands/compatibility/">Compatibility&lt;/a>.&lt;/li>
+&lt;li>&lt;code>TTL&lt;/code> is computed against the &lt;strong>local&lt;/strong> wall clock by the storage layer, so replicas can report
+values that differ by their apply latency.&lt;/li>
+&lt;/ul></description></item><item><title>Building and testing</title><link>https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/</guid><description>&lt;h1 id="building-and-testing">
+ Building and testing
+ &lt;a class="anchor" href="#building-and-testing">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="build">
+ Build
+ &lt;a class="anchor" href="#build">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>make localbuild &lt;span style="color:#75715e"># bin/IceFireDB for the host platform&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make run &lt;span style="color:#75715e"># go run . (development)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make run_dev &lt;span style="color:#75715e"># same, for a dev setup&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make clean &lt;span style="color:#75715e"># remove bin/ and installed copies&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>Release and cross-compilation targets exist (&lt;code>make all&lt;/code>, &lt;code>make release&lt;/code>, &lt;code>make build-linux-*&lt;/code>), but while
+iterating on the code use &lt;code>run&lt;/code>/&lt;code>localbuild&lt;/code> — the release matrix builds five GOOS/GOARCH variants per
+invocation.&lt;/p>
+&lt;p>The binary embeds its git revision and build time:&lt;/p></description></item><item><title>Clustering</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/</guid><description>&lt;h1 id="clustering">
+ Clustering
+ &lt;a class="anchor" href="#clustering">#&lt;/a>
+&lt;/h1>
+&lt;p>A cluster is a set of nodes that share one Raft log. Every write command is appended to that log and
+replayed by every node, so all nodes converge on the same state; reads are answered locally by
+whichever node receives them.&lt;/p>
+&lt;h2 id="bootstrapping-and-joining">
+ Bootstrapping and joining
+ &lt;a class="anchor" href="#bootstrapping-and-joining">#&lt;/a>
+&lt;/h2>
+&lt;p>The first node needs no extra flag: an empty &lt;code>-j&lt;/code> means &amp;ldquo;start a new cluster&amp;rdquo;. Every later node joins
+with &lt;code>-j &amp;lt;leader-or-any-node-address&amp;gt;&lt;/code>:&lt;/p></description></item><item><title>Hashes</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/</guid><description>&lt;h1 id="hashes">
+ Hashes
+ &lt;a class="anchor" href="#hashes">#&lt;/a>
+&lt;/h1>
+&lt;p>19 commands. The hash keyspace is independent from the string keyspace at the same key name.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSET KEY FIELD VALUE [FIELD VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> fields added&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSET user:1 name ada age 36&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSETNX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSETNX KEY FIELD VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 written, 0 field exists&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSETNX user:1 name ada&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HGET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGET KEY FIELD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code>, &lt;code>null&lt;/code> if the field is absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGET user:1 name&lt;/code> → &lt;code>ada&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HMGET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMGET KEY FIELD [FIELD ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> of bulk/null&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMGET user:1 name x&lt;/code> → &lt;code>[ada, null]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HMSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMSET KEY FIELD VALUE [FIELD VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMSET user:2 name bob&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HDEL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HDEL KEY FIELD [FIELD ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> fields removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HDEL user:1 age&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXISTS KEY FIELD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXISTS user:1 name&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HGETALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGETALL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> field/value pairs&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGETALL user:1&lt;/code> → &lt;code>[name, ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HKEYS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> of fields&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYS user:1&lt;/code> → &lt;code>[name]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HVALS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HVALS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> of values&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HVALS user:1&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HLEN KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> field count&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HLEN user:1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSTRLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSTRLEN KEY FIELD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> value length, 0 if absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSTRLEN user:1 name&lt;/code> → &lt;code>3&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HINCRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HINCRBY KEY FIELD increment&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new value&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HINCRBY stats hits 1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HKEYEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYEXISTS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1 — does the hash exist&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYEXISTS user:1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> fields removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HCLEAR user:1&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HMCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMCLEAR KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> hashes removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMCLEAR a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HEXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 set, 0 key absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIRE user:1 300&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HEXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIREAT user:1 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HTTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HTTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> seconds left, &lt;code>-1&lt;/code> none&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HTTL user:1&lt;/code> → &lt;code>299&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="notes">
+ Notes
+ &lt;a class="anchor" href="#notes">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>HCLEAR&lt;/code> / &lt;code>HMCLEAR&lt;/code> delete the &lt;strong>whole hash&lt;/strong> (like &lt;code>DEL&lt;/code> for this type) and take its expiration with
+it; &lt;code>HDEL&lt;/code> removes individual fields.&lt;/li>
+&lt;li>There is no &lt;code>HPERSIST&lt;/code> — the handler exists but is not registered.&lt;/li>
+&lt;li>&lt;code>HSET&lt;/code> counts only newly created fields; overwriting an existing field counts 0.&lt;/li>
+&lt;li>&lt;code>HGETALL&lt;/code> answers field/value pairs in the storage&amp;rsquo;s iteration order. Do not rely on it for ordering
+— sort client-side if it matters.&lt;/li>
+&lt;li>&lt;code>HGET&lt;/code> of a field whose value is empty answers an empty bulk string on the local backends and &lt;code>null&lt;/code>
+on the decentralized ones — the two states are not distinguishable there. See
+
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/commands/compatibility/">Compatibility&lt;/a>.&lt;/li>
+&lt;li>&lt;code>HSTRLEN&lt;/code> reports 0 both for a missing field and for an empty one.&lt;/li>
+&lt;li>Expiry: &lt;code>HEXPIRE&lt;/code>/&lt;code>HEXPIREAT&lt;/code>/&lt;code>HTTL&lt;/code> act on the hash, independently of any string at the same key.&lt;/li>
+&lt;/ul></description></item><item><title>Protocol</title><link>https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/</guid><description>&lt;h1 id="protocol-layer">
+ Protocol layer
+ &lt;a class="anchor" href="#protocol-layer">#&lt;/a>
+&lt;/h1>
+&lt;p>The engine speaks &lt;strong>RESP&lt;/strong> — the Redis serialization protocol — so any Redis client works without a
+shim. This page covers what the protocol layer does beyond parsing bytes.&lt;/p>
+&lt;h2 id="one-socket-two-protocols">
+ One socket, two protocols
+ &lt;a class="anchor" href="#one-socket-two-protocols">#&lt;/a>
+&lt;/h2>
+&lt;p>There is exactly one TCP listener (&lt;code>tcp4&lt;/code>, address from &lt;code>-a&lt;/code>). On it arrive:&lt;/p>
+&lt;ol>
+&lt;li>&lt;strong>Client connections&lt;/strong>: RESP from applications.&lt;/li>
+&lt;li>&lt;strong>Peer connections&lt;/strong>: the Raft transport between nodes.&lt;/li>
+&lt;/ol>
+&lt;p>They are told apart by a sniffing listener: a peer opens the connection by writing a fixed magic
+marker followed by the cluster auth token (&lt;code>transportMarker&lt;/code> in
+&lt;code>vendor/github.com/tidwall/uhaha&lt;/code>), and anything that does not start with that marker is treated as a
+RESP client. This is why TLS, the port and &lt;code>--advertise&lt;/code> are shared between data and replication
+traffic — and why &lt;code>--advertise&lt;/code> must name the address peers can reach.&lt;/p></description></item><item><title>Benchmarking</title><link>https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/</guid><description>&lt;h1 id="benchmarking">
+ Benchmarking
+ &lt;a class="anchor" href="#benchmarking">#&lt;/a>
+&lt;/h1>
+&lt;p>This page describes &lt;strong>how&lt;/strong> to measure the engine. It deliberately contains no performance numbers:
+a number without the commit, hardware, backend and flags that produced it is noise.&lt;/p>
+&lt;h2 id="load-generators-that-work">
+ Load generators that work
+ &lt;a class="anchor" href="#load-generators-that-work">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>redis-benchmark&lt;/code> and &lt;code>memtier_benchmark&lt;/code> both work, because the wire protocol is RESP.&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># baseline: one connection per request, no pipeline&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-benchmark -h 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span> -t set,get -n &lt;span style="color:#ae81ff">200000&lt;/span> -c &lt;span style="color:#ae81ff">50&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># pipelined&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-benchmark -h 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span> -t set,get -n &lt;span style="color:#ae81ff">1000000&lt;/span> -c &lt;span style="color:#ae81ff">50&lt;/span> -P &lt;span style="color:#ae81ff">16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># mixed, with memtier&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>memtier_benchmark -s 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span> --protocol&lt;span style="color:#f92672">=&lt;/span>redis &lt;span style="color:#ae81ff">\
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#ae81ff">&lt;/span> --clients&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#ae81ff">50&lt;/span> --threads&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#ae81ff">4&lt;/span> --ratio&lt;span style="color:#f92672">=&lt;/span>1:1 --test-time&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#ae81ff">120&lt;/span> --key-pattern&lt;span style="color:#f92672">=&lt;/span>S:S
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>What they will &lt;strong>not&lt;/strong> exercise:&lt;/p></description></item><item><title>Lists</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/</guid><description>&lt;h1 id="lists">
+ Lists
+ &lt;a class="anchor" href="#lists">#&lt;/a>
+&lt;/h1>
+&lt;p>18 commands. Lists are stored as an indexed sequence; two of these commands rebuild the whole list.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LPUSH&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPUSH KEY VALUE [VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new length&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPUSH q a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPUSH&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPUSH KEY VALUE [VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new length&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPUSH q c&lt;/code> → &lt;code>3&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LPOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPOP KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> head element, &lt;code>null&lt;/code> if empty&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPOP q&lt;/code> → &lt;code>b&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOP KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> tail element, &lt;code>null&lt;/code> if empty&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOP q&lt;/code> → &lt;code>c&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LLEN KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> element count&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LLEN q&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LINDEX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINDEX KEY index&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code>, &lt;code>null&lt;/code> if out of range&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINDEX q 0&lt;/code> → &lt;code>a&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LRANGE KEY start stop&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> (inclusive, negative offsets from the end)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LRANGE q 0 -1&lt;/code> → &lt;code>[a]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LSET KEY index VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LSET q 0 z&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LTRIM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTRIM KEY start stop&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTRIM q 0 0&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPOPLPUSH&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOPLPUSH source destination&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> moved element, &lt;code>null&lt;/code> if source empty&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOPLPUSH q backup&lt;/code> → &lt;code>z&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LINSERT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINSERT KEY BEFORE|AFTER pivot VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new length; &lt;code>0&lt;/code> pivot absent; &lt;code>-1&lt;/code> key absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINSERT q BEFORE z y&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LREM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LREM KEY count VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> elements removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LREM q 0 z&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LKEYEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LKEYEXISTS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1 — does the list exist&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LKEYEXISTS q&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> elements removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LCLEAR q&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LMCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LMCLEAR KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> lists removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LMCLEAR a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LEXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIRE q 600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LEXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIREAT q 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LTTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> seconds left, &lt;code>-1&lt;/code> none&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTTL q&lt;/code> → &lt;code>599&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="notes">
+ Notes
+ &lt;a class="anchor" href="#notes">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>LPUSH q a b&lt;/code> produces &lt;code>[b, a]&lt;/code> — each element is pushed to the head in turn, as in Redis.&lt;/li>
+&lt;li>&lt;code>LREM KEY count VALUE&lt;/code>: &lt;code>count &amp;gt; 0&lt;/code> removes from the head, &lt;code>count &amp;lt; 0&lt;/code> from the tail, &lt;code>count = 0&lt;/code> every
+occurrence.&lt;/li>
+&lt;li>&lt;strong>&lt;code>LINSERT&lt;/code> and &lt;code>LREM&lt;/code> are O(n) and are not transactional.&lt;/strong> The storage layer has no primitive for
+them, so the handler reads the list, clears it, and rewrites it (restoring the TTL). It happens inside
+one Raft apply, so no other client observes a partial list, but a backend failure mid-rebuild leaves
+the list truncated. Do not use them on long lists in a hot path — prefer &lt;code>LTRIM&lt;/code> or bounded queues.&lt;/li>
+&lt;li>There is no &lt;code>LPERSIST&lt;/code>: the handler is not registered. &lt;code>LCLEAR&lt;/code>/&lt;code>LMCLEAR&lt;/code> delete the list and its TTL.&lt;/li>
+&lt;li>&lt;strong>No blocking commands.&lt;/strong> &lt;code>BLPOP&lt;/code>/&lt;code>BRPOP&lt;/code> are deliberately not registered: a blocking read inside the
+Raft apply loop either stalls the log or consumes the queue without a rollback path.&lt;/li>
+&lt;li>&lt;code>LRANGE&lt;/code> with &lt;code>start &amp;gt; stop&lt;/code> answers an empty array; negative indexes count from the tail.&lt;/li>
+&lt;/ul></description></item><item><title>Network</title><link>https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/</guid><description>&lt;h1 id="network-layer">
+ Network layer
+ &lt;a class="anchor" href="#network-layer">#&lt;/a>
+&lt;/h1>
+&lt;p>Two independent networks exist, and they solve different problems. Confusing them is the most common
+architectural mistake when reading about IceFireDB.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">&lt;/th>
+ &lt;th style="text-align: left">Intra-site network&lt;/th>
+ &lt;th style="text-align: left">Inter-site network&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">Purpose&lt;/td>
+ &lt;td style="text-align: left">One consistent copy of the data&lt;/td>
+ &lt;td style="text-align: left">Replicate across sites / regions&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Technology&lt;/td>
+ &lt;td style="text-align: left">Raft (hashicorp/raft)&lt;/td>
+ &lt;td style="text-align: left">libp2p + pubsub (&lt;code>crdt&lt;/code>, &lt;code>ipfs-log&lt;/code>, &lt;code>ipfs-synckv&lt;/code> drivers)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Topology&lt;/td>
+ &lt;td style="text-align: left">Leader + voters, quorum required&lt;/td>
+ &lt;td style="text-align: left">Peer-to-peer, no leader, eventual&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Configured by&lt;/td>
+ &lt;td style="text-align: left">&lt;code>-a&lt;/code>, &lt;code>-j&lt;/code>, &lt;code>--advertise&lt;/code>, &lt;code>--raft-backend&lt;/code>, &lt;code>--auth&lt;/code>, TLS&lt;/td>
+ &lt;td style="text-align: left">&lt;code>--servicename&lt;/code>, &lt;code>--nettopic&lt;/code>, &lt;code>--datatopic&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Enabled by&lt;/td>
+ &lt;td style="text-align: left">Always&lt;/td>
+ &lt;td style="text-align: left">Only with a P2P storage backend&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>A common deployment runs a Raft cluster per site (strong consistency inside), with one node per site
+using a P2P backend to exchange data between sites (eventual consistency across). The engine does not
+combine the two for you — they are separate layers, and the P2P layer is a property of the &lt;em>driver&lt;/em>, not
+of the server.&lt;/p></description></item><item><title>Storage backends</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/</guid><description>&lt;h1 id="storage-backends">
+ Storage backends
+ &lt;a class="anchor" href="#storage-backends">#&lt;/a>
+&lt;/h1>
+&lt;p>&lt;code>--storage-backend &amp;lt;name&amp;gt;&lt;/code> selects the driver that sits under the ledis data model. The command layer
+is written against &lt;code>store.driver.IDB&lt;/code>, so the same commands run on every backend — what changes is
+where the bytes live, who replicates them, and how much you can trust the driver.&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">IDB&lt;/span> &lt;span style="color:#66d9ef">interface&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Close&lt;/span>() &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Get&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) ([]&lt;span style="color:#66d9ef">byte&lt;/span>, &lt;span style="color:#66d9ef">error&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Put&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>, &lt;span style="color:#a6e22e">value&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Delete&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">SyncPut&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>, &lt;span style="color:#a6e22e">value&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">SyncDelete&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">NewIterator&lt;/span>() &lt;span style="color:#a6e22e">IIterator&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">NewWriteBatch&lt;/span>() &lt;span style="color:#a6e22e">IWriteBatch&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">NewSnapshot&lt;/span>() (&lt;span style="color:#a6e22e">ISnapshot&lt;/span>, &lt;span style="color:#66d9ef">error&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Compact&lt;/span>() &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">GetStorageEngine&lt;/span>() &lt;span style="color:#66d9ef">interface&lt;/span>{}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="what-each-backend-is">
+ What each backend is
+ &lt;a class="anchor" href="#what-each-backend-is">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">&lt;code>--storage-backend&lt;/code>&lt;/th>
+ &lt;th style="text-align: left">Where data lives&lt;/th>
+ &lt;th style="text-align: left">Replication&lt;/th>
+ &lt;th style="text-align: left">External dependency&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>goleveldb&lt;/code> &lt;em>(default)&lt;/em>&lt;/td>
+ &lt;td style="text-align: left">Local LevelDB (pure Go)&lt;/td>
+ &lt;td style="text-align: left">Raft only&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>badger&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Local BadgerDB v4, ZSTD compression&lt;/td>
+ &lt;td style="text-align: left">Raft only&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>hybriddb&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Local LevelDB + Ristretto hot cache, per-driver metrics&lt;/td>
+ &lt;td style="text-align: left">Raft only&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>oss&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">S3-compatible object store, local LevelDB index + Ristretto cache&lt;/td>
+ &lt;td style="text-align: left">Raft only&lt;/td>
+ &lt;td style="text-align: left">S3/MinIO endpoint&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ipfs&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Local LevelDB whose values are fetched from IPFS by CID&lt;/td>
+ &lt;td style="text-align: left">Raft only&lt;/td>
+ &lt;td style="text-align: left">IPFS API (not a gateway)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ipfs-synckv&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">IPFS as source of truth + local mirror + version metadata, optional AES-256&lt;/td>
+ &lt;td style="text-align: left">IPFS/ipfs-log P2P&lt;/td>
+ &lt;td style="text-align: left">IPFS API + P2P&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>crdt&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Local Badger + &lt;code>icefiredb-crdt-kv&lt;/code> over libp2p pubsub&lt;/td>
+ &lt;td style="text-align: left">P2P CRDT&lt;/td>
+ &lt;td style="text-align: left">libp2p peers&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ipfs-log&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Append-only &lt;code>icefiredb-ipfs-log&lt;/code> store over IPFS pubsub&lt;/td>
+ &lt;td style="text-align: left">P2P log&lt;/td>
+ &lt;td style="text-align: left">IPFS + P2P&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>leveldb&lt;/code> (the cgo driver) and &lt;code>orbitdb&lt;/code> are &lt;strong>not&lt;/strong> compiled into the binary: the former is never
+imported, the latter is commented out in &lt;code>main.go&lt;/code>/&lt;code>flags.go&lt;/code>. Passing either name fails at startup
+with &amp;ldquo;unknown driver&amp;rdquo;.&lt;/p></description></item><item><title>Ecosystem</title><link>https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/</guid><description>&lt;h1 id="ecosystem-libraries-and-components">
+ Ecosystem libraries and components
+ &lt;a class="anchor" href="#ecosystem-libraries-and-components">#&lt;/a>
+&lt;/h1>
+&lt;p>The engine is one piece. These are the libraries and services around it, all in the same GitHub
+organisation.&lt;/p>
+&lt;h2 id="libraries-used-by-the-storage-drivers">
+ Libraries used by the storage drivers
+ &lt;a class="anchor" href="#libraries-used-by-the-storage-drivers">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Project&lt;/th>
+ &lt;th style="text-align: left">Used by&lt;/th>
+ &lt;th style="text-align: left">What it does&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/icefiredb-crdt-kv">&lt;code>icefiredb-crdt-kv&lt;/code>&lt;/a>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>driver/crdt&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">CRDT key/value store over libp2p pubsub; merges concurrent writes without coordination&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/icefiredb-ipfs-log">&lt;code>icefiredb-ipfs-log&lt;/code>&lt;/a>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>driver/ipfs-log&lt;/code>, &lt;code>driver/ipfs-synckv&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Immutable, operation-based append-only log for distributed systems, stored in IPFS and merged through pubsub&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/uhaha">&lt;code>IceFireDB/uhaha&lt;/code>&lt;/a> (fork)&lt;/td>
+ &lt;td style="text-align: left">the binary&lt;/td>
+ &lt;td style="text-align: left">Raft application framework: RESP server, log, snapshots, &lt;code>RAFT&lt;/code>/&lt;code>CLUSTER&lt;/code> commands&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/ledisdb">&lt;code>IceFireDB/ledisdb&lt;/code>&lt;/a> (fork)&lt;/td>
+ &lt;td style="text-align: left">the binary&lt;/td>
+ &lt;td style="text-align: left">The data model: per-type keyspaces, TTLs, encodings&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>Two of these are forked and pinned in &lt;code>go.mod&lt;/code> via &lt;code>replace&lt;/code> directives. Vendor updates to them are
+behavioural changes to the engine, so &lt;code>go mod vendor&lt;/code> diffs deserve a real review.&lt;/p></description></item><item><title>Security</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/</guid><description>&lt;h1 id="security">
+ Security
+ &lt;a class="anchor" href="#security">#&lt;/a>
+&lt;/h1>
+&lt;p>The engine has three security-relevant surfaces: the RESP listener, the Raft transport, and the
+optional admin HTTP servers. They share one credential and one certificate.&lt;/p>
+&lt;h2 id="transport-encryption-tls">
+ Transport encryption (TLS)
+ &lt;a class="anchor" href="#transport-encryption-tls">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB --tls-cert ./server.crt --tls-key ./server.key -a 0.0.0.0:11001 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ul>
+&lt;li>Both flags are required together — providing one without the other is a startup error.&lt;/li>
+&lt;li>TLS is applied to the &lt;strong>single listening socket&lt;/strong>. RESP clients and the Raft transport both arrive on
+it, and the server decides which is which by sniffing the first bytes. There is no second port.&lt;/li>
+&lt;li>The value of &lt;code>--advertise&lt;/code> must therefore be the TLS address peers and clients use.&lt;/li>
+&lt;li>Clients must speak TLS too: &lt;code>redis-cli --tls --cacert ./ca.crt -h host -p 11001&lt;/code>, or the equivalent
+client option (&lt;code>go-redis&lt;/code>: &lt;code>TLSConfig&lt;/code>, Python &lt;code>redis.Redis(ssl=True)&lt;/code>, Node &lt;code>tls: {}&lt;/code>).&lt;/li>
+&lt;li>The certificate needs a &lt;code>DNS:&lt;/code> SAN for the name clients use; the server copies the first DNS SAN
+into its &lt;code>tls.Config.ServerName&lt;/code> for outbound connections.&lt;/li>
+&lt;li>&lt;strong>No client certificates.&lt;/strong> &lt;code>tls.Config&lt;/code> is built with &lt;code>Certificates&lt;/code> only, so there is no mTLS and
+no client identity. Peers authenticate with the shared token, not a certificate.&lt;/li>
+&lt;/ul>
+&lt;h2 id="cluster-authorization">
+ Cluster authorization
+ &lt;a class="anchor" href="#cluster-authorization">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>export ICEFIREDB_AUTH&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#e6db74">&amp;#39;openssl rand -hex 32&amp;#39;&lt;/span> &lt;span style="color:#75715e"># preferred: not visible in the process list&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -a 0.0.0.0:11001 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># or&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB --auth &lt;span style="color:#e6db74">&amp;#39;&amp;lt;token&amp;gt;&amp;#39;&lt;/span> -a 0.0.0.0:11001 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>What it does:&lt;/p></description></item><item><title>Sets</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/</guid><description>&lt;h1 id="sets">
+ Sets
+ &lt;a class="anchor" href="#sets">#&lt;/a>
+&lt;/h1>
+&lt;p>21 commands: membership, the three set-algebra families, expiry, and deterministic &lt;code>SPOP&lt;/code>.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SADD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SADD KEY MEMBER [MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members added&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SADD tags go db&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SREM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SREM KEY MEMBER [MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SREM tags db&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCARD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCARD KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> cardinality&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCARD tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SISMEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SISMEMBER KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SISMEMBER tags go&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SMEMBERS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMEMBERS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> of members&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMEMBERS tags&lt;/code> → &lt;code>[go]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SDIFF&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFF KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members in the first but no later set&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFF a b&lt;/code> → &lt;code>[x]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SDIFFSTORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFFSTORE dest KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> size of the result&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFFSTORE out a b&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SINTER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTER KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members in every set&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTER a b&lt;/code> → &lt;code>[y]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SINTERSTORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTERSTORE dest KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> size of the result&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTERSTORE out a b&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SUNION&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNION KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members in any set&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNION a b&lt;/code> → &lt;code>[x,y]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SUNIONSTORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNIONSTORE dest KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> size of the result&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNIONSTORE out a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SMOVE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMOVE source destination MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 moved, 0 not a member&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMOVE a b x&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SPOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPOP KEY [count]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">bare: &lt;code>bulk&lt;/code> member; with &lt;code>count&lt;/code>: &lt;code>array&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPOP queue:ready&lt;/code> → &lt;code>job:7&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SRANDMEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SRANDMEMBER KEY [count]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">bare: &lt;code>bulk&lt;/code>; positive count: distinct &lt;code>array&lt;/code>; negative: &lt;code>array&lt;/code> with repeats&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SRANDMEMBER tags 1&lt;/code> → &lt;code>[go]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SKEYEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SKEYEXISTS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1 — does the set exist&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SKEYEXISTS tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCLEAR tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SMCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMCLEAR KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> sets removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMCLEAR a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SEXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIRE tags 60&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SEXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIREAT tags 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>STTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> seconds left, &lt;code>-1&lt;/code> none&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STTL tags&lt;/code> → &lt;code>59&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SPERSIST&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPERSIST KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 removed, 0 none&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPERSIST tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="notes">
+ Notes
+ &lt;a class="anchor" href="#notes">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;strong>&lt;code>SPOP&lt;/code> is deterministic across replicas.&lt;/strong> Because it is a write command, its result must be
+identical on every node, so the picked member is derived from the Raft-seeded state rather than
+&lt;code>math/rand&lt;/code>. With &lt;code>count&lt;/code>, the count is clamped to the set size; &lt;code>count = 0&lt;/code> answers an empty array
+and a negative count is an error.&lt;/li>
+&lt;li>&lt;code>SRANDMEMBER&lt;/code> is a &lt;strong>read&lt;/strong> command and may use real randomness (&lt;code>count&lt;/code> distinct members when
+positive, repeats when negative). &lt;code>|count|&lt;/code> is capped at 1048576.&lt;/li>
+&lt;li>&lt;code>SMOVE&lt;/code> to the same key is a no-op that returns &lt;code>1&lt;/code> and keeps the TTL.&lt;/li>
+&lt;li>&lt;code>SCLEAR&lt;/code>/&lt;code>SMCLEAR&lt;/code> delete whole sets and their expiration; &lt;code>SREM&lt;/code> removes members.&lt;/li>
+&lt;li>&lt;code>SPERSIST&lt;/code> is the only &lt;code>*PERSIST&lt;/code> command in the engine, and it is known to leave the expiration in
+place on the &lt;code>ipfs&lt;/code> backend. Strings, hashes and lists have no &lt;code>PERSIST&lt;/code> at all.&lt;/li>
+&lt;li>Set algebra commands read the sets named in the arguments; &lt;code>*STORE&lt;/code> variants &lt;strong>overwrite&lt;/strong> the
+destination and return the size of the result.&lt;/li>
+&lt;/ul></description></item><item><title>Storage</title><link>https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/</guid><description>&lt;h1 id="storage-layer">
+ Storage layer
+ &lt;a class="anchor" href="#storage-layer">#&lt;/a>
+&lt;/h1>
+&lt;p>Under the command handlers sits &lt;strong>ledis&lt;/strong>: a data model that turns five Redis types into key/value
+operations over a single &lt;code>driver.IDB&lt;/code>. It is the reason the same commands work on a local LevelDB file
+and on IPFS.&lt;/p>
+&lt;h2 id="per-type-keyspaces">
+ Per-type keyspaces
+ &lt;a class="anchor" href="#per-type-keyspaces">#&lt;/a>
+&lt;/h2>
+&lt;p>ledis does not store &amp;ldquo;a key with a type&amp;rdquo;. It stores separate physical keys per type, each prefixed with
+a type byte:&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Type&lt;/th>
+ &lt;th style="text-align: left">Prefix bytes&lt;/th>
+ &lt;th style="text-align: left">Physical keys per logical key&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">String&lt;/td>
+ &lt;td style="text-align: left">&lt;code>KVType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">the value&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Hash&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HashType&lt;/code>, &lt;code>HSizeType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">one entry per field + a size counter&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">List&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ListType&lt;/code>, &lt;code>LMetaType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">one entry per index + a meta record (head/tail/size)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Set&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SetType&lt;/code>, &lt;code>SSizeType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">one entry per member + a size counter&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Sorted set&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSetType&lt;/code>, &lt;code>ZSizeType&lt;/code>, &lt;code>ZScoreType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">one entry per member + size counter + one index entry per (score, member)&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>Expirations are separate records too (&lt;code>ExpMetaType&lt;/code>, &lt;code>ExpTimeType&lt;/code>), which is why a TTL belongs to the
+type it was set on rather than to the key name.&lt;/p></description></item><item><title>Codec</title><link>https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/</guid><description>&lt;h1 id="codec-layer">
+ Codec layer
+ &lt;a class="anchor" href="#codec-layer">#&lt;/a>
+&lt;/h1>
+&lt;p>The &amp;ldquo;codec&amp;rdquo; in this engine is the mapping between protocol-level structures and the KV pairs ledis
+writes. It is not a serialization format you can choose — it is fixed by ledis and visible only through
+side effects such as key limits, ordering and migration.&lt;/p>
+&lt;h2 id="what-gets-encoded">
+ What gets encoded
+ &lt;a class="anchor" href="#what-gets-encoded">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Logical operation&lt;/th>
+ &lt;th style="text-align: left">Physical operations&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SET k v&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(KVType + k, v)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSET k f v&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(HashType + k + f, v)&lt;/code>, &lt;code>IncrBy(HSizeType + k, 1)&lt;/code> on a new field&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPUSH k v&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(ListType + k + index, v)&lt;/code>, update &lt;code>LMetaType + k&lt;/code> (head, tail, count)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SADD k m&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(SetType + k + m, nil)&lt;/code>, &lt;code>IncrBy(SSizeType + k, 1)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZADD k score m&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(ZSetType + k + m, score)&lt;/code>, &lt;code>Put(ZScoreType + k + score + m, nil)&lt;/code>, size counter&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXPIRE k s&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(ExpTimeType + k, timestamp)&lt;/code>, &lt;code>Put(ExpMetaType + k, …)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>Deletes are the inverse: a hash field delete removes one &lt;code>HashType&lt;/code> record and decrements the size
+counter, while &lt;code>HCLEAR&lt;/code> walks them all and removes the counters and expiry records too.&lt;/p></description></item><item><title>Observability</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/</guid><description>&lt;h1 id="observability">
+ Observability
+ &lt;a class="anchor" href="#observability">#&lt;/a>
+&lt;/h1>
+&lt;p>There are three ways to see what a node is doing: the HTTP endpoints, the &lt;code>INFO&lt;/code> command, and pprof.
+All three are opt-in.&lt;/p>
+&lt;h2 id="http-endpoints">
+ HTTP endpoints
+ &lt;a class="anchor" href="#http-endpoints">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB --metrics --metrics-addr 127.0.0.1:11002 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Path&lt;/th>
+ &lt;th style="text-align: left">Response&lt;/th>
+ &lt;th style="text-align: left">Use&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>/healthz&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>200 ok&lt;/code> whenever the process is up&lt;/td>
+ &lt;td style="text-align: left">Liveness probe&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>/readyz&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>200 ready&lt;/code> once the storage backend has initialized; &lt;code>503 not ready&lt;/code> before that&lt;/td>
+ &lt;td style="text-align: left">Readiness probe / rollout gate&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>/metrics&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Prometheus text exposition&lt;/td>
+ &lt;td style="text-align: left">Scraping&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>The server is a plain &lt;code>http.Server&lt;/code> with a 5-second &lt;code>ReadHeaderTimeout&lt;/code>; it has no authentication, so
+keep it on loopback or a private interface (see 
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/deploy/security/">Security&lt;/a>).&lt;/p></description></item><item><title>Sorted sets</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/</guid><description>&lt;h1 id="sorted-sets">
+ Sorted sets
+ &lt;a class="anchor" href="#sorted-sets">#&lt;/a>
+&lt;/h1>
+&lt;p>15 commands. Scores are &lt;strong>64-bit integers&lt;/strong>, not doubles — the one difference that changes query
+results, not just the wire format.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZADD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZADD KEY score MEMBER [score MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members added&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZADD board 100 ada 90 bob&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZINCRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R ⚠&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZINCRBY KEY increment MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> new score&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZINCRBY board 5 ada&lt;/code> → &lt;code>105&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREM KEY MEMBER [MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREM board bob&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZCARD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCARD KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> cardinality&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCARD board&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZCOUNT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCOUNT KEY min max&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members within the score range&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCOUNT board 0 200&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCORE KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> score, &lt;code>null&lt;/code> if absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCORE board ada&lt;/code> → &lt;code>105&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZRANK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANK KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> rank (0-based), &lt;code>null&lt;/code> if absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANK board ada&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREVRANK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANK KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> reverse rank, &lt;code>null&lt;/code> if absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANK board ada&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGE KEY start stop [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members (and scores)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGE board 0 -1 WITHSCORES&lt;/code> → &lt;code>[ada, 105]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGE KEY start stop [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members (and scores)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGE board 0 0&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZRANGEBYSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGEBYSCORE KEY min max [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members (and scores)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGEBYSCORE board 100 200&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGEBYSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGEBYSCORE KEY max min [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members (and scores)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGEBYSCORE board 200 100&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYRANK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R ⚠&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYRANK KEY start stop&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYRANK board 0 0&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R ⚠&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYSCORE KEY min max&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYSCORE board 0 50&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCLEAR board&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="notes">
+ Notes
+ &lt;a class="anchor" href="#notes">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;strong>⚠ &lt;code>ZINCRBY&lt;/code>, &lt;code>ZREMRANGEBYRANK&lt;/code> and &lt;code>ZREMRANGEBYSCORE&lt;/code> are registered as read commands&lt;/strong> even though
+they mutate. Locally that is harmless; in a cluster their effect is not replicated and does not
+survive a leader change. Until that is fixed: compute scores client-side and write them with &lt;code>ZADD&lt;/code>,
+and remove members with &lt;code>ZREM&lt;/code>.&lt;/li>
+&lt;li>&lt;strong>No TTL for sorted sets.&lt;/strong> There is no &lt;code>ZEXPIRE&lt;/code>/&lt;code>ZTTL&lt;/code>; clear and recreate the key (&lt;code>ZCLEAR&lt;/code>), or
+keep the expiry bookkeeping in a string key.&lt;/li>
+&lt;li>Scores parse as &lt;code>int64&lt;/code>. A float score such as &lt;code>1.5&lt;/code> is rejected; &lt;code>WITHSCORES&lt;/code> returns integers.&lt;/li>
+&lt;li>&lt;code>ZRANGEBYSCORE min max&lt;/code> is inclusive on both ends; &lt;code>ZREVRANGEBYSCORE max min&lt;/code> takes the arguments in
+reverse order, as in Redis.&lt;/li>
+&lt;li>&lt;code>ZRANK&lt;/code>/&lt;code>ZREVRANK&lt;/code> answer &lt;code>null&lt;/code> for a missing member, &lt;code>ZSCORE&lt;/code> likewise.&lt;/li>
+&lt;li>All range reads are ordered by score, then by member for equal scores.&lt;/li>
+&lt;/ul></description></item><item><title>Operations</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/</guid><description>&lt;h1 id="operations">
+ Operations
+ &lt;a class="anchor" href="#operations">#&lt;/a>
+&lt;/h1>
+&lt;p>Backup, restore, upgrade and recovery for a single node or a Raft cluster. The unit of everything is
+the &lt;strong>node directory&lt;/strong>: &lt;code>&amp;lt;data-dir&amp;gt;/IceFireDB/&amp;lt;node-id&amp;gt;/&lt;/code>.&lt;/p>
+&lt;h2 id="what-is-on-disk">
+ What is on disk
+ &lt;a class="anchor" href="#what-is-on-disk">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Path&lt;/th>
+ &lt;th style="text-align: left">Contents&lt;/th>
+ &lt;th style="text-align: left">Backed up by&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>main.db/&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">The ledis store in the selected driver&amp;rsquo;s format&lt;/td>
+ &lt;td style="text-align: left">Copying the directory&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>store/&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Raft log + stable store (&lt;code>leveldb&lt;/code> or &lt;code>bolt&lt;/code>)&lt;/td>
+ &lt;td style="text-align: left">Copying the directory&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>snapshots/&amp;lt;id&amp;gt;/state.bin&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Raft state-machine snapshot: gzip header (start/ts/seed) + &lt;code>sds&lt;/code> key/value stream&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RAFT SNAPSHOT&lt;/code>, or copying the directory&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>state.bin&lt;/code> is backend-agnostic: &lt;code>writeSnapshot&lt;/code> walks the driver&amp;rsquo;s snapshot and writes &lt;code>key, value&lt;/code>
+pairs into a gzip stream. That is why a snapshot taken on a &lt;code>badger&lt;/code> node restores into a &lt;code>goleveldb&lt;/code>
+node, while the &lt;code>main.db/&lt;/code> directory itself never does. Treat the file as opaque: copy it whole (or in
+&lt;code>RAFT SNAPSHOT READ&lt;/code> windows) and hand it back with &lt;code>--restore&lt;/code> — do not unzip or edit it.&lt;/p></description></item><item><title>Scan</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/</guid><description>&lt;h1 id="scan">
+ Scan
+ &lt;a class="anchor" href="#scan">#&lt;/a>
+&lt;/h1>
+&lt;p>8 commands in two families with &lt;strong>two different cursor contracts&lt;/strong>. Getting them mixed up is the most
+common integration bug with this engine.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCAN cursor [MATCH glob] [COUNT n] [TYPE type]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, keys]&lt;/code>; cursor &lt;code>0&lt;/code> ends the walk&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCAN 0 MATCH user:* COUNT 100&lt;/code> → &lt;code>[cursor, [user:1, user:2]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSCAN KEY cursor [MATCH glob] [COUNT n]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [field, value, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSCAN user:1 0 COUNT 10&lt;/code> → &lt;code>[0, [name, ada]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SSCAN KEY cursor [MATCH glob] [COUNT n]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SSCAN tags 0&lt;/code> → &lt;code>[0, [go]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCAN KEY cursor [MATCH glob] [COUNT n]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, score, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCAN board 0&lt;/code> → &lt;code>[0, [ada, 105]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSCAN type cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, keys]&lt;/code>; empty cursor ends the walk&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSCAN KV &amp;quot;&amp;quot; COUNT 5&lt;/code> → &lt;code>[key:5, [...]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XHSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XHSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [field, value, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XHSCAN user:1 &amp;quot;&amp;quot; COUNT 5&lt;/code> → &lt;code>[name, [name, ada]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XSSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSSCAN tags &amp;quot;&amp;quot;&lt;/code> → &lt;code>[go, [go]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XZSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XZSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, score, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XZSCAN board &amp;quot;&amp;quot;&lt;/code> → &lt;code>[ada, [ada, 105]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="the-redis-family">
+ The Redis family
+ &lt;a class="anchor" href="#the-redis-family">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>SCAN&lt;/code> / &lt;code>HSCAN&lt;/code> / &lt;code>SSCAN&lt;/code> / &lt;code>ZSCAN&lt;/code> follow Redis&amp;rsquo; shape but not Redis&amp;rsquo; cursor encoding.&lt;/p></description></item><item><title>Server</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/server/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/server/</guid><description>&lt;h1 id="server">
+ Server
+ &lt;a class="anchor" href="#server">#&lt;/a>
+&lt;/h1>
+&lt;p>Three commands in the data surface. Everything else an operator needs (&lt;code>RAFT&lt;/code>, &lt;code>CLUSTER&lt;/code>, &lt;code>MACHINE&lt;/code>,
+&lt;code>BARRIER&lt;/code>, &lt;code>AUTH&lt;/code>, &lt;code>SHUTDOWN&lt;/code>, &lt;code>VERSION&lt;/code>) lives in 
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/deploy/system-commands/">System commands&lt;/a>.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>INFO&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INFO&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> multi-line report&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INFO&lt;/code> → &lt;code># Server\r\nversion…&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>FLUSHALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> keys removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHALL&lt;/code> → &lt;code>(integer) 42&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>FLUSHDB&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHDB&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> keys removed — alias of &lt;code>FLUSHALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHDB&lt;/code> → &lt;code>(integer) 42&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="info-takes-no-arguments">
+ &lt;code>INFO&lt;/code> takes no arguments
+ &lt;a class="anchor" href="#info-takes-no-arguments">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>INFO memory&lt;/code>, &lt;code>INFO server&lt;/code> and &lt;code>INFO replication&lt;/code> are &lt;strong>argument errors&lt;/strong>; the command is
+&lt;code>len(args) != 1 → wrong number of arguments&lt;/code>. Ask for &lt;code>INFO&lt;/code> and read the section you need out of the
+single reply. The sections and their fields are documented in
+
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/deploy/observability/#info">Observability&lt;/a>.&lt;/p></description></item><item><title>System commands</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/</guid><description>&lt;h1 id="system-commands">
+ System commands
+ &lt;a class="anchor" href="#system-commands">#&lt;/a>
+&lt;/h1>
+&lt;p>The 110 commands in the 
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/commands/">command reference&lt;/a> are the data surface. Under them sits a second
+surface, provided by the Raft/RESP layer, that operations depend on. It is not part of the Redis
+command set, so it is documented here.&lt;/p>
+&lt;p>None of these go through the Raft log unless stated, and &lt;code>--try-errors&lt;/code> disables the &lt;code>CLUSTER&lt;/code> family.&lt;/p>
+&lt;h2 id="connection">
+ Connection
+ &lt;a class="anchor" href="#connection">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Command&lt;/th>
+ &lt;th style="text-align: left">Reply&lt;/th>
+ &lt;th style="text-align: left">Notes&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>PING [message]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>PONG&lt;/code>, or the message&lt;/td>
+ &lt;td style="text-align: left">Handled before dispatch&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ECHO message&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">the message&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>AUTH token&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>OK&lt;/code> / &lt;code>-unauthorized&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Required first when &lt;code>--auth&lt;/code> is set&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>QUIT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>OK&lt;/code>, then the connection closes&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SHUTDOWN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;em>(none — the process exits)&lt;/em>&lt;/td>
+ &lt;td style="text-align: left">Equivalent to &lt;code>SIGKILL&lt;/code> from the client&amp;rsquo;s point of view; requires &lt;code>AUTH&lt;/code> when configured&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="machine">
+ Machine
+ &lt;a class="anchor" href="#machine">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Command&lt;/th>
+ &lt;th style="text-align: left">Reply&lt;/th>
+ &lt;th style="text-align: left">Meaning&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>VERSION&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">bulk string&lt;/td>
+ &lt;td style="text-align: left">Engine version, e.g. &lt;code>1.0.0-rc.1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MACHINE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">map of &lt;code>now&lt;/code>, &lt;code>uptime&lt;/code>, &lt;code>boottime&lt;/code> (nanoseconds)&lt;/td>
+ &lt;td style="text-align: left">Times come from the Raft clock, so every node agrees&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MACHINE HUMAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">same keys as RFC3339 / duration&lt;/td>
+ &lt;td style="text-align: left">Human-readable variant&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BARRIER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">A no-op &lt;strong>write&lt;/strong>: when it returns, every previously issued write from this client has been applied&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>BARRIER&lt;/code> is how you get a read-your-writes guarantee across clients or nodes: send &lt;code>BARRIER&lt;/code> on the
+leader, then read on a follower with &lt;code>--openreads&lt;/code>.&lt;/p></description></item><item><title>Compatibility</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/</guid><description>&lt;h1 id="compatibility-with-redis">
+ Compatibility with Redis
+ &lt;a class="anchor" href="#compatibility-with-redis">#&lt;/a>
+&lt;/h1>
+&lt;p>IceFireDB speaks RESP and most commands behave as Redis does, but it is not Redis: the storage model
+underneath is ledis, which keeps one keyspace per data type and stores expirations in whole seconds.
+This page lists the differences a client will actually notice, and why they exist.&lt;/p>
+&lt;p>Behaviours marked &lt;strong>locked by test&lt;/strong> are pinned by &lt;code>compat_test.go&lt;/code> (&lt;code>make test-compat&lt;/code>) so they cannot
+change without a deliberate update.&lt;/p></description></item></channel></rss>

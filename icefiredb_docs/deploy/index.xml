@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Deployment on IceFireDB Documentation</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/</link><description>Recent content in Deployment on IceFireDB Documentation</description><generator>Hugo</generator><language>en</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/deploy/index.xml" rel="self" type="application/rss+xml"/><item><title>Configuration</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/</guid><description>&lt;h1 id="configuration">
+ Configuration
+ &lt;a class="anchor" href="#configuration">#&lt;/a>
+&lt;/h1>
+&lt;p>The NoSQL engine has &lt;strong>no configuration file&lt;/strong>. Every setting is a command-line flag, parsed once at
+startup in &lt;code>flags.go&lt;/code>. (A &lt;code>.env&lt;/code> file in the working directory is loaded as well — see
+
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/#environment-variables">Environment variables&lt;/a>.)&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -h &lt;span style="color:#75715e"># prints the usage block below&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="basic-options">
+ Basic options
+ &lt;a class="anchor" href="#basic-options">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Flag&lt;/th>
+ &lt;th style="text-align: left">Meaning&lt;/th>
+ &lt;th style="text-align: left">Default&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-a addr&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Bind address (&lt;code>host:port&lt;/code>)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>127.0.0.1:11001&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-n id&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Node ID — also the Raft server ID and the data subdirectory name&lt;/td>
+ &lt;td style="text-align: left">&lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-d dir&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Data directory&lt;/td>
+ &lt;td style="text-align: left">&lt;code>data&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-j addr&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Leader address of a cluster to join&lt;/td>
+ &lt;td style="text-align: left">&lt;em>(empty — bootstrap)&lt;/em>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-l level&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Log level: &lt;code>debug&lt;/code>, &lt;code>verb&lt;/code>, &lt;code>info&lt;/code>, &lt;code>warn&lt;/code>, &lt;code>silent&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>info&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-h&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Print usage and exit&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>-n&lt;/code> is an &lt;strong>identifier, not a port&lt;/strong>. Ports come from &lt;code>-a&lt;/code>. Two nodes may share &lt;code>-d&lt;/code> because each one
+writes to &lt;code>&amp;lt;dir&amp;gt;/IceFireDB/&amp;lt;node-id&amp;gt;/&lt;/code>, but two nodes must not share a node ID.&lt;/p></description></item><item><title>Clustering</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/</guid><description>&lt;h1 id="clustering">
+ Clustering
+ &lt;a class="anchor" href="#clustering">#&lt;/a>
+&lt;/h1>
+&lt;p>A cluster is a set of nodes that share one Raft log. Every write command is appended to that log and
+replayed by every node, so all nodes converge on the same state; reads are answered locally by
+whichever node receives them.&lt;/p>
+&lt;h2 id="bootstrapping-and-joining">
+ Bootstrapping and joining
+ &lt;a class="anchor" href="#bootstrapping-and-joining">#&lt;/a>
+&lt;/h2>
+&lt;p>The first node needs no extra flag: an empty &lt;code>-j&lt;/code> means &amp;ldquo;start a new cluster&amp;rdquo;. Every later node joins
+with &lt;code>-j &amp;lt;leader-or-any-node-address&amp;gt;&lt;/code>:&lt;/p></description></item><item><title>Storage backends</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/</guid><description>&lt;h1 id="storage-backends">
+ Storage backends
+ &lt;a class="anchor" href="#storage-backends">#&lt;/a>
+&lt;/h1>
+&lt;p>&lt;code>--storage-backend &amp;lt;name&amp;gt;&lt;/code> selects the driver that sits under the ledis data model. The command layer
+is written against &lt;code>store.driver.IDB&lt;/code>, so the same commands run on every backend — what changes is
+where the bytes live, who replicates them, and how much you can trust the driver.&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">IDB&lt;/span> &lt;span style="color:#66d9ef">interface&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Close&lt;/span>() &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Get&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) ([]&lt;span style="color:#66d9ef">byte&lt;/span>, &lt;span style="color:#66d9ef">error&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Put&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>, &lt;span style="color:#a6e22e">value&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Delete&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">SyncPut&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>, &lt;span style="color:#a6e22e">value&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">SyncDelete&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">NewIterator&lt;/span>() &lt;span style="color:#a6e22e">IIterator&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">NewWriteBatch&lt;/span>() &lt;span style="color:#a6e22e">IWriteBatch&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">NewSnapshot&lt;/span>() (&lt;span style="color:#a6e22e">ISnapshot&lt;/span>, &lt;span style="color:#66d9ef">error&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Compact&lt;/span>() &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">GetStorageEngine&lt;/span>() &lt;span style="color:#66d9ef">interface&lt;/span>{}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="what-each-backend-is">
+ What each backend is
+ &lt;a class="anchor" href="#what-each-backend-is">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">&lt;code>--storage-backend&lt;/code>&lt;/th>
+ &lt;th style="text-align: left">Where data lives&lt;/th>
+ &lt;th style="text-align: left">Replication&lt;/th>
+ &lt;th style="text-align: left">External dependency&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>goleveldb&lt;/code> &lt;em>(default)&lt;/em>&lt;/td>
+ &lt;td style="text-align: left">Local LevelDB (pure Go)&lt;/td>
+ &lt;td style="text-align: left">Raft only&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>badger&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Local BadgerDB v4, ZSTD compression&lt;/td>
+ &lt;td style="text-align: left">Raft only&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>hybriddb&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Local LevelDB + Ristretto hot cache, per-driver metrics&lt;/td>
+ &lt;td style="text-align: left">Raft only&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>oss&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">S3-compatible object store, local LevelDB index + Ristretto cache&lt;/td>
+ &lt;td style="text-align: left">Raft only&lt;/td>
+ &lt;td style="text-align: left">S3/MinIO endpoint&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ipfs&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Local LevelDB whose values are fetched from IPFS by CID&lt;/td>
+ &lt;td style="text-align: left">Raft only&lt;/td>
+ &lt;td style="text-align: left">IPFS API (not a gateway)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ipfs-synckv&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">IPFS as source of truth + local mirror + version metadata, optional AES-256&lt;/td>
+ &lt;td style="text-align: left">IPFS/ipfs-log P2P&lt;/td>
+ &lt;td style="text-align: left">IPFS API + P2P&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>crdt&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Local Badger + &lt;code>icefiredb-crdt-kv&lt;/code> over libp2p pubsub&lt;/td>
+ &lt;td style="text-align: left">P2P CRDT&lt;/td>
+ &lt;td style="text-align: left">libp2p peers&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ipfs-log&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Append-only &lt;code>icefiredb-ipfs-log&lt;/code> store over IPFS pubsub&lt;/td>
+ &lt;td style="text-align: left">P2P log&lt;/td>
+ &lt;td style="text-align: left">IPFS + P2P&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>leveldb&lt;/code> (the cgo driver) and &lt;code>orbitdb&lt;/code> are &lt;strong>not&lt;/strong> compiled into the binary: the former is never
+imported, the latter is commented out in &lt;code>main.go&lt;/code>/&lt;code>flags.go&lt;/code>. Passing either name fails at startup
+with &amp;ldquo;unknown driver&amp;rdquo;.&lt;/p></description></item><item><title>Security</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/</guid><description>&lt;h1 id="security">
+ Security
+ &lt;a class="anchor" href="#security">#&lt;/a>
+&lt;/h1>
+&lt;p>The engine has three security-relevant surfaces: the RESP listener, the Raft transport, and the
+optional admin HTTP servers. They share one credential and one certificate.&lt;/p>
+&lt;h2 id="transport-encryption-tls">
+ Transport encryption (TLS)
+ &lt;a class="anchor" href="#transport-encryption-tls">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB --tls-cert ./server.crt --tls-key ./server.key -a 0.0.0.0:11001 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ul>
+&lt;li>Both flags are required together — providing one without the other is a startup error.&lt;/li>
+&lt;li>TLS is applied to the &lt;strong>single listening socket&lt;/strong>. RESP clients and the Raft transport both arrive on
+it, and the server decides which is which by sniffing the first bytes. There is no second port.&lt;/li>
+&lt;li>The value of &lt;code>--advertise&lt;/code> must therefore be the TLS address peers and clients use.&lt;/li>
+&lt;li>Clients must speak TLS too: &lt;code>redis-cli --tls --cacert ./ca.crt -h host -p 11001&lt;/code>, or the equivalent
+client option (&lt;code>go-redis&lt;/code>: &lt;code>TLSConfig&lt;/code>, Python &lt;code>redis.Redis(ssl=True)&lt;/code>, Node &lt;code>tls: {}&lt;/code>).&lt;/li>
+&lt;li>The certificate needs a &lt;code>DNS:&lt;/code> SAN for the name clients use; the server copies the first DNS SAN
+into its &lt;code>tls.Config.ServerName&lt;/code> for outbound connections.&lt;/li>
+&lt;li>&lt;strong>No client certificates.&lt;/strong> &lt;code>tls.Config&lt;/code> is built with &lt;code>Certificates&lt;/code> only, so there is no mTLS and
+no client identity. Peers authenticate with the shared token, not a certificate.&lt;/li>
+&lt;/ul>
+&lt;h2 id="cluster-authorization">
+ Cluster authorization
+ &lt;a class="anchor" href="#cluster-authorization">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>export ICEFIREDB_AUTH&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#e6db74">&amp;#39;openssl rand -hex 32&amp;#39;&lt;/span> &lt;span style="color:#75715e"># preferred: not visible in the process list&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -a 0.0.0.0:11001 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># or&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB --auth &lt;span style="color:#e6db74">&amp;#39;&amp;lt;token&amp;gt;&amp;#39;&lt;/span> -a 0.0.0.0:11001 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>What it does:&lt;/p></description></item><item><title>Observability</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/</guid><description>&lt;h1 id="observability">
+ Observability
+ &lt;a class="anchor" href="#observability">#&lt;/a>
+&lt;/h1>
+&lt;p>There are three ways to see what a node is doing: the HTTP endpoints, the &lt;code>INFO&lt;/code> command, and pprof.
+All three are opt-in.&lt;/p>
+&lt;h2 id="http-endpoints">
+ HTTP endpoints
+ &lt;a class="anchor" href="#http-endpoints">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB --metrics --metrics-addr 127.0.0.1:11002 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Path&lt;/th>
+ &lt;th style="text-align: left">Response&lt;/th>
+ &lt;th style="text-align: left">Use&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>/healthz&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>200 ok&lt;/code> whenever the process is up&lt;/td>
+ &lt;td style="text-align: left">Liveness probe&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>/readyz&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>200 ready&lt;/code> once the storage backend has initialized; &lt;code>503 not ready&lt;/code> before that&lt;/td>
+ &lt;td style="text-align: left">Readiness probe / rollout gate&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>/metrics&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Prometheus text exposition&lt;/td>
+ &lt;td style="text-align: left">Scraping&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>The server is a plain &lt;code>http.Server&lt;/code> with a 5-second &lt;code>ReadHeaderTimeout&lt;/code>; it has no authentication, so
+keep it on loopback or a private interface (see 
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/deploy/security/">Security&lt;/a>).&lt;/p></description></item><item><title>Operations</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/</guid><description>&lt;h1 id="operations">
+ Operations
+ &lt;a class="anchor" href="#operations">#&lt;/a>
+&lt;/h1>
+&lt;p>Backup, restore, upgrade and recovery for a single node or a Raft cluster. The unit of everything is
+the &lt;strong>node directory&lt;/strong>: &lt;code>&amp;lt;data-dir&amp;gt;/IceFireDB/&amp;lt;node-id&amp;gt;/&lt;/code>.&lt;/p>
+&lt;h2 id="what-is-on-disk">
+ What is on disk
+ &lt;a class="anchor" href="#what-is-on-disk">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Path&lt;/th>
+ &lt;th style="text-align: left">Contents&lt;/th>
+ &lt;th style="text-align: left">Backed up by&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>main.db/&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">The ledis store in the selected driver&amp;rsquo;s format&lt;/td>
+ &lt;td style="text-align: left">Copying the directory&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>store/&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Raft log + stable store (&lt;code>leveldb&lt;/code> or &lt;code>bolt&lt;/code>)&lt;/td>
+ &lt;td style="text-align: left">Copying the directory&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>snapshots/&amp;lt;id&amp;gt;/state.bin&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Raft state-machine snapshot: gzip header (start/ts/seed) + &lt;code>sds&lt;/code> key/value stream&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RAFT SNAPSHOT&lt;/code>, or copying the directory&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>state.bin&lt;/code> is backend-agnostic: &lt;code>writeSnapshot&lt;/code> walks the driver&amp;rsquo;s snapshot and writes &lt;code>key, value&lt;/code>
+pairs into a gzip stream. That is why a snapshot taken on a &lt;code>badger&lt;/code> node restores into a &lt;code>goleveldb&lt;/code>
+node, while the &lt;code>main.db/&lt;/code> directory itself never does. Treat the file as opaque: copy it whole (or in
+&lt;code>RAFT SNAPSHOT READ&lt;/code> windows) and hand it back with &lt;code>--restore&lt;/code> — do not unzip or edit it.&lt;/p></description></item><item><title>System commands</title><link>https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/</guid><description>&lt;h1 id="system-commands">
+ System commands
+ &lt;a class="anchor" href="#system-commands">#&lt;/a>
+&lt;/h1>
+&lt;p>The 110 commands in the 
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/commands/">command reference&lt;/a> are the data surface. Under them sits a second
+surface, provided by the Raft/RESP layer, that operations depend on. It is not part of the Redis
+command set, so it is documented here.&lt;/p>
+&lt;p>None of these go through the Raft log unless stated, and &lt;code>--try-errors&lt;/code> disables the &lt;code>CLUSTER&lt;/code> family.&lt;/p>
+&lt;h2 id="connection">
+ Connection
+ &lt;a class="anchor" href="#connection">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Command&lt;/th>
+ &lt;th style="text-align: left">Reply&lt;/th>
+ &lt;th style="text-align: left">Notes&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>PING [message]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>PONG&lt;/code>, or the message&lt;/td>
+ &lt;td style="text-align: left">Handled before dispatch&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ECHO message&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">the message&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>AUTH token&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>OK&lt;/code> / &lt;code>-unauthorized&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Required first when &lt;code>--auth&lt;/code> is set&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>QUIT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>OK&lt;/code>, then the connection closes&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SHUTDOWN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;em>(none — the process exits)&lt;/em>&lt;/td>
+ &lt;td style="text-align: left">Equivalent to &lt;code>SIGKILL&lt;/code> from the client&amp;rsquo;s point of view; requires &lt;code>AUTH&lt;/code> when configured&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="machine">
+ Machine
+ &lt;a class="anchor" href="#machine">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Command&lt;/th>
+ &lt;th style="text-align: left">Reply&lt;/th>
+ &lt;th style="text-align: left">Meaning&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>VERSION&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">bulk string&lt;/td>
+ &lt;td style="text-align: left">Engine version, e.g. &lt;code>1.0.0-rc.1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MACHINE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">map of &lt;code>now&lt;/code>, &lt;code>uptime&lt;/code>, &lt;code>boottime&lt;/code> (nanoseconds)&lt;/td>
+ &lt;td style="text-align: left">Times come from the Raft clock, so every node agrees&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MACHINE HUMAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">same keys as RFC3339 / duration&lt;/td>
+ &lt;td style="text-align: left">Human-readable variant&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BARRIER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">A no-op &lt;strong>write&lt;/strong>: when it returns, every previously issued write from this client has been applied&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>BARRIER&lt;/code> is how you get a read-your-writes guarantee across clients or nodes: send &lt;code>BARRIER&lt;/code> on the
+leader, then read on a follower with &lt;code>--openreads&lt;/code>.&lt;/p></description></item></channel></rss>

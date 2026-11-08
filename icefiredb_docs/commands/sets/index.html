@@ -1,0 +1,202 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  Sets
+  #
+
+21 commands: membership, the three set-algebra families, expiry, and deterministic SPOP.
+
+  
+      
+          Cmd
+          RW
+          Syntax
+          Returns
+          Example → reply
+      
+  
+  
+      
+          SADD
+          W
+          SADD KEY MEMBER [MEMBER ...]
+          integer members added
+          SADD tags go db → 2
+      
+      
+          SREM
+          W
+          SREM KEY MEMBER [MEMBER ...]
+          integer members removed
+          SREM tags db → 1
+      
+      
+          SCARD
+          R
+          SCARD KEY
+          integer cardinality
+          SCARD tags → 1
+      
+      
+          SISMEMBER
+          R
+          SISMEMBER KEY MEMBER
+          integer 0/1
+          SISMEMBER tags go → 1
+      
+      
+          SMEMBERS
+          R
+          SMEMBERS KEY
+          array of members
+          SMEMBERS tags → [go]
+      
+      
+          SDIFF
+          R
+          SDIFF KEY [KEY ...]
+          array members in the first but no later set
+          SDIFF a b → [x]
+      
+      
+          SDIFFSTORE
+          W
+          SDIFFSTORE dest KEY [KEY ...]
+          integer size of the result
+          SDIFFSTORE out a b → 1
+      
+      
+          SINTER
+          R
+          SINTER KEY [KEY ...]
+          array members in every set
+          SINTER a b → [y]
+      
+      
+          SINTERSTORE
+          W
+          SINTERSTORE dest KEY [KEY ...]
+          integer size of the result
+          SINTERSTORE out a b → 1
+      
+      
+          SUNION
+          R
+          SUNION KEY [KEY ...]
+          array members in any set
+          SUNION a b → [x,y]
+      
+      
+          SUNIONSTORE
+          W
+          SUNIONSTORE dest KEY [KEY ...]
+          integer size of the result
+          SUNIONSTORE out a b → 2
+      
+      
+          SMOVE
+          W
+          SMOVE source destination MEMBER
+          integer 1 moved, 0 not a member
+          SMOVE a b x → 1
+      
+      
+          SPOP
+          W
+          SPOP KEY [count]
+          bare: bulk member; with count: array
+          SPOP queue:ready → job:7
+      
+      
+          SRANDMEMBER
+          R
+          SRANDMEMBER KEY [count]
+          bare: bulk; positive count: distinct array; negative: array with repeats
+          SRANDMEMBER tags 1 → [go]
+      
+      
+          SKEYEXISTS
+          R
+          SKEYEXISTS KEY
+          integer 0/1 — does the set exist
+          SKEYEXISTS tags → 1
+      
+      
+          SCLEAR
+          W
+          SCLEAR KEY
+          integer members removed
+          SCLEAR tags → 1
+      
+      
+          SMCLEAR
+          W
+          SMCLEAR KEY [KEY ...]
+          integer sets removed
+          SMCLEAR a b → 2
+      
+      
+          SEXPIRE
+          W
+          SEXPIRE KEY seconds
+          integer 1/0
+          SEXPIRE tags 60 → 1
+      
+      
+          SEXPIREAT
+          W
+          SEXPIREAT KEY unixTime
+          integer 1/0
+          SEXPIREAT tags 1767225600 → 1
+      
+      
+          STTL
+          R
+          STTL KEY
+          integer seconds left, -1 none
+          STTL tags → 59
+      
+      
+          SPERSIST
+          W
+          SPERSIST KEY
+          integer 1 removed, 0 none
+          SPERSIST tags → 1
+      
+  
+
+
+  Notes
+  #
+
+
+SPOP is deterministic across replicas. Because it is a write command, its result must be
+identical on every node, so the picked member is derived from the Raft-seeded state rather than
+math/rand. With count, the count is clamped to the set size; count = 0 answers an empty array
+and a negative count is an error.
+SRANDMEMBER is a read command and may use real randomness (count distinct members when
+positive, repeats when negative). |count| is capped at 1048576.
+SMOVE to the same key is a no-op that returns 1 and keeps the TTL.
+SCLEAR/SMCLEAR delete whole sets and their expiration; SREM removes members.
+SPERSIST is the only *PERSIST command in the engine, and it is known to leave the expiration in
+place on the ipfs backend. Strings, hashes and lists have no PERSIST at all.
+Set algebra commands read the sets named in the arguments; *STORE variants overwrite the
+destination and return the size of the result.
+"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Sets"><meta property="og:description" content=" Sets # 21 commands: membership, the three set-algebra families, expiry, and deterministic SPOP.
+Cmd RW Syntax Returns Example → reply SADD W SADD KEY MEMBER [MEMBER ...] integer members added SADD tags go db → 2 SREM W SREM KEY MEMBER [MEMBER ...] integer members removed SREM tags db → 1 SCARD R SCARD KEY integer cardinality SCARD tags → 1 SISMEMBER R SISMEMBER KEY MEMBER integer 0/1 SISMEMBER tags go → 1 SMEMBERS R SMEMBERS KEY array of members SMEMBERS tags → [go] SDIFF R SDIFF KEY [KEY ...] array members in the first but no later set SDIFF a b → [x] SDIFFSTORE W SDIFFSTORE dest KEY [KEY ...] integer size of the result SDIFFSTORE out a b → 1 SINTER R SINTER KEY [KEY ...] array members in every set SINTER a b → [y] SINTERSTORE W SINTERSTORE dest KEY [KEY ...] integer size of the result SINTERSTORE out a b → 1 SUNION R SUNION KEY [KEY ...] array members in any set SUNION a b → [x,y] SUNIONSTORE W SUNIONSTORE dest KEY [KEY ...] integer size of the result SUNIONSTORE out a b → 2 SMOVE W SMOVE source destination MEMBER integer 1 moved, 0 not a member SMOVE a b x → 1 SPOP W SPOP KEY [count] bare: bulk member; with count: array SPOP queue:ready → job:7 SRANDMEMBER R SRANDMEMBER KEY [count] bare: bulk; positive count: distinct array; negative: array with repeats SRANDMEMBER tags 1 → [go] SKEYEXISTS R SKEYEXISTS KEY integer 0/1 — does the set exist SKEYEXISTS tags → 1 SCLEAR W SCLEAR KEY integer members removed SCLEAR tags → 1 SMCLEAR W SMCLEAR KEY [KEY ...] integer sets removed SMCLEAR a b → 2 SEXPIRE W SEXPIRE KEY seconds integer 1/0 SEXPIRE tags 60 → 1 SEXPIREAT W SEXPIREAT KEY unixTime integer 1/0 SEXPIREAT tags 1767225600 → 1 STTL R STTL KEY integer seconds left, -1 none STTL tags → 59 SPERSIST W SPERSIST KEY integer 1 removed, 0 none SPERSIST tags → 1 Notes # SPOP is deterministic across replicas. Because it is a write command, its result must be identical on every node, so the picked member is derived from the Raft-seeded state rather than math/rand. With count, the count is clamped to the set size; count = 0 answers an empty array and a negative count is an error. SRANDMEMBER is a read command and may use real randomness (count distinct members when positive, repeats when negative). |count| is capped at 1048576. SMOVE to the same key is a no-op that returns 1 and keeps the TTL. SCLEAR/SMCLEAR delete whole sets and their expiration; SREM removes members. SPERSIST is the only *PERSIST command in the engine, and it is known to leave the expiration in place on the ipfs backend. Strings, hashes and lists have no PERSIST at all. Set algebra commands read the sets named in the arguments; *STORE variants overwrite the destination and return the size of the result. "><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="article:section" content="commands"><title>Sets | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/ title=集合><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle checked>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/ class=active>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Sets</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#notes>Notes</a></li></ul></nav></aside></header><article class=markdown><h1 id=sets>Sets
+<a class=anchor href=#sets>#</a></h1><p>21 commands: membership, the three set-algebra families, expiry, and deterministic <code>SPOP</code>.</p><table><thead><tr><th style=text-align:left>Cmd</th><th style=text-align:left>RW</th><th style=text-align:left>Syntax</th><th style=text-align:left>Returns</th><th style=text-align:left>Example → reply</th></tr></thead><tbody><tr><td style=text-align:left><code>SADD</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SADD KEY MEMBER [MEMBER ...]</code></td><td style=text-align:left><code>integer</code> members added</td><td style=text-align:left><code>SADD tags go db</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>SREM</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SREM KEY MEMBER [MEMBER ...]</code></td><td style=text-align:left><code>integer</code> members removed</td><td style=text-align:left><code>SREM tags db</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SCARD</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SCARD KEY</code></td><td style=text-align:left><code>integer</code> cardinality</td><td style=text-align:left><code>SCARD tags</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SISMEMBER</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SISMEMBER KEY MEMBER</code></td><td style=text-align:left><code>integer</code> 0/1</td><td style=text-align:left><code>SISMEMBER tags go</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SMEMBERS</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SMEMBERS KEY</code></td><td style=text-align:left><code>array</code> of members</td><td style=text-align:left><code>SMEMBERS tags</code> → <code>[go]</code></td></tr><tr><td style=text-align:left><code>SDIFF</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SDIFF KEY [KEY ...]</code></td><td style=text-align:left><code>array</code> members in the first but no later set</td><td style=text-align:left><code>SDIFF a b</code> → <code>[x]</code></td></tr><tr><td style=text-align:left><code>SDIFFSTORE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SDIFFSTORE dest KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> size of the result</td><td style=text-align:left><code>SDIFFSTORE out a b</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SINTER</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SINTER KEY [KEY ...]</code></td><td style=text-align:left><code>array</code> members in every set</td><td style=text-align:left><code>SINTER a b</code> → <code>[y]</code></td></tr><tr><td style=text-align:left><code>SINTERSTORE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SINTERSTORE dest KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> size of the result</td><td style=text-align:left><code>SINTERSTORE out a b</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SUNION</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SUNION KEY [KEY ...]</code></td><td style=text-align:left><code>array</code> members in any set</td><td style=text-align:left><code>SUNION a b</code> → <code>[x,y]</code></td></tr><tr><td style=text-align:left><code>SUNIONSTORE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SUNIONSTORE dest KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> size of the result</td><td style=text-align:left><code>SUNIONSTORE out a b</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>SMOVE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SMOVE source destination MEMBER</code></td><td style=text-align:left><code>integer</code> 1 moved, 0 not a member</td><td style=text-align:left><code>SMOVE a b x</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SPOP</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SPOP KEY [count]</code></td><td style=text-align:left>bare: <code>bulk</code> member; with <code>count</code>: <code>array</code></td><td style=text-align:left><code>SPOP queue:ready</code> → <code>job:7</code></td></tr><tr><td style=text-align:left><code>SRANDMEMBER</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SRANDMEMBER KEY [count]</code></td><td style=text-align:left>bare: <code>bulk</code>; positive count: distinct <code>array</code>; negative: <code>array</code> with repeats</td><td style=text-align:left><code>SRANDMEMBER tags 1</code> → <code>[go]</code></td></tr><tr><td style=text-align:left><code>SKEYEXISTS</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SKEYEXISTS KEY</code></td><td style=text-align:left><code>integer</code> 0/1 — does the set exist</td><td style=text-align:left><code>SKEYEXISTS tags</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SCLEAR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SCLEAR KEY</code></td><td style=text-align:left><code>integer</code> members removed</td><td style=text-align:left><code>SCLEAR tags</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SMCLEAR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SMCLEAR KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> sets removed</td><td style=text-align:left><code>SMCLEAR a b</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>SEXPIRE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SEXPIRE KEY seconds</code></td><td style=text-align:left><code>integer</code> 1/0</td><td style=text-align:left><code>SEXPIRE tags 60</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SEXPIREAT</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SEXPIREAT KEY unixTime</code></td><td style=text-align:left><code>integer</code> 1/0</td><td style=text-align:left><code>SEXPIREAT tags 1767225600</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>STTL</code></td><td style=text-align:left>R</td><td style=text-align:left><code>STTL KEY</code></td><td style=text-align:left><code>integer</code> seconds left, <code>-1</code> none</td><td style=text-align:left><code>STTL tags</code> → <code>59</code></td></tr><tr><td style=text-align:left><code>SPERSIST</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SPERSIST KEY</code></td><td style=text-align:left><code>integer</code> 1 removed, 0 none</td><td style=text-align:left><code>SPERSIST tags</code> → <code>1</code></td></tr></tbody></table><h2 id=notes>Notes
+<a class=anchor href=#notes>#</a></h2><ul><li><strong><code>SPOP</code> is deterministic across replicas.</strong> Because it is a write command, its result must be
+identical on every node, so the picked member is derived from the Raft-seeded state rather than
+<code>math/rand</code>. With <code>count</code>, the count is clamped to the set size; <code>count = 0</code> answers an empty array
+and a negative count is an error.</li><li><code>SRANDMEMBER</code> is a <strong>read</strong> command and may use real randomness (<code>count</code> distinct members when
+positive, repeats when negative). <code>|count|</code> is capped at 1048576.</li><li><code>SMOVE</code> to the same key is a no-op that returns <code>1</code> and keeps the TTL.</li><li><code>SCLEAR</code>/<code>SMCLEAR</code> delete whole sets and their expiration; <code>SREM</code> removes members.</li><li><code>SPERSIST</code> is the only <code>*PERSIST</code> command in the engine, and it is known to leave the expiration in
+place on the <code>ipfs</code> backend. Strings, hashes and lists have no <code>PERSIST</code> at all.</li><li>Set algebra commands read the sets named in the arguments; <code>*STORE</code> variants <strong>overwrite</strong> the
+destination and return the size of the result.</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#notes>Notes</a></li></ul></nav></div></aside></main></body></html>

@@ -1,0 +1,114 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  Observability
+  #
+
+There are three ways to see what a node is doing: the HTTP endpoints, the INFO command, and pprof.
+All three are opt-in.
+
+  HTTP endpoints
+  #
+
+./bin/IceFireDB --metrics --metrics-addr 127.0.0.1:11002 -d /var/lib/icefiredb
+
+  
+      
+          Path
+          Response
+          Use
+      
+  
+  
+      
+          /healthz
+          200 ok whenever the process is up
+          Liveness probe
+      
+      
+          /readyz
+          200 ready once the storage backend has initialized; 503 not ready before that
+          Readiness probe / rollout gate
+      
+      
+          /metrics
+          Prometheus text exposition
+          Scraping
+      
+  
+
+The server is a plain http.Server with a 5-second ReadHeaderTimeout; it has no authentication, so
+keep it on loopback or a private interface (see 
+  Security)."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Observability"><meta property="og:description" content=" Observability # There are three ways to see what a node is doing: the HTTP endpoints, the INFO command, and pprof. All three are opt-in.
+HTTP endpoints # ./bin/IceFireDB --metrics --metrics-addr 127.0.0.1:11002 -d /var/lib/icefiredb Path Response Use /healthz 200 ok whenever the process is up Liveness probe /readyz 200 ready once the storage backend has initialized; 503 not ready before that Readiness probe / rollout gate /metrics Prometheus text exposition Scraping The server is a plain http.Server with a 5-second ReadHeaderTimeout; it has no authentication, so keep it on loopback or a private interface (see Security)."><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="article:section" content="deploy"><title>Observability | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/ title=可观测性><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle checked>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/ class=active>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Observability</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#http-endpoints>HTTP endpoints</a><ul><li><a href=#metrics-exposed>Metrics exposed</a></li></ul></li><li><a href=#info><code>INFO</code></a></li><li><a href=#pprof>pprof</a></li><li><a href=#cluster-state>Cluster state</a></li><li><a href=#what-to-alert-on>What to alert on</a></li></ul></nav></aside></header><article class=markdown><h1 id=observability>Observability
+<a class=anchor href=#observability>#</a></h1><p>There are three ways to see what a node is doing: the HTTP endpoints, the <code>INFO</code> command, and pprof.
+All three are opt-in.</p><h2 id=http-endpoints>HTTP endpoints
+<a class=anchor href=#http-endpoints>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/IceFireDB --metrics --metrics-addr 127.0.0.1:11002 -d /var/lib/icefiredb
+</span></span></code></pre></div><table><thead><tr><th style=text-align:left>Path</th><th style=text-align:left>Response</th><th style=text-align:left>Use</th></tr></thead><tbody><tr><td style=text-align:left><code>/healthz</code></td><td style=text-align:left><code>200 ok</code> whenever the process is up</td><td style=text-align:left>Liveness probe</td></tr><tr><td style=text-align:left><code>/readyz</code></td><td style=text-align:left><code>200 ready</code> once the storage backend has initialized; <code>503 not ready</code> before that</td><td style=text-align:left>Readiness probe / rollout gate</td></tr><tr><td style=text-align:left><code>/metrics</code></td><td style=text-align:left>Prometheus text exposition</td><td style=text-align:left>Scraping</td></tr></tbody></table><p>The server is a plain <code>http.Server</code> with a 5-second <code>ReadHeaderTimeout</code>; it has no authentication, so
+keep it on loopback or a private interface (see
+<a href=/icefiredb_docs/deploy/security/>Security</a>).</p><h3 id=metrics-exposed>Metrics exposed
+<a class=anchor href=#metrics-exposed>#</a></h3><p>The registry is not the global one — it registers exactly:</p><table><thead><tr><th style=text-align:left>Metric</th><th style=text-align:left>Type</th><th style=text-align:left>Meaning</th></tr></thead><tbody><tr><td style=text-align:left><code>icefiredb_connected_clients</code></td><td style=text-align:left>gauge</td><td style=text-align:left>RESP connections currently open</td></tr><tr><td style=text-align:left><code>go_*</code></td><td style=text-align:left>collector</td><td style=text-align:left>Go runtime (goroutines, GC, memstats, …)</td></tr><tr><td style=text-align:left><code>process_*</code></td><td style=text-align:left>collector</td><td style=text-align:left>Process CPU, RSS, FDs, start time</td></tr></tbody></table><p>There are <strong>no</strong> Raft metrics, no per-command counters and no latency histograms. Command and storage
+counters live in <code>INFO</code> instead (below). Scrape interval and alerting should lean on <code>up</code>,
+<code>icefiredb_connected_clients</code> and container-level signals.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#75715e># prometheus.yml</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>scrape_configs</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#f92672>job_name</span>: <span style=color:#ae81ff>icefiredb</span>
+</span></span><span style=display:flex><span>    <span style=color:#f92672>static_configs</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#f92672>targets</span>: [<span style=color:#e6db74>&#34;127.0.0.1:11002&#34;</span>]
+</span></span></code></pre></div><h2 id=info><code>INFO</code>
+<a class=anchor href=#info>#</a></h2><p><code>INFO</code> takes <strong>no arguments</strong> — <code>INFO memory</code> is an argument error, unlike Redis. It answers one bulk
+string with five sections, then one section per backend that registers extra metrics.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-text data-lang=text><span style=display:flex><span># Server
+</span></span><span style=display:flex><span>os:linux
+</span></span><span style=display:flex><span>arch:amd64
+</span></span><span style=display:flex><span>process_id:1
+</span></span><span style=display:flex><span>addr:127.0.0.1:11001
+</span></span><span style=display:flex><span>http_addr:
+</span></span><span style=display:flex><span>readonly:false
+</span></span><span style=display:flex><span>goroutine_num:38
+</span></span><span style=display:flex><span>gomaxprocs:8
+</span></span><span style=display:flex><span>thread_num:12
+</span></span><span style=display:flex><span>cgo_call_num:0
+</span></span><span style=display:flex><span>resp_client_num:1
+</span></span><span style=display:flex><span>ledisdb_version:...
+</span></span><span style=display:flex><span># Store
+</span></span><span style=display:flex><span>name:goleveldb
+</span></span><span style=display:flex><span>get:0
+</span></span><span style=display:flex><span>get_missing:0
+</span></span><span style=display:flex><span>put:0
+</span></span><span style=display:flex><span>delete:0
+</span></span><span style=display:flex><span>get_total_time:0s
+</span></span><span style=display:flex><span>iter:0
+</span></span><span style=display:flex><span>iter_seek:0
+</span></span><span style=display:flex><span>iter_close:0
+</span></span><span style=display:flex><span>batch_commit:0
+</span></span><span style=display:flex><span>batch_commit_total_time:0s
+</span></span><span style=display:flex><span># Mem
+</span></span><span style=display:flex><span>mem_alloc:... mem_sys:... mem_heap_alloc:... mem_head_objects:...
+</span></span><span style=display:flex><span># GC
+</span></span><span style=display:flex><span>gc_last_time:... gc_num:... gc_pause_total:... gc_pause_history:...
+</span></span></code></pre></div><table><thead><tr><th style=text-align:left>Section</th><th style=text-align:left>Fields</th><th style=text-align:left>Notes</th></tr></thead><tbody><tr><td style=text-align:left><code>Server</code></td><td style=text-align:left><code>os</code>, <code>arch</code>, <code>process_id</code>, <code>addr</code>, <code>http_addr</code>, <code>readonly</code>, <code>goroutine_num</code>, <code>gomaxprocs</code>, <code>thread_num</code>, <code>cgo_call_num</code>, <code>resp_client_num</code>, <code>ledisdb_version</code></td><td style=text-align:left><code>addr</code> is the configured bind address; <code>readonly</code> comes from the ledis config and is always <code>false</code> here</td></tr><tr><td style=text-align:left><code>Store</code></td><td style=text-align:left><code>name</code>, <code>get</code>, <code>get_missing</code>, <code>put</code>, <code>delete</code>, <code>get_total_time</code>, <code>iter</code>, <code>iter_seek</code>, <code>iter_close</code>, <code>batch_commit</code>, <code>batch_commit_total_time</code></td><td style=text-align:left>Counters are per-process, reset on restart</td></tr><tr><td style=text-align:left><code>Mem</code></td><td style=text-align:left><code>mem_alloc</code>, <code>mem_sys</code>, <code>mem_looksups</code>, <code>mem_mallocs</code>, <code>mem_frees</code>, <code>mem_total</code>, <code>mem_heap_alloc</code>, <code>mem_heap_sys</code>, <code>mem_head_idle</code>, <code>mem_head_inuse</code>, <code>mem_head_released</code>, <code>mem_head_objects</code></td><td style=text-align:left>Human-readable sizes (<code>1.234G</code>)</td></tr><tr><td style=text-align:left><code>GC</code></td><td style=text-align:left><code>gc_last_time</code>, <code>gc_num</code>, <code>gc_pause_total</code>, <code>gc_pause_history</code></td><td style=text-align:left>Last five pauses</td></tr><tr><td style=text-align:left>Driver sections</td><td style=text-align:left>see below</td><td style=text-align:left>Only for backends that implement <code>Metrics()</code></td></tr></tbody></table><p>Driver sections appended by <code>main.go</code>:</p><ul><li><code>hybriddb</code>: <code>read_operations</code>, <code>write_operations</code>, <code>delete_operations</code>, <code>bytes_read</code>,
+<code>bytes_written</code>, <code>errors</code>, <code>uptime</code>, <code>closed</code>.</li><li><code>ipfs</code>, <code>ipfs-synckv</code>, <code>oss</code>: a <code>hybriddb cache</code> section (the title is a copy-paste in the drivers)
+with Ristretto counters — <code>used_cost</code>, <code>cost_added</code>, <code>cost_evicted</code>, <code>hits</code>, <code>misses</code>, <code>ratio</code>,
+<code>keys_added</code>, <code>keys_evicted</code>, <code>keys_updated</code>, <code>gets_kept</code>, <code>gets_dropped</code>, <code>sets_dropped</code>,
+<code>sets_rejected</code>.</li></ul><p><code>INFO</code> is a <strong>read</strong> command: it is served by the node you ask, never replicated, and a follower
+answers locally.</p><h2 id=pprof>pprof
+<a class=anchor href=#pprof>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/IceFireDB --pprof --pprof-addr 127.0.0.1:26063 -d /var/lib/icefiredb
+</span></span><span style=display:flex><span>go tool pprof http://127.0.0.1:26063/debug/pprof/heap
+</span></span></code></pre></div><p>Standard <code>net/http/pprof</code> handlers: <code>/debug/pprof/{profile,heap,goroutine,block,mutex,trace}</code>. Same
+caveat as <code>/metrics</code> — no auth, loopback by default.</p><h2 id=cluster-state>Cluster state
+<a class=anchor href=#cluster-state>#</a></h2><p>Cluster and Raft state are exposed as commands rather than metrics:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT LEADER       <span style=color:#75715e># advertise address of the current leader</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT INFO         <span style=color:#75715e># raft state/term/index snapshot</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SERVER LIST  <span style=color:#75715e># id, address, leader flag per member</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> CLUSTER INFO      <span style=color:#75715e># cluster_state:ok/fail, cluster_known_nodes, cluster_size</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> CLUSTER NODES     <span style=color:#75715e># redis-cluster-shaped node lines</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> MACHINE           <span style=color:#75715e># now / uptime / boottime from the Raft clock</span>
+</span></span></code></pre></div><p><code>MACHINE HUMAN</code> returns the same values as RFC3339 timestamps and a Go duration. See
+<a href=/icefiredb_docs/deploy/system-commands/>System commands</a>.</p><h2 id=what-to-alert-on>What to alert on
+<a class=anchor href=#what-to-alert-on>#</a></h2><table><thead><tr><th style=text-align:left>Signal</th><th style=text-align:left>Where</th><th style=text-align:left>Meaning</th></tr></thead><tbody><tr><td style=text-align:left><code>/readyz</code> non-200</td><td style=text-align:left>HTTP probe</td><td style=text-align:left>Storage did not initialize — the node must not take traffic</td></tr><tr><td style=text-align:left><code>up{job="icefiredb"}</code></td><td style=text-align:left>Prometheus</td><td style=text-align:left>The node or its metrics endpoint is gone</td></tr><tr><td style=text-align:left><code>-CLUSTERDOWN</code>, <code>-MOVED</code> storms</td><td style=text-align:left>Your client metrics</td><td style=text-align:left>Write path cannot find a leader; check quorum</td></tr><tr><td style=text-align:left><code>resp_client_num</code> growth</td><td style=text-align:left><code>INFO Server</code></td><td style=text-align:left>Connection leak in the client pool</td></tr><tr><td style=text-align:left><code>get_missing</code> / <code>put</code> ratio</td><td style=text-align:left><code>INFO Store</code></td><td style=text-align:left>Read misses dominating — cache hit-rate or dataset problem</td></tr><tr><td style=text-align:left><code>gc_pause_total</code> slope</td><td style=text-align:left><code>INFO GC</code></td><td style=text-align:left>Allocation pressure, usually large replies or big pipelines</td></tr></tbody></table></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#http-endpoints>HTTP endpoints</a><ul><li><a href=#metrics-exposed>Metrics exposed</a></li></ul></li><li><a href=#info><code>INFO</code></a></li><li><a href=#pprof>pprof</a></li><li><a href=#cluster-state>Cluster state</a></li><li><a href=#what-to-alert-on>What to alert on</a></li></ul></nav></div></aside></main></body></html>

@@ -1,0 +1,151 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content='
+  IceFireDB-SQLite
+  #
+
+一个 MySQL 协议服务器，它把数据存放在本地 SQLite 文件中，并把语句传播给对等节点，因此每个节点
+都能针对自己那份副本回答 SQL 查询。
+cd IceFireDB-SQLite
+make                                 # → bin/IceFireDB-SQLite
+./bin/IceFireDB-SQLite -c ./config/config.yaml
+
+mysql -h 127.0.0.1 -P 23306 -u root -p    # password from userlist in the config
+
+  它是什么
+  #
+
+
+  
+      
+          属性
+          取值
+      
+  
+  
+      
+          协议
+          MySQL 线上协议（MySQL 客户端、驱动、ORM）
+      
+      
+          存储
+          SQLite 文件，sqlite.filename
+      
+      
+          复制
+          语句经 libp2p 在对等节点之间传播
+      
+      
+          监听
+          server.addr，默认 :23306
+      
+      
+          二进制
+          bin/IceFireDB-SQLite（-c <config.yaml>）
+      
+  
+
+
+  配置（config/config.yaml）
+  #
+
+
+  
+      
+          配置项
+          含义
+          文件中的默认值
+      
+  
+  
+      
+          server.addr
+          MySQL 监听地址
+          ":23306"
+      
+      
+          sqlite.filename
+          SQLite 数据库文件
+          db/sqlite.db
+      
+      
+          debug.enable / .port
+          pprof 服务器
+          false / 17878
+      
+      
+          p2p.enable
+          P2P 复制
+          true
+      
+      
+          p2p.service_discovery_id
+          会合名，必须与其他节点一致
+          p2p_sqlite_service
+      
+      
+          p2p.service_command_topic
+          命令频道
+          p2p_sqlite_service_topic
+      
+      
+          p2p.service_discover_mode
+          advertise 或 announce
+          advertise
+      
+      
+          p2p.node_host_ip / node_host_port
+          对等节点应当拨号的地址
+          127.0.0.1 / 0
+      
+      
+          userlist
+          租户账号：user + password
+          root / 123456
+      
+  
+
+
+  运维要点
+  #
+
+
+示例密码就是 123456。 在暴露端口之前先改掉 userlist —— MySQL 客户端会很乐意用这个密码
+连上来。
+语句会在对等节点上重放，所以非确定性的 SQL（NOW()、RAND()、UUID()）可能在不同节点之间产生
+分歧。请让语句保持确定性，或者接受这种漂移。
+每个节点在自己的 SQLite 文件里保存一份完整副本；没有分片，也没有选主。
+表结构变更加和其他语句一样传播：请在安静的时刻执行，不要与写入并发。
+
+
+  与 NoSQL 引擎的关系
+  #
+
+不同的二进制、不同的协议、不同的一致性故事：没有 Raft，没有 RESP，没有共享的存储驱动。当应用本身就是
+SQL 形态、目标就是每个节点本地读时用它；当你需要 Raft 一致性和 RESP 时，用
+
+  NoSQL 引擎。'><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="IceFireDB-SQLite"><meta property="og:description" content=' IceFireDB-SQLite # 一个 MySQL 协议服务器，它把数据存放在本地 SQLite 文件中，并把语句传播给对等节点，因此每个节点 都能针对自己那份副本回答 SQL 查询。
+cd IceFireDB-SQLite make # → bin/IceFireDB-SQLite ./bin/IceFireDB-SQLite -c ./config/config.yaml mysql -h 127.0.0.1 -P 23306 -u root -p # password from userlist in the config 它是什么 # 属性 取值 协议 MySQL 线上协议（MySQL 客户端、驱动、ORM） 存储 SQLite 文件，sqlite.filename 复制 语句经 libp2p 在对等节点之间传播 监听 server.addr，默认 :23306 二进制 bin/IceFireDB-SQLite（-c <config.yaml>） 配置（config/config.yaml） # 配置项 含义 文件中的默认值 server.addr MySQL 监听地址 ":23306" sqlite.filename SQLite 数据库文件 db/sqlite.db debug.enable / .port pprof 服务器 false / 17878 p2p.enable P2P 复制 true p2p.service_discovery_id 会合名，必须与其他节点一致 p2p_sqlite_service p2p.service_command_topic 命令频道 p2p_sqlite_service_topic p2p.service_discover_mode advertise 或 announce advertise p2p.node_host_ip / node_host_port 对等节点应当拨号的地址 127.0.0.1 / 0 userlist 租户账号：user + password root / 123456 运维要点 # 示例密码就是 123456。 在暴露端口之前先改掉 userlist —— MySQL 客户端会很乐意用这个密码 连上来。 语句会在对等节点上重放，所以非确定性的 SQL（NOW()、RAND()、UUID()）可能在不同节点之间产生 分歧。请让语句保持确定性，或者接受这种漂移。 每个节点在自己的 SQLite 文件里保存一份完整副本；没有分片，也没有选主。 表结构变更加和其他语句一样传播：请在安静的时刻执行，不要与写入并发。 与 NoSQL 引擎的关系 # 不同的二进制、不同的协议、不同的一致性故事：没有 Raft，没有 RESP，没有共享的存储驱动。当应用本身就是 SQL 形态、目标就是每个节点本地读时用它；当你需要 Raft 一致性和 RESP 时，用 NoSQL 引擎。'><meta property="og:locale" content="zh"><meta property="og:type" content="website"><title>IceFireDB-SQLite | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/ title=IceFireDB-SQLite><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/index.xml title="IceFireDB 文档中心"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/ class=active>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>IceFireDB-SQLite</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#它是什么>它是什么</a></li><li><a href=#配置configconfigyaml>配置（<code>config/config.yaml</code>）</a></li><li><a href=#运维要点>运维要点</a></li><li><a href=#与-nosql-引擎的关系>与 NoSQL 引擎的关系</a></li></ul></nav></aside></header><article class=markdown><h1 id=icefiredb-sqlite>IceFireDB-SQLite
+<a class=anchor href=#icefiredb-sqlite>#</a></h1><p>一个 <strong>MySQL 协议</strong>服务器，它把数据存放在本地 SQLite 文件中，并把语句传播给对等节点，因此每个节点
+都能针对自己那份副本回答 SQL 查询。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>cd IceFireDB-SQLite
+</span></span><span style=display:flex><span>make                                 <span style=color:#75715e># → bin/IceFireDB-SQLite</span>
+</span></span><span style=display:flex><span>./bin/IceFireDB-SQLite -c ./config/config.yaml
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>mysql -h 127.0.0.1 -P <span style=color:#ae81ff>23306</span> -u root -p    <span style=color:#75715e># password from userlist in the config</span>
+</span></span></code></pre></div><h2 id=它是什么>它是什么
+<a class=anchor href=#%e5%ae%83%e6%98%af%e4%bb%80%e4%b9%88>#</a></h2><table><thead><tr><th style=text-align:left>属性</th><th style=text-align:left>取值</th></tr></thead><tbody><tr><td style=text-align:left>协议</td><td style=text-align:left>MySQL 线上协议（MySQL 客户端、驱动、ORM）</td></tr><tr><td style=text-align:left>存储</td><td style=text-align:left>SQLite 文件，<code>sqlite.filename</code></td></tr><tr><td style=text-align:left>复制</td><td style=text-align:left>语句经 libp2p 在对等节点之间传播</td></tr><tr><td style=text-align:left>监听</td><td style=text-align:left><code>server.addr</code>，默认 <code>:23306</code></td></tr><tr><td style=text-align:left>二进制</td><td style=text-align:left><code>bin/IceFireDB-SQLite</code>（<code>-c &lt;config.yaml></code>）</td></tr></tbody></table><h2 id=配置configconfigyaml>配置（<code>config/config.yaml</code>）
+<a class=anchor href=#%e9%85%8d%e7%bd%aeconfigconfigyaml>#</a></h2><table><thead><tr><th style=text-align:left>配置项</th><th style=text-align:left>含义</th><th style=text-align:left>文件中的默认值</th></tr></thead><tbody><tr><td style=text-align:left><code>server.addr</code></td><td style=text-align:left>MySQL 监听地址</td><td style=text-align:left><code>":23306"</code></td></tr><tr><td style=text-align:left><code>sqlite.filename</code></td><td style=text-align:left>SQLite 数据库文件</td><td style=text-align:left><code>db/sqlite.db</code></td></tr><tr><td style=text-align:left><code>debug.enable</code> / <code>.port</code></td><td style=text-align:left>pprof 服务器</td><td style=text-align:left><code>false</code> / <code>17878</code></td></tr><tr><td style=text-align:left><code>p2p.enable</code></td><td style=text-align:left>P2P 复制</td><td style=text-align:left><code>true</code></td></tr><tr><td style=text-align:left><code>p2p.service_discovery_id</code></td><td style=text-align:left>会合名，必须与其他节点一致</td><td style=text-align:left><code>p2p_sqlite_service</code></td></tr><tr><td style=text-align:left><code>p2p.service_command_topic</code></td><td style=text-align:left>命令频道</td><td style=text-align:left><code>p2p_sqlite_service_topic</code></td></tr><tr><td style=text-align:left><code>p2p.service_discover_mode</code></td><td style=text-align:left><code>advertise</code> 或 <code>announce</code></td><td style=text-align:left><code>advertise</code></td></tr><tr><td style=text-align:left><code>p2p.node_host_ip</code> / <code>node_host_port</code></td><td style=text-align:left>对等节点应当拨号的地址</td><td style=text-align:left><code>127.0.0.1</code> / <code>0</code></td></tr><tr><td style=text-align:left><code>userlist</code></td><td style=text-align:left>租户账号：<code>user</code> + <code>password</code></td><td style=text-align:left><code>root</code> / <code>123456</code></td></tr></tbody></table><h2 id=运维要点>运维要点
+<a class=anchor href=#%e8%bf%90%e7%bb%b4%e8%a6%81%e7%82%b9>#</a></h2><ul><li><strong>示例密码就是 <code>123456</code>。</strong> 在暴露端口之前先改掉 <code>userlist</code> —— MySQL 客户端会很乐意用这个密码
+连上来。</li><li>语句会在对等节点上重放，所以非确定性的 SQL（<code>NOW()</code>、<code>RAND()</code>、<code>UUID()</code>）可能在不同节点之间产生
+分歧。请让语句保持确定性，或者接受这种漂移。</li><li>每个节点在自己的 SQLite 文件里保存一份完整副本；没有分片，也没有选主。</li><li>表结构变更加和其他语句一样传播：请在安静的时刻执行，不要与写入并发。</li></ul><h2 id=与-nosql-引擎的关系>与 NoSQL 引擎的关系
+<a class=anchor href=#%e4%b8%8e-nosql-%e5%bc%95%e6%93%8e%e7%9a%84%e5%85%b3%e7%b3%bb>#</a></h2><p>不同的二进制、不同的协议、不同的一致性故事：没有 Raft，没有 RESP，没有共享的存储驱动。当应用本身就是
+SQL 形态、目标就是每个节点本地读时用它；当你需要 Raft 一致性和 RESP 时，用
+<a href=/icefiredb_docs/zh/overview/>NoSQL 引擎</a>。</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#它是什么>它是什么</a></li><li><a href=#配置configconfigyaml>配置（<code>config/config.yaml</code>）</a></li><li><a href=#运维要点>运维要点</a></li><li><a href=#与-nosql-引擎的关系>与 NoSQL 引擎的关系</a></li></ul></nav></div></aside></main></body></html>

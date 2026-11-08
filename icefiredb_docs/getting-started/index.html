@@ -1,0 +1,102 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content='
+  Getting started
+  #
+
+This page takes you from a clean checkout to a running node, then to a three-node cluster, and ends
+at the two things that surprise people first when they move from Redis.
+
+  Prerequisites
+  #
+
+
+Go 1.27.3+. The module declares go 1.26.0 with toolchain go1.27.3, and CI builds and tests
+on Go 1.27.3.
+make (optional — every target is a thin go build).
+A RESP client: redis-cli is enough for everything except typed scan helpers (see
+
+  Compatibility).
+
+
+  1. Build
+  #
+
+git clone https://github.com/IceFireDB/IceFireDB.git
+cd IceFireDB
+make localbuild          # → ./bin/IceFireDB
+make localbuild is go build -ldflags "-X main.BuildVersion=<git sha> -X main.BuildDate=<date>".
+make all cross-compiles the release matrix (linux amd64/arm64/armv5/armv6/armv7) — useful for
+releases, unnecessary while developing; make run and make run_dev simply go run ..'><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/getting-started/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Getting started"><meta property="og:description" content=' Getting started # This page takes you from a clean checkout to a running node, then to a three-node cluster, and ends at the two things that surprise people first when they move from Redis.
+Prerequisites # Go 1.27.3+. The module declares go 1.26.0 with toolchain go1.27.3, and CI builds and tests on Go 1.27.3. make (optional — every target is a thin go build). A RESP client: redis-cli is enough for everything except typed scan helpers (see Compatibility). 1. Build # git clone https://github.com/IceFireDB/IceFireDB.git cd IceFireDB make localbuild # → ./bin/IceFireDB make localbuild is go build -ldflags "-X main.BuildVersion=<git sha> -X main.BuildDate=<date>". make all cross-compiles the release matrix (linux amd64/arm64/armv5/armv6/armv7) — useful for releases, unnecessary while developing; make run and make run_dev simply go run ..'><meta property="og:locale" content="en"><meta property="og:type" content="website"><title>Getting started | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/ title=快速开始><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/index.xml title="IceFireDB Documentation"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/ class=active>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Getting started</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#prerequisites>Prerequisites</a></li><li><a href=#1-build>1. Build</a></li><li><a href=#2-run-one-node>2. Run one node</a></li><li><a href=#3-first-commands>3. First commands</a></li><li><a href=#4-a-three-node-cluster>4. A three-node cluster</a></li><li><a href=#5-two-things-that-are-not-redis>5. Two things that are not Redis</a></li><li><a href=#where-next>Where next</a></li></ul></nav></aside></header><article class=markdown><h1 id=getting-started>Getting started
+<a class=anchor href=#getting-started>#</a></h1><p>This page takes you from a clean checkout to a running node, then to a three-node cluster, and ends
+at the two things that surprise people first when they move from Redis.</p><h2 id=prerequisites>Prerequisites
+<a class=anchor href=#prerequisites>#</a></h2><ul><li><strong>Go 1.27.3+</strong>. The module declares <code>go 1.26.0</code> with <code>toolchain go1.27.3</code>, and CI builds and tests
+on Go 1.27.3.</li><li><code>make</code> (optional — every target is a thin <code>go build</code>).</li><li>A RESP client: <code>redis-cli</code> is enough for everything except typed scan helpers (see
+<a href=/icefiredb_docs/commands/compatibility/>Compatibility</a>).</li></ul><h2 id=1-build>1. Build
+<a class=anchor href=#1-build>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>git clone https://github.com/IceFireDB/IceFireDB.git
+</span></span><span style=display:flex><span>cd IceFireDB
+</span></span><span style=display:flex><span>make localbuild          <span style=color:#75715e># → ./bin/IceFireDB</span>
+</span></span></code></pre></div><p><code>make localbuild</code> is <code>go build -ldflags "-X main.BuildVersion=&lt;git sha> -X main.BuildDate=&lt;date>"</code>.
+<code>make all</code> cross-compiles the release matrix (linux amd64/arm64/armv5/armv6/armv7) — useful for
+releases, unnecessary while developing; <code>make run</code> and <code>make run_dev</code> simply <code>go run .</code>.</p><h2 id=2-run-one-node>2. Run one node
+<a class=anchor href=#2-run-one-node>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/IceFireDB -a 127.0.0.1:11001 -n <span style=color:#ae81ff>1</span> -d ./data -l info
+</span></span></code></pre></div><p>That is every default explicitly: the bind address is <code>127.0.0.1:11001</code>, the node ID is <code>1</code>, the data
+directory is <code>data</code>, the log level is <code>info</code>. The binary prints a banner, then
+<code>start with Storage Engine: goleveldb</code>, then the Raft section of the log.</p><p>State is written under a per-node directory, so several nodes can share one <code>-d</code>:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-text data-lang=text><span style=display:flex><span>data/
+</span></span><span style=display:flex><span>└── IceFireDB/
+</span></span><span style=display:flex><span>    └── 1/
+</span></span><span style=display:flex><span>        ├── main.db/      # the ledis storage (driver-dependent)
+</span></span><span style=display:flex><span>        ├── store/        # Raft log + stable store (leveldb or bolt, see --raft-backend)
+</span></span><span style=display:flex><span>        └── snapshots/    # Raft snapshots, one directory per snapshot ID
+</span></span></code></pre></div><h2 id=3-first-commands>3. First commands
+<a class=anchor href=#3-first-commands>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>127.0.0.1:11001&gt; SET user:1 <span style=color:#e6db74>&#39;{&#34;name&#34;:&#34;ada&#34;}&#39;</span> EX <span style=color:#ae81ff>300</span>
+</span></span><span style=display:flex><span>OK
+</span></span><span style=display:flex><span>127.0.0.1:11001&gt; GET user:1
+</span></span><span style=display:flex><span><span style=color:#e6db74>&#34;{\&#34;name\&#34;:\&#34;ada\&#34;}&#34;</span>
+</span></span><span style=display:flex><span>127.0.0.1:11001&gt; TTL user:1
+</span></span><span style=display:flex><span><span style=color:#f92672>(</span>integer<span style=color:#f92672>)</span> <span style=color:#ae81ff>299</span>
+</span></span><span style=display:flex><span>127.0.0.1:11001&gt; HSET user:1 name ada
+</span></span><span style=display:flex><span><span style=color:#f92672>(</span>integer<span style=color:#f92672>)</span> <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>127.0.0.1:11001&gt; HGET user:1 name
+</span></span><span style=display:flex><span><span style=color:#e6db74>&#34;ada&#34;</span>
+</span></span><span style=display:flex><span>127.0.0.1:11001&gt; INFO
+</span></span><span style=display:flex><span>$...
+</span></span></code></pre></div><p>Note line 4: the same key <code>user:1</code> holds a string <strong>and</strong> a hash at the same time. That is not a bug —
+see
+<a href=/icefiredb_docs/#5-two-things-that-are-not-redis>step 5</a>.</p><h2 id=4-a-three-node-cluster>4. A three-node cluster
+<a class=anchor href=#4-a-three-node-cluster>#</a></h2><p>Node 1 is the bootstrap node; nodes 2 and 3 join it with <code>-j</code>. Every node keeps its own <code>-d</code> (you can
+also share the parent directory, the node ID keeps them apart).</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># node 1 — bootstrap</span>
+</span></span><span style=display:flex><span>./bin/IceFireDB -a 127.0.0.1:11001 -n <span style=color:#ae81ff>1</span> -d ./data &amp;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># node 2 — join</span>
+</span></span><span style=display:flex><span>./bin/IceFireDB -a 127.0.0.1:11002 -n <span style=color:#ae81ff>2</span> -d ./data -j 127.0.0.1:11001 &amp;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># node 3 — join</span>
+</span></span><span style=display:flex><span>./bin/IceFireDB -a 127.0.0.1:11003 -n <span style=color:#ae81ff>3</span> -d ./data -j 127.0.0.1:11001 &amp;
+</span></span></code></pre></div><p>Check the topology from any node:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> CLUSTER INFO
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> CLUSTER NODES
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT LEADER
+</span></span></code></pre></div><p>Write to the leader, read from a follower:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> SET cluster:smoke ok      <span style=color:#75715e># leader → OK</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11002</span> GET cluster:smoke         <span style=color:#75715e># follower → -MOVED error unless --openreads</span>
+</span></span></code></pre></div><p>A follower without <code>--openreads</code> answers a redirect error rather than stale data; add <code>--openreads</code>
+when you want follower reads. Membership, snapshots and failure handling are covered in
+<a href=/icefiredb_docs/deploy/clustering/>Clustering</a>.</p><h2 id=5-two-things-that-are-not-redis>5. Two things that are not Redis
+<a class=anchor href=#5-two-things-that-are-not-redis>#</a></h2><ol><li><strong>There is no <code>WRONGTYPE</code>.</strong> The engine keeps a separate keyspace per data type, so <code>SET k v</code> and
+<code>HSET k f x</code> can both succeed, and a command for the wrong type reads that type&rsquo;s own (possibly
+empty) view instead of failing. If your application depends on <code>WRONGTYPE</code> for type safety, check
+types at the application layer.</li><li><strong>Scan cursors are opaque, and for <code>HSCAN</code> they are names.</strong> Client helpers that parse the cursor
+as an integer (go-redis&rsquo; typed <code>HScan</code>, for example) do not work; use the generic command API.</li></ol><p>Both, plus eight more divergences, are in
+<a href=/icefiredb_docs/commands/compatibility/>Compatibility</a>.</p><h2 id=where-next>Where next
+<a class=anchor href=#where-next>#</a></h2><ul><li><a href=/icefiredb_docs/deploy/configuration/>Configuration</a> — the full flag set with defaults, including TLS, auth,
+metrics and pprof.</li><li><a href=/icefiredb_docs/commands/>Command reference</a> — 110 engine commands plus the <code>RAFT</code>/<code>CLUSTER</code> system commands.</li><li><a href=/icefiredb_docs/develop/clients/>Clients</a> — copy-pasteable examples for <code>redis-cli</code>, Go, Python and Node.</li><li><a href=/icefiredb_docs/deploy/operations/>Operations</a> — backup, restore, rolling upgrade, health checks.</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#prerequisites>Prerequisites</a></li><li><a href=#1-build>1. Build</a></li><li><a href=#2-run-one-node>2. Run one node</a></li><li><a href=#3-first-commands>3. First commands</a></li><li><a href=#4-a-three-node-cluster>4. A three-node cluster</a></li><li><a href=#5-two-things-that-are-not-redis>5. Two things that are not Redis</a></li><li><a href=#where-next>Where next</a></li></ul></nav></div></aside></main></body></html>

@@ -1,0 +1,81 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  基准测试
+  #
+
+本页讲的是怎么测量这个引擎。它刻意不含任何性能数字：一个数字如果没带上产生它的 commit、硬件、存储驱动和 flag，就只是噪声。
+
+  能用的压测工具
+  #
+
+redis-benchmark 和 memtier_benchmark 都能用，因为线上协议就是 RESP。
+# baseline: one connection per request, no pipeline
+redis-benchmark -h 127.0.0.1 -p 11001 -t set,get -n 200000 -c 50
+
+# pipelined
+redis-benchmark -h 127.0.0.1 -p 11001 -t set,get -n 1000000 -c 50 -P 16
+
+# mixed, with memtier
+memtier_benchmark -s 127.0.0.1 -p 11001 --protocol=redis \
+  --clients=50 --threads=4 --ratio=1:1 --test-time=120 --key-pattern=S:S
+它们不会覆盖到的部分：
+
+  
+      
+          未覆盖
+          原因
+      
+  
+  
+      
+          SCAN/XSCAN 分页
+          没有内置负载；用脚本驱动
+      
+      
+          集群重定向
+          压测直接打主节点，否则错误计数里会出现 -MOVED
+      
+      
+          TTL 过期压力
+          给 SET 负载加上 EX，然后观察 INFO Store
+      
+      
+          Raft 应用延迟
+          写命令在多数派确认后才应答；增加节点才能看出差值
+      
+  
+
+
+  必须保持恒定的项
+  #
+
+任何结果都要连同下面这些一起记录，否则数字不可比较："><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="基准测试"><meta property="og:description" content=" 基准测试 # 本页讲的是怎么测量这个引擎。它刻意不含任何性能数字：一个数字如果没带上产生它的 commit、硬件、存储驱动和 flag，就只是噪声。
+能用的压测工具 # redis-benchmark 和 memtier_benchmark 都能用，因为线上协议就是 RESP。
+# baseline: one connection per request, no pipeline redis-benchmark -h 127.0.0.1 -p 11001 -t set,get -n 200000 -c 50 # pipelined redis-benchmark -h 127.0.0.1 -p 11001 -t set,get -n 1000000 -c 50 -P 16 # mixed, with memtier memtier_benchmark -s 127.0.0.1 -p 11001 --protocol=redis \ --clients=50 --threads=4 --ratio=1:1 --test-time=120 --key-pattern=S:S 它们不会覆盖到的部分：
+未覆盖 原因 SCAN/XSCAN 分页 没有内置负载；用脚本驱动 集群重定向 压测直接打主节点，否则错误计数里会出现 -MOVED TTL 过期压力 给 SET 负载加上 EX，然后观察 INFO Store Raft 应用延迟 写命令在多数派确认后才应答；增加节点才能看出差值 必须保持恒定的项 # 任何结果都要连同下面这些一起记录，否则数字不可比较："><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="develop"><title>基准测试 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/ title=Benchmarking><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle checked>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/ class=active>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>基准测试</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#能用的压测工具>能用的压测工具</a></li><li><a href=#必须保持恒定的项>必须保持恒定的项</a></li><li><a href=#值得跑的负载>值得跑的负载</a></li><li><a href=#压测时同时观察服务端>压测时同时观察服务端</a></li><li><a href=#反模式>反模式</a></li></ul></nav></aside></header><article class=markdown><h1 id=基准测试>基准测试
+<a class=anchor href=#%e5%9f%ba%e5%87%86%e6%b5%8b%e8%af%95>#</a></h1><p>本页讲的是<strong>怎么</strong>测量这个引擎。它刻意不含任何性能数字：一个数字如果没带上产生它的 commit、硬件、存储驱动和 flag，就只是噪声。</p><h2 id=能用的压测工具>能用的压测工具
+<a class=anchor href=#%e8%83%bd%e7%94%a8%e7%9a%84%e5%8e%8b%e6%b5%8b%e5%b7%a5%e5%85%b7>#</a></h2><p><code>redis-benchmark</code> 和 <code>memtier_benchmark</code> 都能用，因为线上协议就是 RESP。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># baseline: one connection per request, no pipeline</span>
+</span></span><span style=display:flex><span>redis-benchmark -h 127.0.0.1 -p <span style=color:#ae81ff>11001</span> -t set,get -n <span style=color:#ae81ff>200000</span> -c <span style=color:#ae81ff>50</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># pipelined</span>
+</span></span><span style=display:flex><span>redis-benchmark -h 127.0.0.1 -p <span style=color:#ae81ff>11001</span> -t set,get -n <span style=color:#ae81ff>1000000</span> -c <span style=color:#ae81ff>50</span> -P <span style=color:#ae81ff>16</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># mixed, with memtier</span>
+</span></span><span style=display:flex><span>memtier_benchmark -s 127.0.0.1 -p <span style=color:#ae81ff>11001</span> --protocol<span style=color:#f92672>=</span>redis <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --clients<span style=color:#f92672>=</span><span style=color:#ae81ff>50</span> --threads<span style=color:#f92672>=</span><span style=color:#ae81ff>4</span> --ratio<span style=color:#f92672>=</span>1:1 --test-time<span style=color:#f92672>=</span><span style=color:#ae81ff>120</span> --key-pattern<span style=color:#f92672>=</span>S:S
+</span></span></code></pre></div><p>它们<strong>不会</strong>覆盖到的部分：</p><table><thead><tr><th style=text-align:left>未覆盖</th><th style=text-align:left>原因</th></tr></thead><tbody><tr><td style=text-align:left><code>SCAN</code>/<code>XSCAN</code> 分页</td><td style=text-align:left>没有内置负载；用脚本驱动</td></tr><tr><td style=text-align:left>集群重定向</td><td style=text-align:left>压测直接打主节点，否则错误计数里会出现 <code>-MOVED</code></td></tr><tr><td style=text-align:left>TTL 过期压力</td><td style=text-align:left>给 <code>SET</code> 负载加上 <code>EX</code>，然后观察 <code>INFO Store</code></td></tr><tr><td style=text-align:left>Raft 应用延迟</td><td style=text-align:left>写命令在多数派确认后才应答；增加节点才能看出差值</td></tr></tbody></table><h2 id=必须保持恒定的项>必须保持恒定的项
+<a class=anchor href=#%e5%bf%85%e9%a1%bb%e4%bf%9d%e6%8c%81%e6%81%92%e5%ae%9a%e7%9a%84%e9%a1%b9>#</a></h2><p>任何结果都要连同下面这些一起记录，否则数字不可比较：</p><ol><li><strong>Commit</strong> —— <code>git rev-parse HEAD</code>，以及 <code>-h</code> 输出的 <code>BuildVersion</code>。</li><li><strong>存储驱动</strong> —— <code>--storage-backend</code>，对 <code>badger</code>/<code>hybriddb</code> 还要记宿主内存（这两个驱动默认以 1 GB memtable / 大缓存打开）。</li><li><strong>持久性</strong> —— <code>--nosync</code> 开或关。这通常是写入侧影响最大的单一因素。</li><li><strong>集群规模与读模式</strong> —— 1 节点 vs 3 节点；<code>--openreads</code> vs 只走主节点。</li><li><strong>客户端侧</strong> —— 连接数、流水线深度、值大小，以及客户端是否在同一台机器上（回环会把网络开销藏起来）。</li></ol><h2 id=值得跑的负载>值得跑的负载
+<a class=anchor href=#%e5%80%bc%e5%be%97%e8%b7%91%e7%9a%84%e8%b4%9f%e8%bd%bd>#</a></h2><table><thead><tr><th style=text-align:left>负载</th><th style=text-align:left>命令形态</th><th style=text-align:left>它能告诉你什么</th></tr></thead><tbody><tr><td style=text-align:left>单点写</td><td style=text-align:left><code>SET key &lt;256B></code></td><td style=text-align:left>Raft + 存储的写入路径</td></tr><tr><td style=text-align:left>单点读</td><td style=text-align:left><code>GET key</code></td><td style=text-align:left>缓存 + 存储的读取路径</td></tr><tr><td style=text-align:left>计数器</td><td style=text-align:left><code>INCR hits</code></td><td style=text-align:left>应用循环内部的读-改-写</td></tr><tr><td style=text-align:left>哈希写</td><td style=text-align:left><code>HSET k f v</code></td><td style=text-align:left>多记录编码的成本</td></tr><tr><td style=text-align:left>列表 push/pop</td><td style=text-align:left><code>RPUSH q v</code> / <code>LPOP q</code></td><td style=text-align:left>索引编码、元数据更新</td></tr><tr><td style=text-align:left>ZSet 写</td><td style=text-align:left><code>ZADD board &lt;score> m</code></td><td style=text-align:left>每个成员两条索引</td></tr><tr><td style=text-align:left>范围读</td><td style=text-align:left><code>ZRANGE board 0 100 WITHSCORES</code></td><td style=text-align:left>索引扫描效率</td></tr><tr><td style=text-align:left>大值</td><td style=text-align:left><code>SET k &lt;64KiB></code></td><td style=text-align:left>内存分配、回复体积、GC 压力</td></tr></tbody></table><h2 id=压测时同时观察服务端>压测时同时观察服务端
+<a class=anchor href=#%e5%8e%8b%e6%b5%8b%e6%97%b6%e5%90%8c%e6%97%b6%e8%a7%82%e5%af%9f%e6%9c%8d%e5%8a%a1%e7%ab%af>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>watch -n1 <span style=color:#e6db74>&#39;redis-cli -p 11001 INFO | sed -n &#34;/# Store/,/# Mem/p&#34;&#39;</span>
+</span></span><span style=display:flex><span>curl -s http://127.0.0.1:11002/metrics | grep icefiredb_connected_clients
+</span></span></code></pre></div><p><code>INFO</code> 给出进程级计数器（<code>get</code>、<code>get_missing</code>、<code>put</code>、<code>batch_commit</code> 及其总耗时），通常比压测工具自己的分位数更有信息量：吞吐平稳而 <code>batch_commit_total_time</code> 持续上升，说明瓶颈在存储设备而不是引擎。</p><h2 id=反模式>反模式
+<a class=anchor href=#%e5%8f%8d%e6%a8%a1%e5%bc%8f>#</a></h2><ul><li><strong>在没开 <code>--openreads</code> 的情况下压测从节点。</strong> 每次读都会变成一次重定向，测出来的是客户端重试循环。</li><li><strong>把 <code>--nosync</code> 的运行和持久化运行放在一起比较。</strong> 两者保证不同；要么都报，要么都不报。</li><li><strong>在吞吐测试里用 <code>LINSERT</code>/<code>LREM</code>。</strong> 它们会重建整个列表；测到的是 O(n) 重写，不是列表性能。</li><li><strong>无视应用循环。</strong> 吞吐受限于单个应用 goroutine，所以客户端线程加到某个点就不再有用；去找那个点，而不是假设它不存在。</li><li><strong>引用本页的数字。</strong> 本页故意没有任何数字。</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#能用的压测工具>能用的压测工具</a></li><li><a href=#必须保持恒定的项>必须保持恒定的项</a></li><li><a href=#值得跑的负载>值得跑的负载</a></li><li><a href=#压测时同时观察服务端>压测时同时观察服务端</a></li><li><a href=#反模式>反模式</a></li></ul></nav></div></aside></main></body></html>

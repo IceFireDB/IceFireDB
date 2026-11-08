@@ -1,0 +1,113 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  IceFireDB 是什么
+  #
+
+IceFireDB 是一个连接 web2 与 web3 存储的数据库基础设施项目。本站记录的是位于仓库根目录、用于
+构建 IceFireDB 二进制的那个组件 —— NoSQL 引擎：一个兼容 Redis 的服务器，其写入经 Raft 日志
+复制，数据存放在可插拔的 KV 驱动中。
+这两个维度彼此独立，整个设计就是如此：
+
+一致性维度 —— 一个站点（或一个可用区）内部的 Raft 集群。主节点接受写入，从节点重放日志，
+--openreads 允许从节点提供读服务。
+存储维度 —— ledis 数据模型之后的一个 store.driver.IDB 实现。它可以是本地 LSM 引擎、对象
+存储，或 P2P 复制存储。命令层并不知道具体是哪一个。
+
+其余的一切 —— RESP 接口面、按类型划分的键空间、过期时间、快照 —— 都叠加在这两个维度之上。
+redis-cli / any RESP client
+            │
+            ▼
+   RESP server (uhaha + redcon)          ← pipelining, TLS, AUTH, CLUSTER/RAFT commands
+            │
+            ▼
+   Raft log (hashicorp/raft)             ← write commands are replayed on every replica
+            │
+            ▼
+   command handlers (strings/hashes/lists/sets/zsets/scan)
+            │
+            ▼
+   ledis data model  (one keyspace per type)
+            │
+            ▼
+   driver.IDB  →  goleveldb | badger | hybriddb | oss | ipfs | ipfs-synckv | crdt | ipfs-log
+
+  产品地图
+  #
+
+
+  
+      
+          组件
+          它是什么
+          运行位置
+      
+  
+  
+      
+          NoSQL 引擎（本文档章节）
+          RESP 服务器、Raft 复制、可插拔 KV 存储
+          仓库根目录，二进制 IceFireDB
+      
+      
+          
+  IceFireDB-PubSub
+          运行在 libp2p 网络之上的 Redis PubSub 协议
+          IceFireDB-PubSub/
+      
+      
+          
+  IceFireDB-SQLite
+          面向 P2P 同步的 SQLite 文件的 MySQL 协议
+          IceFireDB-SQLite/
+      
+      
+          
+  IceFireDB-SQLProxy
+          把语句复制到 MySQL 后端的 MySQL 代理
+          IceFireDB-SQLProxy/
+      
+      
+          
+  IceFireDB-Redis-Proxy
+          把命令复制到 Redis 后端的 RESP 代理
+          IceFireDB-Redis-Proxy/
+      
+  
+
+NoSQL 引擎是本站唯一作为数据库引擎来记录的组件；四个代理属于中间件，各自在自己的配置文件中记录。"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="概览"><meta property="og:description" content=" IceFireDB 是什么 # IceFireDB 是一个连接 web2 与 web3 存储的数据库基础设施项目。本站记录的是位于仓库根目录、用于 构建 IceFireDB 二进制的那个组件 —— NoSQL 引擎：一个兼容 Redis 的服务器，其写入经 Raft 日志 复制，数据存放在可插拔的 KV 驱动中。
+这两个维度彼此独立，整个设计就是如此：
+一致性维度 —— 一个站点（或一个可用区）内部的 Raft 集群。主节点接受写入，从节点重放日志， --openreads 允许从节点提供读服务。 存储维度 —— ledis 数据模型之后的一个 store.driver.IDB 实现。它可以是本地 LSM 引擎、对象 存储，或 P2P 复制存储。命令层并不知道具体是哪一个。 其余的一切 —— RESP 接口面、按类型划分的键空间、过期时间、快照 —— 都叠加在这两个维度之上。
+redis-cli / any RESP client │ ▼ RESP server (uhaha + redcon) ← pipelining, TLS, AUTH, CLUSTER/RAFT commands │ ▼ Raft log (hashicorp/raft) ← write commands are replayed on every replica │ ▼ command handlers (strings/hashes/lists/sets/zsets/scan) │ ▼ ledis data model (one keyspace per type) │ ▼ driver.IDB → goleveldb | badger | hybriddb | oss | ipfs | ipfs-synckv | crdt | ipfs-log 产品地图 # 组件 它是什么 运行位置 NoSQL 引擎（本文档章节） RESP 服务器、Raft 复制、可插拔 KV 存储 仓库根目录，二进制 IceFireDB IceFireDB-PubSub 运行在 libp2p 网络之上的 Redis PubSub 协议 IceFireDB-PubSub/ IceFireDB-SQLite 面向 P2P 同步的 SQLite 文件的 MySQL 协议 IceFireDB-SQLite/ IceFireDB-SQLProxy 把语句复制到 MySQL 后端的 MySQL 代理 IceFireDB-SQLProxy/ IceFireDB-Redis-Proxy 把命令复制到 Redis 后端的 RESP 代理 IceFireDB-Redis-Proxy/ NoSQL 引擎是本站唯一作为数据库引擎来记录的组件；四个代理属于中间件，各自在自己的配置文件中记录。"><meta property="og:locale" content="zh"><meta property="og:type" content="website"><title>概览 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/overview/ title=Overview><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/index.xml title="IceFireDB 文档中心"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/ class=active>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>概览</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#产品地图>产品地图</a></li><li><a href=#目前已实现的部分>目前已实现的部分</a></li><li><a href=#文档其余部分在哪里>文档其余部分在哪里</a></li></ul></nav></aside></header><article class=markdown><h1 id=icefiredb-是什么>IceFireDB 是什么
+<a class=anchor href=#icefiredb-%e6%98%af%e4%bb%80%e4%b9%88>#</a></h1><p>IceFireDB 是一个连接 web2 与 web3 存储的数据库基础设施项目。本站记录的是位于仓库根目录、用于
+构建 <code>IceFireDB</code> 二进制的那个组件 —— <strong>NoSQL 引擎</strong>：一个兼容 Redis 的服务器，其写入经 Raft 日志
+复制，数据存放在可插拔的 KV 驱动中。</p><p>这两个维度彼此独立，整个设计就是如此：</p><ul><li><strong>一致性维度</strong> —— 一个站点（或一个可用区）内部的 Raft 集群。主节点接受写入，从节点重放日志，
+<code>--openreads</code> 允许从节点提供读服务。</li><li><strong>存储维度</strong> —— ledis 数据模型之后的一个 <code>store.driver.IDB</code> 实现。它可以是本地 LSM 引擎、对象
+存储，或 P2P 复制存储。命令层并不知道具体是哪一个。</li></ul><p>其余的一切 —— RESP 接口面、按类型划分的键空间、过期时间、快照 —— 都叠加在这两个维度之上。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-text data-lang=text><span style=display:flex><span>redis-cli / any RESP client
+</span></span><span style=display:flex><span>            │
+</span></span><span style=display:flex><span>            ▼
+</span></span><span style=display:flex><span>   RESP server (uhaha + redcon)          ← pipelining, TLS, AUTH, CLUSTER/RAFT commands
+</span></span><span style=display:flex><span>            │
+</span></span><span style=display:flex><span>            ▼
+</span></span><span style=display:flex><span>   Raft log (hashicorp/raft)             ← write commands are replayed on every replica
+</span></span><span style=display:flex><span>            │
+</span></span><span style=display:flex><span>            ▼
+</span></span><span style=display:flex><span>   command handlers (strings/hashes/lists/sets/zsets/scan)
+</span></span><span style=display:flex><span>            │
+</span></span><span style=display:flex><span>            ▼
+</span></span><span style=display:flex><span>   ledis data model  (one keyspace per type)
+</span></span><span style=display:flex><span>            │
+</span></span><span style=display:flex><span>            ▼
+</span></span><span style=display:flex><span>   driver.IDB  →  goleveldb | badger | hybriddb | oss | ipfs | ipfs-synckv | crdt | ipfs-log
+</span></span></code></pre></div><h2 id=产品地图>产品地图
+<a class=anchor href=#%e4%ba%a7%e5%93%81%e5%9c%b0%e5%9b%be>#</a></h2><table><thead><tr><th style=text-align:left>组件</th><th style=text-align:left>它是什么</th><th style=text-align:left>运行位置</th></tr></thead><tbody><tr><td style=text-align:left><strong>NoSQL 引擎</strong>（本文档章节）</td><td style=text-align:left>RESP 服务器、Raft 复制、可插拔 KV 存储</td><td style=text-align:left>仓库根目录，二进制 <code>IceFireDB</code></td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a></td><td style=text-align:left>运行在 libp2p 网络之上的 Redis PubSub 协议</td><td style=text-align:left><code>IceFireDB-PubSub/</code></td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a></td><td style=text-align:left>面向 P2P 同步的 SQLite 文件的 MySQL 协议</td><td style=text-align:left><code>IceFireDB-SQLite/</code></td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a></td><td style=text-align:left>把语句复制到 MySQL 后端的 MySQL 代理</td><td style=text-align:left><code>IceFireDB-SQLProxy/</code></td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a></td><td style=text-align:left>把命令复制到 Redis 后端的 RESP 代理</td><td style=text-align:left><code>IceFireDB-Redis-Proxy/</code></td></tr></tbody></table><p>NoSQL 引擎是本站唯一作为数据库引擎来记录的组件；四个代理属于中间件，各自在自己的配置文件中记录。</p><h2 id=目前已实现的部分>目前已实现的部分
+<a class=anchor href=#%e7%9b%ae%e5%89%8d%e5%b7%b2%e5%ae%9e%e7%8e%b0%e7%9a%84%e9%83%a8%e5%88%86>#</a></h2><table><thead><tr><th style=text-align:left>能力</th><th style=text-align:left>状态</th><th style=text-align:left>源码中的证据</th></tr></thead><tbody><tr><td style=text-align:left>RESP 命令面</td><td style=text-align:left>已注册 110 条命令</td><td style=text-align:left><code>strings.go</code>、<code>hashes.go</code>、<code>lists.go</code>、<code>set.go</code>、<code>sorted_sets.go</code>、<code>scan.go</code>、<code>servers.go</code></td></tr><tr><td style=text-align:left>Raft 复制 + 快照</td><td style=text-align:left>可用，有集成测试</td><td style=text-align:left><code>vendor/github.com/tidwall/uhaha</code>、<code>snapshot.go</code>、<code>integration_test.go</code></td></tr><tr><td style=text-align:left>本地存储</td><td style=text-align:left><code>goleveldb</code>（默认）、<code>badger</code>、<code>hybriddb</code></td><td style=text-align:left><code>driver/</code> + ledis <code>store/goleveldb</code></td></tr><tr><td style=text-align:left>对象存储</td><td style=text-align:left><code>oss</code>（兼容 S3）</td><td style=text-align:left><code>driver/oss</code></td></tr><tr><td style=text-align:left>去中心化存储</td><td style=text-align:left><code>ipfs</code>、<code>ipfs-synckv</code>、<code>crdt</code>、<code>ipfs-log</code></td><td style=text-align:left><code>driver/ipfs*</code>、<code>driver/crdt</code>、<code>driver/ipfs-log</code></td></tr><tr><td style=text-align:left>TLS + 集群认证令牌</td><td style=text-align:left>可用</td><td style=text-align:left><code>--tls-cert</code>、<code>--tls-key</code>、<code>--auth</code> / <code>ICEFIREDB_AUTH</code></td></tr><tr><td style=text-align:left>可观测性</td><td style=text-align:left><code>/healthz</code>、<code>/readyz</code>、<code>/metrics</code>、<code>INFO</code>、可选的 pprof</td><td style=text-align:left><code>observability.go</code>、<code>server_info.go</code></td></tr><tr><td style=text-align:left>OrbitDB 驱动</td><td style=text-align:left><strong>已禁用</strong>（在 <code>main.go</code>/<code>flags.go</code> 中被注释掉）</td><td style=text-align:left>仓库根目录</td></tr><tr><td style=text-align:left>多数据库 / <code>SELECT</code></td><td style=text-align:left>未实现 —— 只有一个逻辑数据库</td><td style=text-align:left><code>COMMAND-REFERENCE.md</code></td></tr><tr><td style=text-align:left>向量检索、NATS 消息</td><td style=text-align:left>本引擎未实现</td><td style=text-align:left>—</td></tr></tbody></table><h2 id=文档其余部分在哪里>文档其余部分在哪里
+<a class=anchor href=#%e6%96%87%e6%a1%a3%e5%85%b6%e4%bd%99%e9%83%a8%e5%88%86%e5%9c%a8%e5%93%aa%e9%87%8c>#</a></h2><ul><li><a href=/icefiredb_docs/zh/getting-started/>快速开始</a> —— 构建、运行、第一批命令、三节点集群。</li><li><a href=/icefiredb_docs/zh/deploy/>部署</a> —— 配置、集群、存储驱动、安全、可观测性、运维。</li><li><a href=/icefiredb_docs/zh/commands/>命令参考</a> —— 每一条已注册命令，以及 Raft/CLUSTER 系统命令。</li><li><a href=/icefiredb_docs/zh/architecture/>架构</a> —— 协议、网络、存储与编解码层按其当前实际构建方式记录。</li><li><a href=/icefiredb_docs/zh/develop/>开发</a> —— 客户端、构建、测试、基准测试、生态库。</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#产品地图>产品地图</a></li><li><a href=#目前已实现的部分>目前已实现的部分</a></li><li><a href=#文档其余部分在哪里>文档其余部分在哪里</a></li></ul></nav></div></aside></main></body></html>

@@ -1,0 +1,100 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  Develop
+  #
+
+
+  
+      
+          Page
+          Contents
+      
+  
+  
+      
+          
+  Clients
+          Working examples for redis-cli, Go, Python and Node — including the scan caveats
+      
+      
+          
+  Building and testing
+          Make targets, build tags, driver matrix, what CI runs
+      
+      
+          
+  Benchmarking
+          redis-benchmark, memtier, and what the numbers do and do not mean
+      
+      
+          
+  Ecosystem
+          icefiredb-crdt-kv, icefiredb-ipfs-log, proxies, redhub
+      
+  
+
+
+  Ground rules for contributions
+  #
+
+
+A handler change ships with a test that fails when the rule it protects is broken; acceptance of two
+outcomes (err == nil || err == redis.Nil) is not a test.
+Every registered command answers to the nine-point audit in COMMAND-AUDIT.md (replication class,
+determinism, storage behaviour, reply type, bounds, validation-before-write, expiry arithmetic,
+cursor monotonicity, test coverage).
+A behaviour change updates the document that states it: command pages here, COMPATIBILITY.md for
+divergences, COMMAND-AUDIT.md for the audit ledger.
+Commit messages follow the repository convention, e.g.
+feat(compat): add Redis-compatible SET options, list/set commands and SCAN, and carry a
+Signed-off-by line (git commit -s).
+
+
+  Where things live
+  #
+
+.
+├── main.go              # wiring: flags → storage → raft
+├── flags.go             # every CLI flag and its validation
+├── strings.go           # SET family, counters, bits, expiry
+├── hashes.go lists.go set.go sorted_sets.go
+├── scan.go              # SCAN/HSCAN/SSCAN/ZSCAN + X* family
+├── servers.go           # INFO, FLUSHALL, FLUSHDB
+├── snapshot.go          # raft snapshot/restore over driver.IDB
+├── observability.go     # /healthz /readyz /metrics
+├── server_info.go       # INFO sections
+├── driver/              # badger, crdt, hybriddb, ipfs, ipfs-log, ipfs-synckv, oss
+├── *_test.go            # unit + integration (+ compat/-tags alltest)
+└── docs/superpowers/    # internal plans, not user documentation
+"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/develop/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Develop"><meta property="og:description" content=" Develop # Page Contents Clients Working examples for redis-cli, Go, Python and Node — including the scan caveats Building and testing Make targets, build tags, driver matrix, what CI runs Benchmarking redis-benchmark, memtier, and what the numbers do and do not mean Ecosystem icefiredb-crdt-kv, icefiredb-ipfs-log, proxies, redhub Ground rules for contributions # A handler change ships with a test that fails when the rule it protects is broken; acceptance of two outcomes (err == nil || err == redis.Nil) is not a test. Every registered command answers to the nine-point audit in COMMAND-AUDIT.md (replication class, determinism, storage behaviour, reply type, bounds, validation-before-write, expiry arithmetic, cursor monotonicity, test coverage). A behaviour change updates the document that states it: command pages here, COMPATIBILITY.md for divergences, COMMAND-AUDIT.md for the audit ledger. Commit messages follow the repository convention, e.g. feat(compat): add Redis-compatible SET options, list/set commands and SCAN, and carry a Signed-off-by line (git commit -s). Where things live # . ├── main.go # wiring: flags → storage → raft ├── flags.go # every CLI flag and its validation ├── strings.go # SET family, counters, bits, expiry ├── hashes.go lists.go set.go sorted_sets.go ├── scan.go # SCAN/HSCAN/SSCAN/ZSCAN + X* family ├── servers.go # INFO, FLUSHALL, FLUSHDB ├── snapshot.go # raft snapshot/restore over driver.IDB ├── observability.go # /healthz /readyz /metrics ├── server_info.go # INFO sections ├── driver/ # badger, crdt, hybriddb, ipfs, ipfs-log, ipfs-synckv, oss ├── *_test.go # unit + integration (+ compat/-tags alltest) └── docs/superpowers/ # internal plans, not user documentation "><meta property="og:locale" content="en"><meta property="og:type" content="website"><title>Develop | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ title=开发><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/develop/index.xml title="IceFireDB Documentation"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle checked>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ class=active>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Develop</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#ground-rules-for-contributions>Ground rules for contributions</a></li><li><a href=#where-things-live>Where things live</a></li></ul></nav></aside></header><article class=markdown><h1 id=develop>Develop
+<a class=anchor href=#develop>#</a></h1><table><thead><tr><th style=text-align:left>Page</th><th style=text-align:left>Contents</th></tr></thead><tbody><tr><td style=text-align:left><a href=/icefiredb_docs/develop/clients/>Clients</a></td><td style=text-align:left>Working examples for <code>redis-cli</code>, Go, Python and Node — including the scan caveats</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/develop/building-and-testing/>Building and testing</a></td><td style=text-align:left>Make targets, build tags, driver matrix, what CI runs</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/develop/benchmarking/>Benchmarking</a></td><td style=text-align:left><code>redis-benchmark</code>, memtier, and what the numbers do and do not mean</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/develop/ecosystem/>Ecosystem</a></td><td style=text-align:left><code>icefiredb-crdt-kv</code>, <code>icefiredb-ipfs-log</code>, proxies, <code>redhub</code></td></tr></tbody></table><h2 id=ground-rules-for-contributions>Ground rules for contributions
+<a class=anchor href=#ground-rules-for-contributions>#</a></h2><ul><li>A handler change ships with a test that fails when the rule it protects is broken; acceptance of two
+outcomes (<code>err == nil || err == redis.Nil</code>) is not a test.</li><li>Every registered command answers to the nine-point audit in <code>COMMAND-AUDIT.md</code> (replication class,
+determinism, storage behaviour, reply type, bounds, validation-before-write, expiry arithmetic,
+cursor monotonicity, test coverage).</li><li>A behaviour change updates the document that states it: command pages here, <code>COMPATIBILITY.md</code> for
+divergences, <code>COMMAND-AUDIT.md</code> for the audit ledger.</li><li>Commit messages follow the repository convention, e.g.
+<code>feat(compat): add Redis-compatible SET options, list/set commands and SCAN</code>, and carry a
+<code>Signed-off-by</code> line (<code>git commit -s</code>).</li></ul><h2 id=where-things-live>Where things live
+<a class=anchor href=#where-things-live>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-text data-lang=text><span style=display:flex><span>.
+</span></span><span style=display:flex><span>├── main.go              # wiring: flags → storage → raft
+</span></span><span style=display:flex><span>├── flags.go             # every CLI flag and its validation
+</span></span><span style=display:flex><span>├── strings.go           # SET family, counters, bits, expiry
+</span></span><span style=display:flex><span>├── hashes.go lists.go set.go sorted_sets.go
+</span></span><span style=display:flex><span>├── scan.go              # SCAN/HSCAN/SSCAN/ZSCAN + X* family
+</span></span><span style=display:flex><span>├── servers.go           # INFO, FLUSHALL, FLUSHDB
+</span></span><span style=display:flex><span>├── snapshot.go          # raft snapshot/restore over driver.IDB
+</span></span><span style=display:flex><span>├── observability.go     # /healthz /readyz /metrics
+</span></span><span style=display:flex><span>├── server_info.go       # INFO sections
+</span></span><span style=display:flex><span>├── driver/              # badger, crdt, hybriddb, ipfs, ipfs-log, ipfs-synckv, oss
+</span></span><span style=display:flex><span>├── *_test.go            # unit + integration (+ compat/-tags alltest)
+</span></span><span style=display:flex><span>└── docs/superpowers/    # internal plans, not user documentation
+</span></span></code></pre></div></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#ground-rules-for-contributions>Ground rules for contributions</a></li><li><a href=#where-things-live>Where things live</a></li></ul></nav></div></aside></main></body></html>

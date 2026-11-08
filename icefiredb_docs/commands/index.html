@@ -1,0 +1,182 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  Command reference
+  #
+
+Every command the engine registers, grouped by data type. The table below is the whole surface: 110
+commands, plus the 
+  system commands (RAFT, CLUSTER, MACHINE,
+BARRIER, AUTH, …) that the Raft/RESP layer answers.
+
+  
+      
+          Page
+          Commands
+          Count
+      
+  
+  
+      
+          
+  Strings
+          SET … BITPOS, expiry
+          26
+      
+      
+          
+  Hashes
+          HSET … HMCLEAR, expiry
+          19
+      
+      
+          
+  Lists
+          LPUSH … LREM, expiry
+          18
+      
+      
+          
+  Sets
+          SADD … SPERSIST
+          21
+      
+      
+          
+  Sorted sets
+          ZADD … ZCLEAR
+          15
+      
+      
+          
+  Scan
+          SCAN/HSCAN/SSCAN/ZSCAN + the X* family
+          8
+      
+      
+          
+  Server
+          INFO, FLUSHALL, FLUSHDB
+          3
+      
+      
+          
+  Compatibility
+          divergences from Redis, with reasons
+          —
+      
+  
+
+
+  Notation
+  #
+
+
+  
+      
+          Notation
+          Meaning
+      
+  
+  
+      
+          KEY
+          Binary-safe key name, up to 1024 bytes (ledis MaxKeySize; empty keys are rejected)
+      
+      
+          VALUE
+          Binary-safe value, up to 1 GiB (MaxValueSize)
+      
+      
+          [ARG]
+          Optional argument
+      
+      
+          ARG...
+          One or more repetitions
+      
+      
+          A | B
+          Alternative
+      
+      
+          R / W
+          Read command (runs locally) / write command (replicated through the Raft log)
+      
+      
+          integer
+          RESP integer :1
+      
+      
+          bulk
+          RESP bulk string $3 foo
+      
+      
+          null
+          RESP null bulk $-1, &ldquo;no such value&rdquo;
+      
+      
+          array
+          RESP array *2 …
+      
+      
+          +OK
+          RESP simple string
+      
+  
+
+
+  Rules that apply to every command
+  #
+
+
+One keyspace per data type. A key can hold a string and a hash and a list at the same time.
+A command for the wrong type operates on that type&rsquo;s own (possibly empty) view instead of answering
+WRONGTYPE. See 
+  Compatibility.
+Expiration is per type. EXPIRE/TTL apply to the string; HEXPIRE/HTTL to the hash;
+LEXPIRE/LTTL to the list; SEXPIRE/STTL/SPERSIST to the set. Sorted sets have no TTL
+command. TTLs are whole seconds; -1 means &ldquo;no expiration&rdquo; and is also what an expired key reports.
+Scores are 64-bit integers, not floats.
+Counts and paging are bounded. COUNT is capped at 10000, |count| on SRANDMEMBER at
+1048576.
+Writes are replayed on every replica, so their result must be identical cluster-wide — that is
+why e.g. SPOP picks deterministically.
+Errors are RESP errors (-ERR …). -WRONGTYPE is never produced. A follower that may not serve
+a read answers -MOVED (or -TRY with --try-errors).
+
+
+  Read/write classes, and why they matter
+  #
+
+R means the handler is registered with conf.AddReadCommand: it executes on the node that receives
+it, against whatever state that node has applied. W means conf.AddWriteCommand: it is serialised
+through the Raft log and applied on every node."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/commands/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Command reference"><meta property="og:description" content=" Command reference # Every command the engine registers, grouped by data type. The table below is the whole surface: 110 commands, plus the system commands (RAFT, CLUSTER, MACHINE, BARRIER, AUTH, …) that the Raft/RESP layer answers.
+Page Commands Count Strings SET … BITPOS, expiry 26 Hashes HSET … HMCLEAR, expiry 19 Lists LPUSH … LREM, expiry 18 Sets SADD … SPERSIST 21 Sorted sets ZADD … ZCLEAR 15 Scan SCAN/HSCAN/SSCAN/ZSCAN + the X* family 8 Server INFO, FLUSHALL, FLUSHDB 3 Compatibility divergences from Redis, with reasons — Notation # Notation Meaning KEY Binary-safe key name, up to 1024 bytes (ledis MaxKeySize; empty keys are rejected) VALUE Binary-safe value, up to 1 GiB (MaxValueSize) [ARG] Optional argument ARG... One or more repetitions A | B Alternative R / W Read command (runs locally) / write command (replicated through the Raft log) integer RESP integer :1 bulk RESP bulk string $3 foo null RESP null bulk $-1, “no such value” array RESP array *2 … +OK RESP simple string Rules that apply to every command # One keyspace per data type. A key can hold a string and a hash and a list at the same time. A command for the wrong type operates on that type’s own (possibly empty) view instead of answering WRONGTYPE. See Compatibility. Expiration is per type. EXPIRE/TTL apply to the string; HEXPIRE/HTTL to the hash; LEXPIRE/LTTL to the list; SEXPIRE/STTL/SPERSIST to the set. Sorted sets have no TTL command. TTLs are whole seconds; -1 means “no expiration” and is also what an expired key reports. Scores are 64-bit integers, not floats. Counts and paging are bounded. COUNT is capped at 10000, |count| on SRANDMEMBER at 1048576. Writes are replayed on every replica, so their result must be identical cluster-wide — that is why e.g. SPOP picks deterministically. Errors are RESP errors (-ERR …). -WRONGTYPE is never produced. A follower that may not serve a read answers -MOVED (or -TRY with --try-errors). Read/write classes, and why they matter # R means the handler is registered with conf.AddReadCommand: it executes on the node that receives it, against whatever state that node has applied. W means conf.AddWriteCommand: it is serialised through the Raft log and applied on every node."><meta property="og:locale" content="en"><meta property="og:type" content="website"><title>Command reference | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/ title=命令参考><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/commands/index.xml title="IceFireDB Documentation"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle checked>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/ class=active>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Command reference</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#notation>Notation</a></li><li><a href=#rules-that-apply-to-every-command>Rules that apply to every command</a></li><li><a href=#readwrite-classes-and-why-they-matter>Read/write classes, and why they matter</a></li><li><a href=#reply-types>Reply types</a></li><li><a href=#limits>Limits</a></li></ul></nav></aside></header><article class=markdown><h1 id=command-reference>Command reference
+<a class=anchor href=#command-reference>#</a></h1><p>Every command the engine registers, grouped by data type. The table below is the whole surface: 110
+commands, plus the
+<a href=/icefiredb_docs/deploy/system-commands/>system commands</a> (<code>RAFT</code>, <code>CLUSTER</code>, <code>MACHINE</code>,
+<code>BARRIER</code>, <code>AUTH</code>, …) that the Raft/RESP layer answers.</p><table><thead><tr><th style=text-align:left>Page</th><th style=text-align:left>Commands</th><th style=text-align:left>Count</th></tr></thead><tbody><tr><td style=text-align:left><a href=/icefiredb_docs/commands/strings/>Strings</a></td><td style=text-align:left><code>SET</code> … <code>BITPOS</code>, expiry</td><td style=text-align:left>26</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/commands/hashes/>Hashes</a></td><td style=text-align:left><code>HSET</code> … <code>HMCLEAR</code>, expiry</td><td style=text-align:left>19</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/commands/lists/>Lists</a></td><td style=text-align:left><code>LPUSH</code> … <code>LREM</code>, expiry</td><td style=text-align:left>18</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/commands/sets/>Sets</a></td><td style=text-align:left><code>SADD</code> … <code>SPERSIST</code></td><td style=text-align:left>21</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></td><td style=text-align:left><code>ZADD</code> … <code>ZCLEAR</code></td><td style=text-align:left>15</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/commands/scan/>Scan</a></td><td style=text-align:left><code>SCAN</code>/<code>HSCAN</code>/<code>SSCAN</code>/<code>ZSCAN</code> + the <code>X*</code> family</td><td style=text-align:left>8</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/commands/server/>Server</a></td><td style=text-align:left><code>INFO</code>, <code>FLUSHALL</code>, <code>FLUSHDB</code></td><td style=text-align:left>3</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/commands/compatibility/>Compatibility</a></td><td style=text-align:left>divergences from Redis, with reasons</td><td style=text-align:left>—</td></tr></tbody></table><h2 id=notation>Notation
+<a class=anchor href=#notation>#</a></h2><table><thead><tr><th style=text-align:left>Notation</th><th style=text-align:left>Meaning</th></tr></thead><tbody><tr><td style=text-align:left><code>KEY</code></td><td style=text-align:left>Binary-safe key name, up to 1024 bytes (ledis <code>MaxKeySize</code>; empty keys are rejected)</td></tr><tr><td style=text-align:left><code>VALUE</code></td><td style=text-align:left>Binary-safe value, up to 1 GiB (<code>MaxValueSize</code>)</td></tr><tr><td style=text-align:left><code>[ARG]</code></td><td style=text-align:left>Optional argument</td></tr><tr><td style=text-align:left><code>ARG...</code></td><td style=text-align:left>One or more repetitions</td></tr><tr><td style=text-align:left><code>A | B</code></td><td style=text-align:left>Alternative</td></tr><tr><td style=text-align:left><strong>R</strong> / <strong>W</strong></td><td style=text-align:left>Read command (runs locally) / write command (replicated through the Raft log)</td></tr><tr><td style=text-align:left><code>integer</code></td><td style=text-align:left>RESP integer <code>:1</code></td></tr><tr><td style=text-align:left><code>bulk</code></td><td style=text-align:left>RESP bulk string <code>$3 foo</code></td></tr><tr><td style=text-align:left><code>null</code></td><td style=text-align:left>RESP null bulk <code>$-1</code>, &ldquo;no such value&rdquo;</td></tr><tr><td style=text-align:left><code>array</code></td><td style=text-align:left>RESP array <code>*2 …</code></td></tr><tr><td style=text-align:left><code>+OK</code></td><td style=text-align:left>RESP simple string</td></tr></tbody></table><h2 id=rules-that-apply-to-every-command>Rules that apply to every command
+<a class=anchor href=#rules-that-apply-to-every-command>#</a></h2><ol><li><strong>One keyspace per data type.</strong> A key can hold a string <em>and</em> a hash <em>and</em> a list at the same time.
+A command for the wrong type operates on that type&rsquo;s own (possibly empty) view instead of answering
+<code>WRONGTYPE</code>. See
+<a href=/icefiredb_docs/commands/compatibility/>Compatibility</a>.</li><li><strong>Expiration is per type.</strong> <code>EXPIRE</code>/<code>TTL</code> apply to the string; <code>HEXPIRE</code>/<code>HTTL</code> to the hash;
+<code>LEXPIRE</code>/<code>LTTL</code> to the list; <code>SEXPIRE</code>/<code>STTL</code>/<code>SPERSIST</code> to the set. Sorted sets have no TTL
+command. TTLs are whole seconds; <code>-1</code> means &ldquo;no expiration&rdquo; and is also what an expired key reports.</li><li><strong>Scores are 64-bit integers</strong>, not floats.</li><li><strong>Counts and paging are bounded.</strong> <code>COUNT</code> is capped at 10000, <code>|count|</code> on <code>SRANDMEMBER</code> at
+1048576.</li><li><strong>Writes are replayed on every replica</strong>, so their result must be identical cluster-wide — that is
+why e.g. <code>SPOP</code> picks deterministically.</li><li><strong>Errors are RESP errors</strong> (<code>-ERR …</code>). <code>-WRONGTYPE</code> is never produced. A follower that may not serve
+a read answers <code>-MOVED</code> (or <code>-TRY</code> with <code>--try-errors</code>).</li></ol><h2 id=readwrite-classes-and-why-they-matter>Read/write classes, and why they matter
+<a class=anchor href=#readwrite-classes-and-why-they-matter>#</a></h2><p><code>R</code> means the handler is registered with <code>conf.AddReadCommand</code>: it executes on the node that receives
+it, against whatever state that node has applied. <code>W</code> means <code>conf.AddWriteCommand</code>: it is serialised
+through the Raft log and applied on every node.</p><p>Three sorted-set commands are registered as <strong>reads</strong> although they mutate:</p><table><thead><tr><th style=text-align:left>Command</th><th style=text-align:left>Registered as</th><th style=text-align:left>Effect in a cluster</th></tr></thead><tbody><tr><td style=text-align:left><code>ZINCRBY</code></td><td style=text-align:left>R</td><td style=text-align:left>Mutates the local node only — not replicated, lost on leader change</td></tr><tr><td style=text-align:left><code>ZREMRANGEBYRANK</code></td><td style=text-align:left>R</td><td style=text-align:left>Same</td></tr><tr><td style=text-align:left><code>ZREMRANGEBYSCORE</code></td><td style=text-align:left>R</td><td style=text-align:left>Same</td></tr></tbody></table><p>Until that changes, use <code>ZADD</code> with a computed score, and delete members with <code>ZREM</code>.</p><h2 id=reply-types>Reply types
+<a class=anchor href=#reply-types>#</a></h2><p>Handlers return Go values that the RESP layer maps directly:</p><table><thead><tr><th style=text-align:left>Handler returns</th><th style=text-align:left>Client sees</th></tr></thead><tbody><tr><td style=text-align:left><code>nil</code></td><td style=text-align:left>null bulk (<code>$-1</code>)</td></tr><tr><td style=text-align:left><code>[]byte</code></td><td style=text-align:left>bulk string</td></tr><tr><td style=text-align:left><code>[][]byte</code>, <code>[]string</code></td><td style=text-align:left>array</td></tr><tr><td style=text-align:left><code>redcon.SimpleString</code></td><td style=text-align:left>simple string (<code>+OK</code>)</td></tr><tr><td style=text-align:left><code>redcon.SimpleInt</code>, <code>int64</code></td><td style=text-align:left>integer</td></tr><tr><td style=text-align:left><code>error</code></td><td style=text-align:left>error reply (<code>-ERR …</code>)</td></tr></tbody></table><p>A simple string cannot carry <code>\r\n</code>, so values are never returned as one.</p><h2 id=limits>Limits
+<a class=anchor href=#limits>#</a></h2><table><thead><tr><th style=text-align:left>Limit</th><th style=text-align:left>Value</th></tr></thead><tbody><tr><td style=text-align:left>Key size</td><td style=text-align:left>1024 bytes (<code>ledis.MaxKeySize</code>); an empty key is rejected</td></tr><tr><td style=text-align:left>Hash field / set member / zset member</td><td style=text-align:left>1024 bytes each</td></tr><tr><td style=text-align:left>Value size</td><td style=text-align:left>1 GiB (<code>ledis.MaxValueSize</code>)</td></tr><tr><td style=text-align:left><code>COUNT</code> on any scan</td><td style=text-align:left>10000, clamped; still only a hint</td></tr><tr><td style=text-align:left><code>SRANDMEMBER</code> / <code>SPOP</code> count</td><td style=text-align:left>absolute value ≤ 1048576; <code>SPOP</code> clamps to set size</td></tr><tr><td style=text-align:left>Expiration</td><td style=text-align:left>whole seconds; <code>PX</code> rounds up; unrepresentable <code>EX</code> is refused</td></tr><tr><td style=text-align:left>Databases</td><td style=text-align:left>1 (<code>SELECT</code> unimplemented)</td></tr><tr><td style=text-align:left>Blocking commands</td><td style=text-align:left>none (<code>BLPOP</code>/<code>BRPOP</code> are not registered)</td></tr></tbody></table></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#notation>Notation</a></li><li><a href=#rules-that-apply-to-every-command>Rules that apply to every command</a></li><li><a href=#readwrite-classes-and-why-they-matter>Read/write classes, and why they matter</a></li><li><a href=#reply-types>Reply types</a></li><li><a href=#limits>Limits</a></li></ul></nav></div></aside></main></body></html>

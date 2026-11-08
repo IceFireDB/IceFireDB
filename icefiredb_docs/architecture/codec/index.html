@@ -1,0 +1,79 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  Codec layer
+  #
+
+The &ldquo;codec&rdquo; in this engine is the mapping between protocol-level structures and the KV pairs ledis
+writes. It is not a serialization format you can choose — it is fixed by ledis and visible only through
+side effects such as key limits, ordering and migration.
+
+  What gets encoded
+  #
+
+
+  
+      
+          Logical operation
+          Physical operations
+      
+  
+  
+      
+          SET k v
+          Put(KVType + k, v)
+      
+      
+          HSET k f v
+          Put(HashType + k + f, v), IncrBy(HSizeType + k, 1) on a new field
+      
+      
+          RPUSH k v
+          Put(ListType + k + index, v), update LMetaType + k (head, tail, count)
+      
+      
+          SADD k m
+          Put(SetType + k + m, nil), IncrBy(SSizeType + k, 1)
+      
+      
+          ZADD k score m
+          Put(ZSetType + k + m, score), Put(ZScoreType + k + score + m, nil), size counter
+      
+      
+          EXPIRE k s
+          Put(ExpTimeType + k, timestamp), Put(ExpMetaType + k, …)
+      
+  
+
+Deletes are the inverse: a hash field delete removes one HashType record and decrements the size
+counter, while HCLEAR walks them all and removes the counters and expiry records too."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Codec"><meta property="og:description" content=" Codec layer # The “codec” in this engine is the mapping between protocol-level structures and the KV pairs ledis writes. It is not a serialization format you can choose — it is fixed by ledis and visible only through side effects such as key limits, ordering and migration.
+What gets encoded # Logical operation Physical operations SET k v Put(KVType + k, v) HSET k f v Put(HashType + k + f, v), IncrBy(HSizeType + k, 1) on a new field RPUSH k v Put(ListType + k + index, v), update LMetaType + k (head, tail, count) SADD k m Put(SetType + k + m, nil), IncrBy(SSizeType + k, 1) ZADD k score m Put(ZSetType + k + m, score), Put(ZScoreType + k + score + m, nil), size counter EXPIRE k s Put(ExpTimeType + k, timestamp), Put(ExpMetaType + k, …) Deletes are the inverse: a hash field delete removes one HashType record and decrements the size counter, while HCLEAR walks them all and removes the counters and expiry records too."><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="article:section" content="architecture"><title>Codec | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/ title=编解码><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle checked>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/ class=active>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Codec</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#what-gets-encoded>What gets encoded</a></li><li><a href=#why-the-type-byte-matters>Why the type byte matters</a></li><li><a href=#ordering-guarantees-that-fall-out-of-the-encoding>Ordering guarantees that fall out of the encoding</a></li><li><a href=#values-are-opaque>Values are opaque</a></li><li><a href=#migration-implications>Migration implications</a></li></ul></nav></aside></header><article class=markdown><h1 id=codec-layer>Codec layer
+<a class=anchor href=#codec-layer>#</a></h1><p>The &ldquo;codec&rdquo; in this engine is the mapping between protocol-level structures and the KV pairs ledis
+writes. It is not a serialization format you can choose — it is fixed by ledis and visible only through
+side effects such as key limits, ordering and migration.</p><h2 id=what-gets-encoded>What gets encoded
+<a class=anchor href=#what-gets-encoded>#</a></h2><table><thead><tr><th style=text-align:left>Logical operation</th><th style=text-align:left>Physical operations</th></tr></thead><tbody><tr><td style=text-align:left><code>SET k v</code></td><td style=text-align:left><code>Put(KVType + k, v)</code></td></tr><tr><td style=text-align:left><code>HSET k f v</code></td><td style=text-align:left><code>Put(HashType + k + f, v)</code>, <code>IncrBy(HSizeType + k, 1)</code> on a new field</td></tr><tr><td style=text-align:left><code>RPUSH k v</code></td><td style=text-align:left><code>Put(ListType + k + index, v)</code>, update <code>LMetaType + k</code> (head, tail, count)</td></tr><tr><td style=text-align:left><code>SADD k m</code></td><td style=text-align:left><code>Put(SetType + k + m, nil)</code>, <code>IncrBy(SSizeType + k, 1)</code></td></tr><tr><td style=text-align:left><code>ZADD k score m</code></td><td style=text-align:left><code>Put(ZSetType + k + m, score)</code>, <code>Put(ZScoreType + k + score + m, nil)</code>, size counter</td></tr><tr><td style=text-align:left><code>EXPIRE k s</code></td><td style=text-align:left><code>Put(ExpTimeType + k, timestamp)</code>, <code>Put(ExpMetaType + k, …)</code></td></tr></tbody></table><p>Deletes are the inverse: a hash field delete removes one <code>HashType</code> record and decrements the size
+counter, while <code>HCLEAR</code> walks them all and removes the counters and expiry records too.</p><h2 id=why-the-type-byte-matters>Why the type byte matters
+<a class=anchor href=#why-the-type-byte-matters>#</a></h2><p>Because the type is part of the storage key, two types never collide, and no type check is needed on
+read: <code>GET k</code> simply looks up <code>KVType + k</code> and returns nil if it is absent, even if a hash exists under
+<code>HashType + k</code>. That is the mechanical reason there is no <code>WRONGTYPE</code> — and why you cannot ask a key for
+its type.</p><h2 id=ordering-guarantees-that-fall-out-of-the-encoding>Ordering guarantees that fall out of the encoding
+<a class=anchor href=#ordering-guarantees-that-fall-out-of-the-encoding>#</a></h2><ul><li><strong>Sorted sets</strong> are ordered by the encoded score record: sign separator, then big-endian score, then
+member. Range queries are index scans, and equal scores sort by member.</li><li><strong>Lists</strong> are ordered by a <code>uint32</code> index with a head/tail metadata record, so <code>LPUSH</code> and <code>RPUSH</code> are
+both O(1) and <code>LINDEX</code> is a direct lookup — but <code>LINSERT</code>/<code>LREM</code> rewrite the whole range.</li><li><strong>Sets and hashes</strong> have no inherent order: iteration is physical key order of the backend, which is
+why reply order differs between <code>goleveldb</code> and <code>badger</code> and must not be relied on.</li></ul><h2 id=values-are-opaque>Values are opaque
+<a class=anchor href=#values-are-opaque>#</a></h2><p>The codec never interprets values. A string value is the bytes you sent; a hash field value likewise.
+Compression, encryption and content addressing are driver concerns (<code>ipfs-synckv</code> encrypts, <code>ipfs</code>
+addresses by CID, <code>badger</code> compresses blocks). This is why <code>--storage-backend</code> changes durability and
+privacy but never command semantics.</p><h2 id=migration-implications>Migration implications
+<a class=anchor href=#migration-implications>#</a></h2><ul><li>The encoding is stable across releases in this tree; changing it would break on-disk compatibility and
+is why the ledger of storage behaviours in <code>COMMAND-AUDIT.md</code> is treated as a contract.</li><li>Snapshots are <strong>not</strong> encoded: <code>writeSnapshot</code> streams raw physical key/value pairs, so a restore
+depends on the same ledis encoding being present in the target binary. Back up across versions with
+that in mind: restore with a binary whose ledis layer matches the snapshot&rsquo;s.</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#what-gets-encoded>What gets encoded</a></li><li><a href=#why-the-type-byte-matters>Why the type byte matters</a></li><li><a href=#ordering-guarantees-that-fall-out-of-the-encoding>Ordering guarantees that fall out of the encoding</a></li><li><a href=#values-are-opaque>Values are opaque</a></li><li><a href=#migration-implications>Migration implications</a></li></ul></nav></div></aside></main></body></html>

@@ -1,0 +1,1936 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>文档 on IceFireDB 文档中心</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/</link><description>Recent content in 文档 on IceFireDB 文档中心</description><generator>Hugo</generator><language>zh</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/zh/index.xml" rel="self" type="application/rss+xml"/><item><title>概览</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/</guid><description>&lt;h1 id="引擎概览">
+ 引擎概览
+ &lt;a class="anchor" href="#%e5%bc%95%e6%93%8e%e6%a6%82%e8%a7%88">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="启动顺序">
+ 启动顺序
+ &lt;a class="anchor" href="#%e5%90%af%e5%8a%a8%e9%a1%ba%e5%ba%8f">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>main()&lt;/code> 做的工作很少而且固定，顺序很关键：&lt;/p>
+&lt;ol>
+&lt;li>&lt;code>godotenv.Load()&lt;/code> —— 如果存在 &lt;code>.env&lt;/code> 就加载它。&lt;/li>
+&lt;li>&lt;code>confInit(&amp;amp;conf)&lt;/code> —— 解析 flag，从环境变量解析 &lt;code>--auth&lt;/code>，校验 TLS 配对与 &lt;code>--advertise&lt;/code>，
+把 &lt;code>--raft-backend&lt;/code> 映射为 &lt;code>leveldb&lt;/code>/&lt;code>bolt&lt;/code>。&lt;/li>
+&lt;li>注册 &lt;code>conf.DataDirReady&lt;/code> 回调：当 Raft 层准备好节点目录后，它打开存储驱动（&lt;code>openStorage&lt;/code>）并发布 &lt;code>ldb&lt;/code>。&lt;strong>命令处理器只有在这之后才可用&lt;/strong>，&lt;code>/readyz&lt;/code> 就是为此存在的。&lt;/li>
+&lt;li>后端指标注册到 &lt;code>INFO&lt;/code> 采集器（&lt;code>hybriddb&lt;/code>、&lt;code>ipfs&lt;/code>、&lt;code>ipfs-synckv&lt;/code>）。&lt;/li>
+&lt;li>如已启用，启动 &lt;code>--pprof&lt;/code> 与 &lt;code>--metrics&lt;/code> 服务器——两者都是跑在 goroutine 里的普通 &lt;code>net/http&lt;/code> 服务器。&lt;/li>
+&lt;li>把 &lt;code>conf.Snapshot&lt;/code>/&lt;code>Restore&lt;/code> 接到 &lt;code>snapshot.go&lt;/code>，把连接钩子接到客户端计数器，然后由 &lt;code>rafthub.Main(conf)&lt;/code> 接管：恢复日志、在给了 &lt;code>-j&lt;/code> 时加入集群、提供 RESP 服务。&lt;/li>
+&lt;/ol>
+&lt;h2 id="请求路径">
+ 请求路径
+ &lt;a class="anchor" href="#%e8%af%b7%e6%b1%82%e8%b7%af%e5%be%84">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;strong>写命令&lt;/strong>（通过 &lt;code>AddWriteCommand&lt;/code> 注册的 56 条命令）：&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>client → RESP parse → normalise (lowercase command name, args to strings)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> → leader check → append to Raft log → replicate → commit at quorum
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> → apply on every node in log order → handler → ledis → driver
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>命令处理器是在&lt;em>应用阶段&lt;/em>执行的，而不是在追加日志之前，这正是同样结果会出现在每个节点上的原因。因此，一个去读墙上时钟或 &lt;code>math/rand&lt;/code> 的处理器必然产生分歧——它必须使用 &lt;code>m.Now()&lt;/code>/&lt;code>m.Rand()&lt;/code>，而这两个值本身通过内部 &lt;code>TICK&lt;/code> 命令复制。&lt;/p></description></item><item><title>客户端</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/</guid><description>&lt;h1 id="客户端">
+ 客户端
+ &lt;a class="anchor" href="#%e5%ae%a2%e6%88%b7%e7%ab%af">#&lt;/a>
+&lt;/h1>
+&lt;p>服务器使用 RESP，所以 Redis 客户端可以直接用——但有三处需要调整：类型不匹配从不报错、scan 游标必须当作不透明值处理、没有 &lt;code>SELECT&lt;/code>/&lt;code>MULTI&lt;/code>。&lt;/p>
+&lt;h2 id="redis-cli">
+ redis-cli
+ &lt;a class="anchor" href="#redis-cli">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>redis-cli -h 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># with TLS and auth&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-cli --tls --cacert ./ca.crt -a &lt;span style="color:#e6db74">&amp;#34;&lt;/span>$ICEFIREDB_AUTH&lt;span style="color:#e6db74">&amp;#34;&lt;/span> -h db1.internal -p &lt;span style="color:#ae81ff">11001&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>SET user:1 &lt;span style="color:#e6db74">&amp;#39;{&amp;#34;name&amp;#34;:&amp;#34;ada&amp;#34;}&amp;#39;&lt;/span> EX &lt;span style="color:#ae81ff">300&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>HGETALL user:1
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>SCAN &lt;span style="color:#ae81ff">0&lt;/span> MATCH &lt;span style="color:#e6db74">&amp;#39;user:*&amp;#39;&lt;/span> COUNT &lt;span style="color:#ae81ff">100&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>XSCAN HASH &lt;span style="color:#e6db74">&amp;#34;&amp;#34;&lt;/span> MATCH &lt;span style="color:#e6db74">&amp;#39;^user:&amp;#39;&lt;/span> COUNT &lt;span style="color:#ae81ff">100&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>INFO
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>&lt;code>redis-cli --scan&lt;/code> 可用：它从 &lt;code>0&lt;/code> 开始，循环到游标重新变成 &lt;code>0&lt;/code> 为止。&lt;/p>
+&lt;h2 id="go-githubcomredisgo-redisv9">
+ Go (&lt;code>github.com/redis/go-redis/v9&lt;/code>)
+ &lt;a class="anchor" href="#go-githubcomredisgo-redisv9">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f92672">package&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f92672">import&lt;/span> (
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#e6db74">&amp;#34;context&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#e6db74">&amp;#34;crypto/tls&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#e6db74">&amp;#34;fmt&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#e6db74">&amp;#34;github.com/redis/go-redis/v9&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">ctx&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">context&lt;/span>.&lt;span style="color:#a6e22e">Background&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">rdb&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">redis&lt;/span>.&lt;span style="color:#a6e22e">NewClient&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">redis&lt;/span>.&lt;span style="color:#a6e22e">Options&lt;/span>{
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">Addr&lt;/span>: &lt;span style="color:#e6db74">&amp;#34;127.0.0.1:11001&amp;#34;&lt;/span>,
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">Password&lt;/span>: &lt;span style="color:#e6db74">&amp;#34;&amp;#34;&lt;/span>, &lt;span style="color:#75715e">// set when the server runs with --auth
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#a6e22e">TLSConfig&lt;/span>: &lt;span style="color:#66d9ef">nil&lt;/span>, &lt;span style="color:#75715e">// &amp;amp;tls.Config{...} when --tls-cert/--tls-key are used
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#a6e22e">DB&lt;/span>: &lt;span style="color:#ae81ff">0&lt;/span>, &lt;span style="color:#75715e">// there is only database 0
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	})
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">defer&lt;/span> &lt;span style="color:#a6e22e">rdb&lt;/span>.&lt;span style="color:#a6e22e">Close&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">rdb&lt;/span>.&lt;span style="color:#a6e22e">Set&lt;/span>(&lt;span style="color:#a6e22e">ctx&lt;/span>, &lt;span style="color:#e6db74">&amp;#34;user:1&amp;#34;&lt;/span>, &lt;span style="color:#e6db74">`{&amp;#34;name&amp;#34;:&amp;#34;ada&amp;#34;}`&lt;/span>, &lt;span style="color:#ae81ff">0&lt;/span>).&lt;span style="color:#a6e22e">Err&lt;/span>(); &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		panic(&lt;span style="color:#a6e22e">err&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">v&lt;/span>, &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">rdb&lt;/span>.&lt;span style="color:#a6e22e">Get&lt;/span>(&lt;span style="color:#a6e22e">ctx&lt;/span>, &lt;span style="color:#e6db74">&amp;#34;user:1&amp;#34;&lt;/span>).&lt;span style="color:#a6e22e">Result&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">v&lt;/span>, &lt;span style="color:#a6e22e">err&lt;/span>) &lt;span style="color:#75715e">// {&amp;#34;name&amp;#34;:&amp;#34;ada&amp;#34;} &amp;lt;nil&amp;gt;
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">rdb&lt;/span>.&lt;span style="color:#a6e22e">HSet&lt;/span>(&lt;span style="color:#a6e22e">ctx&lt;/span>, &lt;span style="color:#e6db74">&amp;#34;user:1&amp;#34;&lt;/span>, &lt;span style="color:#e6db74">&amp;#34;name&amp;#34;&lt;/span>, &lt;span style="color:#e6db74">&amp;#34;ada&amp;#34;&lt;/span>).&lt;span style="color:#a6e22e">Val&lt;/span>()) &lt;span style="color:#75715e">// 1
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// Paginate keys: the cursor is opaque, handle it as a string.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">cursor&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> uint64(&lt;span style="color:#ae81ff">0&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">for&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">keys&lt;/span>, &lt;span style="color:#a6e22e">next&lt;/span>, &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">rdb&lt;/span>.&lt;span style="color:#a6e22e">Scan&lt;/span>(&lt;span style="color:#a6e22e">ctx&lt;/span>, &lt;span style="color:#a6e22e">cursor&lt;/span>, &lt;span style="color:#e6db74">&amp;#34;user:*&amp;#34;&lt;/span>, &lt;span style="color:#ae81ff">100&lt;/span>).&lt;span style="color:#a6e22e">Result&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>			panic(&lt;span style="color:#a6e22e">err&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">keys&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">next&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>			&lt;span style="color:#66d9ef">break&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">cursor&lt;/span> = &lt;span style="color:#a6e22e">next&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>&lt;strong>注意事项——类型化 scan 辅助函数。&lt;/strong> &lt;code>rdb.HScan&lt;/code>、&lt;code>rdb.SScan&lt;/code>、&lt;code>rdb.ZScan&lt;/code> 和 &lt;code>rdb.Scan&lt;/code> 都会用 &lt;code>strconv.ParseUint&lt;/code> 强制转换游标，而 &lt;code>HScan&lt;/code>/&lt;code>SScan&lt;/code>/&lt;code>ZScan&lt;/code> 还额外要求游标是数字。本引擎对这三条命令返回&lt;strong>最后一个字段/成员名&lt;/strong>作为游标，所以这些类型化辅助函数会以解析错误失败。请改用通用 API：&lt;/p></description></item><item><title>配置</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/</guid><description>&lt;h1 id="配置">
+ 配置
+ &lt;a class="anchor" href="#%e9%85%8d%e7%bd%ae">#&lt;/a>
+&lt;/h1>
+&lt;p>NoSQL 引擎&lt;strong>没有配置文件&lt;/strong>。每一项设置都是一个命令行 flag，在启动时由 &lt;code>flags.go&lt;/code> 解析一次。（工作
+目录中的 &lt;code>.env&lt;/code> 文件同样会被加载 —— 见
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/#%e7%8e%af%e5%a2%83%e5%8f%98%e9%87%8f">环境变量&lt;/a>。）&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -h &lt;span style="color:#75715e"># prints the usage block below&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="基本选项">
+ 基本选项
+ &lt;a class="anchor" href="#%e5%9f%ba%e6%9c%ac%e9%80%89%e9%a1%b9">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Flag&lt;/th>
+ &lt;th style="text-align: left">含义&lt;/th>
+ &lt;th style="text-align: left">默认值&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-a addr&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">绑定地址（&lt;code>host:port&lt;/code>）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>127.0.0.1:11001&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-n id&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">节点 ID —— 同时也是 Raft 服务器 ID 和数据子目录名&lt;/td>
+ &lt;td style="text-align: left">&lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-d dir&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">数据目录&lt;/td>
+ &lt;td style="text-align: left">&lt;code>data&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-j addr&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">要加入的集群的主节点地址&lt;/td>
+ &lt;td style="text-align: left">&lt;em>(空 —— 引导新集群)&lt;/em>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-l level&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">日志级别：&lt;code>debug&lt;/code>、&lt;code>verb&lt;/code>、&lt;code>info&lt;/code>、&lt;code>warn&lt;/code>、&lt;code>silent&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>info&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-h&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">打印用法并退出&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>-n&lt;/code> 是&lt;strong>标识符，不是端口&lt;/strong>。端口来自 &lt;code>-a&lt;/code>。两个节点可以共享 &lt;code>-d&lt;/code>，因为每个节点都写入
+&lt;code>&amp;lt;dir&amp;gt;/IceFireDB/&amp;lt;node-id&amp;gt;/&lt;/code>；但两个节点不能共享同一个节点 ID。&lt;/p>
+&lt;h2 id="安全选项">
+ 安全选项
+ &lt;a class="anchor" href="#%e5%ae%89%e5%85%a8%e9%80%89%e9%a1%b9">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Flag&lt;/th>
+ &lt;th style="text-align: left">含义&lt;/th>
+ &lt;th style="text-align: left">默认值&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>--auth token&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">集群认证令牌，由所有节点和所有客户端共享&lt;/td>
+ &lt;td style="text-align: left">&lt;em>(空 —— 认证关闭)&lt;/em>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>--tls-cert path&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">TLS 证书（PEM）&lt;/td>
+ &lt;td style="text-align: left">&lt;em>(空)&lt;/em>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>--tls-key path&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">TLS 私钥（PEM）&lt;/td>
+ &lt;td style="text-align: left">&lt;em>(空)&lt;/em>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>--tls-cert&lt;/code> 与 &lt;code>--tls-key&lt;/code> 必须成对提供；只提供其中一个会导致启动错误。&lt;code>--auth&lt;/code> 也可以从
+&lt;code>ICEFIREDB_AUTH&lt;/code> 读取，两者都设置时以命令行为准。完整行为，包括该令牌保护什么、不保护什么，见
+
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/deploy/security/">安全&lt;/a>。&lt;/p></description></item><item><title>字符串</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/</guid><description>&lt;h1 id="字符串">
+ 字符串
+ &lt;a class="anchor" href="#%e5%ad%97%e7%ac%a6%e4%b8%b2">#&lt;/a>
+&lt;/h1>
+&lt;p>26 条命令：&lt;code>SET&lt;/code> 系列、计数器、位操作与字符串过期。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SET KEY VALUE [EX seconds] [PX milliseconds] [NX] [XX] [KEEPTTL]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>；&lt;code>NX&lt;/code>/&lt;code>XX&lt;/code> 阻止写入时为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SET user:1 '{&amp;quot;n&amp;quot;:&amp;quot;ada&amp;quot;}' EX 60&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETNX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETNX KEY VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 写入，0 已存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETNX job:42 1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETEX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEX KEY seconds VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEX session:9 60 tok&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETEXAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEXAT KEY unixTime VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEXAT session:9 1767225600 tok&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GETSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETSET KEY VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 旧值，不存在为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETSET counter 0&lt;/code> → &lt;code>&amp;quot;7&amp;quot;&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GET KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code>，不存在为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GET user:1&lt;/code> → &lt;code>{&amp;quot;n&amp;quot;:&amp;quot;ada&amp;quot;}&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MGET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MGET KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code>，逐项为 bulk 或 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MGET a b&lt;/code> → &lt;code>[val, null]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MSET KEY VALUE [KEY VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MSET a 1 b 2&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>APPEND&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>APPEND KEY VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新长度&lt;/td>
+ &lt;td style="text-align: left">&lt;code>APPEND log &amp;quot;x\n&amp;quot;&lt;/code> → &lt;code>5&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>STRLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STRLEN KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 字节长度&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STRLEN user:1&lt;/code> → &lt;code>13&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>INCR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新值&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCR hits&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>INCRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCRBY KEY increment&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新值&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCRBY hits 5&lt;/code> → &lt;code>6&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DECR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新值&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECR hits&lt;/code> → &lt;code>5&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DECRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECRBY KEY decrement&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新值&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECRBY hits 5&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GETRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETRANGE KEY start end&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 子串（闭区间，负偏移从尾部计）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETRANGE user:1 0 3&lt;/code> → &lt;code>{&amp;quot;n&amp;quot;&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETRANGE KEY offset VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新长度&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETRANGE user:1 0 '{&amp;quot;m&amp;quot;'&lt;/code> → &lt;code>13&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GETBIT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETBIT KEY offset&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETBIT bitmap 7&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETBIT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETBIT KEY offset value&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 原比特&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETBIT bitmap 7 1&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BITCOUNT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITCOUNT KEY [start end [BYTE|BIT]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 置位数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITCOUNT bitmap 0 0&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BITOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITOP AND|OR|XOR|NOT destKey KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 结果长度&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITOP AND out a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BITPOS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITPOS KEY bit [start [end [BYTE|BIT]]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 位置，未找到为 &lt;code>-1&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITPOS bitmap 1&lt;/code> → &lt;code>7&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DEL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DEL KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除数量&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DEL a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXISTS KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 存在数量&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXISTS a b&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 设置成功，0 键不存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIRE session:9 60&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 设置成功，0 键不存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIREAT session:9 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>TTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>TTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 剩余秒数，无过期为 &lt;code>-1&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>TTL session:9&lt;/code> → &lt;code>59&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="说明">
+ 说明
+ &lt;a class="anchor" href="#%e8%af%b4%e6%98%8e">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>SET&lt;/code> 会清掉已有的过期时间，除非给出 &lt;code>KEEPTTL&lt;/code>。&lt;code>PX&lt;/code> 会&lt;strong>向上取整&lt;/strong>到下一秒，因为过期时间按整秒存储，所以 &lt;code>PX 500&lt;/code> 让键保留 1 秒、&lt;code>PX 1500&lt;/code> 保留 2 秒 —— 绝不会少于请求值。&lt;/li>
+&lt;li>条件阻止写入时，&lt;code>SET ... NX&lt;/code>/&lt;code>XX&lt;/code> 返回 &lt;strong>null bulk&lt;/strong>，而不是错误。&lt;/li>
+&lt;li>字符串&lt;strong>没有 &lt;code>PERSIST&lt;/code>&lt;/strong>：处理器虽然存在，但被注释掉了、未注册。想保留值又改变生命周期，请再次 &lt;code>EXPIRE&lt;/code>，或使用 &lt;code>SET … KEEPTTL&lt;/code>。&lt;/li>
+&lt;li>&lt;code>EXISTS&lt;/code> 只统计&lt;strong>字符串&lt;/strong>键空间中的键，看不到同名的哈希。其他类型请用 &lt;code>HKEYEXISTS&lt;/code>、&lt;code>LKEYEXISTS&lt;/code>、&lt;code>SKEYEXISTS&lt;/code>。&lt;/li>
+&lt;li>&lt;code>DEL&lt;/code> 删除这些键上的字符串，而不是同名的哈希/列表/集合。&lt;/li>
+&lt;li>对非数值执行 &lt;code>INCR&lt;/code>/&lt;code>DECR&lt;/code> 会像 Redis 一样返回 &lt;code>-ERR&lt;/code>；缺失的键按 &lt;code>0&lt;/code> 处理。&lt;/li>
+&lt;li>&lt;code>BITCOUNT&lt;/code>/&lt;code>BITPOS&lt;/code> 支持 Redis 7 的可选 &lt;code>BYTE&lt;/code>/&lt;code>BIT&lt;/code> 单位。&lt;/li>
+&lt;li>过期时间计算使用 Raft 时钟，因此当某个节点的 Raft 时钟落后于本地时钟时，较短的 TTL 可能被拒绝。见
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/commands/compatibility/">兼容性&lt;/a>。&lt;/li>
+&lt;li>&lt;code>TTL&lt;/code> 由存储层按&lt;strong>本地&lt;/strong>墙上时钟计算，因此各副本报告的值可能相差各自的 apply 延迟。&lt;/li>
+&lt;/ul></description></item><item><title>构建与测试</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/</guid><description>&lt;h1 id="构建与测试">
+ 构建与测试
+ &lt;a class="anchor" href="#%e6%9e%84%e5%bb%ba%e4%b8%8e%e6%b5%8b%e8%af%95">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="构建">
+ 构建
+ &lt;a class="anchor" href="#%e6%9e%84%e5%bb%ba">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>make localbuild &lt;span style="color:#75715e"># bin/IceFireDB for the host platform&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make run &lt;span style="color:#75715e"># go run . (development)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make run_dev &lt;span style="color:#75715e"># same, for a dev setup&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make clean &lt;span style="color:#75715e"># remove bin/ and installed copies&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>发布与交叉编译目标确实存在（&lt;code>make all&lt;/code>、&lt;code>make release&lt;/code>、&lt;code>make build-linux-*&lt;/code>），但在迭代代码时请用 &lt;code>run&lt;/code>/&lt;code>localbuild&lt;/code>——发布矩阵每次调用会构建五个 GOOS/GOARCH 变体。&lt;/p>
+&lt;p>二进制里嵌入了自己的 git revision 和构建时间：&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>go build -ldflags &lt;span style="color:#e6db74">&amp;#34;-X main.BuildVersion=&lt;/span>&lt;span style="color:#66d9ef">$(&lt;/span>git rev-parse --short HEAD&lt;span style="color:#66d9ef">)&lt;/span>&lt;span style="color:#e6db74"> -X main.BuildDate=&lt;/span>&lt;span style="color:#66d9ef">$(&lt;/span>date &lt;span style="color:#e6db74">&amp;#39;+%F %T&amp;#39;&lt;/span>&lt;span style="color:#66d9ef">)&lt;/span>&lt;span style="color:#e6db74">&amp;#34;&lt;/span> -o bin/IceFireDB .
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>&lt;code>-h&lt;/code> 会显示版本，并且在设置了 &lt;code>BuildVersion&lt;/code> 时把它写进 banner。&lt;/p>
+&lt;h2 id="测试套件">
+ 测试套件
+ &lt;a class="anchor" href="#%e6%b5%8b%e8%af%95%e5%a5%97%e4%bb%b6">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">跑什么&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>make test&lt;/code> / &lt;code>go test ./...&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">单元测试，遵循 &lt;code>DRIVER&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DRIVER=goleveldb make test-compat&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">RESP 兼容性套件，&lt;code>-tags alltest&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>make test-integration&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">先构建二进制，再跑崩溃恢复和多节点 Raft 故障切换测试（&lt;code>-tags integration&lt;/code>）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>make test-partition&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">基于 Docker 的脑裂测试：3 个节点，主节点被切断网络（&lt;code>-tags partition&lt;/code>）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>make soak&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">对 3 节点集群施加持续负载；&lt;code>SOAK_DURATION&lt;/code>、&lt;code>SOAK_WORKERS&lt;/code>、&lt;code>SOAK_CHAOS=1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>DRIVER&lt;/code> 选择测试所针对的存储驱动（Makefile 的默认值是 &lt;code>badger&lt;/code>）：&lt;/p></description></item><item><title>哈希</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/</guid><description>&lt;h1 id="哈希">
+ 哈希
+ &lt;a class="anchor" href="#%e5%93%88%e5%b8%8c">#&lt;/a>
+&lt;/h1>
+&lt;p>19 条命令。哈希键空间与同名键上的字符串键空间彼此独立。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSET KEY FIELD VALUE [FIELD VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新增字段数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSET user:1 name ada age 36&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSETNX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSETNX KEY FIELD VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 写入，0 字段已存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSETNX user:1 name ada&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HGET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGET KEY FIELD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code>，字段不存在为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGET user:1 name&lt;/code> → &lt;code>ada&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HMGET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMGET KEY FIELD [FIELD ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code>，逐项 bulk 或 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMGET user:1 name x&lt;/code> → &lt;code>[ada, null]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HMSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMSET KEY FIELD VALUE [FIELD VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMSET user:2 name bob&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HDEL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HDEL KEY FIELD [FIELD ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除字段数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HDEL user:1 age&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXISTS KEY FIELD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXISTS user:1 name&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HGETALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGETALL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 字段/值交替&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGETALL user:1&lt;/code> → &lt;code>[name, ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HKEYS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 字段列表&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYS user:1&lt;/code> → &lt;code>[name]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HVALS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HVALS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 值列表&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HVALS user:1&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HLEN KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 字段数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HLEN user:1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSTRLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSTRLEN KEY FIELD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 值长度，缺失为 0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSTRLEN user:1 name&lt;/code> → &lt;code>3&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HINCRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HINCRBY KEY FIELD increment&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新值&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HINCRBY stats hits 1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HKEYEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYEXISTS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1 —— 哈希是否存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYEXISTS user:1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除字段数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HCLEAR user:1&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HMCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMCLEAR KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除哈希数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMCLEAR a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HEXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 设置成功，0 键不存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIRE user:1 300&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HEXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIREAT user:1 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HTTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HTTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 剩余秒，无过期为 &lt;code>-1&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HTTL user:1&lt;/code> → &lt;code>299&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="说明">
+ 说明
+ &lt;a class="anchor" href="#%e8%af%b4%e6%98%8e">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>HCLEAR&lt;/code> / &lt;code>HMCLEAR&lt;/code> 删除&lt;strong>整条哈希&lt;/strong>（相当于该类型的 &lt;code>DEL&lt;/code>），并连带删掉它的过期时间；&lt;code>HDEL&lt;/code> 只删除单个字段。&lt;/li>
+&lt;li>没有 &lt;code>HPERSIST&lt;/code> —— 处理器存在但未注册。&lt;/li>
+&lt;li>&lt;code>HSET&lt;/code> 只统计新建的字段；覆盖已有字段计 0。&lt;/li>
+&lt;li>&lt;code>HGETALL&lt;/code> 按存储层的迭代顺序返回字段/值对。不要依赖它的顺序 —— 如果顺序重要，请在客户端排序。&lt;/li>
+&lt;li>对值为空的字段执行 &lt;code>HGET&lt;/code>：本地后端返回空 bulk string，去中心化后端返回 &lt;code>null&lt;/code> —— 在去中心化后端上这两种状态无法区分。见
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/commands/compatibility/">兼容性&lt;/a>。&lt;/li>
+&lt;li>字段缺失或值为空时，&lt;code>HSTRLEN&lt;/code> 都报 0。&lt;/li>
+&lt;li>过期：&lt;code>HEXPIRE&lt;/code>/&lt;code>HEXPIREAT&lt;/code>/&lt;code>HTTL&lt;/code> 作用于哈希，与同名键上的字符串互不影响。&lt;/li>
+&lt;/ul></description></item><item><title>集群</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/</guid><description>&lt;h1 id="集群">
+ 集群
+ &lt;a class="anchor" href="#%e9%9b%86%e7%be%a4">#&lt;/a>
+&lt;/h1>
+&lt;p>集群是一组共享同一份 Raft 日志的节点。每条写命令都会追加到该日志，并由每个节点重放，因此所有节点
+收敛到同一状态；读命令由收到它的那个节点在本地应答。&lt;/p>
+&lt;h2 id="引导与加入">
+ 引导与加入
+ &lt;a class="anchor" href="#%e5%bc%95%e5%af%bc%e4%b8%8e%e5%8a%a0%e5%85%a5">#&lt;/a>
+&lt;/h2>
+&lt;p>第一个节点不需要额外 flag：&lt;code>-j&lt;/code> 为空即表示「开启一个新集群」。之后每个节点用
+&lt;code>-j &amp;lt;leader-or-any-node-address&amp;gt;&lt;/code> 加入：&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -n &lt;span style="color:#ae81ff">1&lt;/span> -a 127.0.0.1:11001 -d ./data
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -n &lt;span style="color:#ae81ff">2&lt;/span> -a 127.0.0.1:11002 -d ./data -j 127.0.0.1:11001
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -n &lt;span style="color:#ae81ff">3&lt;/span> -a 127.0.0.1:11003 -d ./data -j 127.0.0.1:11001
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>加入时，节点用 &lt;code>AUTH&lt;/code>（若设置了 &lt;code>--auth&lt;/code>/&lt;code>ICEFIREDB_AUTH&lt;/code>）和 TLS（若配置了证书）连接该地址，请求
+当前的集群状态，把自己加进去，然后从日志追赶。在同一数据目录上重启的节点不需要再次 &lt;code>-j&lt;/code> —— 它会从
+已持久化的 Raft 状态重新加入。&lt;/p>
+&lt;p>当绑定地址不是对等节点应当拨号的那个地址时（容器、NAT、多网卡），请使用 &lt;code>--advertise&lt;/code>：&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -n &lt;span style="color:#ae81ff">2&lt;/span> -a 0.0.0.0:11001 --advertise 10.0.0.12:11001 -d /var/lib/icefiredb -j 10.0.0.11:11001
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>通告地址就是客户端在 &lt;code>-MOVED&lt;/code> 重定向中收到的地址，也是其他节点写入 Raft 配置的地址，因此它必须
+&lt;strong>对对等节点可达，也对客户端可达&lt;/strong>。&lt;/p>
+&lt;h2 id="一致性模型">
+ 一致性模型
+ &lt;a class="anchor" href="#%e4%b8%80%e8%87%b4%e6%80%a7%e6%a8%a1%e5%9e%8b">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">操作&lt;/th>
+ &lt;th style="text-align: left">在哪里执行&lt;/th>
+ &lt;th style="text-align: left">保证&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">写命令（&lt;code>SET&lt;/code>、&lt;code>HSET&lt;/code>、&lt;code>RPUSH&lt;/code>、…）&lt;/td>
+ &lt;td style="text-align: left">只在主节点执行，经 Raft 日志&lt;/td>
+ &lt;td style="text-align: left">在每个节点上按相同顺序应用；写入在多数派提交后才被确认&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">读命令，未启用 &lt;code>--openreads&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">收到它的节点；在从节点上会被拒绝&lt;/td>
+ &lt;td style="text-align: left">从节点返回 &lt;code>-MOVED 0 &amp;lt;leader&amp;gt;&lt;/code>；客户端向主节点重试&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">读命令，启用 &lt;code>--openreads&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">任意节点&lt;/td>
+ &lt;td style="text-align: left">可能返回陈旧数据（本地日志已应用到的状态）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RAFT …&lt;/code>、&lt;code>CLUSTER …&lt;/code>、&lt;code>MACHINE&lt;/code>、&lt;code>BARRIER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">收到它的节点&lt;/td>
+ &lt;td style="text-align: left">管理操作，不复制&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>启用 &lt;code>--try-errors&lt;/code> 后，重定向错误变成 &lt;code>-TRY &amp;lt;leader&amp;gt;&lt;/code>，且 &lt;code>CLUSTER&lt;/code> 命令被禁用；这是为那些需要
+区分「去别处重试」与「集群把我重定向了」的客户端准备的。&lt;/p></description></item><item><title>协议</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/</guid><description>&lt;h1 id="协议层">
+ 协议层
+ &lt;a class="anchor" href="#%e5%8d%8f%e8%ae%ae%e5%b1%82">#&lt;/a>
+&lt;/h1>
+&lt;p>引擎使用 &lt;strong>RESP&lt;/strong>——Redis 序列化协议——所以任何 Redis 客户端都能直接用，不需要适配层。本页讲协议层在解析字节之外还做了什么。&lt;/p>
+&lt;h2 id="一个-socket两种协议">
+ 一个 socket，两种协议
+ &lt;a class="anchor" href="#%e4%b8%80%e4%b8%aa-socket%e4%b8%a4%e7%a7%8d%e5%8d%8f%e8%ae%ae">#&lt;/a>
+&lt;/h2>
+&lt;p>全进程只有一个 TCP 监听（&lt;code>tcp4&lt;/code>，地址来自 &lt;code>-a&lt;/code>）。到达它上面的是两类连接：&lt;/p>
+&lt;ol>
+&lt;li>&lt;strong>客户端连接&lt;/strong>：应用发来的 RESP。&lt;/li>
+&lt;li>&lt;strong>对等连接&lt;/strong>：节点之间的 Raft 传输。&lt;/li>
+&lt;/ol>
+&lt;p>两者由一个嗅探式监听区分：对等节点建立连接时先写一个固定的 magic marker，再跟上集群认证 token（&lt;code>vendor/github.com/tidwall/uhaha&lt;/code> 中的 &lt;code>transportMarker&lt;/code>）；凡是不以该 marker 开头的，都会被当作 RESP 客户端。这就是 TLS、端口和 &lt;code>--advertise&lt;/code> 由数据流量与复制流量共用的原因——也是 &lt;code>--advertise&lt;/code> 必须写出对等节点可访问地址的原因。&lt;/p>
+&lt;h2 id="请求处理">
+ 请求处理
+ &lt;a class="anchor" href="#%e8%af%b7%e6%b1%82%e5%a4%84%e7%90%86">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">步骤&lt;/th>
+ &lt;th style="text-align: left">行为&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">解析&lt;/td>
+ &lt;td style="text-align: left">RESP 数组，另外支持内联（telnet 风格）命令&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">命令名&lt;/td>
+ &lt;td style="text-align: left">分发前统一转小写——命令名不区分大小写&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">流水线&lt;/td>
+ &lt;td style="text-align: left">支持：请求按顺序执行，回复按顺序写出&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">连接状态&lt;/td>
+ &lt;td style="text-align: left">每个连接只有 &lt;code>AUTH&lt;/code> 状态；没有按连接隔离的数据库，没有 &lt;code>SELECT&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">内置命令&lt;/td>
+ &lt;td style="text-align: left">&lt;code>PING&lt;/code>、&lt;code>ECHO&lt;/code>、&lt;code>QUIT&lt;/code>、&lt;code>AUTH&lt;/code>、&lt;code>SHUTDOWN&lt;/code> 在分发之前由服务器直接应答&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">其它一切&lt;/td>
+ &lt;td style="text-align: left">分发给命令表（110 条数据命令 + &lt;code>RAFT&lt;/code>/&lt;code>CLUSTER&lt;/code>/&lt;code>MACHINE&lt;/code>/&lt;code>BARRIER&lt;/code>/&lt;code>VERSION&lt;/code>）&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>未知命令回复 &lt;code>ERR unknown command '&amp;lt;name&amp;gt;'&lt;/code>。&lt;/p>
+&lt;h2 id="回复映射">
+ 回复映射
+ &lt;a class="anchor" href="#%e5%9b%9e%e5%a4%8d%e6%98%a0%e5%b0%84">#&lt;/a>
+&lt;/h2>
+&lt;p>命令处理器返回 Go 值，RESP 写出器按固定规则机械映射：&lt;/p></description></item><item><title>存储驱动</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/</guid><description>&lt;h1 id="存储驱动">
+ 存储驱动
+ &lt;a class="anchor" href="#%e5%ad%98%e5%82%a8%e9%a9%b1%e5%8a%a8">#&lt;/a>
+&lt;/h1>
+&lt;p>&lt;code>--storage-backend &amp;lt;name&amp;gt;&lt;/code> 选择位于 ledis 数据模型之下的驱动。命令层是针对 &lt;code>store.driver.IDB&lt;/code>
+编写的，所以同一套命令在每个后端上都能跑——变的是字节存放在哪里、由谁复制它们，以及这个驱动能信到
+什么程度。&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">IDB&lt;/span> &lt;span style="color:#66d9ef">interface&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Close&lt;/span>() &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Get&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) ([]&lt;span style="color:#66d9ef">byte&lt;/span>, &lt;span style="color:#66d9ef">error&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Put&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>, &lt;span style="color:#a6e22e">value&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Delete&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">SyncPut&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>, &lt;span style="color:#a6e22e">value&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">SyncDelete&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">NewIterator&lt;/span>() &lt;span style="color:#a6e22e">IIterator&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">NewWriteBatch&lt;/span>() &lt;span style="color:#a6e22e">IWriteBatch&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">NewSnapshot&lt;/span>() (&lt;span style="color:#a6e22e">ISnapshot&lt;/span>, &lt;span style="color:#66d9ef">error&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Compact&lt;/span>() &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">GetStorageEngine&lt;/span>() &lt;span style="color:#66d9ef">interface&lt;/span>{}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="每个后端是什么">
+ 每个后端是什么
+ &lt;a class="anchor" href="#%e6%af%8f%e4%b8%aa%e5%90%8e%e7%ab%af%e6%98%af%e4%bb%80%e4%b9%88">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">&lt;code>--storage-backend&lt;/code>&lt;/th>
+ &lt;th style="text-align: left">数据在哪&lt;/th>
+ &lt;th style="text-align: left">复制方式&lt;/th>
+ &lt;th style="text-align: left">外部依赖&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>goleveldb&lt;/code> &lt;em>（默认）&lt;/em>&lt;/td>
+ &lt;td style="text-align: left">本地 LevelDB（纯 Go）&lt;/td>
+ &lt;td style="text-align: left">仅 Raft&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>badger&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">本地 BadgerDB v4，ZSTD 压缩&lt;/td>
+ &lt;td style="text-align: left">仅 Raft&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>hybriddb&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">本地 LevelDB + Ristretto 热缓存，按驱动暴露指标&lt;/td>
+ &lt;td style="text-align: left">仅 Raft&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>oss&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">S3 兼容对象存储，本地 LevelDB 索引 + Ristretto 缓存&lt;/td>
+ &lt;td style="text-align: left">仅 Raft&lt;/td>
+ &lt;td style="text-align: left">S3/MinIO 端点&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ipfs&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">本地 LevelDB，其值按 CID 从 IPFS 取回&lt;/td>
+ &lt;td style="text-align: left">仅 Raft&lt;/td>
+ &lt;td style="text-align: left">IPFS API（不是网关）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ipfs-synckv&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">IPFS 作为真值来源 + 本地镜像 + 版本元数据，可选 AES-256&lt;/td>
+ &lt;td style="text-align: left">IPFS/ipfs-log P2P&lt;/td>
+ &lt;td style="text-align: left">IPFS API + P2P&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>crdt&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">本地 Badger + 基于 libp2p pubsub 的 &lt;code>icefiredb-crdt-kv&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">P2P CRDT&lt;/td>
+ &lt;td style="text-align: left">libp2p 对等节点&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ipfs-log&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">基于 IPFS pubsub 的只追加 &lt;code>icefiredb-ipfs-log&lt;/code> 存储&lt;/td>
+ &lt;td style="text-align: left">P2P 日志&lt;/td>
+ &lt;td style="text-align: left">IPFS + P2P&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>leveldb&lt;/code>（cgo 驱动）和 &lt;code>orbitdb&lt;/code> &lt;strong>没有&lt;/strong>被编译进二进制：前者从未被 import，后者在
+&lt;code>main.go&lt;/code>/&lt;code>flags.go&lt;/code> 里被注释掉。传入这两个名字中的任何一个都会在启动时报 &amp;ldquo;unknown driver&amp;rdquo;。&lt;/p></description></item><item><title>基准测试</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/</guid><description>&lt;h1 id="基准测试">
+ 基准测试
+ &lt;a class="anchor" href="#%e5%9f%ba%e5%87%86%e6%b5%8b%e8%af%95">#&lt;/a>
+&lt;/h1>
+&lt;p>本页讲的是&lt;strong>怎么&lt;/strong>测量这个引擎。它刻意不含任何性能数字：一个数字如果没带上产生它的 commit、硬件、存储驱动和 flag，就只是噪声。&lt;/p>
+&lt;h2 id="能用的压测工具">
+ 能用的压测工具
+ &lt;a class="anchor" href="#%e8%83%bd%e7%94%a8%e7%9a%84%e5%8e%8b%e6%b5%8b%e5%b7%a5%e5%85%b7">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>redis-benchmark&lt;/code> 和 &lt;code>memtier_benchmark&lt;/code> 都能用，因为线上协议就是 RESP。&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># baseline: one connection per request, no pipeline&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-benchmark -h 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span> -t set,get -n &lt;span style="color:#ae81ff">200000&lt;/span> -c &lt;span style="color:#ae81ff">50&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># pipelined&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-benchmark -h 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span> -t set,get -n &lt;span style="color:#ae81ff">1000000&lt;/span> -c &lt;span style="color:#ae81ff">50&lt;/span> -P &lt;span style="color:#ae81ff">16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># mixed, with memtier&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>memtier_benchmark -s 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span> --protocol&lt;span style="color:#f92672">=&lt;/span>redis &lt;span style="color:#ae81ff">\
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#ae81ff">&lt;/span> --clients&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#ae81ff">50&lt;/span> --threads&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#ae81ff">4&lt;/span> --ratio&lt;span style="color:#f92672">=&lt;/span>1:1 --test-time&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#ae81ff">120&lt;/span> --key-pattern&lt;span style="color:#f92672">=&lt;/span>S:S
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>它们&lt;strong>不会&lt;/strong>覆盖到的部分：&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">未覆盖&lt;/th>
+ &lt;th style="text-align: left">原因&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCAN&lt;/code>/&lt;code>XSCAN&lt;/code> 分页&lt;/td>
+ &lt;td style="text-align: left">没有内置负载；用脚本驱动&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">集群重定向&lt;/td>
+ &lt;td style="text-align: left">压测直接打主节点，否则错误计数里会出现 &lt;code>-MOVED&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">TTL 过期压力&lt;/td>
+ &lt;td style="text-align: left">给 &lt;code>SET&lt;/code> 负载加上 &lt;code>EX&lt;/code>，然后观察 &lt;code>INFO Store&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Raft 应用延迟&lt;/td>
+ &lt;td style="text-align: left">写命令在多数派确认后才应答；增加节点才能看出差值&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="必须保持恒定的项">
+ 必须保持恒定的项
+ &lt;a class="anchor" href="#%e5%bf%85%e9%a1%bb%e4%bf%9d%e6%8c%81%e6%81%92%e5%ae%9a%e7%9a%84%e9%a1%b9">#&lt;/a>
+&lt;/h2>
+&lt;p>任何结果都要连同下面这些一起记录，否则数字不可比较：&lt;/p></description></item><item><title>列表</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/</guid><description>&lt;h1 id="列表">
+ 列表
+ &lt;a class="anchor" href="#%e5%88%97%e8%a1%a8">#&lt;/a>
+&lt;/h1>
+&lt;p>18 条命令。列表以带索引的序列存储；其中两条命令会重建整个列表。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LPUSH&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPUSH KEY VALUE [VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新长度&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPUSH q a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPUSH&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPUSH KEY VALUE [VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新长度&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPUSH q c&lt;/code> → &lt;code>3&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LPOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPOP KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 头部元素，空列表为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPOP q&lt;/code> → &lt;code>b&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOP KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 尾部元素，空列表为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOP q&lt;/code> → &lt;code>c&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LLEN KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 元素数量&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LLEN q&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LINDEX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINDEX KEY index&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code>，越界为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINDEX q 0&lt;/code> → &lt;code>a&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LRANGE KEY start stop&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code>（闭区间，负偏移从尾部计）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LRANGE q 0 -1&lt;/code> → &lt;code>[a]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LSET KEY index VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LSET q 0 z&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LTRIM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTRIM KEY start stop&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTRIM q 0 0&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPOPLPUSH&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOPLPUSH source destination&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 被移动的元素，源为空为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOPLPUSH q backup&lt;/code> → &lt;code>z&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LINSERT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINSERT KEY BEFORE|AFTER pivot VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新长度；&lt;code>0&lt;/code> 基准值不存在；&lt;code>-1&lt;/code> 键不存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINSERT q BEFORE z y&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LREM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LREM KEY count VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除数量&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LREM q 0 z&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LKEYEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LKEYEXISTS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1 —— 列表是否存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LKEYEXISTS q&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除元素数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LCLEAR q&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LMCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LMCLEAR KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除列表数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LMCLEAR a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LEXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIRE q 600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LEXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIREAT q 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LTTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 剩余秒，无过期为 &lt;code>-1&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTTL q&lt;/code> → &lt;code>599&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="说明">
+ 说明
+ &lt;a class="anchor" href="#%e8%af%b4%e6%98%8e">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>LPUSH q a b&lt;/code> 得到 &lt;code>[b, a]&lt;/code> —— 每个元素依次压入头部，与 Redis 一致。&lt;/li>
+&lt;li>&lt;code>LREM KEY count VALUE&lt;/code>：&lt;code>count &amp;gt; 0&lt;/code> 从头部删，&lt;code>count &amp;lt; 0&lt;/code> 从尾部删，&lt;code>count = 0&lt;/code> 删除每一处出现。&lt;/li>
+&lt;li>&lt;strong>&lt;code>LINSERT&lt;/code> 和 &lt;code>LREM&lt;/code> 是 O(n)，而且不是事务性的。&lt;/strong> 存储层没有它们的原语，因此处理器会读取列表、清空它，再重新写入（并恢复 TTL）。整个过程发生在同一次 Raft apply 内，所以其他客户端观察不到半成品列表，但中途后端失败会留下被截断的列表。不要在热路径的长列表上使用它们 —— 优先用 &lt;code>LTRIM&lt;/code> 或有界队列。&lt;/li>
+&lt;li>没有 &lt;code>LPERSIST&lt;/code>：处理器未注册。&lt;code>LCLEAR&lt;/code>/&lt;code>LMCLEAR&lt;/code> 删除整个列表及其 TTL。&lt;/li>
+&lt;li>&lt;strong>没有阻塞命令。&lt;/strong> &lt;code>BLPOP&lt;/code>/&lt;code>BRPOP&lt;/code> 是刻意不注册的：在 Raft apply 循环里做阻塞读，要么卡住日志，要么在没有回滚路径的情况下消费掉队列。&lt;/li>
+&lt;li>&lt;code>LRANGE&lt;/code> 在 &lt;code>start &amp;gt; stop&lt;/code> 时返回空数组；负索引从尾部计。&lt;/li>
+&lt;/ul></description></item><item><title>网络</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/</guid><description>&lt;h1 id="网络层">
+ 网络层
+ &lt;a class="anchor" href="#%e7%bd%91%e7%bb%9c%e5%b1%82">#&lt;/a>
+&lt;/h1>
+&lt;p>系统里存在两套彼此独立的网络，解决的是不同问题。读 IceFireDB 相关内容时，把两者混为一谈是最常见的架构错误。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">&lt;/th>
+ &lt;th style="text-align: left">站内网络&lt;/th>
+ &lt;th style="text-align: left">站间网络&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">用途&lt;/td>
+ &lt;td style="text-align: left">一份一致的数据副本&lt;/td>
+ &lt;td style="text-align: left">跨站点 / 跨地域复制&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">技术&lt;/td>
+ &lt;td style="text-align: left">Raft（hashicorp/raft）&lt;/td>
+ &lt;td style="text-align: left">libp2p + pubsub（&lt;code>crdt&lt;/code>、&lt;code>ipfs-log&lt;/code>、&lt;code>ipfs-synckv&lt;/code> 驱动）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">拓扑&lt;/td>
+ &lt;td style="text-align: left">主节点 + 投票者，需要多数派&lt;/td>
+ &lt;td style="text-align: left">对等网络，无主节点，最终一致&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">配置方式&lt;/td>
+ &lt;td style="text-align: left">&lt;code>-a&lt;/code>、&lt;code>-j&lt;/code>、&lt;code>--advertise&lt;/code>、&lt;code>--raft-backend&lt;/code>、&lt;code>--auth&lt;/code>、TLS&lt;/td>
+ &lt;td style="text-align: left">&lt;code>--servicename&lt;/code>、&lt;code>--nettopic&lt;/code>、&lt;code>--datatopic&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">启用方式&lt;/td>
+ &lt;td style="text-align: left">始终启用&lt;/td>
+ &lt;td style="text-align: left">仅在 P2P 存储驱动下启用&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>常见部署是每个站点跑一个 Raft 集群（站内强一致），每个站点再有一个节点使用 P2P 存储驱动在站点之间交换数据（跨站最终一致）。引擎不会替你合并这两层——它们是彼此独立的分层，而 P2P 层是&lt;em>驱动&lt;/em>的属性，不是服务器的属性。&lt;/p>
+&lt;h2 id="站内raft">
+ 站内：Raft
+ &lt;a class="anchor" href="#%e7%ab%99%e5%86%85raft">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>每个节点只监听一个 socket。对等连接用 transport marker 加认证 token 表明身份，所以复制流量和客户端流量共用同一个端口和同一份 TLS 证书。&lt;/li>
+&lt;li>Raft 日志与稳定存储位于 &lt;code>&amp;lt;data-dir&amp;gt;/IceFireDB/&amp;lt;node-id&amp;gt;/store/&lt;/code>，格式为 &lt;code>leveldb&lt;/code>（默认）或 &lt;code>bolt&lt;/code>（&lt;code>--raft-backend&lt;/code>）。&lt;/li>
+&lt;li>&lt;code>--advertise&lt;/code> 设置其它节点保存的本节点地址。不设置时使用绑定的地址，在 NAT 后面或容器里这是错的。&lt;/li>
+&lt;li>加入集群：&lt;code>-j &amp;lt;addr&amp;gt;&lt;/code>（节点自己加入），或在主节点上执行 &lt;code>RAFT SERVER ADD id address&lt;/code>。&lt;/li>
+&lt;li>快照：由 Raft 层生成，通过 &lt;code>writeSnapshot&lt;/code> 写入 &lt;code>snapshots/&amp;lt;id&amp;gt;/state.bin&lt;/code>；被快照覆盖的日志会被截断。&lt;/li>
+&lt;li>时钟：Raft 通过内部复制的 &lt;code>TICK&lt;/code> 命令驱动机器时钟（默认每 200 ms 一次），使依赖时间的命令在各副本间保持一致。&lt;code>--localtime&lt;/code> 用本地时间源替换远程时间源，更快，也更有风险。&lt;/li>
+&lt;/ul>
+&lt;h2 id="站间p2p-驱动">
+ 站间：P2P 驱动
+ &lt;a class="anchor" href="#%e7%ab%99%e9%97%b4p2p-%e9%a9%b1%e5%8a%a8">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>crdt&lt;/code>、&lt;code>ipfs-log&lt;/code> 和 &lt;code>ipfs-synckv&lt;/code> 驱动会在存储层里打开一个 libp2p host：&lt;/p></description></item><item><title>安全</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/</guid><description>&lt;h1 id="安全">
+ 安全
+ &lt;a class="anchor" href="#%e5%ae%89%e5%85%a8">#&lt;/a>
+&lt;/h1>
+&lt;p>引擎有三个与安全相关的面：RESP 监听器、Raft 传输，以及可选的管理 HTTP 服务。它们共用一个凭据和一份
+证书。&lt;/p>
+&lt;h2 id="传输加密tls">
+ 传输加密（TLS）
+ &lt;a class="anchor" href="#%e4%bc%a0%e8%be%93%e5%8a%a0%e5%af%86tls">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB --tls-cert ./server.crt --tls-key ./server.key -a 0.0.0.0:11001 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ul>
+&lt;li>两个参数必须一起给出——只给其中一个会在启动时报错。&lt;/li>
+&lt;li>TLS 作用于&lt;strong>唯一的监听 socket&lt;/strong>。RESP 客户端和 Raft 传输都到达它上面，服务端通过嗅探首字节来分辨
+哪个是哪个。没有第二个端口。&lt;/li>
+&lt;li>因此 &lt;code>--advertise&lt;/code> 的值必须是节点和客户端使用的 TLS 地址。&lt;/li>
+&lt;li>客户端也必须走 TLS：&lt;code>redis-cli --tls --cacert ./ca.crt -h host -p 11001&lt;/code>，或等效的客户端选项
+（&lt;code>go-redis&lt;/code>：&lt;code>TLSConfig&lt;/code>；Python &lt;code>redis.Redis(ssl=True)&lt;/code>；Node &lt;code>tls: {}&lt;/code>）。&lt;/li>
+&lt;li>证书需要为客户端使用的名字提供一个 &lt;code>DNS:&lt;/code> SAN；服务端会把第一个 DNS SAN 复制进用于出站连接的
+&lt;code>tls.Config.ServerName&lt;/code>。&lt;/li>
+&lt;li>&lt;strong>没有客户端证书。&lt;/strong> &lt;code>tls.Config&lt;/code> 只用 &lt;code>Certificates&lt;/code> 构建，所以既没有 mTLS，也没有客户端身份。
+节点之间用共享 token 认证，而不是证书。&lt;/li>
+&lt;/ul>
+&lt;h2 id="集群授权">
+ 集群授权
+ &lt;a class="anchor" href="#%e9%9b%86%e7%be%a4%e6%8e%88%e6%9d%83">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>export ICEFIREDB_AUTH&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#e6db74">&amp;#39;openssl rand -hex 32&amp;#39;&lt;/span> &lt;span style="color:#75715e"># preferred: not visible in the process list&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -a 0.0.0.0:11001 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># or&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB --auth &lt;span style="color:#e6db74">&amp;#39;&amp;lt;token&amp;gt;&amp;#39;&lt;/span> -a 0.0.0.0:11001 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>它做什么：&lt;/p></description></item><item><title>存储</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/</guid><description>&lt;h1 id="存储层">
+ 存储层
+ &lt;a class="anchor" href="#%e5%ad%98%e5%82%a8%e5%b1%82">#&lt;/a>
+&lt;/h1>
+&lt;p>命令处理器之下是 &lt;strong>ledis&lt;/strong>：一个把五种 Redis 类型转换成单个 &lt;code>driver.IDB&lt;/code> 上的键/值操作的数据模型。这也是同一组命令既能作用于本地 LevelDB 文件、又能作用于 IPFS 的原因。&lt;/p>
+&lt;h2 id="按类型的键空间">
+ 按类型的键空间
+ &lt;a class="anchor" href="#%e6%8c%89%e7%b1%bb%e5%9e%8b%e7%9a%84%e9%94%ae%e7%a9%ba%e9%97%b4">#&lt;/a>
+&lt;/h2>
+&lt;p>ledis 不存&amp;quot;带类型的键&amp;quot;。它按类型存彼此独立的物理键，每个都带一个类型字节前缀：&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">类型&lt;/th>
+ &lt;th style="text-align: left">前缀字节&lt;/th>
+ &lt;th style="text-align: left">每个逻辑键对应的物理键&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">字符串&lt;/td>
+ &lt;td style="text-align: left">&lt;code>KVType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">值本身&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">哈希&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HashType&lt;/code>、&lt;code>HSizeType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">每个字段一条记录 + 一个大小计数器&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">列表&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ListType&lt;/code>、&lt;code>LMetaType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">每个索引一条记录 + 一条元数据记录（head/tail/size）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">集合&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SetType&lt;/code>、&lt;code>SSizeType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">每个成员一条记录 + 一个大小计数器&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">有序集合&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSetType&lt;/code>、&lt;code>ZSizeType&lt;/code>、&lt;code>ZScoreType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">每个成员一条记录 + 大小计数器 + 每个（分值，成员）一条索引记录&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>过期时间也是独立记录（&lt;code>ExpMetaType&lt;/code>、&lt;code>ExpTimeType&lt;/code>），所以 TTL 属于设置它的那个类型，而不属于键名。&lt;/p>
+&lt;p>从客户端就能观察到的后果：&lt;/p>
+&lt;ul>
+&lt;li>同一名称下可以并存两种类型（见
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/commands/compatibility/">兼容性&lt;/a>）。&lt;/li>
+&lt;li>&lt;code>SCAN&lt;/code> 必须遍历五个键空间；它的游标里带五个子游标。&lt;/li>
+&lt;li>删除哈希（&lt;code>HCLEAR&lt;/code>）会移除很多物理键；&lt;code>DEL&lt;/code> 只移除字符串那一条。&lt;/li>
+&lt;/ul>
+&lt;h2 id="物理键编码">
+ 物理键编码
+ &lt;a class="anchor" href="#%e7%89%a9%e7%90%86%e9%94%ae%e7%bc%96%e7%a0%81">#&lt;/a>
+&lt;/h2>
+&lt;p>复合键采用长度前缀加分隔符，而不是哈希：&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>hash: [index][HashType][uint16 keyLen][key][&amp;#39;:&amp;#39;][field]
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>list: [index][ListType][uint16 keyLen][key][uint32 index]
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>zset: [index][ZScoreType][uint16 keyLen][key][sep][score][member]
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>有序集合的 &lt;code>sep&lt;/code> 按分值符号取两个字节之一，因此索引的字节序与分值的数值序一致——这正是 &lt;code>ZRANGEBYSCORE&lt;/code> 能做成范围扫描而不是全量排序的原因。成员记录按编码后的键排序，所以 &lt;code>SMEMBERS&lt;/code>/&lt;code>HKEYS&lt;/code> 的返回顺序是存储顺序，而不是插入顺序。&lt;/p></description></item><item><title>集合</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/</guid><description>&lt;h1 id="集合">
+ 集合
+ &lt;a class="anchor" href="#%e9%9b%86%e5%90%88">#&lt;/a>
+&lt;/h1>
+&lt;p>21 条命令：成员关系、三组集合代数、过期，以及确定性的 &lt;code>SPOP&lt;/code>。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SADD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SADD KEY MEMBER [MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新增成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SADD tags go db&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SREM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SREM KEY MEMBER [MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SREM tags db&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCARD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCARD KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 基数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCARD tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SISMEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SISMEMBER KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SISMEMBER tags go&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SMEMBERS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMEMBERS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 成员列表&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMEMBERS tags&lt;/code> → &lt;code>[go]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SDIFF&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFF KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 在首个集合、不在后续集合的成员&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFF a b&lt;/code> → &lt;code>[x]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SDIFFSTORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFFSTORE dest KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 结果大小&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFFSTORE out a b&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SINTER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTER KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 交集成员&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTER a b&lt;/code> → &lt;code>[y]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SINTERSTORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTERSTORE dest KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 结果大小&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTERSTORE out a b&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SUNION&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNION KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 并集成员&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNION a b&lt;/code> → &lt;code>[x,y]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SUNIONSTORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNIONSTORE dest KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 结果大小&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNIONSTORE out a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SMOVE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMOVE source destination MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 移动成功，0 不是成员&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMOVE a b x&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SPOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPOP KEY [count]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">无 count：&lt;code>bulk&lt;/code> 成员；有 count：&lt;code>array&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPOP queue:ready&lt;/code> → &lt;code>job:7&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SRANDMEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SRANDMEMBER KEY [count]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">无 count：&lt;code>bulk&lt;/code>；count 为正：去重的 &lt;code>array&lt;/code>；为负：可重复的 &lt;code>array&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SRANDMEMBER tags 1&lt;/code> → &lt;code>[go]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SKEYEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SKEYEXISTS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1 —— 集合是否存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SKEYEXISTS tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCLEAR tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SMCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMCLEAR KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除集合数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMCLEAR a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SEXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIRE tags 60&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SEXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIREAT tags 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>STTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 剩余秒，无过期为 &lt;code>-1&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STTL tags&lt;/code> → &lt;code>59&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SPERSIST&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPERSIST KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 移除，0 本来没有&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPERSIST tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="说明">
+ 说明
+ &lt;a class="anchor" href="#%e8%af%b4%e6%98%8e">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;strong>&lt;code>SPOP&lt;/code> 的抽取是跨副本确定性的。&lt;/strong> 由于它是写命令，结果必须在每个节点上一致，所以抽取的成员由 Raft 提供的种子决定，而不是 &lt;code>math/rand&lt;/code>。带 &lt;code>count&lt;/code> 时，count 会夹到集合大小；&lt;code>count = 0&lt;/code> 返回空数组，负数 count 报错。&lt;/li>
+&lt;li>&lt;code>SRANDMEMBER&lt;/code> 是&lt;strong>读&lt;/strong>命令，可以使用真正的随机性（&lt;code>count&lt;/code> 为正时返回不重复的成员，为负时允许重复）。&lt;code>|count|&lt;/code> 上限 1048576。&lt;/li>
+&lt;li>&lt;code>SMOVE&lt;/code> 移到同一个键是 no-op，返回 &lt;code>1&lt;/code> 并保留 TTL。&lt;/li>
+&lt;li>&lt;code>SCLEAR&lt;/code>/&lt;code>SMCLEAR&lt;/code> 删除整个集合及其过期时间；&lt;code>SREM&lt;/code> 只删除成员。&lt;/li>
+&lt;li>&lt;code>SPERSIST&lt;/code> 是引擎中唯一的 &lt;code>*PERSIST&lt;/code> 命令，且已知在 &lt;code>ipfs&lt;/code> 后端会留下过期时间。字符串、哈希和列表根本没有 &lt;code>PERSIST&lt;/code>。&lt;/li>
+&lt;li>集合代数命令读取参数中指定的集合；&lt;code>*STORE&lt;/code> 变体会&lt;strong>覆盖&lt;/strong>目标键，并返回结果大小。&lt;/li>
+&lt;/ul></description></item><item><title>生态</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/</guid><description>&lt;h1 id="生态库与组件">
+ 生态库与组件
+ &lt;a class="anchor" href="#%e7%94%9f%e6%80%81%e5%ba%93%e4%b8%8e%e7%bb%84%e4%bb%b6">#&lt;/a>
+&lt;/h1>
+&lt;p>引擎只是其中一块。下面是它周围的库和服务，全部在同一个 GitHub 组织下。&lt;/p>
+&lt;h2 id="存储驱动使用的库">
+ 存储驱动使用的库
+ &lt;a class="anchor" href="#%e5%ad%98%e5%82%a8%e9%a9%b1%e5%8a%a8%e4%bd%bf%e7%94%a8%e7%9a%84%e5%ba%93">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">项目&lt;/th>
+ &lt;th style="text-align: left">使用者&lt;/th>
+ &lt;th style="text-align: left">作用&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/icefiredb-crdt-kv">&lt;code>icefiredb-crdt-kv&lt;/code>&lt;/a>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>driver/crdt&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">基于 libp2p pubsub 的 CRDT 键/值存储；无需协调即可合并并发写入&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/icefiredb-ipfs-log">&lt;code>icefiredb-ipfs-log&lt;/code>&lt;/a>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>driver/ipfs-log&lt;/code>、&lt;code>driver/ipfs-synckv&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">面向分布式系统的不可变、基于操作的只追加日志，存于 IPFS，并通过 pubsub 合并&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/uhaha">&lt;code>IceFireDB/uhaha&lt;/code>&lt;/a>（fork）&lt;/td>
+ &lt;td style="text-align: left">本二进制&lt;/td>
+ &lt;td style="text-align: left">Raft 应用框架：RESP 服务器、日志、快照、&lt;code>RAFT&lt;/code>/&lt;code>CLUSTER&lt;/code> 命令&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/ledisdb">&lt;code>IceFireDB/ledisdb&lt;/code>&lt;/a>（fork）&lt;/td>
+ &lt;td style="text-align: left">本二进制&lt;/td>
+ &lt;td style="text-align: left">数据模型：按类型的键空间、TTL、编码&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>其中两个是 fork，通过 &lt;code>replace&lt;/code> 指令固定在 &lt;code>go.mod&lt;/code> 里。更新它们的 vendor 代码就是改变引擎的行为，所以 &lt;code>go mod vendor&lt;/code> 产生的 diff 值得认真审查。&lt;/p>
+&lt;h2 id="本仓库中的服务">
+ 本仓库中的服务
+ &lt;a class="anchor" href="#%e6%9c%ac%e4%bb%93%e5%ba%93%e4%b8%ad%e7%9a%84%e6%9c%8d%e5%8a%a1">#&lt;/a>
+&lt;/h2>
+&lt;h3 id="icefiredb-pubsub">
+ IceFireDB-PubSub
+ &lt;a class="anchor" href="#icefiredb-pubsub">#&lt;/a>
+&lt;/h3>
+&lt;p>在 libp2p 网络上提供 Redis 发布/订阅协议。客户端照旧使用 &lt;code>SUBSCRIBE&lt;/code>/&lt;code>PUBLISH&lt;/code>；服务器把消息在对等节点之间传播，包括 NAT 后面的节点。&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>cd IceFireDB-PubSub
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB-PubSub -c ./config/config.yaml &lt;span style="color:#75715e"># proxy.local_port: 16379&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-cli -p &lt;span style="color:#ae81ff">16379&lt;/span> SUBSCRIBE name
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-cli -p &lt;span style="color:#ae81ff">16379&lt;/span> PUBLISH name hello
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>配置在 &lt;code>config/config.yaml&lt;/code>：&lt;code>proxy.local_port&lt;/code>、&lt;code>p2p.*&lt;/code>（发现 id、命令 topic、模式、host ip/port）、
+&lt;code>pprof_debug&lt;/code>、&lt;code>log.level&lt;/code>、&lt;code>ip_white_list&lt;/code>、&lt;code>cache&lt;/code>、&lt;code>ignore_cmd&lt;/code>。见
+
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/icefiredb-pubsub/">IceFireDB-PubSub&lt;/a>。&lt;/p></description></item><item><title>编解码</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/</guid><description>&lt;h1 id="编解码层">
+ 编解码层
+ &lt;a class="anchor" href="#%e7%bc%96%e8%a7%a3%e7%a0%81%e5%b1%82">#&lt;/a>
+&lt;/h1>
+&lt;p>这个引擎里的&amp;quot;编解码&amp;quot;指的是协议层结构与 ledis 写入的 KV 对之间的映射。它不是你可以选择的序列化格式——它由 ledis 固定，只能通过键限额、顺序、迁移这类副作用观察到。&lt;/p>
+&lt;h2 id="哪些东西被编码">
+ 哪些东西被编码
+ &lt;a class="anchor" href="#%e5%93%aa%e4%ba%9b%e4%b8%9c%e8%a5%bf%e8%a2%ab%e7%bc%96%e7%a0%81">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">逻辑操作&lt;/th>
+ &lt;th style="text-align: left">物理操作&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SET k v&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(KVType + k, v)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSET k f v&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">字段为新增时：&lt;code>Put(HashType + k + f, v)&lt;/code>、&lt;code>IncrBy(HSizeType + k, 1)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPUSH k v&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(ListType + k + index, v)&lt;/code>，更新 &lt;code>LMetaType + k&lt;/code>（head、tail、count）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SADD k m&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(SetType + k + m, nil)&lt;/code>、&lt;code>IncrBy(SSizeType + k, 1)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZADD k score m&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(ZSetType + k + m, score)&lt;/code>、&lt;code>Put(ZScoreType + k + score + m, nil)&lt;/code>、大小计数器&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXPIRE k s&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(ExpTimeType + k, timestamp)&lt;/code>、&lt;code>Put(ExpMetaType + k, …)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>删除是逆操作：删一个哈希字段会移除一条 &lt;code>HashType&lt;/code> 记录并递减大小计数器，而 &lt;code>HCLEAR&lt;/code> 会遍历全部字段，并连计数器和过期记录一起移除。&lt;/p></description></item><item><title>可观测性</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/</guid><description>&lt;h1 id="可观测性">
+ 可观测性
+ &lt;a class="anchor" href="#%e5%8f%af%e8%a7%82%e6%b5%8b%e6%80%a7">#&lt;/a>
+&lt;/h1>
+&lt;p>有三种方式能看到节点在做什么：HTTP 端点、&lt;code>INFO&lt;/code> 命令和 pprof。三者都需要显式开启。&lt;/p>
+&lt;h2 id="http-端点">
+ HTTP 端点
+ &lt;a class="anchor" href="#http-%e7%ab%af%e7%82%b9">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB --metrics --metrics-addr 127.0.0.1:11002 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">路径&lt;/th>
+ &lt;th style="text-align: left">响应&lt;/th>
+ &lt;th style="text-align: left">用途&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>/healthz&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">只要进程还活着就返回 &lt;code>200 ok&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">存活探针&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>/readyz&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">存储驱动初始化完成后返回 &lt;code>200 ready&lt;/code>；在此之前返回 &lt;code>503 not ready&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">就绪探针 / 上线门禁&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>/metrics&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Prometheus 文本格式&lt;/td>
+ &lt;td style="text-align: left">抓取&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>服务端是一个普通的 &lt;code>http.Server&lt;/code>，&lt;code>ReadHeaderTimeout&lt;/code> 为 5 秒；它没有认证，所以留在回环地址或私有
+网卡上（见
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/deploy/security/">安全&lt;/a>）。&lt;/p>
+&lt;h3 id="暴露的指标">
+ 暴露的指标
+ &lt;a class="anchor" href="#%e6%9a%b4%e9%9c%b2%e7%9a%84%e6%8c%87%e6%a0%87">#&lt;/a>
+&lt;/h3>
+&lt;p>注册表不是全局那个——它注册的正好是：&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">指标&lt;/th>
+ &lt;th style="text-align: left">类型&lt;/th>
+ &lt;th style="text-align: left">含义&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>icefiredb_connected_clients&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">gauge&lt;/td>
+ &lt;td style="text-align: left">当前打开的 RESP 连接数&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>go_*&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">collector&lt;/td>
+ &lt;td style="text-align: left">Go 运行时（goroutine、GC、memstats……）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>process_*&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">collector&lt;/td>
+ &lt;td style="text-align: left">进程 CPU、RSS、FD、启动时间&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;strong>没有&lt;/strong> Raft 指标，没有按命令的计数器，也没有延迟直方图。命令和存储的计数器改放在 &lt;code>INFO&lt;/code> 里（见
+下文）。抓取间隔和告警应当依赖 &lt;code>up&lt;/code>、&lt;code>icefiredb_connected_clients&lt;/code> 以及容器层面的信号。&lt;/p></description></item><item><title>有序集合</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/</guid><description>&lt;h1 id="有序集合">
+ 有序集合
+ &lt;a class="anchor" href="#%e6%9c%89%e5%ba%8f%e9%9b%86%e5%90%88">#&lt;/a>
+&lt;/h1>
+&lt;p>15 条命令。分值类型是 &lt;strong>64 位整数&lt;/strong>，不是双精度浮点 —— 这是唯一会改变查询结果、而不只是线格式的差异。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZADD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZADD KEY score MEMBER [score MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新增成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZADD board 100 ada 90 bob&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZINCRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R ⚠&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZINCRBY KEY increment MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 新分值&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZINCRBY board 5 ada&lt;/code> → &lt;code>105&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREM KEY MEMBER [MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREM board bob&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZCARD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCARD KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 基数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCARD board&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZCOUNT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCOUNT KEY min max&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 分值区间内的成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCOUNT board 0 200&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCORE KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 分值，缺失为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCORE board ada&lt;/code> → &lt;code>105&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZRANK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANK KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 升序排名（0 起），缺失为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANK board ada&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREVRANK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANK KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 降序排名，缺失为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANK board ada&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGE KEY start stop [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 成员（及分值）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGE board 0 -1 WITHSCORES&lt;/code> → &lt;code>[ada, 105]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGE KEY start stop [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 成员（及分值）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGE board 0 0&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZRANGEBYSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGEBYSCORE KEY min max [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 成员（及分值）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGEBYSCORE board 100 200&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGEBYSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGEBYSCORE KEY max min [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 成员（及分值）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGEBYSCORE board 200 100&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYRANK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R ⚠&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYRANK KEY start stop&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYRANK board 0 0&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R ⚠&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYSCORE KEY min max&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYSCORE board 0 50&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCLEAR board&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="说明">
+ 说明
+ &lt;a class="anchor" href="#%e8%af%b4%e6%98%8e">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;strong>⚠ &lt;code>ZINCRBY&lt;/code>、&lt;code>ZREMRANGEBYRANK&lt;/code> 和 &lt;code>ZREMRANGEBYSCORE&lt;/code> 被注册为读命令&lt;/strong>，尽管它们会修改数据。本地执行无害；在集群中它们的影响不会被复制，也无法在 leader 切换后存活。修复前：在客户端算好分值并用 &lt;code>ZADD&lt;/code> 写入，用 &lt;code>ZREM&lt;/code> 删除成员。&lt;/li>
+&lt;li>&lt;strong>有序集合没有 TTL。&lt;/strong> 没有 &lt;code>ZEXPIRE&lt;/code>/&lt;code>ZTTL&lt;/code>；请清理并重建键（&lt;code>ZCLEAR&lt;/code>），或把过期记账放在一个字符串键里。&lt;/li>
+&lt;li>分值按 &lt;code>int64&lt;/code> 解析。像 &lt;code>1.5&lt;/code> 这样的浮点分值会被拒绝；&lt;code>WITHSCORES&lt;/code> 返回整数。&lt;/li>
+&lt;li>&lt;code>ZRANGEBYSCORE min max&lt;/code> 两端都是闭区间；&lt;code>ZREVRANGEBYSCORE max min&lt;/code> 的参数顺序相反，与 Redis 一致。&lt;/li>
+&lt;li>成员缺失时，&lt;code>ZRANK&lt;/code>/&lt;code>ZREVRANK&lt;/code> 返回 &lt;code>null&lt;/code>，&lt;code>ZSCORE&lt;/code> 同理。&lt;/li>
+&lt;li>所有区间读取都按分值排序，分值相同时再按成员排序。&lt;/li>
+&lt;/ul></description></item><item><title>扫描</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/</guid><description>&lt;h1 id="扫描">
+ 扫描
+ &lt;a class="anchor" href="#%e6%89%ab%e6%8f%8f">#&lt;/a>
+&lt;/h1>
+&lt;p>8 条命令，分两族，&lt;strong>两套不同的游标契约&lt;/strong>。把它们搞混是使用本引擎时最常见的集成错误。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCAN cursor [MATCH glob] [COUNT n] [TYPE type]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, keys]&lt;/code>，游标为 &lt;code>0&lt;/code> 表示结束&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCAN 0 MATCH user:* COUNT 100&lt;/code> → &lt;code>[cursor, [user:1, user:2]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSCAN KEY cursor [MATCH glob] [COUNT n]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [field, value, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSCAN user:1 0 COUNT 10&lt;/code> → &lt;code>[0, [name, ada]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SSCAN KEY cursor [MATCH glob] [COUNT n]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SSCAN tags 0&lt;/code> → &lt;code>[0, [go]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCAN KEY cursor [MATCH glob] [COUNT n]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, score, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCAN board 0&lt;/code> → &lt;code>[0, [ada, 105]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSCAN type cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, keys]&lt;/code>，空游标表示结束&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSCAN KV &amp;quot;&amp;quot; COUNT 5&lt;/code> → &lt;code>[key:5, [...]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XHSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XHSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [field, value, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XHSCAN user:1 &amp;quot;&amp;quot; COUNT 5&lt;/code> → &lt;code>[name, [name, ada]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XSSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSSCAN tags &amp;quot;&amp;quot;&lt;/code> → &lt;code>[go, [go]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XZSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XZSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, score, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XZSCAN board &amp;quot;&amp;quot;&lt;/code> → &lt;code>[ada, [ada, 105]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="redis-族">
+ Redis 族
+ &lt;a class="anchor" href="#redis-%e6%97%8f">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>SCAN&lt;/code> / &lt;code>HSCAN&lt;/code> / &lt;code>SSCAN&lt;/code> / &lt;code>ZSCAN&lt;/code> 沿用 Redis 的形态，但不沿用 Redis 的游标编码。&lt;/p></description></item><item><title>运维</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/</guid><description>&lt;h1 id="运维">
+ 运维
+ &lt;a class="anchor" href="#%e8%bf%90%e7%bb%b4">#&lt;/a>
+&lt;/h1>
+&lt;p>单节点或 Raft 集群的备份、恢复、升级与故障恢复。所有东西的单位是&lt;strong>节点目录&lt;/strong>：
+&lt;code>&amp;lt;data-dir&amp;gt;/IceFireDB/&amp;lt;node-id&amp;gt;/&lt;/code>。&lt;/p>
+&lt;h2 id="磁盘上有什么">
+ 磁盘上有什么
+ &lt;a class="anchor" href="#%e7%a3%81%e7%9b%98%e4%b8%8a%e6%9c%89%e4%bb%80%e4%b9%88">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">路径&lt;/th>
+ &lt;th style="text-align: left">内容&lt;/th>
+ &lt;th style="text-align: left">备份方式&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>main.db/&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">所选驱动格式的 ledis 存储&lt;/td>
+ &lt;td style="text-align: left">复制该目录&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>store/&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Raft 日志 + 稳定存储（&lt;code>leveldb&lt;/code> 或 &lt;code>bolt&lt;/code>）&lt;/td>
+ &lt;td style="text-align: left">复制该目录&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>snapshots/&amp;lt;id&amp;gt;/state.bin&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Raft 状态机快照：gzip 头（start/ts/seed）+ &lt;code>sds&lt;/code> 键/值流&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RAFT SNAPSHOT&lt;/code>，或复制该目录&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>state.bin&lt;/code> 与后端无关：&lt;code>writeSnapshot&lt;/code> 遍历驱动的快照，把 &lt;code>key, value&lt;/code> 对写进一个 gzip 流。这就是为什么在
+&lt;code>badger&lt;/code> 节点上做的快照可以恢复到 &lt;code>goleveldb&lt;/code> 节点，而 &lt;code>main.db/&lt;/code> 目录本身永远不行。请把这个文件当作不透明的：
+整体复制（或用 &lt;code>RAFT SNAPSHOT READ&lt;/code> 按窗口读取），再用 &lt;code>--restore&lt;/code> 交回去 —— 不要解压或修改它。&lt;/p>
+&lt;h2 id="备份">
+ 备份
+ &lt;a class="anchor" href="#%e5%a4%87%e4%bb%bd">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;strong>方案 A——快照状态机（推荐，可移植）&lt;/strong>&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>redis-cli -p &lt;span style="color:#ae81ff">11001&lt;/span> RAFT SNAPSHOT NOW &lt;span style="color:#75715e"># returns the new snapshot id&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-cli -p &lt;span style="color:#ae81ff">11001&lt;/span> RAFT SNAPSHOT LIST &lt;span style="color:#75715e"># ids and sizes&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-cli -p &lt;span style="color:#ae81ff">11001&lt;/span> RAFT SNAPSHOT FILE &amp;lt;id&amp;gt; &lt;span style="color:#75715e"># absolute path on the server&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># copy that file off the host:&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>scp db1:/var/lib/icefiredb/IceFireDB/1/snapshots/&amp;lt;id&amp;gt;/state.bin ./backup-&lt;span style="color:#66d9ef">$(&lt;/span>date +%F&lt;span style="color:#66d9ef">)&lt;/span>.sds
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>对于很大或带宽受限的快照，按窗口读它，而不是复制文件：&lt;/p></description></item><item><title>服务器</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/</guid><description>&lt;h1 id="服务器">
+ 服务器
+ &lt;a class="anchor" href="#%e6%9c%8d%e5%8a%a1%e5%99%a8">#&lt;/a>
+&lt;/h1>
+&lt;p>数据面中的三条命令。运维需要的其他一切（&lt;code>RAFT&lt;/code>、&lt;code>CLUSTER&lt;/code>、&lt;code>MACHINE&lt;/code>、&lt;code>BARRIER&lt;/code>、&lt;code>AUTH&lt;/code>、&lt;code>SHUTDOWN&lt;/code>、&lt;code>VERSION&lt;/code>）都在
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/deploy/system-commands/">系统命令&lt;/a>中。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>INFO&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INFO&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 多行报告&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INFO&lt;/code> → &lt;code># Server\r\nversion…&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>FLUSHALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除键数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHALL&lt;/code> → &lt;code>(integer) 42&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>FLUSHDB&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHDB&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除键数 —— &lt;code>FLUSHALL&lt;/code> 的别名&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHDB&lt;/code> → &lt;code>(integer) 42&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="info-不接受参数">
+ &lt;code>INFO&lt;/code> 不接受参数
+ &lt;a class="anchor" href="#info-%e4%b8%8d%e6%8e%a5%e5%8f%97%e5%8f%82%e6%95%b0">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>INFO memory&lt;/code>、&lt;code>INFO server&lt;/code> 和 &lt;code>INFO replication&lt;/code> 都是&lt;strong>参数错误&lt;/strong>；该命令的判断是 &lt;code>len(args) != 1 → wrong number of arguments&lt;/code>。请直接请求 &lt;code>INFO&lt;/code>，再从这一个回复里读你需要的分节。各分节及其字段记录在
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/deploy/observability/#info">可观测性&lt;/a>中。&lt;/p>
+&lt;p>&lt;code>INFO&lt;/code> 是读命令：接收请求的节点用自己的状态作答，永不复制。&lt;/p>
+&lt;h2 id="flushdb-就是-flushall">
+ &lt;code>FLUSHDB&lt;/code> 就是 &lt;code>FLUSHALL&lt;/code>
+ &lt;a class="anchor" href="#flushdb-%e5%b0%b1%e6%98%af-flushall">#&lt;/a>
+&lt;/h2>
+&lt;p>引擎只有一个逻辑数据库，因此 &lt;code>FLUSHDB&lt;/code> 实现为 &lt;code>FLUSHALL&lt;/code> 的别名。两者都：&lt;/p></description></item><item><title>系统命令</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/</guid><description>&lt;h1 id="系统命令">
+ 系统命令
+ &lt;a class="anchor" href="#%e7%b3%bb%e7%bb%9f%e5%91%bd%e4%bb%a4">#&lt;/a>
+&lt;/h1>
+&lt;p>
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/commands/">命令参考&lt;/a>里的 110 条命令是数据面。在它们之下还有第二个面，由 Raft/RESP 层提供，运维
+依赖它。它不属于 Redis 命令集，所以记在这里。&lt;/p>
+&lt;p>这些命令除非特别说明，否则都不经过 Raft 日志，并且 &lt;code>--try-errors&lt;/code> 会禁用 &lt;code>CLUSTER&lt;/code> 家族。&lt;/p>
+&lt;h2 id="连接">
+ 连接
+ &lt;a class="anchor" href="#%e8%bf%9e%e6%8e%a5">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">回复&lt;/th>
+ &lt;th style="text-align: left">说明&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>PING [message]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>PONG&lt;/code>，或该 message&lt;/td>
+ &lt;td style="text-align: left">在分发之前处理&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ECHO message&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">该 message&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>AUTH token&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>OK&lt;/code> / &lt;code>-unauthorized&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">设置 &lt;code>--auth&lt;/code> 时必须最先发送&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>QUIT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>OK&lt;/code>，然后连接关闭&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SHUTDOWN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;em>（无——进程退出）&lt;/em>&lt;/td>
+ &lt;td style="text-align: left">从客户端角度看等价于 &lt;code>SIGKILL&lt;/code>；配置了 &lt;code>AUTH&lt;/code> 时要求先认证&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="machine">
+ Machine
+ &lt;a class="anchor" href="#machine">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">回复&lt;/th>
+ &lt;th style="text-align: left">含义&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>VERSION&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">bulk string&lt;/td>
+ &lt;td style="text-align: left">引擎版本，例如 &lt;code>1.0.0-rc.1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MACHINE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>now&lt;/code>、&lt;code>uptime&lt;/code>、&lt;code>boottime&lt;/code> 的映射（纳秒）&lt;/td>
+ &lt;td style="text-align: left">时间来自 Raft 时钟，所以每个节点一致&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MACHINE HUMAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">同样的键，RFC3339 / duration 形式&lt;/td>
+ &lt;td style="text-align: left">人类可读的变体&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BARRIER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">一个空操作的&lt;strong>写&lt;/strong>：它返回时，该客户端此前发出的每个写都已应用&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>BARRIER&lt;/code> 是跨客户端或跨节点获得读己之写（read-your-writes）保证的方式：在主节点上发送 &lt;code>BARRIER&lt;/code>，
+然后用 &lt;code>--openreads&lt;/code> 在从节点上读。&lt;/p></description></item><item><title>兼容性</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/</guid><description>&lt;h1 id="与-redis-的兼容性">
+ 与 Redis 的兼容性
+ &lt;a class="anchor" href="#%e4%b8%8e-redis-%e7%9a%84%e5%85%bc%e5%ae%b9%e6%80%a7">#&lt;/a>
+&lt;/h1>
+&lt;p>IceFireDB 使用 RESP 协议，大多数命令的行为与 Redis 相同，但它不是 Redis：底层存储模型是 ledis，每种数据类型一个键空间，过期时间按整秒存储。本页列出客户端实际会注意到的差异，以及它们存在的原因。&lt;/p>
+&lt;p>标记为&lt;strong>由测试锁定&lt;/strong>的行为由 &lt;code>compat_test.go&lt;/code>（&lt;code>make test-compat&lt;/code>）固定，除非有意更新，否则不会改变。&lt;/p>
+&lt;h2 id="1-没有-wrongtype--每种数据类型一个键空间">
+ 1. 没有 &lt;code>WRONGTYPE&lt;/code> —— 每种数据类型一个键空间
+ &lt;a class="anchor" href="#1-%e6%b2%a1%e6%9c%89-wrongtype--%e6%af%8f%e7%a7%8d%e6%95%b0%e6%8d%ae%e7%b1%bb%e5%9e%8b%e4%b8%80%e4%b8%aa%e9%94%ae%e7%a9%ba%e9%97%b4">#&lt;/a>
+&lt;/h2>
+&lt;p>Redis：一个键只持有一种类型的一个值；类型不符的命令会失败并返回 &lt;code>WRONGTYPE Operation against a key holding the wrong kind of value&lt;/code>。&lt;/p>
+&lt;p>IceFireDB 为&lt;strong>每种类型保留独立的键空间&lt;/strong>（string、hash、list、set、sorted set）。后果：&lt;/p>
+&lt;ul>
+&lt;li>同一个键名可以同时持有字符串&lt;em>和&lt;/em>哈希&lt;em>和&lt;/em>列表。&lt;/li>
+&lt;li>类型不符的命令不会失败；它在该类型自己的（可能为空的）视图上执行。&lt;/li>
+&lt;li>根本没有 &lt;code>TYPE&lt;/code> 命令，所以你无法查询某个键当前是什么类型。&lt;/li>
+&lt;/ul>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>SET k v -&amp;gt; OK
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>HSET k f x -&amp;gt; 1 # Redis: WRONGTYPE, here: fine
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>GET k -&amp;gt; &amp;#34;v&amp;#34;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>HGET k f -&amp;gt; &amp;#34;x&amp;#34;
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>如果你的应用依赖 &lt;code>WRONGTYPE&lt;/code> 来做类型安全，请在应用层自行保证（例如用 &lt;code>user:1:profile&lt;/code> 与 &lt;code>user:1:fields&lt;/code> 这样的键命名约定）。&lt;/p></description></item></channel></rss>

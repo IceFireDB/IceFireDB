@@ -1,0 +1,242 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content='
+  Strings
+  #
+
+26 commands: the SET family, counters, bit operations and string expiry.
+
+  
+      
+          Cmd
+          RW
+          Syntax
+          Returns
+          Example → reply
+      
+  
+  
+      
+          SET
+          W
+          SET KEY VALUE [EX seconds] [PX milliseconds] [NX] [XX] [KEEPTTL]
+          +OK, or null when NX/XX blocks the write
+          SET user:1 &#39;{"n":"ada"}&#39; EX 60 → OK
+      
+      
+          SETNX
+          W
+          SETNX KEY VALUE
+          integer 1 written, 0 already exists
+          SETNX job:42 1 → 1
+      
+      
+          SETEX
+          W
+          SETEX KEY seconds VALUE
+          +OK
+          SETEX session:9 60 tok → OK
+      
+      
+          SETEXAT
+          W
+          SETEXAT KEY unixTime VALUE
+          +OK
+          SETEXAT session:9 1767225600 tok → OK
+      
+      
+          GETSET
+          W
+          GETSET KEY VALUE
+          bulk old value, null if absent
+          GETSET counter 0 → "7"
+      
+      
+          GET
+          R
+          GET KEY
+          bulk, null if absent
+          GET user:1 → {"n":"ada"}
+      
+      
+          MGET
+          R
+          MGET KEY [KEY ...]
+          array of bulk/null
+          MGET a b → [val, null]
+      
+      
+          MSET
+          W
+          MSET KEY VALUE [KEY VALUE ...]
+          +OK
+          MSET a 1 b 2 → OK
+      
+      
+          APPEND
+          W
+          APPEND KEY VALUE
+          integer new length
+          APPEND log "x\n" → 5
+      
+      
+          STRLEN
+          R
+          STRLEN KEY
+          integer length in bytes
+          STRLEN user:1 → 13
+      
+      
+          INCR
+          W
+          INCR KEY
+          integer new value
+          INCR hits → 1
+      
+      
+          INCRBY
+          W
+          INCRBY KEY increment
+          integer new value
+          INCRBY hits 5 → 6
+      
+      
+          DECR
+          W
+          DECR KEY
+          integer new value
+          DECR hits → 5
+      
+      
+          DECRBY
+          W
+          DECRBY KEY decrement
+          integer new value
+          DECRBY hits 5 → 0
+      
+      
+          GETRANGE
+          R
+          GETRANGE KEY start end
+          bulk substring (inclusive, negative offsets from the end)
+          GETRANGE user:1 0 3 → {"n"
+      
+      
+          SETRANGE
+          W
+          SETRANGE KEY offset VALUE
+          integer new length
+          SETRANGE user:1 0 &#39;{"m"&#39; → 13
+      
+      
+          GETBIT
+          R
+          GETBIT KEY offset
+          integer 0/1
+          GETBIT bitmap 7 → 0
+      
+      
+          SETBIT
+          W
+          SETBIT KEY offset value
+          integer previous bit
+          SETBIT bitmap 7 1 → 0
+      
+      
+          BITCOUNT
+          R
+          BITCOUNT KEY [start end [BYTE|BIT]]
+          integer number of set bits
+          BITCOUNT bitmap 0 0 → 1
+      
+      
+          BITOP
+          W
+          BITOP AND|OR|XOR|NOT destKey KEY [KEY ...]
+          integer length of the result
+          BITOP AND out a b → 2
+      
+      
+          BITPOS
+          R
+          BITPOS KEY bit [start [end [BYTE|BIT]]]
+          integer position, -1 if not found
+          BITPOS bitmap 1 → 7
+      
+      
+          DEL
+          W
+          DEL KEY [KEY ...]
+          integer keys removed
+          DEL a b → 2
+      
+      
+          EXISTS
+          R
+          EXISTS KEY [KEY ...]
+          integer number of existing keys
+          EXISTS a b → 1
+      
+      
+          EXPIRE
+          W
+          EXPIRE KEY seconds
+          integer 1 set, 0 key absent
+          EXPIRE session:9 60 → 1
+      
+      
+          EXPIREAT
+          W
+          EXPIREAT KEY unixTime
+          integer 1 set, 0 key absent
+          EXPIREAT session:9 1767225600 → 1
+      
+      
+          TTL
+          R
+          TTL KEY
+          integer seconds left, -1 no expiration
+          TTL session:9 → 59
+      
+  
+
+
+  Notes
+  #
+
+
+SET clears an existing expiration unless KEEPTTL is given. PX is rounded up to the next
+second because expirations are stored in whole seconds, so PX 500 keeps the key 1 s and PX 1500
+keeps it 2 s — never less than asked.
+SET ... NX/XX answers a null bulk when the condition blocks the write, not an error.
+There is no string PERSIST: the handler exists but is commented out and not registered. To keep
+a value and change its lifetime, EXPIRE again or use SET … KEEPTTL.
+EXISTS counts keys in the string keyspace only; it will not see a hash with the same name. Use
+HKEYEXISTS, LKEYEXISTS, SKEYEXISTS for the other types.
+DEL deletes the string at those keys, not the same-named hash/list/set.
+INCR/DECR on a non-numeric value answer -ERR, like Redis; a missing key is treated as 0.
+BITCOUNT/BITPOS accept the optional BYTE/BIT unit as in Redis 7.
+Expiry arithmetic uses the Raft clock, so a short TTL can be rejected on a node whose Raft clock lags
+its local clock. See 
+  Compatibility.
+TTL is computed against the local wall clock by the storage layer, so replicas can report
+values that differ by their apply latency.
+'><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Strings"><meta property="og:description" content=' Strings # 26 commands: the SET family, counters, bit operations and string expiry.
+Cmd RW Syntax Returns Example → reply SET W SET KEY VALUE [EX seconds] [PX milliseconds] [NX] [XX] [KEEPTTL] +OK, or null when NX/XX blocks the write SET user:1 &#39;{"n":"ada"}&#39; EX 60 → OK SETNX W SETNX KEY VALUE integer 1 written, 0 already exists SETNX job:42 1 → 1 SETEX W SETEX KEY seconds VALUE +OK SETEX session:9 60 tok → OK SETEXAT W SETEXAT KEY unixTime VALUE +OK SETEXAT session:9 1767225600 tok → OK GETSET W GETSET KEY VALUE bulk old value, null if absent GETSET counter 0 → "7" GET R GET KEY bulk, null if absent GET user:1 → {"n":"ada"} MGET R MGET KEY [KEY ...] array of bulk/null MGET a b → [val, null] MSET W MSET KEY VALUE [KEY VALUE ...] +OK MSET a 1 b 2 → OK APPEND W APPEND KEY VALUE integer new length APPEND log "x\n" → 5 STRLEN R STRLEN KEY integer length in bytes STRLEN user:1 → 13 INCR W INCR KEY integer new value INCR hits → 1 INCRBY W INCRBY KEY increment integer new value INCRBY hits 5 → 6 DECR W DECR KEY integer new value DECR hits → 5 DECRBY W DECRBY KEY decrement integer new value DECRBY hits 5 → 0 GETRANGE R GETRANGE KEY start end bulk substring (inclusive, negative offsets from the end) GETRANGE user:1 0 3 → {"n" SETRANGE W SETRANGE KEY offset VALUE integer new length SETRANGE user:1 0 &#39;{"m"&#39; → 13 GETBIT R GETBIT KEY offset integer 0/1 GETBIT bitmap 7 → 0 SETBIT W SETBIT KEY offset value integer previous bit SETBIT bitmap 7 1 → 0 BITCOUNT R BITCOUNT KEY [start end [BYTE|BIT]] integer number of set bits BITCOUNT bitmap 0 0 → 1 BITOP W BITOP AND|OR|XOR|NOT destKey KEY [KEY ...] integer length of the result BITOP AND out a b → 2 BITPOS R BITPOS KEY bit [start [end [BYTE|BIT]]] integer position, -1 if not found BITPOS bitmap 1 → 7 DEL W DEL KEY [KEY ...] integer keys removed DEL a b → 2 EXISTS R EXISTS KEY [KEY ...] integer number of existing keys EXISTS a b → 1 EXPIRE W EXPIRE KEY seconds integer 1 set, 0 key absent EXPIRE session:9 60 → 1 EXPIREAT W EXPIREAT KEY unixTime integer 1 set, 0 key absent EXPIREAT session:9 1767225600 → 1 TTL R TTL KEY integer seconds left, -1 no expiration TTL session:9 → 59 Notes # SET clears an existing expiration unless KEEPTTL is given. PX is rounded up to the next second because expirations are stored in whole seconds, so PX 500 keeps the key 1 s and PX 1500 keeps it 2 s — never less than asked. SET ... NX/XX answers a null bulk when the condition blocks the write, not an error. There is no string PERSIST: the handler exists but is commented out and not registered. To keep a value and change its lifetime, EXPIRE again or use SET … KEEPTTL. EXISTS counts keys in the string keyspace only; it will not see a hash with the same name. Use HKEYEXISTS, LKEYEXISTS, SKEYEXISTS for the other types. DEL deletes the string at those keys, not the same-named hash/list/set. INCR/DECR on a non-numeric value answer -ERR, like Redis; a missing key is treated as 0. BITCOUNT/BITPOS accept the optional BYTE/BIT unit as in Redis 7. Expiry arithmetic uses the Raft clock, so a short TTL can be rejected on a node whose Raft clock lags its local clock. See Compatibility. TTL is computed against the local wall clock by the storage layer, so replicas can report values that differ by their apply latency. '><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="article:section" content="commands"><title>Strings | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/ title=字符串><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle checked>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/ class=active>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Strings</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#notes>Notes</a></li></ul></nav></aside></header><article class=markdown><h1 id=strings>Strings
+<a class=anchor href=#strings>#</a></h1><p>26 commands: the <code>SET</code> family, counters, bit operations and string expiry.</p><table><thead><tr><th style=text-align:left>Cmd</th><th style=text-align:left>RW</th><th style=text-align:left>Syntax</th><th style=text-align:left>Returns</th><th style=text-align:left>Example → reply</th></tr></thead><tbody><tr><td style=text-align:left><code>SET</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SET KEY VALUE [EX seconds] [PX milliseconds] [NX] [XX] [KEEPTTL]</code></td><td style=text-align:left><code>+OK</code>, or <code>null</code> when <code>NX</code>/<code>XX</code> blocks the write</td><td style=text-align:left><code>SET user:1 '{"n":"ada"}' EX 60</code> → <code>OK</code></td></tr><tr><td style=text-align:left><code>SETNX</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SETNX KEY VALUE</code></td><td style=text-align:left><code>integer</code> 1 written, 0 already exists</td><td style=text-align:left><code>SETNX job:42 1</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SETEX</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SETEX KEY seconds VALUE</code></td><td style=text-align:left><code>+OK</code></td><td style=text-align:left><code>SETEX session:9 60 tok</code> → <code>OK</code></td></tr><tr><td style=text-align:left><code>SETEXAT</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SETEXAT KEY unixTime VALUE</code></td><td style=text-align:left><code>+OK</code></td><td style=text-align:left><code>SETEXAT session:9 1767225600 tok</code> → <code>OK</code></td></tr><tr><td style=text-align:left><code>GETSET</code></td><td style=text-align:left>W</td><td style=text-align:left><code>GETSET KEY VALUE</code></td><td style=text-align:left><code>bulk</code> old value, <code>null</code> if absent</td><td style=text-align:left><code>GETSET counter 0</code> → <code>"7"</code></td></tr><tr><td style=text-align:left><code>GET</code></td><td style=text-align:left>R</td><td style=text-align:left><code>GET KEY</code></td><td style=text-align:left><code>bulk</code>, <code>null</code> if absent</td><td style=text-align:left><code>GET user:1</code> → <code>{"n":"ada"}</code></td></tr><tr><td style=text-align:left><code>MGET</code></td><td style=text-align:left>R</td><td style=text-align:left><code>MGET KEY [KEY ...]</code></td><td style=text-align:left><code>array</code> of bulk/null</td><td style=text-align:left><code>MGET a b</code> → <code>[val, null]</code></td></tr><tr><td style=text-align:left><code>MSET</code></td><td style=text-align:left>W</td><td style=text-align:left><code>MSET KEY VALUE [KEY VALUE ...]</code></td><td style=text-align:left><code>+OK</code></td><td style=text-align:left><code>MSET a 1 b 2</code> → <code>OK</code></td></tr><tr><td style=text-align:left><code>APPEND</code></td><td style=text-align:left>W</td><td style=text-align:left><code>APPEND KEY VALUE</code></td><td style=text-align:left><code>integer</code> new length</td><td style=text-align:left><code>APPEND log "x\n"</code> → <code>5</code></td></tr><tr><td style=text-align:left><code>STRLEN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>STRLEN KEY</code></td><td style=text-align:left><code>integer</code> length in bytes</td><td style=text-align:left><code>STRLEN user:1</code> → <code>13</code></td></tr><tr><td style=text-align:left><code>INCR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>INCR KEY</code></td><td style=text-align:left><code>integer</code> new value</td><td style=text-align:left><code>INCR hits</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>INCRBY</code></td><td style=text-align:left>W</td><td style=text-align:left><code>INCRBY KEY increment</code></td><td style=text-align:left><code>integer</code> new value</td><td style=text-align:left><code>INCRBY hits 5</code> → <code>6</code></td></tr><tr><td style=text-align:left><code>DECR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>DECR KEY</code></td><td style=text-align:left><code>integer</code> new value</td><td style=text-align:left><code>DECR hits</code> → <code>5</code></td></tr><tr><td style=text-align:left><code>DECRBY</code></td><td style=text-align:left>W</td><td style=text-align:left><code>DECRBY KEY decrement</code></td><td style=text-align:left><code>integer</code> new value</td><td style=text-align:left><code>DECRBY hits 5</code> → <code>0</code></td></tr><tr><td style=text-align:left><code>GETRANGE</code></td><td style=text-align:left>R</td><td style=text-align:left><code>GETRANGE KEY start end</code></td><td style=text-align:left><code>bulk</code> substring (inclusive, negative offsets from the end)</td><td style=text-align:left><code>GETRANGE user:1 0 3</code> → <code>{"n"</code></td></tr><tr><td style=text-align:left><code>SETRANGE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SETRANGE KEY offset VALUE</code></td><td style=text-align:left><code>integer</code> new length</td><td style=text-align:left><code>SETRANGE user:1 0 '{"m"'</code> → <code>13</code></td></tr><tr><td style=text-align:left><code>GETBIT</code></td><td style=text-align:left>R</td><td style=text-align:left><code>GETBIT KEY offset</code></td><td style=text-align:left><code>integer</code> 0/1</td><td style=text-align:left><code>GETBIT bitmap 7</code> → <code>0</code></td></tr><tr><td style=text-align:left><code>SETBIT</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SETBIT KEY offset value</code></td><td style=text-align:left><code>integer</code> previous bit</td><td style=text-align:left><code>SETBIT bitmap 7 1</code> → <code>0</code></td></tr><tr><td style=text-align:left><code>BITCOUNT</code></td><td style=text-align:left>R</td><td style=text-align:left><code>BITCOUNT KEY [start end [BYTE|BIT]]</code></td><td style=text-align:left><code>integer</code> number of set bits</td><td style=text-align:left><code>BITCOUNT bitmap 0 0</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>BITOP</code></td><td style=text-align:left>W</td><td style=text-align:left><code>BITOP AND|OR|XOR|NOT destKey KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> length of the result</td><td style=text-align:left><code>BITOP AND out a b</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>BITPOS</code></td><td style=text-align:left>R</td><td style=text-align:left><code>BITPOS KEY bit [start [end [BYTE|BIT]]]</code></td><td style=text-align:left><code>integer</code> position, <code>-1</code> if not found</td><td style=text-align:left><code>BITPOS bitmap 1</code> → <code>7</code></td></tr><tr><td style=text-align:left><code>DEL</code></td><td style=text-align:left>W</td><td style=text-align:left><code>DEL KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> keys removed</td><td style=text-align:left><code>DEL a b</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>EXISTS</code></td><td style=text-align:left>R</td><td style=text-align:left><code>EXISTS KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> number of existing keys</td><td style=text-align:left><code>EXISTS a b</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>EXPIRE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>EXPIRE KEY seconds</code></td><td style=text-align:left><code>integer</code> 1 set, 0 key absent</td><td style=text-align:left><code>EXPIRE session:9 60</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>EXPIREAT</code></td><td style=text-align:left>W</td><td style=text-align:left><code>EXPIREAT KEY unixTime</code></td><td style=text-align:left><code>integer</code> 1 set, 0 key absent</td><td style=text-align:left><code>EXPIREAT session:9 1767225600</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>TTL</code></td><td style=text-align:left>R</td><td style=text-align:left><code>TTL KEY</code></td><td style=text-align:left><code>integer</code> seconds left, <code>-1</code> no expiration</td><td style=text-align:left><code>TTL session:9</code> → <code>59</code></td></tr></tbody></table><h2 id=notes>Notes
+<a class=anchor href=#notes>#</a></h2><ul><li><code>SET</code> clears an existing expiration unless <code>KEEPTTL</code> is given. <code>PX</code> is rounded <strong>up</strong> to the next
+second because expirations are stored in whole seconds, so <code>PX 500</code> keeps the key 1 s and <code>PX 1500</code>
+keeps it 2 s — never less than asked.</li><li><code>SET ... NX</code>/<code>XX</code> answers a <strong>null bulk</strong> when the condition blocks the write, not an error.</li><li>There is <strong>no string <code>PERSIST</code></strong>: the handler exists but is commented out and not registered. To keep
+a value and change its lifetime, <code>EXPIRE</code> again or use <code>SET … KEEPTTL</code>.</li><li><code>EXISTS</code> counts keys in the <strong>string</strong> keyspace only; it will not see a hash with the same name. Use
+<code>HKEYEXISTS</code>, <code>LKEYEXISTS</code>, <code>SKEYEXISTS</code> for the other types.</li><li><code>DEL</code> deletes the string at those keys, not the same-named hash/list/set.</li><li><code>INCR</code>/<code>DECR</code> on a non-numeric value answer <code>-ERR</code>, like Redis; a missing key is treated as <code>0</code>.</li><li><code>BITCOUNT</code>/<code>BITPOS</code> accept the optional <code>BYTE</code>/<code>BIT</code> unit as in Redis 7.</li><li>Expiry arithmetic uses the Raft clock, so a short TTL can be rejected on a node whose Raft clock lags
+its local clock. See
+<a href=/icefiredb_docs/commands/compatibility/>Compatibility</a>.</li><li><code>TTL</code> is computed against the <strong>local</strong> wall clock by the storage layer, so replicas can report
+values that differ by their apply latency.</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#notes>Notes</a></li></ul></nav></div></aside></main></body></html>

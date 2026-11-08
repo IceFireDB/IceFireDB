@@ -1,0 +1,123 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content='
+  Scan
+  #
+
+8 commands in two families with two different cursor contracts. Getting them mixed up is the most
+common integration bug with this engine.
+
+  
+      
+          Cmd
+          RW
+          Syntax
+          Returns
+          Example → reply
+      
+  
+  
+      
+          SCAN
+          R
+          SCAN cursor [MATCH glob] [COUNT n] [TYPE type]
+          array [cursor, keys]; cursor 0 ends the walk
+          SCAN 0 MATCH user:* COUNT 100 → [cursor, [user:1, user:2]]
+      
+      
+          HSCAN
+          R
+          HSCAN KEY cursor [MATCH glob] [COUNT n]
+          array [cursor, [field, value, ...]]
+          HSCAN user:1 0 COUNT 10 → [0, [name, ada]]
+      
+      
+          SSCAN
+          R
+          SSCAN KEY cursor [MATCH glob] [COUNT n]
+          array [cursor, [member, ...]]
+          SSCAN tags 0 → [0, [go]]
+      
+      
+          ZSCAN
+          R
+          ZSCAN KEY cursor [MATCH glob] [COUNT n]
+          array [cursor, [member, score, ...]]
+          ZSCAN board 0 → [0, [ada, 105]]
+      
+      
+          XSCAN
+          R
+          XSCAN type cursor [MATCH regex] [COUNT n] [ASC|DESC]
+          array [cursor, keys]; empty cursor ends the walk
+          XSCAN KV "" COUNT 5 → [key:5, [...]]
+      
+      
+          XHSCAN
+          R
+          XHSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]
+          array [cursor, [field, value, ...]]
+          XHSCAN user:1 "" COUNT 5 → [name, [name, ada]]
+      
+      
+          XSSCAN
+          R
+          XSSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]
+          array [cursor, [member, ...]]
+          XSSCAN tags "" → [go, [go]]
+      
+      
+          XZSCAN
+          R
+          XZSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]
+          array [cursor, [member, score, ...]]
+          XZSCAN board "" → [ada, [ada, 105]]
+      
+  
+
+
+  The Redis family
+  #
+
+SCAN / HSCAN / SSCAN / ZSCAN follow Redis&rsquo; shape but not Redis&rsquo; cursor encoding.'><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Scan"><meta property="og:description" content=' Scan # 8 commands in two families with two different cursor contracts. Getting them mixed up is the most common integration bug with this engine.
+Cmd RW Syntax Returns Example → reply SCAN R SCAN cursor [MATCH glob] [COUNT n] [TYPE type] array [cursor, keys]; cursor 0 ends the walk SCAN 0 MATCH user:* COUNT 100 → [cursor, [user:1, user:2]] HSCAN R HSCAN KEY cursor [MATCH glob] [COUNT n] array [cursor, [field, value, ...]] HSCAN user:1 0 COUNT 10 → [0, [name, ada]] SSCAN R SSCAN KEY cursor [MATCH glob] [COUNT n] array [cursor, [member, ...]] SSCAN tags 0 → [0, [go]] ZSCAN R ZSCAN KEY cursor [MATCH glob] [COUNT n] array [cursor, [member, score, ...]] ZSCAN board 0 → [0, [ada, 105]] XSCAN R XSCAN type cursor [MATCH regex] [COUNT n] [ASC|DESC] array [cursor, keys]; empty cursor ends the walk XSCAN KV "" COUNT 5 → [key:5, [...]] XHSCAN R XHSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC] array [cursor, [field, value, ...]] XHSCAN user:1 "" COUNT 5 → [name, [name, ada]] XSSCAN R XSSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC] array [cursor, [member, ...]] XSSCAN tags "" → [go, [go]] XZSCAN R XZSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC] array [cursor, [member, score, ...]] XZSCAN board "" → [ada, [ada, 105]] The Redis family # SCAN / HSCAN / SSCAN / ZSCAN follow Redis’ shape but not Redis’ cursor encoding.'><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="article:section" content="commands"><title>Scan | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/ title=扫描><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle checked>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/ class=active>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Scan</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#the-redis-family>The Redis family</a></li><li><a href=#the-x-family>The X family</a></li><li><a href=#rules-that-apply-to-both>Rules that apply to both</a></li><li><a href=#loop-patterns>Loop patterns</a></li></ul></nav></aside></header><article class=markdown><h1 id=scan>Scan
+<a class=anchor href=#scan>#</a></h1><p>8 commands in two families with <strong>two different cursor contracts</strong>. Getting them mixed up is the most
+common integration bug with this engine.</p><table><thead><tr><th style=text-align:left>Cmd</th><th style=text-align:left>RW</th><th style=text-align:left>Syntax</th><th style=text-align:left>Returns</th><th style=text-align:left>Example → reply</th></tr></thead><tbody><tr><td style=text-align:left><code>SCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SCAN cursor [MATCH glob] [COUNT n] [TYPE type]</code></td><td style=text-align:left><code>array</code> <code>[cursor, keys]</code>; cursor <code>0</code> ends the walk</td><td style=text-align:left><code>SCAN 0 MATCH user:* COUNT 100</code> → <code>[cursor, [user:1, user:2]]</code></td></tr><tr><td style=text-align:left><code>HSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>HSCAN KEY cursor [MATCH glob] [COUNT n]</code></td><td style=text-align:left><code>array</code> <code>[cursor, [field, value, ...]]</code></td><td style=text-align:left><code>HSCAN user:1 0 COUNT 10</code> → <code>[0, [name, ada]]</code></td></tr><tr><td style=text-align:left><code>SSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SSCAN KEY cursor [MATCH glob] [COUNT n]</code></td><td style=text-align:left><code>array</code> <code>[cursor, [member, ...]]</code></td><td style=text-align:left><code>SSCAN tags 0</code> → <code>[0, [go]]</code></td></tr><tr><td style=text-align:left><code>ZSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>ZSCAN KEY cursor [MATCH glob] [COUNT n]</code></td><td style=text-align:left><code>array</code> <code>[cursor, [member, score, ...]]</code></td><td style=text-align:left><code>ZSCAN board 0</code> → <code>[0, [ada, 105]]</code></td></tr><tr><td style=text-align:left><code>XSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>XSCAN type cursor [MATCH regex] [COUNT n] [ASC|DESC]</code></td><td style=text-align:left><code>array</code> <code>[cursor, keys]</code>; empty cursor ends the walk</td><td style=text-align:left><code>XSCAN KV "" COUNT 5</code> → <code>[key:5, [...]]</code></td></tr><tr><td style=text-align:left><code>XHSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>XHSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]</code></td><td style=text-align:left><code>array</code> <code>[cursor, [field, value, ...]]</code></td><td style=text-align:left><code>XHSCAN user:1 "" COUNT 5</code> → <code>[name, [name, ada]]</code></td></tr><tr><td style=text-align:left><code>XSSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>XSSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]</code></td><td style=text-align:left><code>array</code> <code>[cursor, [member, ...]]</code></td><td style=text-align:left><code>XSSCAN tags ""</code> → <code>[go, [go]]</code></td></tr><tr><td style=text-align:left><code>XZSCAN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>XZSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]</code></td><td style=text-align:left><code>array</code> <code>[cursor, [member, score, ...]]</code></td><td style=text-align:left><code>XZSCAN board ""</code> → <code>[ada, [ada, 105]]</code></td></tr></tbody></table><h2 id=the-redis-family>The Redis family
+<a class=anchor href=#the-redis-family>#</a></h2><p><code>SCAN</code> / <code>HSCAN</code> / <code>SSCAN</code> / <code>ZSCAN</code> follow Redis&rsquo; shape but not Redis&rsquo; cursor encoding.</p><ul><li>Start at cursor <code>0</code>; the walk is over when the reply&rsquo;s cursor is <code>0</code>.</li><li><code>SCAN</code>&rsquo;s cursor is an opaque base64 string that carries <strong>five sub-cursors</strong>, one per keyspace
+(<code>string</code>, <code>hash</code>, <code>list</code>, <code>set</code>, <code>zset</code>). It is not a number and not a key offset.</li><li><code>HSCAN</code> / <code>SSCAN</code> / <code>ZSCAN</code> answer the <strong>last field or member name</strong> as the cursor. Consequences:<ul><li>A field literally named <code>0</code> collides with the end marker.</li><li>Client helpers that parse the cursor as an integer (go-redis&rsquo; typed <code>HScan</code>, for example) reject
+it. Use the generic command API: <code>redis-cli</code>, <code>Do("hscan", …)</code>, <code>execute_command</code>.</li></ul></li><li><code>MATCH</code> takes a <strong>Redis glob</strong> (<code>*</code>, <code>?</code>, <code>[abc]</code>, <code>\\</code> escape), translated to a regexp and applied by
+the handler over a bounded page.</li><li><code>SCAN</code> supports <code>TYPE string|hash|list|set|zset</code>; an unknown type answers an empty result.</li><li>Default <code>COUNT</code> is 10 when omitted.</li></ul><h2 id=the-x-family>The X family
+<a class=anchor href=#the-x-family>#</a></h2><p><code>XSCAN</code> / <code>XHSCAN</code> / <code>XSSCAN</code> / <code>XZSCAN</code> are the engine&rsquo;s native scans:</p><ul><li>Start at an <strong>empty cursor</strong> <code>""</code>; the walk is over when an empty cursor comes back.</li><li><code>MATCH</code> is a <strong>regular expression</strong>, not a glob, and is passed to the storage layer.</li><li><code>ASC</code> / <code>DESC</code> choose the direction (<code>DESC</code> walks with <code>RevScan</code>).</li><li><code>XSCAN</code>&rsquo;s first argument is the <strong>type name</strong>: <code>KV</code>, <code>HASH</code>, <code>LIST</code>, <code>SET</code>, <code>ZSET</code> (case-insensitive;
+anything else is an <code>invalid key type</code> error).</li></ul><h2 id=rules-that-apply-to-both>Rules that apply to both
+<a class=anchor href=#rules-that-apply-to-both>#</a></h2><ul><li><code>COUNT</code> is a hint, capped at <strong>10000</strong>. It bounds allocation, not the number of returned items.</li><li><strong>A page can come back empty while the cursor still advances.</strong> Never stop on a short or empty page;
+loop until the cursor is <code>0</code> (Redis family) or <code>""</code> (X family).</li><li>Scans do not take a snapshot: keys added or removed during a walk may or may not appear. That is the
+same guarantee Redis gives.</li><li>Both families are read commands, so on a follower they need <code>--openreads</code> (or a redirect to the
+leader).</li></ul><h2 id=loop-patterns>Loop patterns
+<a class=anchor href=#loop-patterns>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#75715e># Redis family — go-redis&#39;s typed HScan does not work; use the generic API</span>
+</span></span><span style=display:flex><span>cursor <span style=color:#f92672>=</span> <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>while</span> <span style=color:#66d9ef>True</span>:
+</span></span><span style=display:flex><span>    cursor, keys <span style=color:#f92672>=</span> r<span style=color:#f92672>.</span>execute_command(<span style=color:#e6db74>&#34;SCAN&#34;</span>, cursor, <span style=color:#e6db74>&#34;MATCH&#34;</span>, <span style=color:#e6db74>&#34;user:*&#34;</span>, <span style=color:#e6db74>&#34;COUNT&#34;</span>, <span style=color:#ae81ff>500</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>for</span> k <span style=color:#f92672>in</span> keys:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> cursor <span style=color:#f92672>==</span> <span style=color:#e6db74>b</span><span style=color:#e6db74>&#34;0&#34;</span> <span style=color:#f92672>or</span> cursor <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;0&#34;</span>:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>break</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># X family — empty cursor terminates</span>
+</span></span><span style=display:flex><span>cursor <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>while</span> <span style=color:#66d9ef>True</span>:
+</span></span><span style=display:flex><span>    cursor, items <span style=color:#f92672>=</span> r<span style=color:#f92672>.</span>execute_command(<span style=color:#e6db74>&#34;XSCAN&#34;</span>, <span style=color:#e6db74>&#34;HASH&#34;</span>, cursor, <span style=color:#e6db74>&#34;MATCH&#34;</span>, <span style=color:#e6db74>&#34;^user:&#34;</span>, <span style=color:#e6db74>&#34;COUNT&#34;</span>, <span style=color:#ae81ff>500</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>for</span> k <span style=color:#f92672>in</span> items:
+</span></span><span style=display:flex><span>        <span style=color:#f92672>...</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#f92672>not</span> cursor:
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>break</span>
+</span></span></code></pre></div><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># redis-cli drives the cursor for you on SCAN</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> --scan --pattern <span style=color:#e6db74>&#39;user:*&#39;</span> | head
+</span></span></code></pre></div></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#the-redis-family>The Redis family</a></li><li><a href=#the-x-family>The X family</a></li><li><a href=#rules-that-apply-to-both>Rules that apply to both</a></li><li><a href=#loop-patterns>Loop patterns</a></li></ul></nav></div></aside></main></body></html>

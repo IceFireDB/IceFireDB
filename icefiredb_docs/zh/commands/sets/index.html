@@ -1,0 +1,190 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  集合
+  #
+
+21 条命令：成员关系、三组集合代数、过期，以及确定性的 SPOP。
+
+  
+      
+          命令
+          读写
+          语法
+          返回
+          示例 → 回复
+      
+  
+  
+      
+          SADD
+          W
+          SADD KEY MEMBER [MEMBER ...]
+          integer 新增成员数
+          SADD tags go db → 2
+      
+      
+          SREM
+          W
+          SREM KEY MEMBER [MEMBER ...]
+          integer 删除成员数
+          SREM tags db → 1
+      
+      
+          SCARD
+          R
+          SCARD KEY
+          integer 基数
+          SCARD tags → 1
+      
+      
+          SISMEMBER
+          R
+          SISMEMBER KEY MEMBER
+          integer 0/1
+          SISMEMBER tags go → 1
+      
+      
+          SMEMBERS
+          R
+          SMEMBERS KEY
+          array 成员列表
+          SMEMBERS tags → [go]
+      
+      
+          SDIFF
+          R
+          SDIFF KEY [KEY ...]
+          array 在首个集合、不在后续集合的成员
+          SDIFF a b → [x]
+      
+      
+          SDIFFSTORE
+          W
+          SDIFFSTORE dest KEY [KEY ...]
+          integer 结果大小
+          SDIFFSTORE out a b → 1
+      
+      
+          SINTER
+          R
+          SINTER KEY [KEY ...]
+          array 交集成员
+          SINTER a b → [y]
+      
+      
+          SINTERSTORE
+          W
+          SINTERSTORE dest KEY [KEY ...]
+          integer 结果大小
+          SINTERSTORE out a b → 1
+      
+      
+          SUNION
+          R
+          SUNION KEY [KEY ...]
+          array 并集成员
+          SUNION a b → [x,y]
+      
+      
+          SUNIONSTORE
+          W
+          SUNIONSTORE dest KEY [KEY ...]
+          integer 结果大小
+          SUNIONSTORE out a b → 2
+      
+      
+          SMOVE
+          W
+          SMOVE source destination MEMBER
+          integer 1 移动成功，0 不是成员
+          SMOVE a b x → 1
+      
+      
+          SPOP
+          W
+          SPOP KEY [count]
+          无 count：bulk 成员；有 count：array
+          SPOP queue:ready → job:7
+      
+      
+          SRANDMEMBER
+          R
+          SRANDMEMBER KEY [count]
+          无 count：bulk；count 为正：去重的 array；为负：可重复的 array
+          SRANDMEMBER tags 1 → [go]
+      
+      
+          SKEYEXISTS
+          R
+          SKEYEXISTS KEY
+          integer 0/1 —— 集合是否存在
+          SKEYEXISTS tags → 1
+      
+      
+          SCLEAR
+          W
+          SCLEAR KEY
+          integer 删除成员数
+          SCLEAR tags → 1
+      
+      
+          SMCLEAR
+          W
+          SMCLEAR KEY [KEY ...]
+          integer 删除集合数
+          SMCLEAR a b → 2
+      
+      
+          SEXPIRE
+          W
+          SEXPIRE KEY seconds
+          integer 1/0
+          SEXPIRE tags 60 → 1
+      
+      
+          SEXPIREAT
+          W
+          SEXPIREAT KEY unixTime
+          integer 1/0
+          SEXPIREAT tags 1767225600 → 1
+      
+      
+          STTL
+          R
+          STTL KEY
+          integer 剩余秒，无过期为 -1
+          STTL tags → 59
+      
+      
+          SPERSIST
+          W
+          SPERSIST KEY
+          integer 1 移除，0 本来没有
+          SPERSIST tags → 1
+      
+  
+
+
+  说明
+  #
+
+
+SPOP 的抽取是跨副本确定性的。 由于它是写命令，结果必须在每个节点上一致，所以抽取的成员由 Raft 提供的种子决定，而不是 math/rand。带 count 时，count 会夹到集合大小；count = 0 返回空数组，负数 count 报错。
+SRANDMEMBER 是读命令，可以使用真正的随机性（count 为正时返回不重复的成员，为负时允许重复）。|count| 上限 1048576。
+SMOVE 移到同一个键是 no-op，返回 1 并保留 TTL。
+SCLEAR/SMCLEAR 删除整个集合及其过期时间；SREM 只删除成员。
+SPERSIST 是引擎中唯一的 *PERSIST 命令，且已知在 ipfs 后端会留下过期时间。字符串、哈希和列表根本没有 PERSIST。
+集合代数命令读取参数中指定的集合；*STORE 变体会覆盖目标键，并返回结果大小。
+"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="集合"><meta property="og:description" content=" 集合 # 21 条命令：成员关系、三组集合代数、过期，以及确定性的 SPOP。
+命令 读写 语法 返回 示例 → 回复 SADD W SADD KEY MEMBER [MEMBER ...] integer 新增成员数 SADD tags go db → 2 SREM W SREM KEY MEMBER [MEMBER ...] integer 删除成员数 SREM tags db → 1 SCARD R SCARD KEY integer 基数 SCARD tags → 1 SISMEMBER R SISMEMBER KEY MEMBER integer 0/1 SISMEMBER tags go → 1 SMEMBERS R SMEMBERS KEY array 成员列表 SMEMBERS tags → [go] SDIFF R SDIFF KEY [KEY ...] array 在首个集合、不在后续集合的成员 SDIFF a b → [x] SDIFFSTORE W SDIFFSTORE dest KEY [KEY ...] integer 结果大小 SDIFFSTORE out a b → 1 SINTER R SINTER KEY [KEY ...] array 交集成员 SINTER a b → [y] SINTERSTORE W SINTERSTORE dest KEY [KEY ...] integer 结果大小 SINTERSTORE out a b → 1 SUNION R SUNION KEY [KEY ...] array 并集成员 SUNION a b → [x,y] SUNIONSTORE W SUNIONSTORE dest KEY [KEY ...] integer 结果大小 SUNIONSTORE out a b → 2 SMOVE W SMOVE source destination MEMBER integer 1 移动成功，0 不是成员 SMOVE a b x → 1 SPOP W SPOP KEY [count] 无 count：bulk 成员；有 count：array SPOP queue:ready → job:7 SRANDMEMBER R SRANDMEMBER KEY [count] 无 count：bulk；count 为正：去重的 array；为负：可重复的 array SRANDMEMBER tags 1 → [go] SKEYEXISTS R SKEYEXISTS KEY integer 0/1 —— 集合是否存在 SKEYEXISTS tags → 1 SCLEAR W SCLEAR KEY integer 删除成员数 SCLEAR tags → 1 SMCLEAR W SMCLEAR KEY [KEY ...] integer 删除集合数 SMCLEAR a b → 2 SEXPIRE W SEXPIRE KEY seconds integer 1/0 SEXPIRE tags 60 → 1 SEXPIREAT W SEXPIREAT KEY unixTime integer 1/0 SEXPIREAT tags 1767225600 → 1 STTL R STTL KEY integer 剩余秒，无过期为 -1 STTL tags → 59 SPERSIST W SPERSIST KEY integer 1 移除，0 本来没有 SPERSIST tags → 1 说明 # SPOP 的抽取是跨副本确定性的。 由于它是写命令，结果必须在每个节点上一致，所以抽取的成员由 Raft 提供的种子决定，而不是 math/rand。带 count 时，count 会夹到集合大小；count = 0 返回空数组，负数 count 报错。 SRANDMEMBER 是读命令，可以使用真正的随机性（count 为正时返回不重复的成员，为负时允许重复）。|count| 上限 1048576。 SMOVE 移到同一个键是 no-op，返回 1 并保留 TTL。 SCLEAR/SMCLEAR 删除整个集合及其过期时间；SREM 只删除成员。 SPERSIST 是引擎中唯一的 *PERSIST 命令，且已知在 ipfs 后端会留下过期时间。字符串、哈希和列表根本没有 PERSIST。 集合代数命令读取参数中指定的集合；*STORE 变体会覆盖目标键，并返回结果大小。 "><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="commands"><title>集合 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/ title=Sets><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle checked>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/ class=active>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>集合</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#说明>说明</a></li></ul></nav></aside></header><article class=markdown><h1 id=集合>集合
+<a class=anchor href=#%e9%9b%86%e5%90%88>#</a></h1><p>21 条命令：成员关系、三组集合代数、过期，以及确定性的 <code>SPOP</code>。</p><table><thead><tr><th style=text-align:left>命令</th><th style=text-align:left>读写</th><th style=text-align:left>语法</th><th style=text-align:left>返回</th><th style=text-align:left>示例 → 回复</th></tr></thead><tbody><tr><td style=text-align:left><code>SADD</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SADD KEY MEMBER [MEMBER ...]</code></td><td style=text-align:left><code>integer</code> 新增成员数</td><td style=text-align:left><code>SADD tags go db</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>SREM</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SREM KEY MEMBER [MEMBER ...]</code></td><td style=text-align:left><code>integer</code> 删除成员数</td><td style=text-align:left><code>SREM tags db</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SCARD</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SCARD KEY</code></td><td style=text-align:left><code>integer</code> 基数</td><td style=text-align:left><code>SCARD tags</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SISMEMBER</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SISMEMBER KEY MEMBER</code></td><td style=text-align:left><code>integer</code> 0/1</td><td style=text-align:left><code>SISMEMBER tags go</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SMEMBERS</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SMEMBERS KEY</code></td><td style=text-align:left><code>array</code> 成员列表</td><td style=text-align:left><code>SMEMBERS tags</code> → <code>[go]</code></td></tr><tr><td style=text-align:left><code>SDIFF</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SDIFF KEY [KEY ...]</code></td><td style=text-align:left><code>array</code> 在首个集合、不在后续集合的成员</td><td style=text-align:left><code>SDIFF a b</code> → <code>[x]</code></td></tr><tr><td style=text-align:left><code>SDIFFSTORE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SDIFFSTORE dest KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> 结果大小</td><td style=text-align:left><code>SDIFFSTORE out a b</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SINTER</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SINTER KEY [KEY ...]</code></td><td style=text-align:left><code>array</code> 交集成员</td><td style=text-align:left><code>SINTER a b</code> → <code>[y]</code></td></tr><tr><td style=text-align:left><code>SINTERSTORE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SINTERSTORE dest KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> 结果大小</td><td style=text-align:left><code>SINTERSTORE out a b</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SUNION</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SUNION KEY [KEY ...]</code></td><td style=text-align:left><code>array</code> 并集成员</td><td style=text-align:left><code>SUNION a b</code> → <code>[x,y]</code></td></tr><tr><td style=text-align:left><code>SUNIONSTORE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SUNIONSTORE dest KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> 结果大小</td><td style=text-align:left><code>SUNIONSTORE out a b</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>SMOVE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SMOVE source destination MEMBER</code></td><td style=text-align:left><code>integer</code> 1 移动成功，0 不是成员</td><td style=text-align:left><code>SMOVE a b x</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SPOP</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SPOP KEY [count]</code></td><td style=text-align:left>无 count：<code>bulk</code> 成员；有 count：<code>array</code></td><td style=text-align:left><code>SPOP queue:ready</code> → <code>job:7</code></td></tr><tr><td style=text-align:left><code>SRANDMEMBER</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SRANDMEMBER KEY [count]</code></td><td style=text-align:left>无 count：<code>bulk</code>；count 为正：去重的 <code>array</code>；为负：可重复的 <code>array</code></td><td style=text-align:left><code>SRANDMEMBER tags 1</code> → <code>[go]</code></td></tr><tr><td style=text-align:left><code>SKEYEXISTS</code></td><td style=text-align:left>R</td><td style=text-align:left><code>SKEYEXISTS KEY</code></td><td style=text-align:left><code>integer</code> 0/1 —— 集合是否存在</td><td style=text-align:left><code>SKEYEXISTS tags</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SCLEAR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SCLEAR KEY</code></td><td style=text-align:left><code>integer</code> 删除成员数</td><td style=text-align:left><code>SCLEAR tags</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SMCLEAR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SMCLEAR KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> 删除集合数</td><td style=text-align:left><code>SMCLEAR a b</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>SEXPIRE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SEXPIRE KEY seconds</code></td><td style=text-align:left><code>integer</code> 1/0</td><td style=text-align:left><code>SEXPIRE tags 60</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>SEXPIREAT</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SEXPIREAT KEY unixTime</code></td><td style=text-align:left><code>integer</code> 1/0</td><td style=text-align:left><code>SEXPIREAT tags 1767225600</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>STTL</code></td><td style=text-align:left>R</td><td style=text-align:left><code>STTL KEY</code></td><td style=text-align:left><code>integer</code> 剩余秒，无过期为 <code>-1</code></td><td style=text-align:left><code>STTL tags</code> → <code>59</code></td></tr><tr><td style=text-align:left><code>SPERSIST</code></td><td style=text-align:left>W</td><td style=text-align:left><code>SPERSIST KEY</code></td><td style=text-align:left><code>integer</code> 1 移除，0 本来没有</td><td style=text-align:left><code>SPERSIST tags</code> → <code>1</code></td></tr></tbody></table><h2 id=说明>说明
+<a class=anchor href=#%e8%af%b4%e6%98%8e>#</a></h2><ul><li><strong><code>SPOP</code> 的抽取是跨副本确定性的。</strong> 由于它是写命令，结果必须在每个节点上一致，所以抽取的成员由 Raft 提供的种子决定，而不是 <code>math/rand</code>。带 <code>count</code> 时，count 会夹到集合大小；<code>count = 0</code> 返回空数组，负数 count 报错。</li><li><code>SRANDMEMBER</code> 是<strong>读</strong>命令，可以使用真正的随机性（<code>count</code> 为正时返回不重复的成员，为负时允许重复）。<code>|count|</code> 上限 1048576。</li><li><code>SMOVE</code> 移到同一个键是 no-op，返回 <code>1</code> 并保留 TTL。</li><li><code>SCLEAR</code>/<code>SMCLEAR</code> 删除整个集合及其过期时间；<code>SREM</code> 只删除成员。</li><li><code>SPERSIST</code> 是引擎中唯一的 <code>*PERSIST</code> 命令，且已知在 <code>ipfs</code> 后端会留下过期时间。字符串、哈希和列表根本没有 <code>PERSIST</code>。</li><li>集合代数命令读取参数中指定的集合；<code>*STORE</code> 变体会<strong>覆盖</strong>目标键，并返回结果大小。</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#说明>说明</a></li></ul></nav></div></aside></main></body></html>

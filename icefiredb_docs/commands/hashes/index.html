@@ -1,0 +1,186 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  Hashes
+  #
+
+19 commands. The hash keyspace is independent from the string keyspace at the same key name.
+
+  
+      
+          Cmd
+          RW
+          Syntax
+          Returns
+          Example → reply
+      
+  
+  
+      
+          HSET
+          W
+          HSET KEY FIELD VALUE [FIELD VALUE ...]
+          integer fields added
+          HSET user:1 name ada age 36 → 2
+      
+      
+          HSETNX
+          W
+          HSETNX KEY FIELD VALUE
+          integer 1 written, 0 field exists
+          HSETNX user:1 name ada → 0
+      
+      
+          HGET
+          R
+          HGET KEY FIELD
+          bulk, null if the field is absent
+          HGET user:1 name → ada
+      
+      
+          HMGET
+          R
+          HMGET KEY FIELD [FIELD ...]
+          array of bulk/null
+          HMGET user:1 name x → [ada, null]
+      
+      
+          HMSET
+          W
+          HMSET KEY FIELD VALUE [FIELD VALUE ...]
+          +OK
+          HMSET user:2 name bob → OK
+      
+      
+          HDEL
+          W
+          HDEL KEY FIELD [FIELD ...]
+          integer fields removed
+          HDEL user:1 age → 1
+      
+      
+          HEXISTS
+          R
+          HEXISTS KEY FIELD
+          integer 0/1
+          HEXISTS user:1 name → 1
+      
+      
+          HGETALL
+          R
+          HGETALL KEY
+          array field/value pairs
+          HGETALL user:1 → [name, ada]
+      
+      
+          HKEYS
+          R
+          HKEYS KEY
+          array of fields
+          HKEYS user:1 → [name]
+      
+      
+          HVALS
+          R
+          HVALS KEY
+          array of values
+          HVALS user:1 → [ada]
+      
+      
+          HLEN
+          R
+          HLEN KEY
+          integer field count
+          HLEN user:1 → 1
+      
+      
+          HSTRLEN
+          R
+          HSTRLEN KEY FIELD
+          integer value length, 0 if absent
+          HSTRLEN user:1 name → 3
+      
+      
+          HINCRBY
+          W
+          HINCRBY KEY FIELD increment
+          integer new value
+          HINCRBY stats hits 1 → 1
+      
+      
+          HKEYEXISTS
+          R
+          HKEYEXISTS KEY
+          integer 0/1 — does the hash exist
+          HKEYEXISTS user:1 → 1
+      
+      
+          HCLEAR
+          W
+          HCLEAR KEY
+          integer fields removed
+          HCLEAR user:1 → 2
+      
+      
+          HMCLEAR
+          W
+          HMCLEAR KEY [KEY ...]
+          integer hashes removed
+          HMCLEAR a b → 2
+      
+      
+          HEXPIRE
+          W
+          HEXPIRE KEY seconds
+          integer 1 set, 0 key absent
+          HEXPIRE user:1 300 → 1
+      
+      
+          HEXPIREAT
+          W
+          HEXPIREAT KEY unixTime
+          integer 1/0
+          HEXPIREAT user:1 1767225600 → 1
+      
+      
+          HTTL
+          R
+          HTTL KEY
+          integer seconds left, -1 none
+          HTTL user:1 → 299
+      
+  
+
+
+  Notes
+  #
+
+
+HCLEAR / HMCLEAR delete the whole hash (like DEL for this type) and take its expiration with
+it; HDEL removes individual fields.
+There is no HPERSIST — the handler exists but is not registered.
+HSET counts only newly created fields; overwriting an existing field counts 0.
+HGETALL answers field/value pairs in the storage&rsquo;s iteration order. Do not rely on it for ordering
+— sort client-side if it matters.
+HGET of a field whose value is empty answers an empty bulk string on the local backends and null
+on the decentralized ones — the two states are not distinguishable there. See
+
+  Compatibility.
+HSTRLEN reports 0 both for a missing field and for an empty one.
+Expiry: HEXPIRE/HEXPIREAT/HTTL act on the hash, independently of any string at the same key.
+"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Hashes"><meta property="og:description" content=" Hashes # 19 commands. The hash keyspace is independent from the string keyspace at the same key name.
+Cmd RW Syntax Returns Example → reply HSET W HSET KEY FIELD VALUE [FIELD VALUE ...] integer fields added HSET user:1 name ada age 36 → 2 HSETNX W HSETNX KEY FIELD VALUE integer 1 written, 0 field exists HSETNX user:1 name ada → 0 HGET R HGET KEY FIELD bulk, null if the field is absent HGET user:1 name → ada HMGET R HMGET KEY FIELD [FIELD ...] array of bulk/null HMGET user:1 name x → [ada, null] HMSET W HMSET KEY FIELD VALUE [FIELD VALUE ...] +OK HMSET user:2 name bob → OK HDEL W HDEL KEY FIELD [FIELD ...] integer fields removed HDEL user:1 age → 1 HEXISTS R HEXISTS KEY FIELD integer 0/1 HEXISTS user:1 name → 1 HGETALL R HGETALL KEY array field/value pairs HGETALL user:1 → [name, ada] HKEYS R HKEYS KEY array of fields HKEYS user:1 → [name] HVALS R HVALS KEY array of values HVALS user:1 → [ada] HLEN R HLEN KEY integer field count HLEN user:1 → 1 HSTRLEN R HSTRLEN KEY FIELD integer value length, 0 if absent HSTRLEN user:1 name → 3 HINCRBY W HINCRBY KEY FIELD increment integer new value HINCRBY stats hits 1 → 1 HKEYEXISTS R HKEYEXISTS KEY integer 0/1 — does the hash exist HKEYEXISTS user:1 → 1 HCLEAR W HCLEAR KEY integer fields removed HCLEAR user:1 → 2 HMCLEAR W HMCLEAR KEY [KEY ...] integer hashes removed HMCLEAR a b → 2 HEXPIRE W HEXPIRE KEY seconds integer 1 set, 0 key absent HEXPIRE user:1 300 → 1 HEXPIREAT W HEXPIREAT KEY unixTime integer 1/0 HEXPIREAT user:1 1767225600 → 1 HTTL R HTTL KEY integer seconds left, -1 none HTTL user:1 → 299 Notes # HCLEAR / HMCLEAR delete the whole hash (like DEL for this type) and take its expiration with it; HDEL removes individual fields. There is no HPERSIST — the handler exists but is not registered. HSET counts only newly created fields; overwriting an existing field counts 0. HGETALL answers field/value pairs in the storage’s iteration order. Do not rely on it for ordering — sort client-side if it matters. HGET of a field whose value is empty answers an empty bulk string on the local backends and null on the decentralized ones — the two states are not distinguishable there. See Compatibility. HSTRLEN reports 0 both for a missing field and for an empty one. Expiry: HEXPIRE/HEXPIREAT/HTTL act on the hash, independently of any string at the same key. "><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="article:section" content="commands"><title>Hashes | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/ title=哈希><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle checked>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/ class=active>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Hashes</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#notes>Notes</a></li></ul></nav></aside></header><article class=markdown><h1 id=hashes>Hashes
+<a class=anchor href=#hashes>#</a></h1><p>19 commands. The hash keyspace is independent from the string keyspace at the same key name.</p><table><thead><tr><th style=text-align:left>Cmd</th><th style=text-align:left>RW</th><th style=text-align:left>Syntax</th><th style=text-align:left>Returns</th><th style=text-align:left>Example → reply</th></tr></thead><tbody><tr><td style=text-align:left><code>HSET</code></td><td style=text-align:left>W</td><td style=text-align:left><code>HSET KEY FIELD VALUE [FIELD VALUE ...]</code></td><td style=text-align:left><code>integer</code> fields added</td><td style=text-align:left><code>HSET user:1 name ada age 36</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>HSETNX</code></td><td style=text-align:left>W</td><td style=text-align:left><code>HSETNX KEY FIELD VALUE</code></td><td style=text-align:left><code>integer</code> 1 written, 0 field exists</td><td style=text-align:left><code>HSETNX user:1 name ada</code> → <code>0</code></td></tr><tr><td style=text-align:left><code>HGET</code></td><td style=text-align:left>R</td><td style=text-align:left><code>HGET KEY FIELD</code></td><td style=text-align:left><code>bulk</code>, <code>null</code> if the field is absent</td><td style=text-align:left><code>HGET user:1 name</code> → <code>ada</code></td></tr><tr><td style=text-align:left><code>HMGET</code></td><td style=text-align:left>R</td><td style=text-align:left><code>HMGET KEY FIELD [FIELD ...]</code></td><td style=text-align:left><code>array</code> of bulk/null</td><td style=text-align:left><code>HMGET user:1 name x</code> → <code>[ada, null]</code></td></tr><tr><td style=text-align:left><code>HMSET</code></td><td style=text-align:left>W</td><td style=text-align:left><code>HMSET KEY FIELD VALUE [FIELD VALUE ...]</code></td><td style=text-align:left><code>+OK</code></td><td style=text-align:left><code>HMSET user:2 name bob</code> → <code>OK</code></td></tr><tr><td style=text-align:left><code>HDEL</code></td><td style=text-align:left>W</td><td style=text-align:left><code>HDEL KEY FIELD [FIELD ...]</code></td><td style=text-align:left><code>integer</code> fields removed</td><td style=text-align:left><code>HDEL user:1 age</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>HEXISTS</code></td><td style=text-align:left>R</td><td style=text-align:left><code>HEXISTS KEY FIELD</code></td><td style=text-align:left><code>integer</code> 0/1</td><td style=text-align:left><code>HEXISTS user:1 name</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>HGETALL</code></td><td style=text-align:left>R</td><td style=text-align:left><code>HGETALL KEY</code></td><td style=text-align:left><code>array</code> field/value pairs</td><td style=text-align:left><code>HGETALL user:1</code> → <code>[name, ada]</code></td></tr><tr><td style=text-align:left><code>HKEYS</code></td><td style=text-align:left>R</td><td style=text-align:left><code>HKEYS KEY</code></td><td style=text-align:left><code>array</code> of fields</td><td style=text-align:left><code>HKEYS user:1</code> → <code>[name]</code></td></tr><tr><td style=text-align:left><code>HVALS</code></td><td style=text-align:left>R</td><td style=text-align:left><code>HVALS KEY</code></td><td style=text-align:left><code>array</code> of values</td><td style=text-align:left><code>HVALS user:1</code> → <code>[ada]</code></td></tr><tr><td style=text-align:left><code>HLEN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>HLEN KEY</code></td><td style=text-align:left><code>integer</code> field count</td><td style=text-align:left><code>HLEN user:1</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>HSTRLEN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>HSTRLEN KEY FIELD</code></td><td style=text-align:left><code>integer</code> value length, 0 if absent</td><td style=text-align:left><code>HSTRLEN user:1 name</code> → <code>3</code></td></tr><tr><td style=text-align:left><code>HINCRBY</code></td><td style=text-align:left>W</td><td style=text-align:left><code>HINCRBY KEY FIELD increment</code></td><td style=text-align:left><code>integer</code> new value</td><td style=text-align:left><code>HINCRBY stats hits 1</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>HKEYEXISTS</code></td><td style=text-align:left>R</td><td style=text-align:left><code>HKEYEXISTS KEY</code></td><td style=text-align:left><code>integer</code> 0/1 — does the hash exist</td><td style=text-align:left><code>HKEYEXISTS user:1</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>HCLEAR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>HCLEAR KEY</code></td><td style=text-align:left><code>integer</code> fields removed</td><td style=text-align:left><code>HCLEAR user:1</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>HMCLEAR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>HMCLEAR KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> hashes removed</td><td style=text-align:left><code>HMCLEAR a b</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>HEXPIRE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>HEXPIRE KEY seconds</code></td><td style=text-align:left><code>integer</code> 1 set, 0 key absent</td><td style=text-align:left><code>HEXPIRE user:1 300</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>HEXPIREAT</code></td><td style=text-align:left>W</td><td style=text-align:left><code>HEXPIREAT KEY unixTime</code></td><td style=text-align:left><code>integer</code> 1/0</td><td style=text-align:left><code>HEXPIREAT user:1 1767225600</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>HTTL</code></td><td style=text-align:left>R</td><td style=text-align:left><code>HTTL KEY</code></td><td style=text-align:left><code>integer</code> seconds left, <code>-1</code> none</td><td style=text-align:left><code>HTTL user:1</code> → <code>299</code></td></tr></tbody></table><h2 id=notes>Notes
+<a class=anchor href=#notes>#</a></h2><ul><li><code>HCLEAR</code> / <code>HMCLEAR</code> delete the <strong>whole hash</strong> (like <code>DEL</code> for this type) and take its expiration with
+it; <code>HDEL</code> removes individual fields.</li><li>There is no <code>HPERSIST</code> — the handler exists but is not registered.</li><li><code>HSET</code> counts only newly created fields; overwriting an existing field counts 0.</li><li><code>HGETALL</code> answers field/value pairs in the storage&rsquo;s iteration order. Do not rely on it for ordering
+— sort client-side if it matters.</li><li><code>HGET</code> of a field whose value is empty answers an empty bulk string on the local backends and <code>null</code>
+on the decentralized ones — the two states are not distinguishable there. See
+<a href=/icefiredb_docs/commands/compatibility/>Compatibility</a>.</li><li><code>HSTRLEN</code> reports 0 both for a missing field and for an empty one.</li><li>Expiry: <code>HEXPIRE</code>/<code>HEXPIREAT</code>/<code>HTTL</code> act on the hash, independently of any string at the same key.</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#notes>Notes</a></li></ul></nav></div></aside></main></body></html>

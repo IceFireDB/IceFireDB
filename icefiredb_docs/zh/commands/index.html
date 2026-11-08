@@ -1,0 +1,160 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  命令参考
+  #
+
+引擎注册的全部命令，按数据类型分组。下表就是完整的命令面：110 条命令，外加由 Raft/RESP 层响应的
+  系统命令（RAFT、CLUSTER、MACHINE、BARRIER、AUTH 等）。
+
+  
+      
+          页面
+          命令
+          数量
+      
+  
+  
+      
+          
+  字符串
+          SET … BITPOS，过期
+          26
+      
+      
+          
+  哈希
+          HSET … HMCLEAR，过期
+          19
+      
+      
+          
+  列表
+          LPUSH … LREM，过期
+          18
+      
+      
+          
+  集合
+          SADD … SPERSIST
+          21
+      
+      
+          
+  有序集合
+          ZADD … ZCLEAR
+          15
+      
+      
+          
+  扫描
+          SCAN/HSCAN/SSCAN/ZSCAN + X* 族
+          8
+      
+      
+          
+  服务器
+          INFO、FLUSHALL、FLUSHDB
+          3
+      
+      
+          
+  兼容性
+          与 Redis 的偏差及原因
+          —
+      
+  
+
+
+  记法
+  #
+
+
+  
+      
+          记法
+          含义
+      
+  
+  
+      
+          KEY
+          二进制安全的键名，最大 1024 字节（ledis MaxKeySize；空键会被拒绝）
+      
+      
+          VALUE
+          二进制安全的值，最大 1 GiB（MaxValueSize）
+      
+      
+          [ARG]
+          可选参数
+      
+      
+          ARG...
+          一个或多个
+      
+      
+          A | B
+          二选一
+      
+      
+          R / W
+          读命令（本地执行）/ 写命令（经 Raft 日志复制）
+      
+      
+          integer
+          RESP 整数 :1
+      
+      
+          bulk
+          RESP bulk string $3 foo
+      
+      
+          null
+          RESP 空批量 $-1，表示“不存在”
+      
+      
+          array
+          RESP 数组 *2 …
+      
+      
+          +OK
+          RESP 简单字符串
+      
+  
+
+
+  适用于所有命令的规则
+  #
+
+
+每种数据类型一个独立键空间。 同一个键可以同时持有字符串和哈希和列表。类型不符的命令会在该类型自己的（可能为空的）视图上执行，而不是返回 WRONGTYPE。见
+  兼容性。
+过期时间按类型分开。 EXPIRE/TTL 作用于字符串；HEXPIRE/HTTL 作用于哈希；LEXPIRE/LTTL 作用于列表；SEXPIRE/STTL/SPERSIST 作用于集合。有序集合没有 TTL 命令。TTL 为整秒；-1 表示“无过期”，已过期的键报的也是 -1。
+分值是 64 位整数，不是浮点数。
+数量与分页都有上限。 COUNT 上限 10000，SRANDMEMBER 的 |count| 上限 1048576。
+写命令会在每个副本上重放，结果必须全集群一致 —— 这正是 SPOP 采用确定性抽取的原因。
+错误以 RESP 错误返回（-ERR …）。永远不会产生 -WRONGTYPE。不允许提供读的从节点会返回 -MOVED（带 --try-errors 时为 -TRY）。
+
+
+  读写分类，以及为什么重要
+  #
+
+R 表示处理器通过 conf.AddReadCommand 注册：它在接收请求的节点上执行，针对的是该节点已应用的状态。W 表示 conf.AddWriteCommand：它经 Raft 日志串行化，并在每个节点上应用。"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="命令参考"><meta property="og:description" content=" 命令参考 # 引擎注册的全部命令，按数据类型分组。下表就是完整的命令面：110 条命令，外加由 Raft/RESP 层响应的 系统命令（RAFT、CLUSTER、MACHINE、BARRIER、AUTH 等）。
+页面 命令 数量 字符串 SET … BITPOS，过期 26 哈希 HSET … HMCLEAR，过期 19 列表 LPUSH … LREM，过期 18 集合 SADD … SPERSIST 21 有序集合 ZADD … ZCLEAR 15 扫描 SCAN/HSCAN/SSCAN/ZSCAN + X* 族 8 服务器 INFO、FLUSHALL、FLUSHDB 3 兼容性 与 Redis 的偏差及原因 — 记法 # 记法 含义 KEY 二进制安全的键名，最大 1024 字节（ledis MaxKeySize；空键会被拒绝） VALUE 二进制安全的值，最大 1 GiB（MaxValueSize） [ARG] 可选参数 ARG... 一个或多个 A | B 二选一 R / W 读命令（本地执行）/ 写命令（经 Raft 日志复制） integer RESP 整数 :1 bulk RESP bulk string $3 foo null RESP 空批量 $-1，表示“不存在” array RESP 数组 *2 … +OK RESP 简单字符串 适用于所有命令的规则 # 每种数据类型一个独立键空间。 同一个键可以同时持有字符串和哈希和列表。类型不符的命令会在该类型自己的（可能为空的）视图上执行，而不是返回 WRONGTYPE。见 兼容性。 过期时间按类型分开。 EXPIRE/TTL 作用于字符串；HEXPIRE/HTTL 作用于哈希；LEXPIRE/LTTL 作用于列表；SEXPIRE/STTL/SPERSIST 作用于集合。有序集合没有 TTL 命令。TTL 为整秒；-1 表示“无过期”，已过期的键报的也是 -1。 分值是 64 位整数，不是浮点数。 数量与分页都有上限。 COUNT 上限 10000，SRANDMEMBER 的 |count| 上限 1048576。 写命令会在每个副本上重放，结果必须全集群一致 —— 这正是 SPOP 采用确定性抽取的原因。 错误以 RESP 错误返回（-ERR …）。永远不会产生 -WRONGTYPE。不允许提供读的从节点会返回 -MOVED（带 --try-errors 时为 -TRY）。 读写分类，以及为什么重要 # R 表示处理器通过 conf.AddReadCommand 注册：它在接收请求的节点上执行，针对的是该节点已应用的状态。W 表示 conf.AddWriteCommand：它经 Raft 日志串行化，并在每个节点上应用。"><meta property="og:locale" content="zh"><meta property="og:type" content="website"><title>命令参考 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/commands/ title="Command reference"><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/index.xml title="IceFireDB 文档中心"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle checked>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/ class=active>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>命令参考</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#记法>记法</a></li><li><a href=#适用于所有命令的规则>适用于所有命令的规则</a></li><li><a href=#读写分类以及为什么重要>读写分类，以及为什么重要</a></li><li><a href=#回复类型>回复类型</a></li><li><a href=#限额>限额</a></li></ul></nav></aside></header><article class=markdown><h1 id=命令参考>命令参考
+<a class=anchor href=#%e5%91%bd%e4%bb%a4%e5%8f%82%e8%80%83>#</a></h1><p>引擎注册的全部命令，按数据类型分组。下表就是完整的命令面：110 条命令，外加由 Raft/RESP 层响应的
+<a href=/icefiredb_docs/zh/deploy/system-commands/>系统命令</a>（<code>RAFT</code>、<code>CLUSTER</code>、<code>MACHINE</code>、<code>BARRIER</code>、<code>AUTH</code> 等）。</p><table><thead><tr><th style=text-align:left>页面</th><th style=text-align:left>命令</th><th style=text-align:left>数量</th></tr></thead><tbody><tr><td style=text-align:left><a href=/icefiredb_docs/zh/commands/strings/>字符串</a></td><td style=text-align:left><code>SET</code> … <code>BITPOS</code>，过期</td><td style=text-align:left>26</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/commands/hashes/>哈希</a></td><td style=text-align:left><code>HSET</code> … <code>HMCLEAR</code>，过期</td><td style=text-align:left>19</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/commands/lists/>列表</a></td><td style=text-align:left><code>LPUSH</code> … <code>LREM</code>，过期</td><td style=text-align:left>18</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/commands/sets/>集合</a></td><td style=text-align:left><code>SADD</code> … <code>SPERSIST</code></td><td style=text-align:left>21</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></td><td style=text-align:left><code>ZADD</code> … <code>ZCLEAR</code></td><td style=text-align:left>15</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/commands/scan/>扫描</a></td><td style=text-align:left><code>SCAN</code>/<code>HSCAN</code>/<code>SSCAN</code>/<code>ZSCAN</code> + <code>X*</code> 族</td><td style=text-align:left>8</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/commands/server/>服务器</a></td><td style=text-align:left><code>INFO</code>、<code>FLUSHALL</code>、<code>FLUSHDB</code></td><td style=text-align:left>3</td></tr><tr><td style=text-align:left><a href=/icefiredb_docs/zh/commands/compatibility/>兼容性</a></td><td style=text-align:left>与 Redis 的偏差及原因</td><td style=text-align:left>—</td></tr></tbody></table><h2 id=记法>记法
+<a class=anchor href=#%e8%ae%b0%e6%b3%95>#</a></h2><table><thead><tr><th style=text-align:left>记法</th><th style=text-align:left>含义</th></tr></thead><tbody><tr><td style=text-align:left><code>KEY</code></td><td style=text-align:left>二进制安全的键名，最大 1024 字节（ledis <code>MaxKeySize</code>；空键会被拒绝）</td></tr><tr><td style=text-align:left><code>VALUE</code></td><td style=text-align:left>二进制安全的值，最大 1 GiB（<code>MaxValueSize</code>）</td></tr><tr><td style=text-align:left><code>[ARG]</code></td><td style=text-align:left>可选参数</td></tr><tr><td style=text-align:left><code>ARG...</code></td><td style=text-align:left>一个或多个</td></tr><tr><td style=text-align:left><code>A | B</code></td><td style=text-align:left>二选一</td></tr><tr><td style=text-align:left><strong>R</strong> / <strong>W</strong></td><td style=text-align:left>读命令（本地执行）/ 写命令（经 Raft 日志复制）</td></tr><tr><td style=text-align:left><code>integer</code></td><td style=text-align:left>RESP 整数 <code>:1</code></td></tr><tr><td style=text-align:left><code>bulk</code></td><td style=text-align:left>RESP bulk string <code>$3 foo</code></td></tr><tr><td style=text-align:left><code>null</code></td><td style=text-align:left>RESP 空批量 <code>$-1</code>，表示“不存在”</td></tr><tr><td style=text-align:left><code>array</code></td><td style=text-align:left>RESP 数组 <code>*2 …</code></td></tr><tr><td style=text-align:left><code>+OK</code></td><td style=text-align:left>RESP 简单字符串</td></tr></tbody></table><h2 id=适用于所有命令的规则>适用于所有命令的规则
+<a class=anchor href=#%e9%80%82%e7%94%a8%e4%ba%8e%e6%89%80%e6%9c%89%e5%91%bd%e4%bb%a4%e7%9a%84%e8%a7%84%e5%88%99>#</a></h2><ol><li><strong>每种数据类型一个独立键空间。</strong> 同一个键可以同时持有字符串<em>和</em>哈希<em>和</em>列表。类型不符的命令会在该类型自己的（可能为空的）视图上执行，而不是返回 <code>WRONGTYPE</code>。见
+<a href=/icefiredb_docs/zh/commands/compatibility/>兼容性</a>。</li><li><strong>过期时间按类型分开。</strong> <code>EXPIRE</code>/<code>TTL</code> 作用于字符串；<code>HEXPIRE</code>/<code>HTTL</code> 作用于哈希；<code>LEXPIRE</code>/<code>LTTL</code> 作用于列表；<code>SEXPIRE</code>/<code>STTL</code>/<code>SPERSIST</code> 作用于集合。有序集合没有 TTL 命令。TTL 为整秒；<code>-1</code> 表示“无过期”，已过期的键报的也是 <code>-1</code>。</li><li><strong>分值是 64 位整数</strong>，不是浮点数。</li><li><strong>数量与分页都有上限。</strong> <code>COUNT</code> 上限 10000，<code>SRANDMEMBER</code> 的 <code>|count|</code> 上限 1048576。</li><li><strong>写命令会在每个副本上重放</strong>，结果必须全集群一致 —— 这正是 <code>SPOP</code> 采用确定性抽取的原因。</li><li><strong>错误以 RESP 错误返回</strong>（<code>-ERR …</code>）。永远不会产生 <code>-WRONGTYPE</code>。不允许提供读的从节点会返回 <code>-MOVED</code>（带 <code>--try-errors</code> 时为 <code>-TRY</code>）。</li></ol><h2 id=读写分类以及为什么重要>读写分类，以及为什么重要
+<a class=anchor href=#%e8%af%bb%e5%86%99%e5%88%86%e7%b1%bb%e4%bb%a5%e5%8f%8a%e4%b8%ba%e4%bb%80%e4%b9%88%e9%87%8d%e8%a6%81>#</a></h2><p><code>R</code> 表示处理器通过 <code>conf.AddReadCommand</code> 注册：它在接收请求的节点上执行，针对的是该节点已应用的状态。<code>W</code> 表示 <code>conf.AddWriteCommand</code>：它经 Raft 日志串行化，并在每个节点上应用。</p><p>有三条有序集合命令虽然会修改数据，却被注册为<strong>读</strong>命令：</p><table><thead><tr><th style=text-align:left>命令</th><th style=text-align:left>注册为</th><th style=text-align:left>集群中的影响</th></tr></thead><tbody><tr><td style=text-align:left><code>ZINCRBY</code></td><td style=text-align:left>R</td><td style=text-align:left>只修改本地节点 —— 不复制，leader 切换后丢失</td></tr><tr><td style=text-align:left><code>ZREMRANGEBYRANK</code></td><td style=text-align:left>R</td><td style=text-align:left>同上</td></tr><tr><td style=text-align:left><code>ZREMRANGEBYSCORE</code></td><td style=text-align:left>R</td><td style=text-align:left>同上</td></tr></tbody></table><p>在这一点改变之前，请用 <code>ZADD</code> 写入算好的分值，用 <code>ZREM</code> 删除成员。</p><h2 id=回复类型>回复类型
+<a class=anchor href=#%e5%9b%9e%e5%a4%8d%e7%b1%bb%e5%9e%8b>#</a></h2><p>处理器返回 Go 值，由 RESP 层直接映射：</p><table><thead><tr><th style=text-align:left>处理器返回</th><th style=text-align:left>客户端看到</th></tr></thead><tbody><tr><td style=text-align:left><code>nil</code></td><td style=text-align:left>空批量（<code>$-1</code>）</td></tr><tr><td style=text-align:left><code>[]byte</code></td><td style=text-align:left>bulk string</td></tr><tr><td style=text-align:left><code>[][]byte</code>、<code>[]string</code></td><td style=text-align:left>数组</td></tr><tr><td style=text-align:left><code>redcon.SimpleString</code></td><td style=text-align:left>简单字符串（<code>+OK</code>）</td></tr><tr><td style=text-align:left><code>redcon.SimpleInt</code>、<code>int64</code></td><td style=text-align:left>整数</td></tr><tr><td style=text-align:left><code>error</code></td><td style=text-align:left>错误回复（<code>-ERR …</code>）</td></tr></tbody></table><p>简单字符串不能携带 <code>\r\n</code>，所以值永远不会以简单字符串返回。</p><h2 id=限额>限额
+<a class=anchor href=#%e9%99%90%e9%a2%9d>#</a></h2><table><thead><tr><th style=text-align:left>限制项</th><th style=text-align:left>取值</th></tr></thead><tbody><tr><td style=text-align:left>键大小</td><td style=text-align:left>1024 字节（<code>ledis.MaxKeySize</code>）；空键会被拒绝</td></tr><tr><td style=text-align:left>哈希字段 / 集合成员 / zset 成员</td><td style=text-align:left>各 1024 字节</td></tr><tr><td style=text-align:left>值大小</td><td style=text-align:left>1 GiB（<code>ledis.MaxValueSize</code>）</td></tr><tr><td style=text-align:left>任意 scan 的 <code>COUNT</code></td><td style=text-align:left>10000，超出即夹到上限；仍只是提示</td></tr><tr><td style=text-align:left><code>SRANDMEMBER</code> / <code>SPOP</code> 计数</td><td style=text-align:left>绝对值 ≤ 1048576；<code>SPOP</code> 夹到集合大小</td></tr><tr><td style=text-align:left>过期时间</td><td style=text-align:left>整秒；<code>PX</code> 向上取整；无法表示的 <code>EX</code> 直接报错</td></tr><tr><td style=text-align:left>数据库数量</td><td style=text-align:left>1（未实现 <code>SELECT</code>）</td></tr><tr><td style=text-align:left>阻塞命令</td><td style=text-align:left>无（<code>BLPOP</code>/<code>BRPOP</code> 未注册）</td></tr></tbody></table></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#记法>记法</a></li><li><a href=#适用于所有命令的规则>适用于所有命令的规则</a></li><li><a href=#读写分类以及为什么重要>读写分类，以及为什么重要</a></li><li><a href=#回复类型>回复类型</a></li><li><a href=#限额>限额</a></li></ul></nav></div></aside></main></body></html>

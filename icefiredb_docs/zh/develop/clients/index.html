@@ -1,0 +1,191 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content='
+  客户端
+  #
+
+服务器使用 RESP，所以 Redis 客户端可以直接用——但有三处需要调整：类型不匹配从不报错、scan 游标必须当作不透明值处理、没有 SELECT/MULTI。
+
+  redis-cli
+  #
+
+redis-cli -h 127.0.0.1 -p 11001
+
+# with TLS and auth
+redis-cli --tls --cacert ./ca.crt -a "$ICEFIREDB_AUTH" -h db1.internal -p 11001
+
+SET user:1 &#39;{"name":"ada"}&#39; EX 300
+HGETALL user:1
+SCAN 0 MATCH &#39;user:*&#39; COUNT 100
+XSCAN HASH "" MATCH &#39;^user:&#39; COUNT 100
+INFO
+redis-cli --scan 可用：它从 0 开始，循环到游标重新变成 0 为止。
+
+  Go (github.com/redis/go-redis/v9)
+  #
+
+package main
+
+import (
+	"context"
+	"crypto/tls"
+	"fmt"
+
+	"github.com/redis/go-redis/v9"
+)
+
+func main() {
+	ctx := context.Background()
+	rdb := redis.NewClient(&amp;redis.Options{
+		Addr:      "127.0.0.1:11001",
+		Password:  "",              // set when the server runs with --auth
+		TLSConfig: nil,             // &amp;tls.Config{...} when --tls-cert/--tls-key are used
+		DB:        0,               // there is only database 0
+	})
+	defer rdb.Close()
+
+	if err := rdb.Set(ctx, "user:1", `{"name":"ada"}`, 0).Err(); err != nil {
+		panic(err)
+	}
+	v, err := rdb.Get(ctx, "user:1").Result()
+	fmt.Println(v, err)                       // {"name":"ada"} <nil>
+
+	fmt.Println(rdb.HSet(ctx, "user:1", "name", "ada").Val())   // 1
+
+	// Paginate keys: the cursor is opaque, handle it as a string.
+	cursor := uint64(0)
+	for {
+		keys, next, err := rdb.Scan(ctx, cursor, "user:*", 100).Result()
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(keys)
+		if next == 0 {
+			break
+		}
+		cursor = next
+	}
+}
+注意事项——类型化 scan 辅助函数。 rdb.HScan、rdb.SScan、rdb.ZScan 和 rdb.Scan 都会用 strconv.ParseUint 强制转换游标，而 HScan/SScan/ZScan 还额外要求游标是数字。本引擎对这三条命令返回最后一个字段/成员名作为游标，所以这些类型化辅助函数会以解析错误失败。请改用通用 API：'><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="客户端"><meta property="og:description" content=' 客户端 # 服务器使用 RESP，所以 Redis 客户端可以直接用——但有三处需要调整：类型不匹配从不报错、scan 游标必须当作不透明值处理、没有 SELECT/MULTI。
+redis-cli # redis-cli -h 127.0.0.1 -p 11001 # with TLS and auth redis-cli --tls --cacert ./ca.crt -a "$ICEFIREDB_AUTH" -h db1.internal -p 11001 SET user:1 &#39;{"name":"ada"}&#39; EX 300 HGETALL user:1 SCAN 0 MATCH &#39;user:*&#39; COUNT 100 XSCAN HASH "" MATCH &#39;^user:&#39; COUNT 100 INFO redis-cli --scan 可用：它从 0 开始，循环到游标重新变成 0 为止。
+Go (github.com/redis/go-redis/v9) # package main import ( "context" "crypto/tls" "fmt" "github.com/redis/go-redis/v9" ) func main() { ctx := context.Background() rdb := redis.NewClient(&amp;redis.Options{ Addr: "127.0.0.1:11001", Password: "", // set when the server runs with --auth TLSConfig: nil, // &amp;tls.Config{...} when --tls-cert/--tls-key are used DB: 0, // there is only database 0 }) defer rdb.Close() if err := rdb.Set(ctx, "user:1", `{"name":"ada"}`, 0).Err(); err != nil { panic(err) } v, err := rdb.Get(ctx, "user:1").Result() fmt.Println(v, err) // {"name":"ada"} <nil> fmt.Println(rdb.HSet(ctx, "user:1", "name", "ada").Val()) // 1 // Paginate keys: the cursor is opaque, handle it as a string. cursor := uint64(0) for { keys, next, err := rdb.Scan(ctx, cursor, "user:*", 100).Result() if err != nil { panic(err) } fmt.Println(keys) if next == 0 { break } cursor = next } } 注意事项——类型化 scan 辅助函数。 rdb.HScan、rdb.SScan、rdb.ZScan 和 rdb.Scan 都会用 strconv.ParseUint 强制转换游标，而 HScan/SScan/ZScan 还额外要求游标是数字。本引擎对这三条命令返回最后一个字段/成员名作为游标，所以这些类型化辅助函数会以解析错误失败。请改用通用 API：'><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="develop"><title>客户端 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/ title=Clients><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle checked>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/ class=active>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>客户端</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#redis-cli>redis-cli</a></li><li><a href=#go-githubcomredisgo-redisv9>Go (<code>github.com/redis/go-redis/v9</code>)</a></li><li><a href=#python-redis-py>Python (<code>redis-py</code>)</a></li><li><a href=#node-ioredis>Node (<code>ioredis</code>)</a></li><li><a href=#常见注意事项>常见注意事项</a></li><li><a href=#从客户端做健康检查>从客户端做健康检查</a></li></ul></nav></aside></header><article class=markdown><h1 id=客户端>客户端
+<a class=anchor href=#%e5%ae%a2%e6%88%b7%e7%ab%af>#</a></h1><p>服务器使用 RESP，所以 Redis 客户端可以直接用——但有三处需要调整：类型不匹配从不报错、scan 游标必须当作不透明值处理、没有 <code>SELECT</code>/<code>MULTI</code>。</p><h2 id=redis-cli>redis-cli
+<a class=anchor href=#redis-cli>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -h 127.0.0.1 -p <span style=color:#ae81ff>11001</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># with TLS and auth</span>
+</span></span><span style=display:flex><span>redis-cli --tls --cacert ./ca.crt -a <span style=color:#e6db74>&#34;</span>$ICEFIREDB_AUTH<span style=color:#e6db74>&#34;</span> -h db1.internal -p <span style=color:#ae81ff>11001</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>SET user:1 <span style=color:#e6db74>&#39;{&#34;name&#34;:&#34;ada&#34;}&#39;</span> EX <span style=color:#ae81ff>300</span>
+</span></span><span style=display:flex><span>HGETALL user:1
+</span></span><span style=display:flex><span>SCAN <span style=color:#ae81ff>0</span> MATCH <span style=color:#e6db74>&#39;user:*&#39;</span> COUNT <span style=color:#ae81ff>100</span>
+</span></span><span style=display:flex><span>XSCAN HASH <span style=color:#e6db74>&#34;&#34;</span> MATCH <span style=color:#e6db74>&#39;^user:&#39;</span> COUNT <span style=color:#ae81ff>100</span>
+</span></span><span style=display:flex><span>INFO
+</span></span></code></pre></div><p><code>redis-cli --scan</code> 可用：它从 <code>0</code> 开始，循环到游标重新变成 <code>0</code> 为止。</p><h2 id=go-githubcomredisgo-redisv9>Go (<code>github.com/redis/go-redis/v9</code>)
+<a class=anchor href=#go-githubcomredisgo-redisv9>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> (
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;context&#34;</span>
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;crypto/tls&#34;</span>
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;fmt&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;github.com/redis/go-redis/v9&#34;</span>
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>main</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>ctx</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>context</span>.<span style=color:#a6e22e>Background</span>()
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>rdb</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>redis</span>.<span style=color:#a6e22e>NewClient</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>redis</span>.<span style=color:#a6e22e>Options</span>{
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>Addr</span>:      <span style=color:#e6db74>&#34;127.0.0.1:11001&#34;</span>,
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>Password</span>:  <span style=color:#e6db74>&#34;&#34;</span>,              <span style=color:#75715e>// set when the server runs with --auth
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>TLSConfig</span>: <span style=color:#66d9ef>nil</span>,             <span style=color:#75715e>// &amp;tls.Config{...} when --tls-cert/--tls-key are used
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>DB</span>:        <span style=color:#ae81ff>0</span>,               <span style=color:#75715e>// there is only database 0
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	})
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>defer</span> <span style=color:#a6e22e>rdb</span>.<span style=color:#a6e22e>Close</span>()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>err</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>rdb</span>.<span style=color:#a6e22e>Set</span>(<span style=color:#a6e22e>ctx</span>, <span style=color:#e6db74>&#34;user:1&#34;</span>, <span style=color:#e6db74>`{&#34;name&#34;:&#34;ada&#34;}`</span>, <span style=color:#ae81ff>0</span>).<span style=color:#a6e22e>Err</span>(); <span style=color:#a6e22e>err</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>		panic(<span style=color:#a6e22e>err</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>v</span>, <span style=color:#a6e22e>err</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>rdb</span>.<span style=color:#a6e22e>Get</span>(<span style=color:#a6e22e>ctx</span>, <span style=color:#e6db74>&#34;user:1&#34;</span>).<span style=color:#a6e22e>Result</span>()
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#a6e22e>v</span>, <span style=color:#a6e22e>err</span>)                       <span style=color:#75715e>// {&#34;name&#34;:&#34;ada&#34;} &lt;nil&gt;
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#a6e22e>rdb</span>.<span style=color:#a6e22e>HSet</span>(<span style=color:#a6e22e>ctx</span>, <span style=color:#e6db74>&#34;user:1&#34;</span>, <span style=color:#e6db74>&#34;name&#34;</span>, <span style=color:#e6db74>&#34;ada&#34;</span>).<span style=color:#a6e22e>Val</span>())   <span style=color:#75715e>// 1
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Paginate keys: the cursor is opaque, handle it as a string.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>cursor</span> <span style=color:#f92672>:=</span> uint64(<span style=color:#ae81ff>0</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>for</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>keys</span>, <span style=color:#a6e22e>next</span>, <span style=color:#a6e22e>err</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>rdb</span>.<span style=color:#a6e22e>Scan</span>(<span style=color:#a6e22e>ctx</span>, <span style=color:#a6e22e>cursor</span>, <span style=color:#e6db74>&#34;user:*&#34;</span>, <span style=color:#ae81ff>100</span>).<span style=color:#a6e22e>Result</span>()
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>err</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>			panic(<span style=color:#a6e22e>err</span>)
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#a6e22e>keys</span>)
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>next</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>break</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>cursor</span> = <span style=color:#a6e22e>next</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p><strong>注意事项——类型化 scan 辅助函数。</strong> <code>rdb.HScan</code>、<code>rdb.SScan</code>、<code>rdb.ZScan</code> 和 <code>rdb.Scan</code> 都会用 <code>strconv.ParseUint</code> 强制转换游标，而 <code>HScan</code>/<code>SScan</code>/<code>ZScan</code> 还额外要求游标是数字。本引擎对这三条命令返回<strong>最后一个字段/成员名</strong>作为游标，所以这些类型化辅助函数会以解析错误失败。请改用通用 API：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#a6e22e>cursor</span> <span style=color:#f92672>:=</span> <span style=color:#e6db74>&#34;0&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>vals</span>, <span style=color:#a6e22e>err</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>rdb</span>.<span style=color:#a6e22e>Do</span>(<span style=color:#a6e22e>ctx</span>, <span style=color:#e6db74>&#34;HSCAN&#34;</span>, <span style=color:#e6db74>&#34;user:1&#34;</span>, <span style=color:#a6e22e>cursor</span>, <span style=color:#e6db74>&#34;MATCH&#34;</span>, <span style=color:#e6db74>&#34;n*&#34;</span>, <span style=color:#e6db74>&#34;COUNT&#34;</span>, <span style=color:#ae81ff>100</span>).<span style=color:#a6e22e>Slice</span>()
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>err</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>		panic(<span style=color:#a6e22e>err</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>cursor</span> = <span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Sprint</span>(<span style=color:#a6e22e>vals</span>[<span style=color:#ae81ff>0</span>])
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>pairs</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>vals</span>[<span style=color:#ae81ff>1</span>].([]<span style=color:#66d9ef>interface</span>{})
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>i</span> <span style=color:#f92672>:=</span> <span style=color:#ae81ff>0</span>; <span style=color:#a6e22e>i</span><span style=color:#f92672>+</span><span style=color:#ae81ff>1</span> &lt; len(<span style=color:#a6e22e>pairs</span>); <span style=color:#a6e22e>i</span> <span style=color:#f92672>+=</span> <span style=color:#ae81ff>2</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#a6e22e>pairs</span>[<span style=color:#a6e22e>i</span>], <span style=color:#a6e22e>pairs</span>[<span style=color:#a6e22e>i</span><span style=color:#f92672>+</span><span style=color:#ae81ff>1</span>])
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>cursor</span> <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;0&#34;</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>cursor</span> <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;&#34;</span> {
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>break</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p><code>redis.NewClusterClient</code> 同样可用：<code>CLUSTER SLOTS</code> 报告主节点上一段覆盖 <code>0-16383</code> 的区间，这是一个合法的单分片拓扑。它对分摊负载毫无意义，对客户端统一性有用——而且它会自动跟随 <code>-MOVED</code> 重定向。</p><h2 id=python-redis-py>Python (<code>redis-py</code>)
+<a class=anchor href=#python-redis-py>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>import</span> redis
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>r <span style=color:#f92672>=</span> redis<span style=color:#f92672>.</span>Redis(
+</span></span><span style=display:flex><span>    host<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;127.0.0.1&#34;</span>, port<span style=color:#f92672>=</span><span style=color:#ae81ff>11001</span>,
+</span></span><span style=display:flex><span>    password<span style=color:#f92672>=</span><span style=color:#66d9ef>None</span>,                 <span style=color:#75715e># set when the server runs with --auth</span>
+</span></span><span style=display:flex><span>    ssl<span style=color:#f92672>=</span><span style=color:#66d9ef>False</span>,                     <span style=color:#75715e># True with --tls-cert/--tls-key</span>
+</span></span><span style=display:flex><span>    decode_responses<span style=color:#f92672>=</span><span style=color:#66d9ef>True</span>,
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>r<span style=color:#f92672>.</span>set(<span style=color:#e6db74>&#34;user:1&#34;</span>, <span style=color:#e6db74>&#39;{&#34;name&#34;:&#34;ada&#34;}&#39;</span>)
+</span></span><span style=display:flex><span>print(r<span style=color:#f92672>.</span>get(<span style=color:#e6db74>&#34;user:1&#34;</span>))
+</span></span><span style=display:flex><span>print(r<span style=color:#f92672>.</span>hset(<span style=color:#e6db74>&#34;user:1&#34;</span>, <span style=color:#e6db74>&#34;name&#34;</span>, <span style=color:#e6db74>&#34;ada&#34;</span>))
+</span></span><span style=display:flex><span>print(r<span style=color:#f92672>.</span>ttl(<span style=color:#e6db74>&#34;user:1&#34;</span>))             <span style=color:#75715e># works: TTL is per type</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># The typed helpers coerce the cursor to int, which this engine&#39;s cursors are not.</span>
+</span></span><span style=display:flex><span>cursor <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;0&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>while</span> <span style=color:#66d9ef>True</span>:
+</span></span><span style=display:flex><span>    cursor, pairs <span style=color:#f92672>=</span> r<span style=color:#f92672>.</span>execute_command(<span style=color:#e6db74>&#34;HSCAN&#34;</span>, <span style=color:#e6db74>&#34;user:1&#34;</span>, cursor, <span style=color:#e6db74>&#34;COUNT&#34;</span>, <span style=color:#ae81ff>100</span>)
+</span></span><span style=display:flex><span>    print(pairs)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> cursor <span style=color:#f92672>in</span> (<span style=color:#e6db74>&#34;0&#34;</span>, <span style=color:#e6db74>b</span><span style=color:#e6db74>&#34;0&#34;</span>):
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>break</span>
+</span></span></code></pre></div><h2 id=node-ioredis>Node (<code>ioredis</code>)
+<a class=anchor href=#node-ioredis>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-js data-lang=js><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>Redis</span> <span style=color:#f92672>=</span> <span style=color:#a6e22e>require</span>(<span style=color:#e6db74>&#34;ioredis&#34;</span>);
+</span></span><span style=display:flex><span><span style=color:#66d9ef>const</span> <span style=color:#a6e22e>r</span> <span style=color:#f92672>=</span> <span style=color:#66d9ef>new</span> <span style=color:#a6e22e>Redis</span>({ <span style=color:#a6e22e>host</span><span style=color:#f92672>:</span> <span style=color:#e6db74>&#34;127.0.0.1&#34;</span>, <span style=color:#a6e22e>port</span><span style=color:#f92672>:</span> <span style=color:#ae81ff>11001</span> <span style=color:#75715e>/*, password, tls: {} */</span> });
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>(<span style=color:#66d9ef>async</span> () =&gt; {
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>await</span> <span style=color:#a6e22e>r</span>.<span style=color:#a6e22e>set</span>(<span style=color:#e6db74>&#34;user:1&#34;</span>, <span style=color:#e6db74>&#39;{&#34;name&#34;:&#34;ada&#34;}&#39;</span>);
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>console</span>.<span style=color:#a6e22e>log</span>(<span style=color:#66d9ef>await</span> <span style=color:#a6e22e>r</span>.<span style=color:#a6e22e>get</span>(<span style=color:#e6db74>&#34;user:1&#34;</span>));
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>console</span>.<span style=color:#a6e22e>log</span>(<span style=color:#66d9ef>await</span> <span style=color:#a6e22e>r</span>.<span style=color:#a6e22e>hset</span>(<span style=color:#e6db74>&#34;user:1&#34;</span>, <span style=color:#e6db74>&#34;name&#34;</span>, <span style=color:#e6db74>&#34;ada&#34;</span>));
+</span></span><span style=display:flex><span>  <span style=color:#75715e>// hscan returns [cursor, flatArray]; ioredis keeps the cursor as a string
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>  <span style=color:#66d9ef>let</span> [<span style=color:#a6e22e>cursor</span>, <span style=color:#a6e22e>flat</span>] <span style=color:#f92672>=</span> <span style=color:#66d9ef>await</span> <span style=color:#a6e22e>r</span>.<span style=color:#a6e22e>hscan</span>(<span style=color:#e6db74>&#34;user:1&#34;</span>, <span style=color:#e6db74>&#34;0&#34;</span>, <span style=color:#e6db74>&#34;COUNT&#34;</span>, <span style=color:#ae81ff>100</span>);
+</span></span><span style=display:flex><span>  <span style=color:#66d9ef>while</span> (<span style=color:#a6e22e>cursor</span> <span style=color:#f92672>!==</span> <span style=color:#e6db74>&#34;0&#34;</span>) {
+</span></span><span style=display:flex><span>    [<span style=color:#a6e22e>cursor</span>, <span style=color:#a6e22e>flat</span>] <span style=color:#f92672>=</span> <span style=color:#66d9ef>await</span> <span style=color:#a6e22e>r</span>.<span style=color:#a6e22e>hscan</span>(<span style=color:#e6db74>&#34;user:1&#34;</span>, <span style=color:#a6e22e>cursor</span>, <span style=color:#e6db74>&#34;COUNT&#34;</span>, <span style=color:#ae81ff>100</span>);
+</span></span><span style=display:flex><span>  }
+</span></span><span style=display:flex><span>})();
+</span></span></code></pre></div><h2 id=常见注意事项>常见注意事项
+<a class=anchor href=#%e5%b8%b8%e8%a7%81%e6%b3%a8%e6%84%8f%e4%ba%8b%e9%a1%b9>#</a></h2><table><thead><tr><th style=text-align:left>注意事项</th><th style=text-align:left>该怎么办</th></tr></thead><tbody><tr><td style=text-align:left>没有 <code>WRONGTYPE</code></td><td style=text-align:left>在键命名约定里或应用层强制执行类型规则</td></tr><tr><td style=text-align:left>没有 <code>TYPE</code> 命令</td><td style=text-align:left>自己记录类型；或用 <code>EXISTS</code>/<code>HKEYEXISTS</code>/<code>LKEYEXISTS</code>/<code>SKEYEXISTS</code> 探测</td></tr><tr><td style=text-align:left>没有 <code>SELECT</code></td><td style=text-align:left>设 <code>DB: 0</code>，然后就不用再管它</td></tr><tr><td style=text-align:left>没有 <code>MULTI</code>/<code>EXEC</code></td><td style=text-align:left>用 <code>SET … NX</code> 做原子占位，用 <code>BARRIER</code> 保证读到自己刚写的</td></tr><tr><td style=text-align:left>没有 <code>BLPOP</code></td><td style=text-align:left>轮询 <code>LPOP</code>，或改用为阻塞读设计的队列</td></tr><tr><td style=text-align:left>在 P2P 驱动上，<code>HGET</code>/<code>GET</code> 一个空值会返回 <code>null</code></td><td style=text-align:left>当"空"必须保留时，存一个哨兵值</td></tr><tr><td style=text-align:left>从节点读需要 <code>--openreads</code></td><td style=text-align:left>没有它就只能等 <code>-MOVED 0 &lt;leader></code></td></tr><tr><td style=text-align:left><code>INFO</code> 不接受参数</td><td style=text-align:left>解析这一条回复；不要调用 <code>INFO memory</code></td></tr></tbody></table><h2 id=从客户端做健康检查>从客户端做健康检查
+<a class=anchor href=#%e4%bb%8e%e5%ae%a2%e6%88%b7%e7%ab%af%e5%81%9a%e5%81%a5%e5%ba%b7%e6%a3%80%e6%9f%a5>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> PING                    <span style=color:#75715e># PONG when the process is up</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> BARRIER                 <span style=color:#75715e># OK once this client&#39;s writes are applied</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT LEADER             <span style=color:#75715e># who to write to</span>
+</span></span><span style=display:flex><span>curl -fsS http://127.0.0.1:11002/readyz    <span style=color:#75715e># 200 &#34;ready&#34; once storage is initialized</span>
+</span></span></code></pre></div></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#redis-cli>redis-cli</a></li><li><a href=#go-githubcomredisgo-redisv9>Go (<code>github.com/redis/go-redis/v9</code>)</a></li><li><a href=#python-redis-py>Python (<code>redis-py</code>)</a></li><li><a href=#node-ioredis>Node (<code>ioredis</code>)</a></li><li><a href=#常见注意事项>常见注意事项</a></li><li><a href=#从客户端做健康检查>从客户端做健康检查</a></li></ul></nav></div></aside></main></body></html>

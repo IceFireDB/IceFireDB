@@ -1,0 +1,995 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>命令参考 on IceFireDB 文档中心</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/</link><description>Recent content in 命令参考 on IceFireDB 文档中心</description><generator>Hugo</generator><language>zh</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/index.xml" rel="self" type="application/rss+xml"/><item><title>字符串</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/</guid><description>&lt;h1 id="字符串">
+ 字符串
+ &lt;a class="anchor" href="#%e5%ad%97%e7%ac%a6%e4%b8%b2">#&lt;/a>
+&lt;/h1>
+&lt;p>26 条命令：&lt;code>SET&lt;/code> 系列、计数器、位操作与字符串过期。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SET KEY VALUE [EX seconds] [PX milliseconds] [NX] [XX] [KEEPTTL]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>；&lt;code>NX&lt;/code>/&lt;code>XX&lt;/code> 阻止写入时为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SET user:1 '{&amp;quot;n&amp;quot;:&amp;quot;ada&amp;quot;}' EX 60&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETNX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETNX KEY VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 写入，0 已存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETNX job:42 1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETEX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEX KEY seconds VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEX session:9 60 tok&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETEXAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEXAT KEY unixTime VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEXAT session:9 1767225600 tok&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GETSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETSET KEY VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 旧值，不存在为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETSET counter 0&lt;/code> → &lt;code>&amp;quot;7&amp;quot;&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GET KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code>，不存在为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GET user:1&lt;/code> → &lt;code>{&amp;quot;n&amp;quot;:&amp;quot;ada&amp;quot;}&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MGET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MGET KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code>，逐项为 bulk 或 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MGET a b&lt;/code> → &lt;code>[val, null]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MSET KEY VALUE [KEY VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MSET a 1 b 2&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>APPEND&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>APPEND KEY VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新长度&lt;/td>
+ &lt;td style="text-align: left">&lt;code>APPEND log &amp;quot;x\n&amp;quot;&lt;/code> → &lt;code>5&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>STRLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STRLEN KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 字节长度&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STRLEN user:1&lt;/code> → &lt;code>13&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>INCR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新值&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCR hits&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>INCRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCRBY KEY increment&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新值&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCRBY hits 5&lt;/code> → &lt;code>6&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DECR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新值&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECR hits&lt;/code> → &lt;code>5&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DECRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECRBY KEY decrement&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新值&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECRBY hits 5&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GETRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETRANGE KEY start end&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 子串（闭区间，负偏移从尾部计）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETRANGE user:1 0 3&lt;/code> → &lt;code>{&amp;quot;n&amp;quot;&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETRANGE KEY offset VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新长度&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETRANGE user:1 0 '{&amp;quot;m&amp;quot;'&lt;/code> → &lt;code>13&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GETBIT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETBIT KEY offset&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETBIT bitmap 7&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETBIT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETBIT KEY offset value&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 原比特&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETBIT bitmap 7 1&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BITCOUNT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITCOUNT KEY [start end [BYTE|BIT]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 置位数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITCOUNT bitmap 0 0&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BITOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITOP AND|OR|XOR|NOT destKey KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 结果长度&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITOP AND out a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BITPOS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITPOS KEY bit [start [end [BYTE|BIT]]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 位置，未找到为 &lt;code>-1&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITPOS bitmap 1&lt;/code> → &lt;code>7&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DEL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DEL KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除数量&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DEL a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXISTS KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 存在数量&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXISTS a b&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 设置成功，0 键不存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIRE session:9 60&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 设置成功，0 键不存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIREAT session:9 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>TTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>TTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 剩余秒数，无过期为 &lt;code>-1&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>TTL session:9&lt;/code> → &lt;code>59&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="说明">
+ 说明
+ &lt;a class="anchor" href="#%e8%af%b4%e6%98%8e">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>SET&lt;/code> 会清掉已有的过期时间，除非给出 &lt;code>KEEPTTL&lt;/code>。&lt;code>PX&lt;/code> 会&lt;strong>向上取整&lt;/strong>到下一秒，因为过期时间按整秒存储，所以 &lt;code>PX 500&lt;/code> 让键保留 1 秒、&lt;code>PX 1500&lt;/code> 保留 2 秒 —— 绝不会少于请求值。&lt;/li>
+&lt;li>条件阻止写入时，&lt;code>SET ... NX&lt;/code>/&lt;code>XX&lt;/code> 返回 &lt;strong>null bulk&lt;/strong>，而不是错误。&lt;/li>
+&lt;li>字符串&lt;strong>没有 &lt;code>PERSIST&lt;/code>&lt;/strong>：处理器虽然存在，但被注释掉了、未注册。想保留值又改变生命周期，请再次 &lt;code>EXPIRE&lt;/code>，或使用 &lt;code>SET … KEEPTTL&lt;/code>。&lt;/li>
+&lt;li>&lt;code>EXISTS&lt;/code> 只统计&lt;strong>字符串&lt;/strong>键空间中的键，看不到同名的哈希。其他类型请用 &lt;code>HKEYEXISTS&lt;/code>、&lt;code>LKEYEXISTS&lt;/code>、&lt;code>SKEYEXISTS&lt;/code>。&lt;/li>
+&lt;li>&lt;code>DEL&lt;/code> 删除这些键上的字符串，而不是同名的哈希/列表/集合。&lt;/li>
+&lt;li>对非数值执行 &lt;code>INCR&lt;/code>/&lt;code>DECR&lt;/code> 会像 Redis 一样返回 &lt;code>-ERR&lt;/code>；缺失的键按 &lt;code>0&lt;/code> 处理。&lt;/li>
+&lt;li>&lt;code>BITCOUNT&lt;/code>/&lt;code>BITPOS&lt;/code> 支持 Redis 7 的可选 &lt;code>BYTE&lt;/code>/&lt;code>BIT&lt;/code> 单位。&lt;/li>
+&lt;li>过期时间计算使用 Raft 时钟，因此当某个节点的 Raft 时钟落后于本地时钟时，较短的 TTL 可能被拒绝。见
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/commands/compatibility/">兼容性&lt;/a>。&lt;/li>
+&lt;li>&lt;code>TTL&lt;/code> 由存储层按&lt;strong>本地&lt;/strong>墙上时钟计算，因此各副本报告的值可能相差各自的 apply 延迟。&lt;/li>
+&lt;/ul></description></item><item><title>哈希</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/</guid><description>&lt;h1 id="哈希">
+ 哈希
+ &lt;a class="anchor" href="#%e5%93%88%e5%b8%8c">#&lt;/a>
+&lt;/h1>
+&lt;p>19 条命令。哈希键空间与同名键上的字符串键空间彼此独立。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSET KEY FIELD VALUE [FIELD VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新增字段数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSET user:1 name ada age 36&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSETNX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSETNX KEY FIELD VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 写入，0 字段已存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSETNX user:1 name ada&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HGET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGET KEY FIELD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code>，字段不存在为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGET user:1 name&lt;/code> → &lt;code>ada&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HMGET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMGET KEY FIELD [FIELD ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code>，逐项 bulk 或 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMGET user:1 name x&lt;/code> → &lt;code>[ada, null]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HMSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMSET KEY FIELD VALUE [FIELD VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMSET user:2 name bob&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HDEL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HDEL KEY FIELD [FIELD ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除字段数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HDEL user:1 age&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXISTS KEY FIELD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXISTS user:1 name&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HGETALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGETALL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 字段/值交替&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGETALL user:1&lt;/code> → &lt;code>[name, ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HKEYS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 字段列表&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYS user:1&lt;/code> → &lt;code>[name]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HVALS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HVALS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 值列表&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HVALS user:1&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HLEN KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 字段数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HLEN user:1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSTRLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSTRLEN KEY FIELD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 值长度，缺失为 0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSTRLEN user:1 name&lt;/code> → &lt;code>3&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HINCRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HINCRBY KEY FIELD increment&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新值&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HINCRBY stats hits 1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HKEYEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYEXISTS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1 —— 哈希是否存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYEXISTS user:1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除字段数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HCLEAR user:1&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HMCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMCLEAR KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除哈希数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMCLEAR a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HEXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 设置成功，0 键不存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIRE user:1 300&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HEXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIREAT user:1 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HTTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HTTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 剩余秒，无过期为 &lt;code>-1&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HTTL user:1&lt;/code> → &lt;code>299&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="说明">
+ 说明
+ &lt;a class="anchor" href="#%e8%af%b4%e6%98%8e">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>HCLEAR&lt;/code> / &lt;code>HMCLEAR&lt;/code> 删除&lt;strong>整条哈希&lt;/strong>（相当于该类型的 &lt;code>DEL&lt;/code>），并连带删掉它的过期时间；&lt;code>HDEL&lt;/code> 只删除单个字段。&lt;/li>
+&lt;li>没有 &lt;code>HPERSIST&lt;/code> —— 处理器存在但未注册。&lt;/li>
+&lt;li>&lt;code>HSET&lt;/code> 只统计新建的字段；覆盖已有字段计 0。&lt;/li>
+&lt;li>&lt;code>HGETALL&lt;/code> 按存储层的迭代顺序返回字段/值对。不要依赖它的顺序 —— 如果顺序重要，请在客户端排序。&lt;/li>
+&lt;li>对值为空的字段执行 &lt;code>HGET&lt;/code>：本地后端返回空 bulk string，去中心化后端返回 &lt;code>null&lt;/code> —— 在去中心化后端上这两种状态无法区分。见
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/commands/compatibility/">兼容性&lt;/a>。&lt;/li>
+&lt;li>字段缺失或值为空时，&lt;code>HSTRLEN&lt;/code> 都报 0。&lt;/li>
+&lt;li>过期：&lt;code>HEXPIRE&lt;/code>/&lt;code>HEXPIREAT&lt;/code>/&lt;code>HTTL&lt;/code> 作用于哈希，与同名键上的字符串互不影响。&lt;/li>
+&lt;/ul></description></item><item><title>列表</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/</guid><description>&lt;h1 id="列表">
+ 列表
+ &lt;a class="anchor" href="#%e5%88%97%e8%a1%a8">#&lt;/a>
+&lt;/h1>
+&lt;p>18 条命令。列表以带索引的序列存储；其中两条命令会重建整个列表。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LPUSH&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPUSH KEY VALUE [VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新长度&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPUSH q a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPUSH&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPUSH KEY VALUE [VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新长度&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPUSH q c&lt;/code> → &lt;code>3&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LPOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPOP KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 头部元素，空列表为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPOP q&lt;/code> → &lt;code>b&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOP KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 尾部元素，空列表为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOP q&lt;/code> → &lt;code>c&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LLEN KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 元素数量&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LLEN q&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LINDEX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINDEX KEY index&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code>，越界为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINDEX q 0&lt;/code> → &lt;code>a&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LRANGE KEY start stop&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code>（闭区间，负偏移从尾部计）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LRANGE q 0 -1&lt;/code> → &lt;code>[a]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LSET KEY index VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LSET q 0 z&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LTRIM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTRIM KEY start stop&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTRIM q 0 0&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPOPLPUSH&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOPLPUSH source destination&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 被移动的元素，源为空为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOPLPUSH q backup&lt;/code> → &lt;code>z&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LINSERT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINSERT KEY BEFORE|AFTER pivot VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新长度；&lt;code>0&lt;/code> 基准值不存在；&lt;code>-1&lt;/code> 键不存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINSERT q BEFORE z y&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LREM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LREM KEY count VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除数量&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LREM q 0 z&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LKEYEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LKEYEXISTS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1 —— 列表是否存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LKEYEXISTS q&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除元素数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LCLEAR q&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LMCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LMCLEAR KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除列表数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LMCLEAR a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LEXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIRE q 600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LEXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIREAT q 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LTTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 剩余秒，无过期为 &lt;code>-1&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTTL q&lt;/code> → &lt;code>599&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="说明">
+ 说明
+ &lt;a class="anchor" href="#%e8%af%b4%e6%98%8e">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>LPUSH q a b&lt;/code> 得到 &lt;code>[b, a]&lt;/code> —— 每个元素依次压入头部，与 Redis 一致。&lt;/li>
+&lt;li>&lt;code>LREM KEY count VALUE&lt;/code>：&lt;code>count &amp;gt; 0&lt;/code> 从头部删，&lt;code>count &amp;lt; 0&lt;/code> 从尾部删，&lt;code>count = 0&lt;/code> 删除每一处出现。&lt;/li>
+&lt;li>&lt;strong>&lt;code>LINSERT&lt;/code> 和 &lt;code>LREM&lt;/code> 是 O(n)，而且不是事务性的。&lt;/strong> 存储层没有它们的原语，因此处理器会读取列表、清空它，再重新写入（并恢复 TTL）。整个过程发生在同一次 Raft apply 内，所以其他客户端观察不到半成品列表，但中途后端失败会留下被截断的列表。不要在热路径的长列表上使用它们 —— 优先用 &lt;code>LTRIM&lt;/code> 或有界队列。&lt;/li>
+&lt;li>没有 &lt;code>LPERSIST&lt;/code>：处理器未注册。&lt;code>LCLEAR&lt;/code>/&lt;code>LMCLEAR&lt;/code> 删除整个列表及其 TTL。&lt;/li>
+&lt;li>&lt;strong>没有阻塞命令。&lt;/strong> &lt;code>BLPOP&lt;/code>/&lt;code>BRPOP&lt;/code> 是刻意不注册的：在 Raft apply 循环里做阻塞读，要么卡住日志，要么在没有回滚路径的情况下消费掉队列。&lt;/li>
+&lt;li>&lt;code>LRANGE&lt;/code> 在 &lt;code>start &amp;gt; stop&lt;/code> 时返回空数组；负索引从尾部计。&lt;/li>
+&lt;/ul></description></item><item><title>集合</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/</guid><description>&lt;h1 id="集合">
+ 集合
+ &lt;a class="anchor" href="#%e9%9b%86%e5%90%88">#&lt;/a>
+&lt;/h1>
+&lt;p>21 条命令：成员关系、三组集合代数、过期，以及确定性的 &lt;code>SPOP&lt;/code>。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SADD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SADD KEY MEMBER [MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新增成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SADD tags go db&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SREM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SREM KEY MEMBER [MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SREM tags db&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCARD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCARD KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 基数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCARD tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SISMEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SISMEMBER KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SISMEMBER tags go&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SMEMBERS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMEMBERS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 成员列表&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMEMBERS tags&lt;/code> → &lt;code>[go]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SDIFF&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFF KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 在首个集合、不在后续集合的成员&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFF a b&lt;/code> → &lt;code>[x]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SDIFFSTORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFFSTORE dest KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 结果大小&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFFSTORE out a b&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SINTER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTER KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 交集成员&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTER a b&lt;/code> → &lt;code>[y]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SINTERSTORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTERSTORE dest KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 结果大小&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTERSTORE out a b&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SUNION&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNION KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 并集成员&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNION a b&lt;/code> → &lt;code>[x,y]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SUNIONSTORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNIONSTORE dest KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 结果大小&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNIONSTORE out a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SMOVE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMOVE source destination MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 移动成功，0 不是成员&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMOVE a b x&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SPOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPOP KEY [count]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">无 count：&lt;code>bulk&lt;/code> 成员；有 count：&lt;code>array&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPOP queue:ready&lt;/code> → &lt;code>job:7&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SRANDMEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SRANDMEMBER KEY [count]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">无 count：&lt;code>bulk&lt;/code>；count 为正：去重的 &lt;code>array&lt;/code>；为负：可重复的 &lt;code>array&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SRANDMEMBER tags 1&lt;/code> → &lt;code>[go]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SKEYEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SKEYEXISTS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1 —— 集合是否存在&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SKEYEXISTS tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCLEAR tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SMCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMCLEAR KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除集合数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMCLEAR a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SEXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIRE tags 60&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SEXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIREAT tags 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>STTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 剩余秒，无过期为 &lt;code>-1&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STTL tags&lt;/code> → &lt;code>59&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SPERSIST&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPERSIST KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 移除，0 本来没有&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPERSIST tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="说明">
+ 说明
+ &lt;a class="anchor" href="#%e8%af%b4%e6%98%8e">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;strong>&lt;code>SPOP&lt;/code> 的抽取是跨副本确定性的。&lt;/strong> 由于它是写命令，结果必须在每个节点上一致，所以抽取的成员由 Raft 提供的种子决定，而不是 &lt;code>math/rand&lt;/code>。带 &lt;code>count&lt;/code> 时，count 会夹到集合大小；&lt;code>count = 0&lt;/code> 返回空数组，负数 count 报错。&lt;/li>
+&lt;li>&lt;code>SRANDMEMBER&lt;/code> 是&lt;strong>读&lt;/strong>命令，可以使用真正的随机性（&lt;code>count&lt;/code> 为正时返回不重复的成员，为负时允许重复）。&lt;code>|count|&lt;/code> 上限 1048576。&lt;/li>
+&lt;li>&lt;code>SMOVE&lt;/code> 移到同一个键是 no-op，返回 &lt;code>1&lt;/code> 并保留 TTL。&lt;/li>
+&lt;li>&lt;code>SCLEAR&lt;/code>/&lt;code>SMCLEAR&lt;/code> 删除整个集合及其过期时间；&lt;code>SREM&lt;/code> 只删除成员。&lt;/li>
+&lt;li>&lt;code>SPERSIST&lt;/code> 是引擎中唯一的 &lt;code>*PERSIST&lt;/code> 命令，且已知在 &lt;code>ipfs&lt;/code> 后端会留下过期时间。字符串、哈希和列表根本没有 &lt;code>PERSIST&lt;/code>。&lt;/li>
+&lt;li>集合代数命令读取参数中指定的集合；&lt;code>*STORE&lt;/code> 变体会&lt;strong>覆盖&lt;/strong>目标键，并返回结果大小。&lt;/li>
+&lt;/ul></description></item><item><title>有序集合</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/</guid><description>&lt;h1 id="有序集合">
+ 有序集合
+ &lt;a class="anchor" href="#%e6%9c%89%e5%ba%8f%e9%9b%86%e5%90%88">#&lt;/a>
+&lt;/h1>
+&lt;p>15 条命令。分值类型是 &lt;strong>64 位整数&lt;/strong>，不是双精度浮点 —— 这是唯一会改变查询结果、而不只是线格式的差异。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZADD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZADD KEY score MEMBER [score MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 新增成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZADD board 100 ada 90 bob&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZINCRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R ⚠&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZINCRBY KEY increment MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 新分值&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZINCRBY board 5 ada&lt;/code> → &lt;code>105&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREM KEY MEMBER [MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREM board bob&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZCARD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCARD KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 基数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCARD board&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZCOUNT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCOUNT KEY min max&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 分值区间内的成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCOUNT board 0 200&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCORE KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 分值，缺失为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCORE board ada&lt;/code> → &lt;code>105&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZRANK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANK KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 升序排名（0 起），缺失为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANK board ada&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREVRANK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANK KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 降序排名，缺失为 &lt;code>null&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANK board ada&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGE KEY start stop [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 成员（及分值）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGE board 0 -1 WITHSCORES&lt;/code> → &lt;code>[ada, 105]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGE KEY start stop [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 成员（及分值）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGE board 0 0&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZRANGEBYSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGEBYSCORE KEY min max [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 成员（及分值）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGEBYSCORE board 100 200&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGEBYSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGEBYSCORE KEY max min [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> 成员（及分值）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGEBYSCORE board 200 100&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYRANK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R ⚠&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYRANK KEY start stop&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYRANK board 0 0&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R ⚠&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYSCORE KEY min max&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYSCORE board 0 50&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除成员数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCLEAR board&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="说明">
+ 说明
+ &lt;a class="anchor" href="#%e8%af%b4%e6%98%8e">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;strong>⚠ &lt;code>ZINCRBY&lt;/code>、&lt;code>ZREMRANGEBYRANK&lt;/code> 和 &lt;code>ZREMRANGEBYSCORE&lt;/code> 被注册为读命令&lt;/strong>，尽管它们会修改数据。本地执行无害；在集群中它们的影响不会被复制，也无法在 leader 切换后存活。修复前：在客户端算好分值并用 &lt;code>ZADD&lt;/code> 写入，用 &lt;code>ZREM&lt;/code> 删除成员。&lt;/li>
+&lt;li>&lt;strong>有序集合没有 TTL。&lt;/strong> 没有 &lt;code>ZEXPIRE&lt;/code>/&lt;code>ZTTL&lt;/code>；请清理并重建键（&lt;code>ZCLEAR&lt;/code>），或把过期记账放在一个字符串键里。&lt;/li>
+&lt;li>分值按 &lt;code>int64&lt;/code> 解析。像 &lt;code>1.5&lt;/code> 这样的浮点分值会被拒绝；&lt;code>WITHSCORES&lt;/code> 返回整数。&lt;/li>
+&lt;li>&lt;code>ZRANGEBYSCORE min max&lt;/code> 两端都是闭区间；&lt;code>ZREVRANGEBYSCORE max min&lt;/code> 的参数顺序相反，与 Redis 一致。&lt;/li>
+&lt;li>成员缺失时，&lt;code>ZRANK&lt;/code>/&lt;code>ZREVRANK&lt;/code> 返回 &lt;code>null&lt;/code>，&lt;code>ZSCORE&lt;/code> 同理。&lt;/li>
+&lt;li>所有区间读取都按分值排序，分值相同时再按成员排序。&lt;/li>
+&lt;/ul></description></item><item><title>扫描</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/</guid><description>&lt;h1 id="扫描">
+ 扫描
+ &lt;a class="anchor" href="#%e6%89%ab%e6%8f%8f">#&lt;/a>
+&lt;/h1>
+&lt;p>8 条命令，分两族，&lt;strong>两套不同的游标契约&lt;/strong>。把它们搞混是使用本引擎时最常见的集成错误。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCAN cursor [MATCH glob] [COUNT n] [TYPE type]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, keys]&lt;/code>，游标为 &lt;code>0&lt;/code> 表示结束&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCAN 0 MATCH user:* COUNT 100&lt;/code> → &lt;code>[cursor, [user:1, user:2]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSCAN KEY cursor [MATCH glob] [COUNT n]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [field, value, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSCAN user:1 0 COUNT 10&lt;/code> → &lt;code>[0, [name, ada]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SSCAN KEY cursor [MATCH glob] [COUNT n]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SSCAN tags 0&lt;/code> → &lt;code>[0, [go]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCAN KEY cursor [MATCH glob] [COUNT n]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, score, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCAN board 0&lt;/code> → &lt;code>[0, [ada, 105]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSCAN type cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, keys]&lt;/code>，空游标表示结束&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSCAN KV &amp;quot;&amp;quot; COUNT 5&lt;/code> → &lt;code>[key:5, [...]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XHSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XHSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [field, value, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XHSCAN user:1 &amp;quot;&amp;quot; COUNT 5&lt;/code> → &lt;code>[name, [name, ada]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XSSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSSCAN tags &amp;quot;&amp;quot;&lt;/code> → &lt;code>[go, [go]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XZSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XZSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, score, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XZSCAN board &amp;quot;&amp;quot;&lt;/code> → &lt;code>[ada, [ada, 105]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="redis-族">
+ Redis 族
+ &lt;a class="anchor" href="#redis-%e6%97%8f">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>SCAN&lt;/code> / &lt;code>HSCAN&lt;/code> / &lt;code>SSCAN&lt;/code> / &lt;code>ZSCAN&lt;/code> 沿用 Redis 的形态，但不沿用 Redis 的游标编码。&lt;/p></description></item><item><title>服务器</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/</guid><description>&lt;h1 id="服务器">
+ 服务器
+ &lt;a class="anchor" href="#%e6%9c%8d%e5%8a%a1%e5%99%a8">#&lt;/a>
+&lt;/h1>
+&lt;p>数据面中的三条命令。运维需要的其他一切（&lt;code>RAFT&lt;/code>、&lt;code>CLUSTER&lt;/code>、&lt;code>MACHINE&lt;/code>、&lt;code>BARRIER&lt;/code>、&lt;code>AUTH&lt;/code>、&lt;code>SHUTDOWN&lt;/code>、&lt;code>VERSION&lt;/code>）都在
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/deploy/system-commands/">系统命令&lt;/a>中。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">读写&lt;/th>
+ &lt;th style="text-align: left">语法&lt;/th>
+ &lt;th style="text-align: left">返回&lt;/th>
+ &lt;th style="text-align: left">示例 → 回复&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>INFO&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INFO&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> 多行报告&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INFO&lt;/code> → &lt;code># Server\r\nversion…&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>FLUSHALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除键数&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHALL&lt;/code> → &lt;code>(integer) 42&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>FLUSHDB&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHDB&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 删除键数 —— &lt;code>FLUSHALL&lt;/code> 的别名&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHDB&lt;/code> → &lt;code>(integer) 42&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="info-不接受参数">
+ &lt;code>INFO&lt;/code> 不接受参数
+ &lt;a class="anchor" href="#info-%e4%b8%8d%e6%8e%a5%e5%8f%97%e5%8f%82%e6%95%b0">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>INFO memory&lt;/code>、&lt;code>INFO server&lt;/code> 和 &lt;code>INFO replication&lt;/code> 都是&lt;strong>参数错误&lt;/strong>；该命令的判断是 &lt;code>len(args) != 1 → wrong number of arguments&lt;/code>。请直接请求 &lt;code>INFO&lt;/code>，再从这一个回复里读你需要的分节。各分节及其字段记录在
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/deploy/observability/#info">可观测性&lt;/a>中。&lt;/p>
+&lt;p>&lt;code>INFO&lt;/code> 是读命令：接收请求的节点用自己的状态作答，永不复制。&lt;/p>
+&lt;h2 id="flushdb-就是-flushall">
+ &lt;code>FLUSHDB&lt;/code> 就是 &lt;code>FLUSHALL&lt;/code>
+ &lt;a class="anchor" href="#flushdb-%e5%b0%b1%e6%98%af-flushall">#&lt;/a>
+&lt;/h2>
+&lt;p>引擎只有一个逻辑数据库，因此 &lt;code>FLUSHDB&lt;/code> 实现为 &lt;code>FLUSHALL&lt;/code> 的别名。两者都：&lt;/p></description></item><item><title>兼容性</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/</guid><description>&lt;h1 id="与-redis-的兼容性">
+ 与 Redis 的兼容性
+ &lt;a class="anchor" href="#%e4%b8%8e-redis-%e7%9a%84%e5%85%bc%e5%ae%b9%e6%80%a7">#&lt;/a>
+&lt;/h1>
+&lt;p>IceFireDB 使用 RESP 协议，大多数命令的行为与 Redis 相同，但它不是 Redis：底层存储模型是 ledis，每种数据类型一个键空间，过期时间按整秒存储。本页列出客户端实际会注意到的差异，以及它们存在的原因。&lt;/p>
+&lt;p>标记为&lt;strong>由测试锁定&lt;/strong>的行为由 &lt;code>compat_test.go&lt;/code>（&lt;code>make test-compat&lt;/code>）固定，除非有意更新，否则不会改变。&lt;/p>
+&lt;h2 id="1-没有-wrongtype--每种数据类型一个键空间">
+ 1. 没有 &lt;code>WRONGTYPE&lt;/code> —— 每种数据类型一个键空间
+ &lt;a class="anchor" href="#1-%e6%b2%a1%e6%9c%89-wrongtype--%e6%af%8f%e7%a7%8d%e6%95%b0%e6%8d%ae%e7%b1%bb%e5%9e%8b%e4%b8%80%e4%b8%aa%e9%94%ae%e7%a9%ba%e9%97%b4">#&lt;/a>
+&lt;/h2>
+&lt;p>Redis：一个键只持有一种类型的一个值；类型不符的命令会失败并返回 &lt;code>WRONGTYPE Operation against a key holding the wrong kind of value&lt;/code>。&lt;/p>
+&lt;p>IceFireDB 为&lt;strong>每种类型保留独立的键空间&lt;/strong>（string、hash、list、set、sorted set）。后果：&lt;/p>
+&lt;ul>
+&lt;li>同一个键名可以同时持有字符串&lt;em>和&lt;/em>哈希&lt;em>和&lt;/em>列表。&lt;/li>
+&lt;li>类型不符的命令不会失败；它在该类型自己的（可能为空的）视图上执行。&lt;/li>
+&lt;li>根本没有 &lt;code>TYPE&lt;/code> 命令，所以你无法查询某个键当前是什么类型。&lt;/li>
+&lt;/ul>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>SET k v -&amp;gt; OK
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>HSET k f x -&amp;gt; 1 # Redis: WRONGTYPE, here: fine
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>GET k -&amp;gt; &amp;#34;v&amp;#34;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>HGET k f -&amp;gt; &amp;#34;x&amp;#34;
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>如果你的应用依赖 &lt;code>WRONGTYPE&lt;/code> 来做类型安全，请在应用层自行保证（例如用 &lt;code>user:1:profile&lt;/code> 与 &lt;code>user:1:fields&lt;/code> 这样的键命名约定）。&lt;/p></description></item></channel></rss>

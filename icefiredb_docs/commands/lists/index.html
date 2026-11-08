@@ -1,0 +1,179 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  Lists
+  #
+
+18 commands. Lists are stored as an indexed sequence; two of these commands rebuild the whole list.
+
+  
+      
+          Cmd
+          RW
+          Syntax
+          Returns
+          Example → reply
+      
+  
+  
+      
+          LPUSH
+          W
+          LPUSH KEY VALUE [VALUE ...]
+          integer new length
+          LPUSH q a b → 2
+      
+      
+          RPUSH
+          W
+          RPUSH KEY VALUE [VALUE ...]
+          integer new length
+          RPUSH q c → 3
+      
+      
+          LPOP
+          W
+          LPOP KEY
+          bulk head element, null if empty
+          LPOP q → b
+      
+      
+          RPOP
+          W
+          RPOP KEY
+          bulk tail element, null if empty
+          RPOP q → c
+      
+      
+          LLEN
+          R
+          LLEN KEY
+          integer element count
+          LLEN q → 1
+      
+      
+          LINDEX
+          R
+          LINDEX KEY index
+          bulk, null if out of range
+          LINDEX q 0 → a
+      
+      
+          LRANGE
+          R
+          LRANGE KEY start stop
+          array (inclusive, negative offsets from the end)
+          LRANGE q 0 -1 → [a]
+      
+      
+          LSET
+          W
+          LSET KEY index VALUE
+          +OK
+          LSET q 0 z → OK
+      
+      
+          LTRIM
+          W
+          LTRIM KEY start stop
+          +OK
+          LTRIM q 0 0 → OK
+      
+      
+          RPOPLPUSH
+          W
+          RPOPLPUSH source destination
+          bulk moved element, null if source empty
+          RPOPLPUSH q backup → z
+      
+      
+          LINSERT
+          W
+          LINSERT KEY BEFORE|AFTER pivot VALUE
+          integer new length; 0 pivot absent; -1 key absent
+          LINSERT q BEFORE z y → 2
+      
+      
+          LREM
+          W
+          LREM KEY count VALUE
+          integer elements removed
+          LREM q 0 z → 1
+      
+      
+          LKEYEXISTS
+          R
+          LKEYEXISTS KEY
+          integer 0/1 — does the list exist
+          LKEYEXISTS q → 1
+      
+      
+          LCLEAR
+          W
+          LCLEAR KEY
+          integer elements removed
+          LCLEAR q → 1
+      
+      
+          LMCLEAR
+          W
+          LMCLEAR KEY [KEY ...]
+          integer lists removed
+          LMCLEAR a b → 2
+      
+      
+          LEXPIRE
+          W
+          LEXPIRE KEY seconds
+          integer 1/0
+          LEXPIRE q 600 → 1
+      
+      
+          LEXPIREAT
+          W
+          LEXPIREAT KEY unixTime
+          integer 1/0
+          LEXPIREAT q 1767225600 → 1
+      
+      
+          LTTL
+          R
+          LTTL KEY
+          integer seconds left, -1 none
+          LTTL q → 599
+      
+  
+
+
+  Notes
+  #
+
+
+LPUSH q a b produces [b, a] — each element is pushed to the head in turn, as in Redis.
+LREM KEY count VALUE: count > 0 removes from the head, count < 0 from the tail, count = 0 every
+occurrence.
+LINSERT and LREM are O(n) and are not transactional. The storage layer has no primitive for
+them, so the handler reads the list, clears it, and rewrites it (restoring the TTL). It happens inside
+one Raft apply, so no other client observes a partial list, but a backend failure mid-rebuild leaves
+the list truncated. Do not use them on long lists in a hot path — prefer LTRIM or bounded queues.
+There is no LPERSIST: the handler is not registered. LCLEAR/LMCLEAR delete the list and its TTL.
+No blocking commands. BLPOP/BRPOP are deliberately not registered: a blocking read inside the
+Raft apply loop either stalls the log or consumes the queue without a rollback path.
+LRANGE with start > stop answers an empty array; negative indexes count from the tail.
+"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Lists"><meta property="og:description" content=" Lists # 18 commands. Lists are stored as an indexed sequence; two of these commands rebuild the whole list.
+Cmd RW Syntax Returns Example → reply LPUSH W LPUSH KEY VALUE [VALUE ...] integer new length LPUSH q a b → 2 RPUSH W RPUSH KEY VALUE [VALUE ...] integer new length RPUSH q c → 3 LPOP W LPOP KEY bulk head element, null if empty LPOP q → b RPOP W RPOP KEY bulk tail element, null if empty RPOP q → c LLEN R LLEN KEY integer element count LLEN q → 1 LINDEX R LINDEX KEY index bulk, null if out of range LINDEX q 0 → a LRANGE R LRANGE KEY start stop array (inclusive, negative offsets from the end) LRANGE q 0 -1 → [a] LSET W LSET KEY index VALUE +OK LSET q 0 z → OK LTRIM W LTRIM KEY start stop +OK LTRIM q 0 0 → OK RPOPLPUSH W RPOPLPUSH source destination bulk moved element, null if source empty RPOPLPUSH q backup → z LINSERT W LINSERT KEY BEFORE|AFTER pivot VALUE integer new length; 0 pivot absent; -1 key absent LINSERT q BEFORE z y → 2 LREM W LREM KEY count VALUE integer elements removed LREM q 0 z → 1 LKEYEXISTS R LKEYEXISTS KEY integer 0/1 — does the list exist LKEYEXISTS q → 1 LCLEAR W LCLEAR KEY integer elements removed LCLEAR q → 1 LMCLEAR W LMCLEAR KEY [KEY ...] integer lists removed LMCLEAR a b → 2 LEXPIRE W LEXPIRE KEY seconds integer 1/0 LEXPIRE q 600 → 1 LEXPIREAT W LEXPIREAT KEY unixTime integer 1/0 LEXPIREAT q 1767225600 → 1 LTTL R LTTL KEY integer seconds left, -1 none LTTL q → 599 Notes # LPUSH q a b produces [b, a] — each element is pushed to the head in turn, as in Redis. LREM KEY count VALUE: count > 0 removes from the head, count < 0 from the tail, count = 0 every occurrence. LINSERT and LREM are O(n) and are not transactional. The storage layer has no primitive for them, so the handler reads the list, clears it, and rewrites it (restoring the TTL). It happens inside one Raft apply, so no other client observes a partial list, but a backend failure mid-rebuild leaves the list truncated. Do not use them on long lists in a hot path — prefer LTRIM or bounded queues. There is no LPERSIST: the handler is not registered. LCLEAR/LMCLEAR delete the list and its TTL. No blocking commands. BLPOP/BRPOP are deliberately not registered: a blocking read inside the Raft apply loop either stalls the log or consumes the queue without a rollback path. LRANGE with start > stop answers an empty array; negative indexes count from the tail. "><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="article:section" content="commands"><title>Lists | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/ title=列表><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle checked>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/ class=active>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Lists</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#notes>Notes</a></li></ul></nav></aside></header><article class=markdown><h1 id=lists>Lists
+<a class=anchor href=#lists>#</a></h1><p>18 commands. Lists are stored as an indexed sequence; two of these commands rebuild the whole list.</p><table><thead><tr><th style=text-align:left>Cmd</th><th style=text-align:left>RW</th><th style=text-align:left>Syntax</th><th style=text-align:left>Returns</th><th style=text-align:left>Example → reply</th></tr></thead><tbody><tr><td style=text-align:left><code>LPUSH</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LPUSH KEY VALUE [VALUE ...]</code></td><td style=text-align:left><code>integer</code> new length</td><td style=text-align:left><code>LPUSH q a b</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>RPUSH</code></td><td style=text-align:left>W</td><td style=text-align:left><code>RPUSH KEY VALUE [VALUE ...]</code></td><td style=text-align:left><code>integer</code> new length</td><td style=text-align:left><code>RPUSH q c</code> → <code>3</code></td></tr><tr><td style=text-align:left><code>LPOP</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LPOP KEY</code></td><td style=text-align:left><code>bulk</code> head element, <code>null</code> if empty</td><td style=text-align:left><code>LPOP q</code> → <code>b</code></td></tr><tr><td style=text-align:left><code>RPOP</code></td><td style=text-align:left>W</td><td style=text-align:left><code>RPOP KEY</code></td><td style=text-align:left><code>bulk</code> tail element, <code>null</code> if empty</td><td style=text-align:left><code>RPOP q</code> → <code>c</code></td></tr><tr><td style=text-align:left><code>LLEN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>LLEN KEY</code></td><td style=text-align:left><code>integer</code> element count</td><td style=text-align:left><code>LLEN q</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>LINDEX</code></td><td style=text-align:left>R</td><td style=text-align:left><code>LINDEX KEY index</code></td><td style=text-align:left><code>bulk</code>, <code>null</code> if out of range</td><td style=text-align:left><code>LINDEX q 0</code> → <code>a</code></td></tr><tr><td style=text-align:left><code>LRANGE</code></td><td style=text-align:left>R</td><td style=text-align:left><code>LRANGE KEY start stop</code></td><td style=text-align:left><code>array</code> (inclusive, negative offsets from the end)</td><td style=text-align:left><code>LRANGE q 0 -1</code> → <code>[a]</code></td></tr><tr><td style=text-align:left><code>LSET</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LSET KEY index VALUE</code></td><td style=text-align:left><code>+OK</code></td><td style=text-align:left><code>LSET q 0 z</code> → <code>OK</code></td></tr><tr><td style=text-align:left><code>LTRIM</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LTRIM KEY start stop</code></td><td style=text-align:left><code>+OK</code></td><td style=text-align:left><code>LTRIM q 0 0</code> → <code>OK</code></td></tr><tr><td style=text-align:left><code>RPOPLPUSH</code></td><td style=text-align:left>W</td><td style=text-align:left><code>RPOPLPUSH source destination</code></td><td style=text-align:left><code>bulk</code> moved element, <code>null</code> if source empty</td><td style=text-align:left><code>RPOPLPUSH q backup</code> → <code>z</code></td></tr><tr><td style=text-align:left><code>LINSERT</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LINSERT KEY BEFORE|AFTER pivot VALUE</code></td><td style=text-align:left><code>integer</code> new length; <code>0</code> pivot absent; <code>-1</code> key absent</td><td style=text-align:left><code>LINSERT q BEFORE z y</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>LREM</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LREM KEY count VALUE</code></td><td style=text-align:left><code>integer</code> elements removed</td><td style=text-align:left><code>LREM q 0 z</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>LKEYEXISTS</code></td><td style=text-align:left>R</td><td style=text-align:left><code>LKEYEXISTS KEY</code></td><td style=text-align:left><code>integer</code> 0/1 — does the list exist</td><td style=text-align:left><code>LKEYEXISTS q</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>LCLEAR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LCLEAR KEY</code></td><td style=text-align:left><code>integer</code> elements removed</td><td style=text-align:left><code>LCLEAR q</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>LMCLEAR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LMCLEAR KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> lists removed</td><td style=text-align:left><code>LMCLEAR a b</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>LEXPIRE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LEXPIRE KEY seconds</code></td><td style=text-align:left><code>integer</code> 1/0</td><td style=text-align:left><code>LEXPIRE q 600</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>LEXPIREAT</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LEXPIREAT KEY unixTime</code></td><td style=text-align:left><code>integer</code> 1/0</td><td style=text-align:left><code>LEXPIREAT q 1767225600</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>LTTL</code></td><td style=text-align:left>R</td><td style=text-align:left><code>LTTL KEY</code></td><td style=text-align:left><code>integer</code> seconds left, <code>-1</code> none</td><td style=text-align:left><code>LTTL q</code> → <code>599</code></td></tr></tbody></table><h2 id=notes>Notes
+<a class=anchor href=#notes>#</a></h2><ul><li><code>LPUSH q a b</code> produces <code>[b, a]</code> — each element is pushed to the head in turn, as in Redis.</li><li><code>LREM KEY count VALUE</code>: <code>count > 0</code> removes from the head, <code>count &lt; 0</code> from the tail, <code>count = 0</code> every
+occurrence.</li><li><strong><code>LINSERT</code> and <code>LREM</code> are O(n) and are not transactional.</strong> The storage layer has no primitive for
+them, so the handler reads the list, clears it, and rewrites it (restoring the TTL). It happens inside
+one Raft apply, so no other client observes a partial list, but a backend failure mid-rebuild leaves
+the list truncated. Do not use them on long lists in a hot path — prefer <code>LTRIM</code> or bounded queues.</li><li>There is no <code>LPERSIST</code>: the handler is not registered. <code>LCLEAR</code>/<code>LMCLEAR</code> delete the list and its TTL.</li><li><strong>No blocking commands.</strong> <code>BLPOP</code>/<code>BRPOP</code> are deliberately not registered: a blocking read inside the
+Raft apply loop either stalls the log or consumes the queue without a rollback path.</li><li><code>LRANGE</code> with <code>start > stop</code> answers an empty array; negative indexes count from the tail.</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#notes>Notes</a></li></ul></nav></div></aside></main></body></html>

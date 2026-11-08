@@ -1,0 +1,1008 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Command reference on IceFireDB Documentation</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/</link><description>Recent content in Command reference on IceFireDB Documentation</description><generator>Hugo</generator><language>en</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/commands/index.xml" rel="self" type="application/rss+xml"/><item><title>Strings</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/</guid><description>&lt;h1 id="strings">
+ Strings
+ &lt;a class="anchor" href="#strings">#&lt;/a>
+&lt;/h1>
+&lt;p>26 commands: the &lt;code>SET&lt;/code> family, counters, bit operations and string expiry.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SET KEY VALUE [EX seconds] [PX milliseconds] [NX] [XX] [KEEPTTL]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>, or &lt;code>null&lt;/code> when &lt;code>NX&lt;/code>/&lt;code>XX&lt;/code> blocks the write&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SET user:1 '{&amp;quot;n&amp;quot;:&amp;quot;ada&amp;quot;}' EX 60&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETNX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETNX KEY VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 written, 0 already exists&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETNX job:42 1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETEX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEX KEY seconds VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEX session:9 60 tok&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETEXAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEXAT KEY unixTime VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETEXAT session:9 1767225600 tok&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GETSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETSET KEY VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> old value, &lt;code>null&lt;/code> if absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETSET counter 0&lt;/code> → &lt;code>&amp;quot;7&amp;quot;&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GET KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code>, &lt;code>null&lt;/code> if absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GET user:1&lt;/code> → &lt;code>{&amp;quot;n&amp;quot;:&amp;quot;ada&amp;quot;}&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MGET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MGET KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> of bulk/null&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MGET a b&lt;/code> → &lt;code>[val, null]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MSET KEY VALUE [KEY VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>MSET a 1 b 2&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>APPEND&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>APPEND KEY VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new length&lt;/td>
+ &lt;td style="text-align: left">&lt;code>APPEND log &amp;quot;x\n&amp;quot;&lt;/code> → &lt;code>5&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>STRLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STRLEN KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> length in bytes&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STRLEN user:1&lt;/code> → &lt;code>13&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>INCR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new value&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCR hits&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>INCRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCRBY KEY increment&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new value&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INCRBY hits 5&lt;/code> → &lt;code>6&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DECR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new value&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECR hits&lt;/code> → &lt;code>5&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DECRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECRBY KEY decrement&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new value&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DECRBY hits 5&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GETRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETRANGE KEY start end&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> substring (inclusive, negative offsets from the end)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETRANGE user:1 0 3&lt;/code> → &lt;code>{&amp;quot;n&amp;quot;&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETRANGE KEY offset VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new length&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETRANGE user:1 0 '{&amp;quot;m&amp;quot;'&lt;/code> → &lt;code>13&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>GETBIT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETBIT KEY offset&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1&lt;/td>
+ &lt;td style="text-align: left">&lt;code>GETBIT bitmap 7&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SETBIT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETBIT KEY offset value&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> previous bit&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SETBIT bitmap 7 1&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BITCOUNT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITCOUNT KEY [start end [BYTE|BIT]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> number of set bits&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITCOUNT bitmap 0 0&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BITOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITOP AND|OR|XOR|NOT destKey KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> length of the result&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITOP AND out a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BITPOS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITPOS KEY bit [start [end [BYTE|BIT]]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> position, &lt;code>-1&lt;/code> if not found&lt;/td>
+ &lt;td style="text-align: left">&lt;code>BITPOS bitmap 1&lt;/code> → &lt;code>7&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DEL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DEL KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> keys removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>DEL a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXISTS KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> number of existing keys&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXISTS a b&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 set, 0 key absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIRE session:9 60&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 set, 0 key absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>EXPIREAT session:9 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>TTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>TTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> seconds left, &lt;code>-1&lt;/code> no expiration&lt;/td>
+ &lt;td style="text-align: left">&lt;code>TTL session:9&lt;/code> → &lt;code>59&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="notes">
+ Notes
+ &lt;a class="anchor" href="#notes">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>SET&lt;/code> clears an existing expiration unless &lt;code>KEEPTTL&lt;/code> is given. &lt;code>PX&lt;/code> is rounded &lt;strong>up&lt;/strong> to the next
+second because expirations are stored in whole seconds, so &lt;code>PX 500&lt;/code> keeps the key 1 s and &lt;code>PX 1500&lt;/code>
+keeps it 2 s — never less than asked.&lt;/li>
+&lt;li>&lt;code>SET ... NX&lt;/code>/&lt;code>XX&lt;/code> answers a &lt;strong>null bulk&lt;/strong> when the condition blocks the write, not an error.&lt;/li>
+&lt;li>There is &lt;strong>no string &lt;code>PERSIST&lt;/code>&lt;/strong>: the handler exists but is commented out and not registered. To keep
+a value and change its lifetime, &lt;code>EXPIRE&lt;/code> again or use &lt;code>SET … KEEPTTL&lt;/code>.&lt;/li>
+&lt;li>&lt;code>EXISTS&lt;/code> counts keys in the &lt;strong>string&lt;/strong> keyspace only; it will not see a hash with the same name. Use
+&lt;code>HKEYEXISTS&lt;/code>, &lt;code>LKEYEXISTS&lt;/code>, &lt;code>SKEYEXISTS&lt;/code> for the other types.&lt;/li>
+&lt;li>&lt;code>DEL&lt;/code> deletes the string at those keys, not the same-named hash/list/set.&lt;/li>
+&lt;li>&lt;code>INCR&lt;/code>/&lt;code>DECR&lt;/code> on a non-numeric value answer &lt;code>-ERR&lt;/code>, like Redis; a missing key is treated as &lt;code>0&lt;/code>.&lt;/li>
+&lt;li>&lt;code>BITCOUNT&lt;/code>/&lt;code>BITPOS&lt;/code> accept the optional &lt;code>BYTE&lt;/code>/&lt;code>BIT&lt;/code> unit as in Redis 7.&lt;/li>
+&lt;li>Expiry arithmetic uses the Raft clock, so a short TTL can be rejected on a node whose Raft clock lags
+its local clock. See 
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/commands/compatibility/">Compatibility&lt;/a>.&lt;/li>
+&lt;li>&lt;code>TTL&lt;/code> is computed against the &lt;strong>local&lt;/strong> wall clock by the storage layer, so replicas can report
+values that differ by their apply latency.&lt;/li>
+&lt;/ul></description></item><item><title>Hashes</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/</guid><description>&lt;h1 id="hashes">
+ Hashes
+ &lt;a class="anchor" href="#hashes">#&lt;/a>
+&lt;/h1>
+&lt;p>19 commands. The hash keyspace is independent from the string keyspace at the same key name.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSET KEY FIELD VALUE [FIELD VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> fields added&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSET user:1 name ada age 36&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSETNX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSETNX KEY FIELD VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 written, 0 field exists&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSETNX user:1 name ada&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HGET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGET KEY FIELD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code>, &lt;code>null&lt;/code> if the field is absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGET user:1 name&lt;/code> → &lt;code>ada&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HMGET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMGET KEY FIELD [FIELD ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> of bulk/null&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMGET user:1 name x&lt;/code> → &lt;code>[ada, null]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HMSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMSET KEY FIELD VALUE [FIELD VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMSET user:2 name bob&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HDEL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HDEL KEY FIELD [FIELD ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> fields removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HDEL user:1 age&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXISTS KEY FIELD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXISTS user:1 name&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HGETALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGETALL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> field/value pairs&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HGETALL user:1&lt;/code> → &lt;code>[name, ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HKEYS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> of fields&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYS user:1&lt;/code> → &lt;code>[name]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HVALS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HVALS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> of values&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HVALS user:1&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HLEN KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> field count&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HLEN user:1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSTRLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSTRLEN KEY FIELD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> value length, 0 if absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSTRLEN user:1 name&lt;/code> → &lt;code>3&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HINCRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HINCRBY KEY FIELD increment&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new value&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HINCRBY stats hits 1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HKEYEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYEXISTS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1 — does the hash exist&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HKEYEXISTS user:1&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> fields removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HCLEAR user:1&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HMCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMCLEAR KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> hashes removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HMCLEAR a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HEXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 set, 0 key absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIRE user:1 300&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HEXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HEXPIREAT user:1 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HTTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HTTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> seconds left, &lt;code>-1&lt;/code> none&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HTTL user:1&lt;/code> → &lt;code>299&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="notes">
+ Notes
+ &lt;a class="anchor" href="#notes">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>HCLEAR&lt;/code> / &lt;code>HMCLEAR&lt;/code> delete the &lt;strong>whole hash&lt;/strong> (like &lt;code>DEL&lt;/code> for this type) and take its expiration with
+it; &lt;code>HDEL&lt;/code> removes individual fields.&lt;/li>
+&lt;li>There is no &lt;code>HPERSIST&lt;/code> — the handler exists but is not registered.&lt;/li>
+&lt;li>&lt;code>HSET&lt;/code> counts only newly created fields; overwriting an existing field counts 0.&lt;/li>
+&lt;li>&lt;code>HGETALL&lt;/code> answers field/value pairs in the storage&amp;rsquo;s iteration order. Do not rely on it for ordering
+— sort client-side if it matters.&lt;/li>
+&lt;li>&lt;code>HGET&lt;/code> of a field whose value is empty answers an empty bulk string on the local backends and &lt;code>null&lt;/code>
+on the decentralized ones — the two states are not distinguishable there. See
+
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/commands/compatibility/">Compatibility&lt;/a>.&lt;/li>
+&lt;li>&lt;code>HSTRLEN&lt;/code> reports 0 both for a missing field and for an empty one.&lt;/li>
+&lt;li>Expiry: &lt;code>HEXPIRE&lt;/code>/&lt;code>HEXPIREAT&lt;/code>/&lt;code>HTTL&lt;/code> act on the hash, independently of any string at the same key.&lt;/li>
+&lt;/ul></description></item><item><title>Lists</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/</guid><description>&lt;h1 id="lists">
+ Lists
+ &lt;a class="anchor" href="#lists">#&lt;/a>
+&lt;/h1>
+&lt;p>18 commands. Lists are stored as an indexed sequence; two of these commands rebuild the whole list.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LPUSH&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPUSH KEY VALUE [VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new length&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPUSH q a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPUSH&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPUSH KEY VALUE [VALUE ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new length&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPUSH q c&lt;/code> → &lt;code>3&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LPOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPOP KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> head element, &lt;code>null&lt;/code> if empty&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LPOP q&lt;/code> → &lt;code>b&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOP KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> tail element, &lt;code>null&lt;/code> if empty&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOP q&lt;/code> → &lt;code>c&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LLEN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LLEN KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> element count&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LLEN q&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LINDEX&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINDEX KEY index&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code>, &lt;code>null&lt;/code> if out of range&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINDEX q 0&lt;/code> → &lt;code>a&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LRANGE KEY start stop&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> (inclusive, negative offsets from the end)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LRANGE q 0 -1&lt;/code> → &lt;code>[a]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LSET&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LSET KEY index VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LSET q 0 z&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LTRIM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTRIM KEY start stop&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>+OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTRIM q 0 0&lt;/code> → &lt;code>OK&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPOPLPUSH&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOPLPUSH source destination&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> moved element, &lt;code>null&lt;/code> if source empty&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RPOPLPUSH q backup&lt;/code> → &lt;code>z&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LINSERT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINSERT KEY BEFORE|AFTER pivot VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> new length; &lt;code>0&lt;/code> pivot absent; &lt;code>-1&lt;/code> key absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LINSERT q BEFORE z y&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LREM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LREM KEY count VALUE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> elements removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LREM q 0 z&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LKEYEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LKEYEXISTS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1 — does the list exist&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LKEYEXISTS q&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> elements removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LCLEAR q&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LMCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LMCLEAR KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> lists removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LMCLEAR a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LEXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIRE q 600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LEXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LEXPIREAT q 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>LTTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> seconds left, &lt;code>-1&lt;/code> none&lt;/td>
+ &lt;td style="text-align: left">&lt;code>LTTL q&lt;/code> → &lt;code>599&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="notes">
+ Notes
+ &lt;a class="anchor" href="#notes">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>LPUSH q a b&lt;/code> produces &lt;code>[b, a]&lt;/code> — each element is pushed to the head in turn, as in Redis.&lt;/li>
+&lt;li>&lt;code>LREM KEY count VALUE&lt;/code>: &lt;code>count &amp;gt; 0&lt;/code> removes from the head, &lt;code>count &amp;lt; 0&lt;/code> from the tail, &lt;code>count = 0&lt;/code> every
+occurrence.&lt;/li>
+&lt;li>&lt;strong>&lt;code>LINSERT&lt;/code> and &lt;code>LREM&lt;/code> are O(n) and are not transactional.&lt;/strong> The storage layer has no primitive for
+them, so the handler reads the list, clears it, and rewrites it (restoring the TTL). It happens inside
+one Raft apply, so no other client observes a partial list, but a backend failure mid-rebuild leaves
+the list truncated. Do not use them on long lists in a hot path — prefer &lt;code>LTRIM&lt;/code> or bounded queues.&lt;/li>
+&lt;li>There is no &lt;code>LPERSIST&lt;/code>: the handler is not registered. &lt;code>LCLEAR&lt;/code>/&lt;code>LMCLEAR&lt;/code> delete the list and its TTL.&lt;/li>
+&lt;li>&lt;strong>No blocking commands.&lt;/strong> &lt;code>BLPOP&lt;/code>/&lt;code>BRPOP&lt;/code> are deliberately not registered: a blocking read inside the
+Raft apply loop either stalls the log or consumes the queue without a rollback path.&lt;/li>
+&lt;li>&lt;code>LRANGE&lt;/code> with &lt;code>start &amp;gt; stop&lt;/code> answers an empty array; negative indexes count from the tail.&lt;/li>
+&lt;/ul></description></item><item><title>Sets</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/</guid><description>&lt;h1 id="sets">
+ Sets
+ &lt;a class="anchor" href="#sets">#&lt;/a>
+&lt;/h1>
+&lt;p>21 commands: membership, the three set-algebra families, expiry, and deterministic &lt;code>SPOP&lt;/code>.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SADD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SADD KEY MEMBER [MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members added&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SADD tags go db&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SREM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SREM KEY MEMBER [MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SREM tags db&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCARD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCARD KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> cardinality&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCARD tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SISMEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SISMEMBER KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SISMEMBER tags go&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SMEMBERS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMEMBERS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> of members&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMEMBERS tags&lt;/code> → &lt;code>[go]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SDIFF&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFF KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members in the first but no later set&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFF a b&lt;/code> → &lt;code>[x]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SDIFFSTORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFFSTORE dest KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> size of the result&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SDIFFSTORE out a b&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SINTER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTER KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members in every set&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTER a b&lt;/code> → &lt;code>[y]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SINTERSTORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTERSTORE dest KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> size of the result&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SINTERSTORE out a b&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SUNION&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNION KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members in any set&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNION a b&lt;/code> → &lt;code>[x,y]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SUNIONSTORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNIONSTORE dest KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> size of the result&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SUNIONSTORE out a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SMOVE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMOVE source destination MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 moved, 0 not a member&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMOVE a b x&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SPOP&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPOP KEY [count]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">bare: &lt;code>bulk&lt;/code> member; with &lt;code>count&lt;/code>: &lt;code>array&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPOP queue:ready&lt;/code> → &lt;code>job:7&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SRANDMEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SRANDMEMBER KEY [count]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">bare: &lt;code>bulk&lt;/code>; positive count: distinct &lt;code>array&lt;/code>; negative: &lt;code>array&lt;/code> with repeats&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SRANDMEMBER tags 1&lt;/code> → &lt;code>[go]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SKEYEXISTS&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SKEYEXISTS KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 0/1 — does the set exist&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SKEYEXISTS tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCLEAR tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SMCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMCLEAR KEY [KEY ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> sets removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SMCLEAR a b&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SEXPIRE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIRE KEY seconds&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIRE tags 60&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SEXPIREAT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIREAT KEY unixTime&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1/0&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SEXPIREAT tags 1767225600&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>STTL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STTL KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> seconds left, &lt;code>-1&lt;/code> none&lt;/td>
+ &lt;td style="text-align: left">&lt;code>STTL tags&lt;/code> → &lt;code>59&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SPERSIST&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPERSIST KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> 1 removed, 0 none&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SPERSIST tags&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="notes">
+ Notes
+ &lt;a class="anchor" href="#notes">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;strong>&lt;code>SPOP&lt;/code> is deterministic across replicas.&lt;/strong> Because it is a write command, its result must be
+identical on every node, so the picked member is derived from the Raft-seeded state rather than
+&lt;code>math/rand&lt;/code>. With &lt;code>count&lt;/code>, the count is clamped to the set size; &lt;code>count = 0&lt;/code> answers an empty array
+and a negative count is an error.&lt;/li>
+&lt;li>&lt;code>SRANDMEMBER&lt;/code> is a &lt;strong>read&lt;/strong> command and may use real randomness (&lt;code>count&lt;/code> distinct members when
+positive, repeats when negative). &lt;code>|count|&lt;/code> is capped at 1048576.&lt;/li>
+&lt;li>&lt;code>SMOVE&lt;/code> to the same key is a no-op that returns &lt;code>1&lt;/code> and keeps the TTL.&lt;/li>
+&lt;li>&lt;code>SCLEAR&lt;/code>/&lt;code>SMCLEAR&lt;/code> delete whole sets and their expiration; &lt;code>SREM&lt;/code> removes members.&lt;/li>
+&lt;li>&lt;code>SPERSIST&lt;/code> is the only &lt;code>*PERSIST&lt;/code> command in the engine, and it is known to leave the expiration in
+place on the &lt;code>ipfs&lt;/code> backend. Strings, hashes and lists have no &lt;code>PERSIST&lt;/code> at all.&lt;/li>
+&lt;li>Set algebra commands read the sets named in the arguments; &lt;code>*STORE&lt;/code> variants &lt;strong>overwrite&lt;/strong> the
+destination and return the size of the result.&lt;/li>
+&lt;/ul></description></item><item><title>Sorted sets</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/</guid><description>&lt;h1 id="sorted-sets">
+ Sorted sets
+ &lt;a class="anchor" href="#sorted-sets">#&lt;/a>
+&lt;/h1>
+&lt;p>15 commands. Scores are &lt;strong>64-bit integers&lt;/strong>, not doubles — the one difference that changes query
+results, not just the wire format.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZADD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZADD KEY score MEMBER [score MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members added&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZADD board 100 ada 90 bob&lt;/code> → &lt;code>2&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZINCRBY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R ⚠&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZINCRBY KEY increment MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> new score&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZINCRBY board 5 ada&lt;/code> → &lt;code>105&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREM&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREM KEY MEMBER [MEMBER ...]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREM board bob&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZCARD&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCARD KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> cardinality&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCARD board&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZCOUNT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCOUNT KEY min max&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members within the score range&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCOUNT board 0 200&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCORE KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> score, &lt;code>null&lt;/code> if absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCORE board ada&lt;/code> → &lt;code>105&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZRANK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANK KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> rank (0-based), &lt;code>null&lt;/code> if absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANK board ada&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREVRANK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANK KEY MEMBER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> reverse rank, &lt;code>null&lt;/code> if absent&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANK board ada&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGE KEY start stop [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members (and scores)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGE board 0 -1 WITHSCORES&lt;/code> → &lt;code>[ada, 105]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGE KEY start stop [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members (and scores)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGE board 0 0&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZRANGEBYSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGEBYSCORE KEY min max [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members (and scores)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZRANGEBYSCORE board 100 200&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGEBYSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGEBYSCORE KEY max min [WITHSCORES]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> members (and scores)&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREVRANGEBYSCORE board 200 100&lt;/code> → &lt;code>[ada]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYRANK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R ⚠&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYRANK KEY start stop&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYRANK board 0 0&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYSCORE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R ⚠&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYSCORE KEY min max&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZREMRANGEBYSCORE board 0 50&lt;/code> → &lt;code>0&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZCLEAR&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCLEAR KEY&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> members removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZCLEAR board&lt;/code> → &lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="notes">
+ Notes
+ &lt;a class="anchor" href="#notes">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;strong>⚠ &lt;code>ZINCRBY&lt;/code>, &lt;code>ZREMRANGEBYRANK&lt;/code> and &lt;code>ZREMRANGEBYSCORE&lt;/code> are registered as read commands&lt;/strong> even though
+they mutate. Locally that is harmless; in a cluster their effect is not replicated and does not
+survive a leader change. Until that is fixed: compute scores client-side and write them with &lt;code>ZADD&lt;/code>,
+and remove members with &lt;code>ZREM&lt;/code>.&lt;/li>
+&lt;li>&lt;strong>No TTL for sorted sets.&lt;/strong> There is no &lt;code>ZEXPIRE&lt;/code>/&lt;code>ZTTL&lt;/code>; clear and recreate the key (&lt;code>ZCLEAR&lt;/code>), or
+keep the expiry bookkeeping in a string key.&lt;/li>
+&lt;li>Scores parse as &lt;code>int64&lt;/code>. A float score such as &lt;code>1.5&lt;/code> is rejected; &lt;code>WITHSCORES&lt;/code> returns integers.&lt;/li>
+&lt;li>&lt;code>ZRANGEBYSCORE min max&lt;/code> is inclusive on both ends; &lt;code>ZREVRANGEBYSCORE max min&lt;/code> takes the arguments in
+reverse order, as in Redis.&lt;/li>
+&lt;li>&lt;code>ZRANK&lt;/code>/&lt;code>ZREVRANK&lt;/code> answer &lt;code>null&lt;/code> for a missing member, &lt;code>ZSCORE&lt;/code> likewise.&lt;/li>
+&lt;li>All range reads are ordered by score, then by member for equal scores.&lt;/li>
+&lt;/ul></description></item><item><title>Scan</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/</guid><description>&lt;h1 id="scan">
+ Scan
+ &lt;a class="anchor" href="#scan">#&lt;/a>
+&lt;/h1>
+&lt;p>8 commands in two families with &lt;strong>two different cursor contracts&lt;/strong>. Getting them mixed up is the most
+common integration bug with this engine.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCAN cursor [MATCH glob] [COUNT n] [TYPE type]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, keys]&lt;/code>; cursor &lt;code>0&lt;/code> ends the walk&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SCAN 0 MATCH user:* COUNT 100&lt;/code> → &lt;code>[cursor, [user:1, user:2]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSCAN KEY cursor [MATCH glob] [COUNT n]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [field, value, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HSCAN user:1 0 COUNT 10&lt;/code> → &lt;code>[0, [name, ada]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SSCAN KEY cursor [MATCH glob] [COUNT n]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SSCAN tags 0&lt;/code> → &lt;code>[0, [go]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCAN KEY cursor [MATCH glob] [COUNT n]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, score, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSCAN board 0&lt;/code> → &lt;code>[0, [ada, 105]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSCAN type cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, keys]&lt;/code>; empty cursor ends the walk&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSCAN KV &amp;quot;&amp;quot; COUNT 5&lt;/code> → &lt;code>[key:5, [...]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XHSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XHSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [field, value, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XHSCAN user:1 &amp;quot;&amp;quot; COUNT 5&lt;/code> → &lt;code>[name, [name, ada]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XSSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XSSCAN tags &amp;quot;&amp;quot;&lt;/code> → &lt;code>[go, [go]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>XZSCAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XZSCAN KEY cursor [MATCH regex] [COUNT n] [ASC|DESC]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>array&lt;/code> &lt;code>[cursor, [member, score, ...]]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>XZSCAN board &amp;quot;&amp;quot;&lt;/code> → &lt;code>[ada, [ada, 105]]&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="the-redis-family">
+ The Redis family
+ &lt;a class="anchor" href="#the-redis-family">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>SCAN&lt;/code> / &lt;code>HSCAN&lt;/code> / &lt;code>SSCAN&lt;/code> / &lt;code>ZSCAN&lt;/code> follow Redis&amp;rsquo; shape but not Redis&amp;rsquo; cursor encoding.&lt;/p></description></item><item><title>Server</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/server/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/server/</guid><description>&lt;h1 id="server">
+ Server
+ &lt;a class="anchor" href="#server">#&lt;/a>
+&lt;/h1>
+&lt;p>Three commands in the data surface. Everything else an operator needs (&lt;code>RAFT&lt;/code>, &lt;code>CLUSTER&lt;/code>, &lt;code>MACHINE&lt;/code>,
+&lt;code>BARRIER&lt;/code>, &lt;code>AUTH&lt;/code>, &lt;code>SHUTDOWN&lt;/code>, &lt;code>VERSION&lt;/code>) lives in 
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/deploy/system-commands/">System commands&lt;/a>.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Cmd&lt;/th>
+ &lt;th style="text-align: left">RW&lt;/th>
+ &lt;th style="text-align: left">Syntax&lt;/th>
+ &lt;th style="text-align: left">Returns&lt;/th>
+ &lt;th style="text-align: left">Example → reply&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>INFO&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">R&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INFO&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>bulk&lt;/code> multi-line report&lt;/td>
+ &lt;td style="text-align: left">&lt;code>INFO&lt;/code> → &lt;code># Server\r\nversion…&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>FLUSHALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> keys removed&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHALL&lt;/code> → &lt;code>(integer) 42&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>FLUSHDB&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">W&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHDB&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>integer&lt;/code> keys removed — alias of &lt;code>FLUSHALL&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>FLUSHDB&lt;/code> → &lt;code>(integer) 42&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="info-takes-no-arguments">
+ &lt;code>INFO&lt;/code> takes no arguments
+ &lt;a class="anchor" href="#info-takes-no-arguments">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>INFO memory&lt;/code>, &lt;code>INFO server&lt;/code> and &lt;code>INFO replication&lt;/code> are &lt;strong>argument errors&lt;/strong>; the command is
+&lt;code>len(args) != 1 → wrong number of arguments&lt;/code>. Ask for &lt;code>INFO&lt;/code> and read the section you need out of the
+single reply. The sections and their fields are documented in
+
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/deploy/observability/#info">Observability&lt;/a>.&lt;/p></description></item><item><title>Compatibility</title><link>https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/</guid><description>&lt;h1 id="compatibility-with-redis">
+ Compatibility with Redis
+ &lt;a class="anchor" href="#compatibility-with-redis">#&lt;/a>
+&lt;/h1>
+&lt;p>IceFireDB speaks RESP and most commands behave as Redis does, but it is not Redis: the storage model
+underneath is ledis, which keeps one keyspace per data type and stores expirations in whole seconds.
+This page lists the differences a client will actually notice, and why they exist.&lt;/p>
+&lt;p>Behaviours marked &lt;strong>locked by test&lt;/strong> are pinned by &lt;code>compat_test.go&lt;/code> (&lt;code>make test-compat&lt;/code>) so they cannot
+change without a deliberate update.&lt;/p></description></item></channel></rss>

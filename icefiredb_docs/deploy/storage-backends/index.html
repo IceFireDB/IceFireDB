@@ -1,0 +1,140 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  Storage backends
+  #
+
+--storage-backend <name> selects the driver that sits under the ledis data model. The command layer
+is written against store.driver.IDB, so the same commands run on every backend — what changes is
+where the bytes live, who replicates them, and how much you can trust the driver.
+type IDB interface {
+    Close() error
+    Get(key []byte) ([]byte, error)
+    Put(key []byte, value []byte) error
+    Delete(key []byte) error
+    SyncPut(key []byte, value []byte) error
+    SyncDelete(key []byte) error
+    NewIterator() IIterator
+    NewWriteBatch() IWriteBatch
+    NewSnapshot() (ISnapshot, error)
+    Compact() error
+    GetStorageEngine() interface{}
+}
+
+  What each backend is
+  #
+
+
+  
+      
+          --storage-backend
+          Where data lives
+          Replication
+          External dependency
+      
+  
+  
+      
+          goleveldb (default)
+          Local LevelDB (pure Go)
+          Raft only
+          —
+      
+      
+          badger
+          Local BadgerDB v4, ZSTD compression
+          Raft only
+          —
+      
+      
+          hybriddb
+          Local LevelDB + Ristretto hot cache, per-driver metrics
+          Raft only
+          —
+      
+      
+          oss
+          S3-compatible object store, local LevelDB index + Ristretto cache
+          Raft only
+          S3/MinIO endpoint
+      
+      
+          ipfs
+          Local LevelDB whose values are fetched from IPFS by CID
+          Raft only
+          IPFS API (not a gateway)
+      
+      
+          ipfs-synckv
+          IPFS as source of truth + local mirror + version metadata, optional AES-256
+          IPFS/ipfs-log P2P
+          IPFS API + P2P
+      
+      
+          crdt
+          Local Badger + icefiredb-crdt-kv over libp2p pubsub
+          P2P CRDT
+          libp2p peers
+      
+      
+          ipfs-log
+          Append-only icefiredb-ipfs-log store over IPFS pubsub
+          P2P log
+          IPFS + P2P
+      
+  
+
+leveldb (the cgo driver) and orbitdb are not compiled into the binary: the former is never
+imported, the latter is commented out in main.go/flags.go. Passing either name fails at startup
+with &ldquo;unknown driver&rdquo;."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Storage backends"><meta property="og:description" content=" Storage backends # --storage-backend <name> selects the driver that sits under the ledis data model. The command layer is written against store.driver.IDB, so the same commands run on every backend — what changes is where the bytes live, who replicates them, and how much you can trust the driver.
+type IDB interface { Close() error Get(key []byte) ([]byte, error) Put(key []byte, value []byte) error Delete(key []byte) error SyncPut(key []byte, value []byte) error SyncDelete(key []byte) error NewIterator() IIterator NewWriteBatch() IWriteBatch NewSnapshot() (ISnapshot, error) Compact() error GetStorageEngine() interface{} } What each backend is # --storage-backend Where data lives Replication External dependency goleveldb (default) Local LevelDB (pure Go) Raft only — badger Local BadgerDB v4, ZSTD compression Raft only — hybriddb Local LevelDB + Ristretto hot cache, per-driver metrics Raft only — oss S3-compatible object store, local LevelDB index + Ristretto cache Raft only S3/MinIO endpoint ipfs Local LevelDB whose values are fetched from IPFS by CID Raft only IPFS API (not a gateway) ipfs-synckv IPFS as source of truth + local mirror + version metadata, optional AES-256 IPFS/ipfs-log P2P IPFS API + P2P crdt Local Badger + icefiredb-crdt-kv over libp2p pubsub P2P CRDT libp2p peers ipfs-log Append-only icefiredb-ipfs-log store over IPFS pubsub P2P log IPFS + P2P leveldb (the cgo driver) and orbitdb are not compiled into the binary: the former is never imported, the latter is commented out in main.go/flags.go. Passing either name fails at startup with “unknown driver”."><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="article:section" content="deploy"><title>Storage backends | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/ title=存储驱动><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle checked>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/ class=active>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Storage backends</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#what-each-backend-is>What each backend is</a></li><li><a href=#choosing-one>Choosing one</a></li><li><a href=#per-backend-configuration>Per-backend configuration</a></li><li><a href=#guarantees-you-do-and-do-not-get>Guarantees you do and do not get</a></li><li><a href=#test-coverage-by-driver>Test coverage, by driver</a></li></ul></nav></aside></header><article class=markdown><h1 id=storage-backends>Storage backends
+<a class=anchor href=#storage-backends>#</a></h1><p><code>--storage-backend &lt;name></code> selects the driver that sits under the ledis data model. The command layer
+is written against <code>store.driver.IDB</code>, so the same commands run on every backend — what changes is
+where the bytes live, who replicates them, and how much you can trust the driver.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>IDB</span> <span style=color:#66d9ef>interface</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Close</span>() <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Get</span>(<span style=color:#a6e22e>key</span> []<span style=color:#66d9ef>byte</span>) ([]<span style=color:#66d9ef>byte</span>, <span style=color:#66d9ef>error</span>)
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Put</span>(<span style=color:#a6e22e>key</span> []<span style=color:#66d9ef>byte</span>, <span style=color:#a6e22e>value</span> []<span style=color:#66d9ef>byte</span>) <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Delete</span>(<span style=color:#a6e22e>key</span> []<span style=color:#66d9ef>byte</span>) <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>SyncPut</span>(<span style=color:#a6e22e>key</span> []<span style=color:#66d9ef>byte</span>, <span style=color:#a6e22e>value</span> []<span style=color:#66d9ef>byte</span>) <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>SyncDelete</span>(<span style=color:#a6e22e>key</span> []<span style=color:#66d9ef>byte</span>) <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>NewIterator</span>() <span style=color:#a6e22e>IIterator</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>NewWriteBatch</span>() <span style=color:#a6e22e>IWriteBatch</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>NewSnapshot</span>() (<span style=color:#a6e22e>ISnapshot</span>, <span style=color:#66d9ef>error</span>)
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Compact</span>() <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>GetStorageEngine</span>() <span style=color:#66d9ef>interface</span>{}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h2 id=what-each-backend-is>What each backend is
+<a class=anchor href=#what-each-backend-is>#</a></h2><table><thead><tr><th style=text-align:left><code>--storage-backend</code></th><th style=text-align:left>Where data lives</th><th style=text-align:left>Replication</th><th style=text-align:left>External dependency</th></tr></thead><tbody><tr><td style=text-align:left><code>goleveldb</code> <em>(default)</em></td><td style=text-align:left>Local LevelDB (pure Go)</td><td style=text-align:left>Raft only</td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>badger</code></td><td style=text-align:left>Local BadgerDB v4, ZSTD compression</td><td style=text-align:left>Raft only</td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>hybriddb</code></td><td style=text-align:left>Local LevelDB + Ristretto hot cache, per-driver metrics</td><td style=text-align:left>Raft only</td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>oss</code></td><td style=text-align:left>S3-compatible object store, local LevelDB index + Ristretto cache</td><td style=text-align:left>Raft only</td><td style=text-align:left>S3/MinIO endpoint</td></tr><tr><td style=text-align:left><code>ipfs</code></td><td style=text-align:left>Local LevelDB whose values are fetched from IPFS by CID</td><td style=text-align:left>Raft only</td><td style=text-align:left>IPFS API (not a gateway)</td></tr><tr><td style=text-align:left><code>ipfs-synckv</code></td><td style=text-align:left>IPFS as source of truth + local mirror + version metadata, optional AES-256</td><td style=text-align:left>IPFS/ipfs-log P2P</td><td style=text-align:left>IPFS API + P2P</td></tr><tr><td style=text-align:left><code>crdt</code></td><td style=text-align:left>Local Badger + <code>icefiredb-crdt-kv</code> over libp2p pubsub</td><td style=text-align:left>P2P CRDT</td><td style=text-align:left>libp2p peers</td></tr><tr><td style=text-align:left><code>ipfs-log</code></td><td style=text-align:left>Append-only <code>icefiredb-ipfs-log</code> store over IPFS pubsub</td><td style=text-align:left>P2P log</td><td style=text-align:left>IPFS + P2P</td></tr></tbody></table><p><code>leveldb</code> (the cgo driver) and <code>orbitdb</code> are <strong>not</strong> compiled into the binary: the former is never
+imported, the latter is commented out in <code>main.go</code>/<code>flags.go</code>. Passing either name fails at startup
+with &ldquo;unknown driver&rdquo;.</p><h2 id=choosing-one>Choosing one
+<a class=anchor href=#choosing-one>#</a></h2><ul><li><strong>Default / most workloads</strong> — <code>goleveldb</code>. Pure Go, no cgo, predictable memory, no external
+services.</li><li><strong>Write-heavy local workloads</strong> — <code>badger</code>. Note the driver opens with large fixed defaults (1 GB
+memtable, 1 GB block cache, 100 goroutines/compactors), so size the host accordingly.</li><li><strong>Read-heavy working sets that fit in RAM</strong> — <code>hybriddb</code>. The hot tier absorbs reads, and the driver
+registers <code>read_operations</code>, <code>write_operations</code>, <code>bytes_read</code>, <code>errors</code> … into <code>INFO</code>.</li><li><strong>Data that must outlive the host</strong> — <code>oss</code>, with <code>--oss-endpoint</code>, <code>--oss-ak</code>, <code>--oss-sk</code>. Every
+write goes to the object store and a local LevelDB index keeps it addressable; keep the local disk
+because it carries the index.</li><li><strong>Multi-site / decentralized</strong> — <code>ipfs-synckv</code> or <code>crdt</code>. Both replicate through libp2p pubsub and
+are configured with <code>--servicename</code>, <code>--nettopic</code>, <code>--datatopic</code> (all three must match across
+nodes).</li><li><strong>Not as a general backend today</strong> — <code>ipfs</code>. Its write path stores the raw value locally while the
+read path treats the stored bytes as an IPFS CID and <code>cat</code>s them, so a value written through the
+engine does not round-trip. Use <code>ipfs-synckv</code> when you want IPFS persistence.</li></ul><h2 id=per-backend-configuration>Per-backend configuration
+<a class=anchor href=#per-backend-configuration>#</a></h2><table><thead><tr><th style=text-align:left>Backend</th><th style=text-align:left>Flags</th><th style=text-align:left>Defaults</th></tr></thead><tbody><tr><td style=text-align:left><code>ipfs</code>, <code>ipfs-synckv</code></td><td style=text-align:left><code>--ipfs-endpoint</code></td><td style=text-align:left><code>http://localhost:5001</code> (the API port, not the <code>8080</code> gateway)</td></tr><tr><td style=text-align:left><code>ipfs-synckv</code></td><td style=text-align:left><code>--ipfs-synckv-key</code></td><td style=text-align:left>empty → no encryption; a 32-byte key enables AES-256</td></tr><tr><td style=text-align:left><code>ipfs-log</code></td><td style=text-align:left><code>--ipfs-log-dbname</code>, or env <code>IPFS_LOG_DBNAME</code></td><td style=text-align:left><code>ifdb-event-kv-ipfs-log</code></td></tr><tr><td style=text-align:left><code>oss</code></td><td style=text-align:left><code>--oss-endpoint</code>, <code>--oss-ak</code>, <code>--oss-sk</code></td><td style=text-align:left><code>http://localhost:9000</code> + placeholder credentials</td></tr><tr><td style=text-align:left><code>crdt</code>, <code>ipfs-log</code></td><td style=text-align:left><code>--servicename</code>, <code>--nettopic</code>, <code>--datatopic</code></td><td style=text-align:left><code>icefiredb</code>, <code>icefiredb-net</code>, <code>icefiredb-data</code></td></tr></tbody></table><p>The hot-cache capacity of <code>oss</code>, <code>ipfs</code> and <code>ipfs-synckv</code> is <strong>not</strong> configurable from the command
+line: it is the driver constant of 1024 MB. See
+<a href=/icefiredb_docs/deploy/configuration/#flags-that-are-printed-but-not-wired>Configuration</a>.</p><h2 id=guarantees-you-do-and-do-not-get>Guarantees you do and do not get
+<a class=anchor href=#guarantees-you-do-and-do-not-get>#</a></h2><p><strong>You get</strong></p><ul><li>The same command semantics on every backend, including the per-type keyspaces and per-type expiry.</li><li>Raft snapshot/restore that is backend-agnostic: <code>writeSnapshot</code> iterates the driver&rsquo;s snapshot and
+streams key/value pairs in <code>sds</code> format inside a gzip file, so a backup taken on <code>badger</code> can be restored into a fresh
+<code>goleveldb</code> node (see
+<a href=/icefiredb_docs/deploy/operations/>Operations</a>).</li><li>Backend metrics in <code>INFO</code> for <code>hybriddb</code>, <code>ipfs</code>, <code>ipfs-synckv</code>, <code>oss</code>.</li></ul><p><strong>You do not get</strong></p><ul><li><strong>No cross-backend on-disk compatibility.</strong> Do not change <code>--storage-backend</code> for an existing data
+directory; the formats are unrelated.</li><li><strong>No &ldquo;empty value&rdquo; distinction on the decentralized drivers.</strong> They collapse &ldquo;missing&rdquo; and &ldquo;empty&rdquo;,
+so an empty string reads back as a nil reply. Pinned in
+<a href=/icefiredb_docs/commands/compatibility/>Compatibility</a>.</li><li><strong>No driver-level retry or repair.</strong> A failed write surfaces as a command error; on a P2P driver a
+temporarily unreachable peer shows up as missing data until the log catches up.</li></ul><h2 id=test-coverage-by-driver>Test coverage, by driver
+<a class=anchor href=#test-coverage-by-driver>#</a></h2><table><thead><tr><th style=text-align:left>Driver</th><th style=text-align:left>Tests</th><th style=text-align:left>Notes</th></tr></thead><tbody><tr><td style=text-align:left><code>goleveldb</code></td><td style=text-align:left>engine-level compat suite (<code>DRIVER=goleveldb make test-compat</code>)</td><td style=text-align:left>via ledisdb</td></tr><tr><td style=text-align:left><code>badger</code></td><td style=text-align:left><code>driver/badger/db_test.go</code> + engine suite (default <code>DRIVER=badger</code>)</td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>hybriddb</code></td><td style=text-align:left><code>driver/hybriddb/{db,iterator,snapshot,write_batch}_test.go</code></td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>ipfs-synckv</code></td><td style=text-align:left><code>driver/ipfs-synckv/{db,iterator,singularity}_test.go</code></td><td style=text-align:left>needs an IPFS daemon</td></tr><tr><td style=text-align:left><code>oss</code></td><td style=text-align:left><code>driver/oss/s3_test.go</code></td><td style=text-align:left>needs S3/MinIO (CI runs localstack)</td></tr><tr><td style=text-align:left><code>ipfs</code>, <code>crdt</code>, <code>ipfs-log</code></td><td style=text-align:left>no unit tests in this repository</td><td style=text-align:left>exercised manually against real peers</td></tr></tbody></table><p>That table is the honest version of &ldquo;supported&rdquo;: a driver with no test can still work, but nothing in
+CI will tell you when it stops working.</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#what-each-backend-is>What each backend is</a></li><li><a href=#choosing-one>Choosing one</a></li><li><a href=#per-backend-configuration>Per-backend configuration</a></li><li><a href=#guarantees-you-do-and-do-not-get>Guarantees you do and do not get</a></li><li><a href=#test-coverage-by-driver>Test coverage, by driver</a></li></ul></nav></div></aside></main></body></html>

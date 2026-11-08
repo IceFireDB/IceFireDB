@@ -1,0 +1,106 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  运维
+  #
+
+单节点或 Raft 集群的备份、恢复、升级与故障恢复。所有东西的单位是节点目录：
+<data-dir>/IceFireDB/<node-id>/。
+
+  磁盘上有什么
+  #
+
+
+  
+      
+          路径
+          内容
+          备份方式
+      
+  
+  
+      
+          main.db/
+          所选驱动格式的 ledis 存储
+          复制该目录
+      
+      
+          store/
+          Raft 日志 + 稳定存储（leveldb 或 bolt）
+          复制该目录
+      
+      
+          snapshots/<id>/state.bin
+          Raft 状态机快照：gzip 头（start/ts/seed）+ sds 键/值流
+          RAFT SNAPSHOT，或复制该目录
+      
+  
+
+state.bin 与后端无关：writeSnapshot 遍历驱动的快照，把 key, value 对写进一个 gzip 流。这就是为什么在
+badger 节点上做的快照可以恢复到 goleveldb 节点，而 main.db/ 目录本身永远不行。请把这个文件当作不透明的：
+整体复制（或用 RAFT SNAPSHOT READ 按窗口读取），再用 --restore 交回去 —— 不要解压或修改它。
+
+  备份
+  #
+
+方案 A——快照状态机（推荐，可移植）
+redis-cli -p 11001 RAFT SNAPSHOT NOW            # returns the new snapshot id
+redis-cli -p 11001 RAFT SNAPSHOT LIST           # ids and sizes
+redis-cli -p 11001 RAFT SNAPSHOT FILE <id>      # absolute path on the server
+# copy that file off the host:
+scp db1:/var/lib/icefiredb/IceFireDB/1/snapshots/<id>/state.bin ./backup-$(date +%F).sds
+对于很大或带宽受限的快照，按窗口读它，而不是复制文件："><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="运维"><meta property="og:description" content=" 运维 # 单节点或 Raft 集群的备份、恢复、升级与故障恢复。所有东西的单位是节点目录： <data-dir>/IceFireDB/<node-id>/。
+磁盘上有什么 # 路径 内容 备份方式 main.db/ 所选驱动格式的 ledis 存储 复制该目录 store/ Raft 日志 + 稳定存储（leveldb 或 bolt） 复制该目录 snapshots/<id>/state.bin Raft 状态机快照：gzip 头（start/ts/seed）+ sds 键/值流 RAFT SNAPSHOT，或复制该目录 state.bin 与后端无关：writeSnapshot 遍历驱动的快照，把 key, value 对写进一个 gzip 流。这就是为什么在 badger 节点上做的快照可以恢复到 goleveldb 节点，而 main.db/ 目录本身永远不行。请把这个文件当作不透明的： 整体复制（或用 RAFT SNAPSHOT READ 按窗口读取），再用 --restore 交回去 —— 不要解压或修改它。
+备份 # 方案 A——快照状态机（推荐，可移植）
+redis-cli -p 11001 RAFT SNAPSHOT NOW # returns the new snapshot id redis-cli -p 11001 RAFT SNAPSHOT LIST # ids and sizes redis-cli -p 11001 RAFT SNAPSHOT FILE <id> # absolute path on the server # copy that file off the host: scp db1:/var/lib/icefiredb/IceFireDB/1/snapshots/<id>/state.bin ./backup-$(date +%F).sds 对于很大或带宽受限的快照，按窗口读它，而不是复制文件："><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="deploy"><title>运维 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/ title=Operations><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle checked>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/ class=active>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>运维</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#磁盘上有什么>磁盘上有什么</a></li><li><a href=#备份>备份</a></li><li><a href=#恢复>恢复</a></li><li><a href=#滚动升级>滚动升级</a></li><li><a href=#灾难恢复>灾难恢复</a></li><li><a href=#例行检查>例行检查</a></li><li><a href=#容量说明>容量说明</a></li></ul></nav></aside></header><article class=markdown><h1 id=运维>运维
+<a class=anchor href=#%e8%bf%90%e7%bb%b4>#</a></h1><p>单节点或 Raft 集群的备份、恢复、升级与故障恢复。所有东西的单位是<strong>节点目录</strong>：
+<code>&lt;data-dir>/IceFireDB/&lt;node-id>/</code>。</p><h2 id=磁盘上有什么>磁盘上有什么
+<a class=anchor href=#%e7%a3%81%e7%9b%98%e4%b8%8a%e6%9c%89%e4%bb%80%e4%b9%88>#</a></h2><table><thead><tr><th style=text-align:left>路径</th><th style=text-align:left>内容</th><th style=text-align:left>备份方式</th></tr></thead><tbody><tr><td style=text-align:left><code>main.db/</code></td><td style=text-align:left>所选驱动格式的 ledis 存储</td><td style=text-align:left>复制该目录</td></tr><tr><td style=text-align:left><code>store/</code></td><td style=text-align:left>Raft 日志 + 稳定存储（<code>leveldb</code> 或 <code>bolt</code>）</td><td style=text-align:left>复制该目录</td></tr><tr><td style=text-align:left><code>snapshots/&lt;id>/state.bin</code></td><td style=text-align:left>Raft 状态机快照：gzip 头（start/ts/seed）+ <code>sds</code> 键/值流</td><td style=text-align:left><code>RAFT SNAPSHOT</code>，或复制该目录</td></tr></tbody></table><p><code>state.bin</code> 与后端无关：<code>writeSnapshot</code> 遍历驱动的快照，把 <code>key, value</code> 对写进一个 gzip 流。这就是为什么在
+<code>badger</code> 节点上做的快照可以恢复到 <code>goleveldb</code> 节点，而 <code>main.db/</code> 目录本身永远不行。请把这个文件当作不透明的：
+整体复制（或用 <code>RAFT SNAPSHOT READ</code> 按窗口读取），再用 <code>--restore</code> 交回去 —— 不要解压或修改它。</p><h2 id=备份>备份
+<a class=anchor href=#%e5%a4%87%e4%bb%bd>#</a></h2><p><strong>方案 A——快照状态机（推荐，可移植）</strong></p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SNAPSHOT NOW            <span style=color:#75715e># returns the new snapshot id</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SNAPSHOT LIST           <span style=color:#75715e># ids and sizes</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SNAPSHOT FILE &lt;id&gt;      <span style=color:#75715e># absolute path on the server</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># copy that file off the host:</span>
+</span></span><span style=display:flex><span>scp db1:/var/lib/icefiredb/IceFireDB/1/snapshots/&lt;id&gt;/state.bin ./backup-<span style=color:#66d9ef>$(</span>date +%F<span style=color:#66d9ef>)</span>.sds
+</span></span></code></pre></div><p>对于很大或带宽受限的快照，按窗口读它，而不是复制文件：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> --raw RAFT SNAPSHOT READ &lt;id&gt; RANGE <span style=color:#ae81ff>0</span> <span style=color:#ae81ff>1048576</span> &gt; part-000
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> --raw RAFT SNAPSHOT READ &lt;id&gt; RANGE <span style=color:#ae81ff>1048576</span> <span style=color:#ae81ff>1048576</span> &gt; part-001
+</span></span></code></pre></div><p><strong>方案 B——复制节点目录（对整个集群最快）</strong></p><p>停止写入，或者挑一个从节点让它稳定下来，然后复制整个 <code>&lt;data-dir>/IceFireDB/&lt;node-id>/</code> 目录树。
+在写负载下复制主节点，得到的目录在某个较近的日志索引处是内部一致的，但"某个索引"不是你控制的点
+——要一份能推理的备份，就用方案 A，或者让节点静默。</p><h2 id=恢复>恢复
+<a class=anchor href=#%e6%81%a2%e5%a4%8d>#</a></h2><p><code>--restore</code> 从快照文件引导一个全新的<strong>单节点</strong>集群：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>mkdir -p /var/lib/icefiredb-restore
+</span></span><span style=display:flex><span>./bin/IceFireDB -n <span style=color:#ae81ff>1</span> -a 127.0.0.1:11001 -d /var/lib/icefiredb-restore <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  --restore ./backup-2026-11-08.sds
+</span></span></code></pre></div><p>规则，全部由 Raft 层强制执行：</p><ul><li>如果 <code>&lt;data-dir>/IceFireDB/&lt;node-id>/</code> 已经存在，<code>--restore</code> 会被<strong>忽略</strong>。请用一个新的目录。</li><li>它<strong>不能</strong>与 <code>-j</code> 组合使用；被恢复的节点就是新的单节点集群。</li><li>其他每个节点都必须清空并用 <code>-j &lt;restored-node-addr></code> 重新加入——它们的日志指向一个已经不存在的
+集群历史。</li><li>恢复时每 1000 对写一批，所以内存是有界的，大快照不需要整个塞进内存。</li></ul><h2 id=滚动升级>滚动升级
+<a class=anchor href=#%e6%bb%9a%e5%8a%a8%e5%8d%87%e7%ba%a7>#</a></h2><p>一次一个节点，从节点先升级，主节点最后：</p><ol><li><strong>检查健康</strong> — <code>CLUSTER INFO</code> 报告 <code>cluster_state:ok</code>，<code>RAFT SERVER LIST</code> 列出每个成员，所有
+节点的 <code>/readyz</code> 都是 200。</li><li><strong>升级一个从节点。</strong> 停掉它，替换二进制，用<em>相同</em>的 <code>-n</code>、<code>-a</code> 和 <code>-d</code> 启动它。它从持久化的
+Raft 状态重新加入，并从日志或快照追上。</li><li><strong>等待</strong> <code>/readyz</code> 返回 200 且它的 <code>RAFT INFO</code> 索引追上，再去动下一个节点。</li><li><strong>最后升级主节点。</strong> 停掉它；一个从节点被选出；启动升级后的二进制；它作为从节点重新加入。</li></ol><p>绝不要一次干掉多数派：没有多数派时，写入会以 <code>-CLUSTERDOWN</code> 失败，直到能再次选出主节点。</p><p>对已有数据目录的兼容规则：</p><table><thead><tr><th style=text-align:left>要做</th><th style=text-align:left>不要做</th></tr></thead><tbody><tr><td style=text-align:left>保持 <code>-n</code>、<code>-a</code> 和 <code>-d</code> 不变</td><td style=text-align:left>更改节点 ID，或把目录移到另一个节点</td></tr><tr><td style=text-align:left>在每个节点上保持 <code>--auth</code>/<code>ICEFIREDB_AUTH</code> 一致</td><td style=text-align:left>逐节点轮转 token</td></tr><tr><td style=text-align:left>保持 <code>--storage-backend</code> 原样</td><td style=text-align:left>在已有的 <code>main.db</code> 上切换存储驱动</td></tr><tr><td style=text-align:left>保持 <code>--raft-backend</code> 原样</td><td style=text-align:left>在已有的 <code>store/</code> 下切换 Raft 日志格式</td></tr></tbody></table><h2 id=灾难恢复>灾难恢复
+<a class=anchor href=#%e7%81%be%e9%9a%be%e6%81%a2%e5%a4%8d>#</a></h2><p><strong>丢失一个节点</strong> — 给它一个新的目录（或清掉旧目录），然后把它加入：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>rm -rf /var/lib/icefiredb/IceFireDB/3
+</span></span><span style=display:flex><span>./bin/IceFireDB -n <span style=color:#ae81ff>3</span> -a 10.0.0.13:11001 --advertise 10.0.0.13:11001 -d /var/lib/icefiredb -j 10.0.0.11:11001
+</span></span></code></pre></div><p>如果旧的成员记录仍然存在而该节点无法重新加入，先从健康成员上删掉它：<code>RAFT SERVER REMOVE 3</code>，然后
+用 <code>-j</code> 启动该节点。</p><p><strong>丢失多数派</strong> — 写入已停，但数据仍然存在于存活的节点上。把最新的快照恢复进一个全新的单节点集群
+（<code>--restore</code>，见上），然后用 <code>RAFT SERVER ADD</code> 或 <code>-j</code> 把其他节点加回来。那个快照之后写入的数据会
+丢失；这是唯一不需要多数派的恢复方式。</p><p><strong>存储损坏</strong> — <code>main.db/</code> 可以按驱动修复（例如 GoLevelDB/Badger 的恢复工具），但受支持的路径是：
+移除该节点，从最新的快照恢复，重新加入。</p><h2 id=例行检查>例行检查
+<a class=anchor href=#%e4%be%8b%e8%a1%8c%e6%a3%80%e6%9f%a5>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># is the process serving?</span>
+</span></span><span style=display:flex><span>curl -fsS http://127.0.0.1:11002/healthz
+</span></span><span style=display:flex><span>curl -fsS http://127.0.0.1:11002/readyz
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># is the cluster healthy?</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> CLUSTER INFO
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT SERVER LIST
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># is it roughly in sync? (compare a sample on two nodes)</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> --scan --pattern <span style=color:#e6db74>&#39;sample:*&#39;</span> | head -50 | xargs -n1 redis-cli -p <span style=color:#ae81ff>11001</span> GET
+</span></span></code></pre></div><h2 id=容量说明>容量说明
+<a class=anchor href=#%e5%ae%b9%e9%87%8f%e8%af%b4%e6%98%8e>#</a></h2><ul><li>每个节点都存完整数据集；没有分片。磁盘规划是按节点算，不是按集群算。</li><li><code>--nosync</code> 用持久性换写吞吐；绝不要用在断电后还打算从它恢复的节点上。</li><li><code>badger</code> 以 1 GB memtable 和 1 GB block cache 的默认值打开；要为它们留出预算。</li><li>Raft 快照会在 <code>snapshots/</code> 下累积；Raft 层会剪掉旧的，但在一个从不做快照的节点上，日志会一直增长
+到下一次快照——为这部分磁盘占用做规划。</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#磁盘上有什么>磁盘上有什么</a></li><li><a href=#备份>备份</a></li><li><a href=#恢复>恢复</a></li><li><a href=#滚动升级>滚动升级</a></li><li><a href=#灾难恢复>灾难恢复</a></li><li><a href=#例行检查>例行检查</a></li><li><a href=#容量说明>容量说明</a></li></ul></nav></div></aside></main></body></html>

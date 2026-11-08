@@ -1,0 +1,142 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content='
+  IceFireDB-SQLProxy
+  #
+
+一个 MySQL 协议代理，它挡在普通 MySQL 服务器前面，把语句重放给网络中的其他代理节点，于是分布
+在不同地方的多套 MySQL 实例无需改动应用就能保持一致。
+cd IceFireDB-SQLProxy
+make                                   # → bin/IceFireDB-SQLProxy
+./bin/IceFireDB-SQLProxy -c ./config/config.yaml
+
+mysql -h 127.0.0.1 -P 33306 -u host1 -p    # a user from userlist
+
+  它是什么
+  #
+
+
+  
+      
+          属性
+          取值
+      
+  
+  
+      
+          协议
+          MySQL 线上协议
+      
+      
+          后端
+          MySQL（mysql.admin、mysql.readonly）
+      
+      
+          复制
+          语句经 libp2p 在各代理节点之间传播
+      
+      
+          监听
+          server.addr，默认 :33306
+      
+      
+          二进制
+          bin/IceFireDB-SQLProxy（-c <config.yaml>）
+      
+  
+
+
+  配置（config/config.yaml）
+  #
+
+
+  
+      
+          配置项
+          含义
+          文件中的默认值
+      
+  
+  
+      
+          server.addr
+          协议代理监听地址
+          ":33306"
+      
+      
+          debug.enable / .port
+          调试/pprof 服务器
+          true / 17878
+      
+      
+          mysql.admin
+          写连接池：addr、user、password、dbname、minAlive、maxAlive、maxIdle
+          127.0.0.1:3306、admin_user
+      
+      
+          mysql.readonly
+          读连接池，键名相同
+          127.0.0.1:3306、readonly_user
+      
+      
+          userlist
+          客户端租户（user/password）
+          host1 / host1
+      
+      
+          p2p.enable
+          网络复制
+          true
+      
+      
+          p2p.serviceDiscoveryId
+          会合名，必须与其他节点一致
+          tanovo_sqlproxy_admin_service
+      
+      
+          p2p.serviceCommandTopic
+          命令频道
+          tanovo_sqlproxy_command_topic
+      
+      
+          p2p.adminTopic / p2p.readonlyTopic
+          按角色划分的频道
+          tanovo_sqlproxy_admin_topic / …_readonly_topic
+      
+      
+          p2p.serviceDiscoverMode
+          advertise 或 announce
+          advertise
+      
+      
+          p2p.nodeHostIp / nodeHostPort
+          对等节点应当拨号的地址
+          127.0.0.1 / 0
+      
+  
+
+注意本组件用的是驼峰式键名（serviceDiscoveryId，而不是 PubSub/SQLite 里的 service_discovery_id）。
+在组件之间照抄配置，会静默地给你一个默认值。'><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="IceFireDB-SQLProxy"><meta property="og:description" content=' IceFireDB-SQLProxy # 一个 MySQL 协议代理，它挡在普通 MySQL 服务器前面，把语句重放给网络中的其他代理节点，于是分布 在不同地方的多套 MySQL 实例无需改动应用就能保持一致。
+cd IceFireDB-SQLProxy make # → bin/IceFireDB-SQLProxy ./bin/IceFireDB-SQLProxy -c ./config/config.yaml mysql -h 127.0.0.1 -P 33306 -u host1 -p # a user from userlist 它是什么 # 属性 取值 协议 MySQL 线上协议 后端 MySQL（mysql.admin、mysql.readonly） 复制 语句经 libp2p 在各代理节点之间传播 监听 server.addr，默认 :33306 二进制 bin/IceFireDB-SQLProxy（-c <config.yaml>） 配置（config/config.yaml） # 配置项 含义 文件中的默认值 server.addr 协议代理监听地址 ":33306" debug.enable / .port 调试/pprof 服务器 true / 17878 mysql.admin 写连接池：addr、user、password、dbname、minAlive、maxAlive、maxIdle 127.0.0.1:3306、admin_user mysql.readonly 读连接池，键名相同 127.0.0.1:3306、readonly_user userlist 客户端租户（user/password） host1 / host1 p2p.enable 网络复制 true p2p.serviceDiscoveryId 会合名，必须与其他节点一致 tanovo_sqlproxy_admin_service p2p.serviceCommandTopic 命令频道 tanovo_sqlproxy_command_topic p2p.adminTopic / p2p.readonlyTopic 按角色划分的频道 tanovo_sqlproxy_admin_topic / …_readonly_topic p2p.serviceDiscoverMode advertise 或 announce advertise p2p.nodeHostIp / nodeHostPort 对等节点应当拨号的地址 127.0.0.1 / 0 注意本组件用的是驼峰式键名（serviceDiscoveryId，而不是 PubSub/SQLite 里的 service_discovery_id）。 在组件之间照抄配置，会静默地给你一个默认值。'><meta property="og:locale" content="zh"><meta property="og:type" content="website"><title>IceFireDB-SQLProxy | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/ title=IceFireDB-SQLProxy><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/index.xml title="IceFireDB 文档中心"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/ class=active>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>IceFireDB-SQLProxy</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#它是什么>它是什么</a></li><li><a href=#配置configconfigyaml>配置（<code>config/config.yaml</code>）</a></li><li><a href=#运维要点>运维要点</a></li><li><a href=#什么时候用它>什么时候用它</a></li></ul></nav></aside></header><article class=markdown><h1 id=icefiredb-sqlproxy>IceFireDB-SQLProxy
+<a class=anchor href=#icefiredb-sqlproxy>#</a></h1><p>一个 <strong>MySQL 协议代理</strong>，它挡在普通 MySQL 服务器前面，把语句重放给网络中的其他代理节点，于是分布
+在不同地方的多套 MySQL 实例无需改动应用就能保持一致。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>cd IceFireDB-SQLProxy
+</span></span><span style=display:flex><span>make                                   <span style=color:#75715e># → bin/IceFireDB-SQLProxy</span>
+</span></span><span style=display:flex><span>./bin/IceFireDB-SQLProxy -c ./config/config.yaml
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>mysql -h 127.0.0.1 -P <span style=color:#ae81ff>33306</span> -u host1 -p    <span style=color:#75715e># a user from userlist</span>
+</span></span></code></pre></div><h2 id=它是什么>它是什么
+<a class=anchor href=#%e5%ae%83%e6%98%af%e4%bb%80%e4%b9%88>#</a></h2><table><thead><tr><th style=text-align:left>属性</th><th style=text-align:left>取值</th></tr></thead><tbody><tr><td style=text-align:left>协议</td><td style=text-align:left>MySQL 线上协议</td></tr><tr><td style=text-align:left>后端</td><td style=text-align:left>MySQL（<code>mysql.admin</code>、<code>mysql.readonly</code>）</td></tr><tr><td style=text-align:left>复制</td><td style=text-align:left>语句经 libp2p 在各代理节点之间传播</td></tr><tr><td style=text-align:left>监听</td><td style=text-align:left><code>server.addr</code>，默认 <code>:33306</code></td></tr><tr><td style=text-align:left>二进制</td><td style=text-align:left><code>bin/IceFireDB-SQLProxy</code>（<code>-c &lt;config.yaml></code>）</td></tr></tbody></table><h2 id=配置configconfigyaml>配置（<code>config/config.yaml</code>）
+<a class=anchor href=#%e9%85%8d%e7%bd%aeconfigconfigyaml>#</a></h2><table><thead><tr><th style=text-align:left>配置项</th><th style=text-align:left>含义</th><th style=text-align:left>文件中的默认值</th></tr></thead><tbody><tr><td style=text-align:left><code>server.addr</code></td><td style=text-align:left>协议代理监听地址</td><td style=text-align:left><code>":33306"</code></td></tr><tr><td style=text-align:left><code>debug.enable</code> / <code>.port</code></td><td style=text-align:left>调试/pprof 服务器</td><td style=text-align:left><code>true</code> / <code>17878</code></td></tr><tr><td style=text-align:left><code>mysql.admin</code></td><td style=text-align:left>写连接池：<code>addr</code>、<code>user</code>、<code>password</code>、<code>dbname</code>、<code>minAlive</code>、<code>maxAlive</code>、<code>maxIdle</code></td><td style=text-align:left><code>127.0.0.1:3306</code>、<code>admin_user</code></td></tr><tr><td style=text-align:left><code>mysql.readonly</code></td><td style=text-align:left>读连接池，键名相同</td><td style=text-align:left><code>127.0.0.1:3306</code>、<code>readonly_user</code></td></tr><tr><td style=text-align:left><code>userlist</code></td><td style=text-align:left>客户端租户（<code>user</code>/<code>password</code>）</td><td style=text-align:left><code>host1</code> / <code>host1</code></td></tr><tr><td style=text-align:left><code>p2p.enable</code></td><td style=text-align:left>网络复制</td><td style=text-align:left><code>true</code></td></tr><tr><td style=text-align:left><code>p2p.serviceDiscoveryId</code></td><td style=text-align:left>会合名，必须与其他节点一致</td><td style=text-align:left><code>tanovo_sqlproxy_admin_service</code></td></tr><tr><td style=text-align:left><code>p2p.serviceCommandTopic</code></td><td style=text-align:left>命令频道</td><td style=text-align:left><code>tanovo_sqlproxy_command_topic</code></td></tr><tr><td style=text-align:left><code>p2p.adminTopic</code> / <code>p2p.readonlyTopic</code></td><td style=text-align:left>按角色划分的频道</td><td style=text-align:left><code>tanovo_sqlproxy_admin_topic</code> / <code>…_readonly_topic</code></td></tr><tr><td style=text-align:left><code>p2p.serviceDiscoverMode</code></td><td style=text-align:left><code>advertise</code> 或 <code>announce</code></td><td style=text-align:left><code>advertise</code></td></tr><tr><td style=text-align:left><code>p2p.nodeHostIp</code> / <code>nodeHostPort</code></td><td style=text-align:left>对等节点应当拨号的地址</td><td style=text-align:left><code>127.0.0.1</code> / <code>0</code></td></tr></tbody></table><p>注意本组件用的是驼峰式键名（<code>serviceDiscoveryId</code>，而不是 PubSub/SQLite 里的 <code>service_discovery_id</code>）。
+在组件之间照抄配置，会静默地给你一个默认值。</p><h2 id=运维要点>运维要点
+<a class=anchor href=#%e8%bf%90%e7%bb%b4%e8%a6%81%e7%82%b9>#</a></h2><ul><li><strong>读写分离是一个配置选择，不是路由魔法</strong>：读查询用 <code>mysql.readonly</code> 这个池，写入用 <code>mysql.admin</code>。
+如果没有副本，把它们指向同一台服务器即可。</li><li>示例凭据（<code>admin_pass</code>、<code>readonly_pass</code>、<code>host1</code>/<code>host1</code>）都是占位值 —— 请替换掉。</li><li>语句会重放到每个代理节点，所以只能用确定性 SQL。<code>NOW()</code>/<code>RAND()</code>/<code>UUID()</code> 可能产生分歧。</li><li>没有冲突解决：网络按到达顺序排序，所以两个代理节点并发写同一行时，最终落在后应用的那条语句上。</li><li>示例配置里调试服务器是<strong>开启</strong>的，监听端口 <code>17878</code>；生产环境请关掉它。</li></ul><h2 id=什么时候用它>什么时候用它
+<a class=anchor href=#%e4%bb%80%e4%b9%88%e6%97%b6%e5%80%99%e7%94%a8%e5%ae%83>#</a></h2><p>你已经在跑 MySQL，希望把同样的数据放到离其他地区用户更近的地方，又不想把应用迁到新数据库上。它不是
+MySQL 集群的替代品：它不对 MySQL 后端做自动故障转移，也不为冲突写入保证跨站点一致性。</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#它是什么>它是什么</a></li><li><a href=#配置configconfigyaml>配置（<code>config/config.yaml</code>）</a></li><li><a href=#运维要点>运维要点</a></li><li><a href=#什么时候用它>什么时候用它</a></li></ul></nav></div></aside></main></body></html>

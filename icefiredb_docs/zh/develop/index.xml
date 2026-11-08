@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>开发 on IceFireDB 文档中心</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/</link><description>Recent content in 开发 on IceFireDB 文档中心</description><generator>Hugo</generator><language>zh</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/index.xml" rel="self" type="application/rss+xml"/><item><title>客户端</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/</guid><description>&lt;h1 id="客户端">
+ 客户端
+ &lt;a class="anchor" href="#%e5%ae%a2%e6%88%b7%e7%ab%af">#&lt;/a>
+&lt;/h1>
+&lt;p>服务器使用 RESP，所以 Redis 客户端可以直接用——但有三处需要调整：类型不匹配从不报错、scan 游标必须当作不透明值处理、没有 &lt;code>SELECT&lt;/code>/&lt;code>MULTI&lt;/code>。&lt;/p>
+&lt;h2 id="redis-cli">
+ redis-cli
+ &lt;a class="anchor" href="#redis-cli">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>redis-cli -h 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># with TLS and auth&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-cli --tls --cacert ./ca.crt -a &lt;span style="color:#e6db74">&amp;#34;&lt;/span>$ICEFIREDB_AUTH&lt;span style="color:#e6db74">&amp;#34;&lt;/span> -h db1.internal -p &lt;span style="color:#ae81ff">11001&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>SET user:1 &lt;span style="color:#e6db74">&amp;#39;{&amp;#34;name&amp;#34;:&amp;#34;ada&amp;#34;}&amp;#39;&lt;/span> EX &lt;span style="color:#ae81ff">300&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>HGETALL user:1
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>SCAN &lt;span style="color:#ae81ff">0&lt;/span> MATCH &lt;span style="color:#e6db74">&amp;#39;user:*&amp;#39;&lt;/span> COUNT &lt;span style="color:#ae81ff">100&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>XSCAN HASH &lt;span style="color:#e6db74">&amp;#34;&amp;#34;&lt;/span> MATCH &lt;span style="color:#e6db74">&amp;#39;^user:&amp;#39;&lt;/span> COUNT &lt;span style="color:#ae81ff">100&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>INFO
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>&lt;code>redis-cli --scan&lt;/code> 可用：它从 &lt;code>0&lt;/code> 开始，循环到游标重新变成 &lt;code>0&lt;/code> 为止。&lt;/p>
+&lt;h2 id="go-githubcomredisgo-redisv9">
+ Go (&lt;code>github.com/redis/go-redis/v9&lt;/code>)
+ &lt;a class="anchor" href="#go-githubcomredisgo-redisv9">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f92672">package&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f92672">import&lt;/span> (
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#e6db74">&amp;#34;context&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#e6db74">&amp;#34;crypto/tls&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#e6db74">&amp;#34;fmt&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#e6db74">&amp;#34;github.com/redis/go-redis/v9&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">ctx&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">context&lt;/span>.&lt;span style="color:#a6e22e">Background&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">rdb&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">redis&lt;/span>.&lt;span style="color:#a6e22e">NewClient&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">redis&lt;/span>.&lt;span style="color:#a6e22e">Options&lt;/span>{
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">Addr&lt;/span>: &lt;span style="color:#e6db74">&amp;#34;127.0.0.1:11001&amp;#34;&lt;/span>,
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">Password&lt;/span>: &lt;span style="color:#e6db74">&amp;#34;&amp;#34;&lt;/span>, &lt;span style="color:#75715e">// set when the server runs with --auth
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#a6e22e">TLSConfig&lt;/span>: &lt;span style="color:#66d9ef">nil&lt;/span>, &lt;span style="color:#75715e">// &amp;amp;tls.Config{...} when --tls-cert/--tls-key are used
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#a6e22e">DB&lt;/span>: &lt;span style="color:#ae81ff">0&lt;/span>, &lt;span style="color:#75715e">// there is only database 0
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	})
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">defer&lt;/span> &lt;span style="color:#a6e22e">rdb&lt;/span>.&lt;span style="color:#a6e22e">Close&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">rdb&lt;/span>.&lt;span style="color:#a6e22e">Set&lt;/span>(&lt;span style="color:#a6e22e">ctx&lt;/span>, &lt;span style="color:#e6db74">&amp;#34;user:1&amp;#34;&lt;/span>, &lt;span style="color:#e6db74">`{&amp;#34;name&amp;#34;:&amp;#34;ada&amp;#34;}`&lt;/span>, &lt;span style="color:#ae81ff">0&lt;/span>).&lt;span style="color:#a6e22e">Err&lt;/span>(); &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		panic(&lt;span style="color:#a6e22e">err&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">v&lt;/span>, &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">rdb&lt;/span>.&lt;span style="color:#a6e22e">Get&lt;/span>(&lt;span style="color:#a6e22e">ctx&lt;/span>, &lt;span style="color:#e6db74">&amp;#34;user:1&amp;#34;&lt;/span>).&lt;span style="color:#a6e22e">Result&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">v&lt;/span>, &lt;span style="color:#a6e22e">err&lt;/span>) &lt;span style="color:#75715e">// {&amp;#34;name&amp;#34;:&amp;#34;ada&amp;#34;} &amp;lt;nil&amp;gt;
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">rdb&lt;/span>.&lt;span style="color:#a6e22e">HSet&lt;/span>(&lt;span style="color:#a6e22e">ctx&lt;/span>, &lt;span style="color:#e6db74">&amp;#34;user:1&amp;#34;&lt;/span>, &lt;span style="color:#e6db74">&amp;#34;name&amp;#34;&lt;/span>, &lt;span style="color:#e6db74">&amp;#34;ada&amp;#34;&lt;/span>).&lt;span style="color:#a6e22e">Val&lt;/span>()) &lt;span style="color:#75715e">// 1
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// Paginate keys: the cursor is opaque, handle it as a string.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">cursor&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> uint64(&lt;span style="color:#ae81ff">0&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">for&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">keys&lt;/span>, &lt;span style="color:#a6e22e">next&lt;/span>, &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">rdb&lt;/span>.&lt;span style="color:#a6e22e">Scan&lt;/span>(&lt;span style="color:#a6e22e">ctx&lt;/span>, &lt;span style="color:#a6e22e">cursor&lt;/span>, &lt;span style="color:#e6db74">&amp;#34;user:*&amp;#34;&lt;/span>, &lt;span style="color:#ae81ff">100&lt;/span>).&lt;span style="color:#a6e22e">Result&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>			panic(&lt;span style="color:#a6e22e">err&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">keys&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">next&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>			&lt;span style="color:#66d9ef">break&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">cursor&lt;/span> = &lt;span style="color:#a6e22e">next&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>&lt;strong>注意事项——类型化 scan 辅助函数。&lt;/strong> &lt;code>rdb.HScan&lt;/code>、&lt;code>rdb.SScan&lt;/code>、&lt;code>rdb.ZScan&lt;/code> 和 &lt;code>rdb.Scan&lt;/code> 都会用 &lt;code>strconv.ParseUint&lt;/code> 强制转换游标，而 &lt;code>HScan&lt;/code>/&lt;code>SScan&lt;/code>/&lt;code>ZScan&lt;/code> 还额外要求游标是数字。本引擎对这三条命令返回&lt;strong>最后一个字段/成员名&lt;/strong>作为游标，所以这些类型化辅助函数会以解析错误失败。请改用通用 API：&lt;/p></description></item><item><title>构建与测试</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/</guid><description>&lt;h1 id="构建与测试">
+ 构建与测试
+ &lt;a class="anchor" href="#%e6%9e%84%e5%bb%ba%e4%b8%8e%e6%b5%8b%e8%af%95">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="构建">
+ 构建
+ &lt;a class="anchor" href="#%e6%9e%84%e5%bb%ba">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>make localbuild &lt;span style="color:#75715e"># bin/IceFireDB for the host platform&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make run &lt;span style="color:#75715e"># go run . (development)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make run_dev &lt;span style="color:#75715e"># same, for a dev setup&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make clean &lt;span style="color:#75715e"># remove bin/ and installed copies&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>发布与交叉编译目标确实存在（&lt;code>make all&lt;/code>、&lt;code>make release&lt;/code>、&lt;code>make build-linux-*&lt;/code>），但在迭代代码时请用 &lt;code>run&lt;/code>/&lt;code>localbuild&lt;/code>——发布矩阵每次调用会构建五个 GOOS/GOARCH 变体。&lt;/p>
+&lt;p>二进制里嵌入了自己的 git revision 和构建时间：&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>go build -ldflags &lt;span style="color:#e6db74">&amp;#34;-X main.BuildVersion=&lt;/span>&lt;span style="color:#66d9ef">$(&lt;/span>git rev-parse --short HEAD&lt;span style="color:#66d9ef">)&lt;/span>&lt;span style="color:#e6db74"> -X main.BuildDate=&lt;/span>&lt;span style="color:#66d9ef">$(&lt;/span>date &lt;span style="color:#e6db74">&amp;#39;+%F %T&amp;#39;&lt;/span>&lt;span style="color:#66d9ef">)&lt;/span>&lt;span style="color:#e6db74">&amp;#34;&lt;/span> -o bin/IceFireDB .
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>&lt;code>-h&lt;/code> 会显示版本，并且在设置了 &lt;code>BuildVersion&lt;/code> 时把它写进 banner。&lt;/p>
+&lt;h2 id="测试套件">
+ 测试套件
+ &lt;a class="anchor" href="#%e6%b5%8b%e8%af%95%e5%a5%97%e4%bb%b6">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">跑什么&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>make test&lt;/code> / &lt;code>go test ./...&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">单元测试，遵循 &lt;code>DRIVER&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>DRIVER=goleveldb make test-compat&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">RESP 兼容性套件，&lt;code>-tags alltest&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>make test-integration&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">先构建二进制，再跑崩溃恢复和多节点 Raft 故障切换测试（&lt;code>-tags integration&lt;/code>）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>make test-partition&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">基于 Docker 的脑裂测试：3 个节点，主节点被切断网络（&lt;code>-tags partition&lt;/code>）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>make soak&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">对 3 节点集群施加持续负载；&lt;code>SOAK_DURATION&lt;/code>、&lt;code>SOAK_WORKERS&lt;/code>、&lt;code>SOAK_CHAOS=1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>DRIVER&lt;/code> 选择测试所针对的存储驱动（Makefile 的默认值是 &lt;code>badger&lt;/code>）：&lt;/p></description></item><item><title>基准测试</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/</guid><description>&lt;h1 id="基准测试">
+ 基准测试
+ &lt;a class="anchor" href="#%e5%9f%ba%e5%87%86%e6%b5%8b%e8%af%95">#&lt;/a>
+&lt;/h1>
+&lt;p>本页讲的是&lt;strong>怎么&lt;/strong>测量这个引擎。它刻意不含任何性能数字：一个数字如果没带上产生它的 commit、硬件、存储驱动和 flag，就只是噪声。&lt;/p>
+&lt;h2 id="能用的压测工具">
+ 能用的压测工具
+ &lt;a class="anchor" href="#%e8%83%bd%e7%94%a8%e7%9a%84%e5%8e%8b%e6%b5%8b%e5%b7%a5%e5%85%b7">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>redis-benchmark&lt;/code> 和 &lt;code>memtier_benchmark&lt;/code> 都能用，因为线上协议就是 RESP。&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># baseline: one connection per request, no pipeline&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-benchmark -h 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span> -t set,get -n &lt;span style="color:#ae81ff">200000&lt;/span> -c &lt;span style="color:#ae81ff">50&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># pipelined&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-benchmark -h 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span> -t set,get -n &lt;span style="color:#ae81ff">1000000&lt;/span> -c &lt;span style="color:#ae81ff">50&lt;/span> -P &lt;span style="color:#ae81ff">16&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># mixed, with memtier&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>memtier_benchmark -s 127.0.0.1 -p &lt;span style="color:#ae81ff">11001&lt;/span> --protocol&lt;span style="color:#f92672">=&lt;/span>redis &lt;span style="color:#ae81ff">\
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#ae81ff">&lt;/span> --clients&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#ae81ff">50&lt;/span> --threads&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#ae81ff">4&lt;/span> --ratio&lt;span style="color:#f92672">=&lt;/span>1:1 --test-time&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#ae81ff">120&lt;/span> --key-pattern&lt;span style="color:#f92672">=&lt;/span>S:S
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>它们&lt;strong>不会&lt;/strong>覆盖到的部分：&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">未覆盖&lt;/th>
+ &lt;th style="text-align: left">原因&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SCAN&lt;/code>/&lt;code>XSCAN&lt;/code> 分页&lt;/td>
+ &lt;td style="text-align: left">没有内置负载；用脚本驱动&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">集群重定向&lt;/td>
+ &lt;td style="text-align: left">压测直接打主节点，否则错误计数里会出现 &lt;code>-MOVED&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">TTL 过期压力&lt;/td>
+ &lt;td style="text-align: left">给 &lt;code>SET&lt;/code> 负载加上 &lt;code>EX&lt;/code>，然后观察 &lt;code>INFO Store&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Raft 应用延迟&lt;/td>
+ &lt;td style="text-align: left">写命令在多数派确认后才应答；增加节点才能看出差值&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="必须保持恒定的项">
+ 必须保持恒定的项
+ &lt;a class="anchor" href="#%e5%bf%85%e9%a1%bb%e4%bf%9d%e6%8c%81%e6%81%92%e5%ae%9a%e7%9a%84%e9%a1%b9">#&lt;/a>
+&lt;/h2>
+&lt;p>任何结果都要连同下面这些一起记录，否则数字不可比较：&lt;/p></description></item><item><title>生态</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/</guid><description>&lt;h1 id="生态库与组件">
+ 生态库与组件
+ &lt;a class="anchor" href="#%e7%94%9f%e6%80%81%e5%ba%93%e4%b8%8e%e7%bb%84%e4%bb%b6">#&lt;/a>
+&lt;/h1>
+&lt;p>引擎只是其中一块。下面是它周围的库和服务，全部在同一个 GitHub 组织下。&lt;/p>
+&lt;h2 id="存储驱动使用的库">
+ 存储驱动使用的库
+ &lt;a class="anchor" href="#%e5%ad%98%e5%82%a8%e9%a9%b1%e5%8a%a8%e4%bd%bf%e7%94%a8%e7%9a%84%e5%ba%93">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">项目&lt;/th>
+ &lt;th style="text-align: left">使用者&lt;/th>
+ &lt;th style="text-align: left">作用&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/icefiredb-crdt-kv">&lt;code>icefiredb-crdt-kv&lt;/code>&lt;/a>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>driver/crdt&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">基于 libp2p pubsub 的 CRDT 键/值存储；无需协调即可合并并发写入&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/icefiredb-ipfs-log">&lt;code>icefiredb-ipfs-log&lt;/code>&lt;/a>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>driver/ipfs-log&lt;/code>、&lt;code>driver/ipfs-synckv&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">面向分布式系统的不可变、基于操作的只追加日志，存于 IPFS，并通过 pubsub 合并&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/uhaha">&lt;code>IceFireDB/uhaha&lt;/code>&lt;/a>（fork）&lt;/td>
+ &lt;td style="text-align: left">本二进制&lt;/td>
+ &lt;td style="text-align: left">Raft 应用框架：RESP 服务器、日志、快照、&lt;code>RAFT&lt;/code>/&lt;code>CLUSTER&lt;/code> 命令&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">
+ &lt;a href="https://github.com/IceFireDB/ledisdb">&lt;code>IceFireDB/ledisdb&lt;/code>&lt;/a>（fork）&lt;/td>
+ &lt;td style="text-align: left">本二进制&lt;/td>
+ &lt;td style="text-align: left">数据模型：按类型的键空间、TTL、编码&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>其中两个是 fork，通过 &lt;code>replace&lt;/code> 指令固定在 &lt;code>go.mod&lt;/code> 里。更新它们的 vendor 代码就是改变引擎的行为，所以 &lt;code>go mod vendor&lt;/code> 产生的 diff 值得认真审查。&lt;/p>
+&lt;h2 id="本仓库中的服务">
+ 本仓库中的服务
+ &lt;a class="anchor" href="#%e6%9c%ac%e4%bb%93%e5%ba%93%e4%b8%ad%e7%9a%84%e6%9c%8d%e5%8a%a1">#&lt;/a>
+&lt;/h2>
+&lt;h3 id="icefiredb-pubsub">
+ IceFireDB-PubSub
+ &lt;a class="anchor" href="#icefiredb-pubsub">#&lt;/a>
+&lt;/h3>
+&lt;p>在 libp2p 网络上提供 Redis 发布/订阅协议。客户端照旧使用 &lt;code>SUBSCRIBE&lt;/code>/&lt;code>PUBLISH&lt;/code>；服务器把消息在对等节点之间传播，包括 NAT 后面的节点。&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>cd IceFireDB-PubSub
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>make
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB-PubSub -c ./config/config.yaml &lt;span style="color:#75715e"># proxy.local_port: 16379&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-cli -p &lt;span style="color:#ae81ff">16379&lt;/span> SUBSCRIBE name
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-cli -p &lt;span style="color:#ae81ff">16379&lt;/span> PUBLISH name hello
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>配置在 &lt;code>config/config.yaml&lt;/code>：&lt;code>proxy.local_port&lt;/code>、&lt;code>p2p.*&lt;/code>（发现 id、命令 topic、模式、host ip/port）、
+&lt;code>pprof_debug&lt;/code>、&lt;code>log.level&lt;/code>、&lt;code>ip_white_list&lt;/code>、&lt;code>cache&lt;/code>、&lt;code>ignore_cmd&lt;/code>。见
+
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/icefiredb-pubsub/">IceFireDB-PubSub&lt;/a>。&lt;/p></description></item></channel></rss>

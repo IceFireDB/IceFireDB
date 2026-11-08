@@ -1,0 +1,92 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  存储层
+  #
+
+命令处理器之下是 ledis：一个把五种 Redis 类型转换成单个 driver.IDB 上的键/值操作的数据模型。这也是同一组命令既能作用于本地 LevelDB 文件、又能作用于 IPFS 的原因。
+
+  按类型的键空间
+  #
+
+ledis 不存&#34;带类型的键&#34;。它按类型存彼此独立的物理键，每个都带一个类型字节前缀：
+
+  
+      
+          类型
+          前缀字节
+          每个逻辑键对应的物理键
+      
+  
+  
+      
+          字符串
+          KVType
+          值本身
+      
+      
+          哈希
+          HashType、HSizeType
+          每个字段一条记录 + 一个大小计数器
+      
+      
+          列表
+          ListType、LMetaType
+          每个索引一条记录 + 一条元数据记录（head/tail/size）
+      
+      
+          集合
+          SetType、SSizeType
+          每个成员一条记录 + 一个大小计数器
+      
+      
+          有序集合
+          ZSetType、ZSizeType、ZScoreType
+          每个成员一条记录 + 大小计数器 + 每个（分值，成员）一条索引记录
+      
+  
+
+过期时间也是独立记录（ExpMetaType、ExpTimeType），所以 TTL 属于设置它的那个类型，而不属于键名。
+从客户端就能观察到的后果：
+
+同一名称下可以并存两种类型（见
+  兼容性）。
+SCAN 必须遍历五个键空间；它的游标里带五个子游标。
+删除哈希（HCLEAR）会移除很多物理键；DEL 只移除字符串那一条。
+
+
+  物理键编码
+  #
+
+复合键采用长度前缀加分隔符，而不是哈希：
+hash:   [index][HashType][uint16 keyLen][key][':'][field]
+list:   [index][ListType][uint16 keyLen][key][uint32 index]
+zset:   [index][ZScoreType][uint16 keyLen][key][sep][score][member]
+有序集合的 sep 按分值符号取两个字节之一，因此索引的字节序与分值的数值序一致——这正是 ZRANGEBYSCORE 能做成范围扫描而不是全量排序的原因。成员记录按编码后的键排序，所以 SMEMBERS/HKEYS 的返回顺序是存储顺序，而不是插入顺序。"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="存储"><meta property="og:description" content=" 存储层 # 命令处理器之下是 ledis：一个把五种 Redis 类型转换成单个 driver.IDB 上的键/值操作的数据模型。这也是同一组命令既能作用于本地 LevelDB 文件、又能作用于 IPFS 的原因。
+按类型的键空间 # ledis 不存&#34;带类型的键&#34;。它按类型存彼此独立的物理键，每个都带一个类型字节前缀：
+类型 前缀字节 每个逻辑键对应的物理键 字符串 KVType 值本身 哈希 HashType、HSizeType 每个字段一条记录 + 一个大小计数器 列表 ListType、LMetaType 每个索引一条记录 + 一条元数据记录（head/tail/size） 集合 SetType、SSizeType 每个成员一条记录 + 一个大小计数器 有序集合 ZSetType、ZSizeType、ZScoreType 每个成员一条记录 + 大小计数器 + 每个（分值，成员）一条索引记录 过期时间也是独立记录（ExpMetaType、ExpTimeType），所以 TTL 属于设置它的那个类型，而不属于键名。
+从客户端就能观察到的后果：
+同一名称下可以并存两种类型（见 兼容性）。 SCAN 必须遍历五个键空间；它的游标里带五个子游标。 删除哈希（HCLEAR）会移除很多物理键；DEL 只移除字符串那一条。 物理键编码 # 复合键采用长度前缀加分隔符，而不是哈希：
+hash: [index][HashType][uint16 keyLen][key][':'][field] list: [index][ListType][uint16 keyLen][key][uint32 index] zset: [index][ZScoreType][uint16 keyLen][key][sep][score][member] 有序集合的 sep 按分值符号取两个字节之一，因此索引的字节序与分值的数值序一致——这正是 ZRANGEBYSCORE 能做成范围扫描而不是全量排序的原因。成员记录按编码后的键排序，所以 SMEMBERS/HKEYS 的返回顺序是存储顺序，而不是插入顺序。"><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="architecture"><title>存储 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/ title=Storage><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle checked>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/ class=active>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>存储</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#按类型的键空间>按类型的键空间</a></li><li><a href=#物理键编码>物理键编码</a></li><li><a href=#在这里而不是在处理器里执行的限额>在这里而不是在处理器里执行的限额</a></li><li><a href=#过期时间>过期时间</a></li><li><a href=#存储驱动与持久性>存储驱动与持久性</a></li><li><a href=#这套设计为什么能成立>这套设计为什么能成立</a></li></ul></nav></aside></header><article class=markdown><h1 id=存储层>存储层
+<a class=anchor href=#%e5%ad%98%e5%82%a8%e5%b1%82>#</a></h1><p>命令处理器之下是 <strong>ledis</strong>：一个把五种 Redis 类型转换成单个 <code>driver.IDB</code> 上的键/值操作的数据模型。这也是同一组命令既能作用于本地 LevelDB 文件、又能作用于 IPFS 的原因。</p><h2 id=按类型的键空间>按类型的键空间
+<a class=anchor href=#%e6%8c%89%e7%b1%bb%e5%9e%8b%e7%9a%84%e9%94%ae%e7%a9%ba%e9%97%b4>#</a></h2><p>ledis 不存"带类型的键"。它按类型存彼此独立的物理键，每个都带一个类型字节前缀：</p><table><thead><tr><th style=text-align:left>类型</th><th style=text-align:left>前缀字节</th><th style=text-align:left>每个逻辑键对应的物理键</th></tr></thead><tbody><tr><td style=text-align:left>字符串</td><td style=text-align:left><code>KVType</code></td><td style=text-align:left>值本身</td></tr><tr><td style=text-align:left>哈希</td><td style=text-align:left><code>HashType</code>、<code>HSizeType</code></td><td style=text-align:left>每个字段一条记录 + 一个大小计数器</td></tr><tr><td style=text-align:left>列表</td><td style=text-align:left><code>ListType</code>、<code>LMetaType</code></td><td style=text-align:left>每个索引一条记录 + 一条元数据记录（head/tail/size）</td></tr><tr><td style=text-align:left>集合</td><td style=text-align:left><code>SetType</code>、<code>SSizeType</code></td><td style=text-align:left>每个成员一条记录 + 一个大小计数器</td></tr><tr><td style=text-align:left>有序集合</td><td style=text-align:left><code>ZSetType</code>、<code>ZSizeType</code>、<code>ZScoreType</code></td><td style=text-align:left>每个成员一条记录 + 大小计数器 + 每个（分值，成员）一条索引记录</td></tr></tbody></table><p>过期时间也是独立记录（<code>ExpMetaType</code>、<code>ExpTimeType</code>），所以 TTL 属于设置它的那个类型，而不属于键名。</p><p>从客户端就能观察到的后果：</p><ul><li>同一名称下可以并存两种类型（见
+<a href=/icefiredb_docs/zh/commands/compatibility/>兼容性</a>）。</li><li><code>SCAN</code> 必须遍历五个键空间；它的游标里带五个子游标。</li><li>删除哈希（<code>HCLEAR</code>）会移除很多物理键；<code>DEL</code> 只移除字符串那一条。</li></ul><h2 id=物理键编码>物理键编码
+<a class=anchor href=#%e7%89%a9%e7%90%86%e9%94%ae%e7%bc%96%e7%a0%81>#</a></h2><p>复合键采用长度前缀加分隔符，而不是哈希：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-text data-lang=text><span style=display:flex><span>hash:   [index][HashType][uint16 keyLen][key][&#39;:&#39;][field]
+</span></span><span style=display:flex><span>list:   [index][ListType][uint16 keyLen][key][uint32 index]
+</span></span><span style=display:flex><span>zset:   [index][ZScoreType][uint16 keyLen][key][sep][score][member]
+</span></span></code></pre></div><p>有序集合的 <code>sep</code> 按分值符号取两个字节之一，因此索引的字节序与分值的数值序一致——这正是 <code>ZRANGEBYSCORE</code> 能做成范围扫描而不是全量排序的原因。成员记录按编码后的键排序，所以 <code>SMEMBERS</code>/<code>HKEYS</code> 的返回顺序是存储顺序，而不是插入顺序。</p><h2 id=在这里而不是在处理器里执行的限额>在这里而不是在处理器里执行的限额
+<a class=anchor href=#%e5%9c%a8%e8%bf%99%e9%87%8c%e8%80%8c%e4%b8%8d%e6%98%af%e5%9c%a8%e5%a4%84%e7%90%86%e5%99%a8%e9%87%8c%e6%89%a7%e8%a1%8c%e7%9a%84%e9%99%90%e9%a2%9d>#</a></h2><table><thead><tr><th style=text-align:left>限制项</th><th style=text-align:left>取值</th><th style=text-align:left>错误</th></tr></thead><tbody><tr><td style=text-align:left>键大小</td><td style=text-align:left>1024 字节，不可为空</td><td style=text-align:left><code>invalid key size</code></td></tr><tr><td style=text-align:left>哈希字段大小</td><td style=text-align:left>1024 字节，不可为空</td><td style=text-align:left><code>invalid hash field size</code></td></tr><tr><td style=text-align:left>集合成员大小</td><td style=text-align:left>1024 字节</td><td style=text-align:left><code>invalid set member size</code></td></tr><tr><td style=text-align:left>有序集合成员大小</td><td style=text-align:left>1024 字节</td><td style=text-align:left><code>invalid zset member size</code></td></tr><tr><td style=text-align:left>值大小</td><td style=text-align:left>1 GiB</td><td style=text-align:left><code>invalid value size</code></td></tr><tr><td style=text-align:left>过期时间戳早于当前时间</td><td style=text-align:left>—</td><td style=text-align:left><code>invalid expire value</code></td></tr></tbody></table><p>这些来自 <code>vendor/github.com/ledisdb/ledisdb/ledis/const.go</code>；改它们就等于改 ledis。注意它们比 Redis 的 512 MB 值、几乎不限的键要严得多——1 KiB 的键预算才是大多数应用最先撞上的约束。</p><h2 id=过期时间>过期时间
+<a class=anchor href=#%e8%bf%87%e6%9c%9f%e6%97%b6%e9%97%b4>#</a></h2><ul><li>过期时间以<strong>整秒</strong>存储，并按类型分别记录。</li><li>时间戳由命令处理器按 Raft 时钟算出，再由 ledis 对照本地时钟校验；<code>&lt;= now</code> 的时间戳会被拒绝。</li><li>过期键是惰性/异步回收的，所以逻辑上已过期的键在另一个副本上仍可能被存在性检查看到。见
+<a href=/icefiredb_docs/zh/commands/compatibility/>兼容性</a>。</li><li><code>TTL</code>/<code>HTTL</code>/<code>LTTL</code>/<code>STTL</code> 用存储的时间戳减去本地时钟，&ldquo;无过期"和"已过期"都返回 <code>-1</code>。</li></ul><h2 id=存储驱动与持久性>存储驱动与持久性
+<a class=anchor href=#%e5%ad%98%e5%82%a8%e9%a9%b1%e5%8a%a8%e4%b8%8e%e6%8c%81%e4%b9%85%e6%80%a7>#</a></h2><p>驱动的接口约定刻意做得很小（见
+<a href=/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a>）。在它之上：</p><ul><li><strong>写命令</strong>先经过 ledis，再走驱动的 <code>Put</code>/<code>WriteBatch</code>；<code>--nosync</code> 关掉的是 Raft 日志层里每次写入的落盘同步，不是驱动里的。</li><li><strong>压实（compaction）</strong> 交给驱动（<code>Compact()</code>）；对 <code>goleveldb</code>/<code>badger</code> 就是普通的 LSM 压实，对 <code>crdt</code>/<code>ipfs-log</code> 则是空操作。</li><li><strong>快照</strong>遍历驱动，在 gzip 容器里以 <code>sds</code> 格式流式输出键/值对，因此与具体驱动无关——见
+<a href=/icefiredb_docs/zh/deploy/operations/>运维</a>。</li></ul><h2 id=这套设计为什么能成立>这套设计为什么能成立
+<a class=anchor href=#%e8%bf%99%e5%a5%97%e8%ae%be%e8%ae%a1%e4%b8%ba%e4%bb%80%e4%b9%88%e8%83%bd%e6%88%90%e7%ab%8b>#</a></h2><p>命令层从不假定具体存储。它向 ledis 要操作（<code>HSet</code>、<code>LPush</code>、<code>ZRangeByScore</code> 等），由 ledis 把它们映射成带前缀的键操作。让这个引擎成为<em>数据库</em>的一切——结构、顺序、过期——都活在这层映射里，所以新的存储驱动只需要是一个正确的有序 KV 存储。</p><p>代价落在边角上：没有跨类型原子性、O(n) 的列表重建、基于名字的扫描游标，以及 1024 字节的键预算。这些都被当作局限记录下来，而不是糊过去。</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#按类型的键空间>按类型的键空间</a></li><li><a href=#物理键编码>物理键编码</a></li><li><a href=#在这里而不是在处理器里执行的限额>在这里而不是在处理器里执行的限额</a></li><li><a href=#过期时间>过期时间</a></li><li><a href=#存储驱动与持久性>存储驱动与持久性</a></li><li><a href=#这套设计为什么能成立>这套设计为什么能成立</a></li></ul></nav></div></aside></main></body></html>

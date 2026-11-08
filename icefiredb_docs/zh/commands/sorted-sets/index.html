@@ -1,0 +1,148 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  有序集合
+  #
+
+15 条命令。分值类型是 64 位整数，不是双精度浮点 —— 这是唯一会改变查询结果、而不只是线格式的差异。
+
+  
+      
+          命令
+          读写
+          语法
+          返回
+          示例 → 回复
+      
+  
+  
+      
+          ZADD
+          W
+          ZADD KEY score MEMBER [score MEMBER ...]
+          integer 新增成员数
+          ZADD board 100 ada 90 bob → 2
+      
+      
+          ZINCRBY
+          R ⚠
+          ZINCRBY KEY increment MEMBER
+          bulk 新分值
+          ZINCRBY board 5 ada → 105
+      
+      
+          ZREM
+          W
+          ZREM KEY MEMBER [MEMBER ...]
+          integer 删除成员数
+          ZREM board bob → 1
+      
+      
+          ZCARD
+          R
+          ZCARD KEY
+          integer 基数
+          ZCARD board → 1
+      
+      
+          ZCOUNT
+          R
+          ZCOUNT KEY min max
+          integer 分值区间内的成员数
+          ZCOUNT board 0 200 → 1
+      
+      
+          ZSCORE
+          R
+          ZSCORE KEY MEMBER
+          bulk 分值，缺失为 null
+          ZSCORE board ada → 105
+      
+      
+          ZRANK
+          R
+          ZRANK KEY MEMBER
+          integer 升序排名（0 起），缺失为 null
+          ZRANK board ada → 0
+      
+      
+          ZREVRANK
+          R
+          ZREVRANK KEY MEMBER
+          integer 降序排名，缺失为 null
+          ZREVRANK board ada → 0
+      
+      
+          ZRANGE
+          R
+          ZRANGE KEY start stop [WITHSCORES]
+          array 成员（及分值）
+          ZRANGE board 0 -1 WITHSCORES → [ada, 105]
+      
+      
+          ZREVRANGE
+          R
+          ZREVRANGE KEY start stop [WITHSCORES]
+          array 成员（及分值）
+          ZREVRANGE board 0 0 → [ada]
+      
+      
+          ZRANGEBYSCORE
+          R
+          ZRANGEBYSCORE KEY min max [WITHSCORES]
+          array 成员（及分值）
+          ZRANGEBYSCORE board 100 200 → [ada]
+      
+      
+          ZREVRANGEBYSCORE
+          R
+          ZREVRANGEBYSCORE KEY max min [WITHSCORES]
+          array 成员（及分值）
+          ZREVRANGEBYSCORE board 200 100 → [ada]
+      
+      
+          ZREMRANGEBYRANK
+          R ⚠
+          ZREMRANGEBYRANK KEY start stop
+          integer 删除成员数
+          ZREMRANGEBYRANK board 0 0 → 1
+      
+      
+          ZREMRANGEBYSCORE
+          R ⚠
+          ZREMRANGEBYSCORE KEY min max
+          integer 删除成员数
+          ZREMRANGEBYSCORE board 0 50 → 0
+      
+      
+          ZCLEAR
+          W
+          ZCLEAR KEY
+          integer 删除成员数
+          ZCLEAR board → 1
+      
+  
+
+
+  说明
+  #
+
+
+⚠ ZINCRBY、ZREMRANGEBYRANK 和 ZREMRANGEBYSCORE 被注册为读命令，尽管它们会修改数据。本地执行无害；在集群中它们的影响不会被复制，也无法在 leader 切换后存活。修复前：在客户端算好分值并用 ZADD 写入，用 ZREM 删除成员。
+有序集合没有 TTL。 没有 ZEXPIRE/ZTTL；请清理并重建键（ZCLEAR），或把过期记账放在一个字符串键里。
+分值按 int64 解析。像 1.5 这样的浮点分值会被拒绝；WITHSCORES 返回整数。
+ZRANGEBYSCORE min max 两端都是闭区间；ZREVRANGEBYSCORE max min 的参数顺序相反，与 Redis 一致。
+成员缺失时，ZRANK/ZREVRANK 返回 null，ZSCORE 同理。
+所有区间读取都按分值排序，分值相同时再按成员排序。
+"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="有序集合"><meta property="og:description" content=" 有序集合 # 15 条命令。分值类型是 64 位整数，不是双精度浮点 —— 这是唯一会改变查询结果、而不只是线格式的差异。
+命令 读写 语法 返回 示例 → 回复 ZADD W ZADD KEY score MEMBER [score MEMBER ...] integer 新增成员数 ZADD board 100 ada 90 bob → 2 ZINCRBY R ⚠ ZINCRBY KEY increment MEMBER bulk 新分值 ZINCRBY board 5 ada → 105 ZREM W ZREM KEY MEMBER [MEMBER ...] integer 删除成员数 ZREM board bob → 1 ZCARD R ZCARD KEY integer 基数 ZCARD board → 1 ZCOUNT R ZCOUNT KEY min max integer 分值区间内的成员数 ZCOUNT board 0 200 → 1 ZSCORE R ZSCORE KEY MEMBER bulk 分值，缺失为 null ZSCORE board ada → 105 ZRANK R ZRANK KEY MEMBER integer 升序排名（0 起），缺失为 null ZRANK board ada → 0 ZREVRANK R ZREVRANK KEY MEMBER integer 降序排名，缺失为 null ZREVRANK board ada → 0 ZRANGE R ZRANGE KEY start stop [WITHSCORES] array 成员（及分值） ZRANGE board 0 -1 WITHSCORES → [ada, 105] ZREVRANGE R ZREVRANGE KEY start stop [WITHSCORES] array 成员（及分值） ZREVRANGE board 0 0 → [ada] ZRANGEBYSCORE R ZRANGEBYSCORE KEY min max [WITHSCORES] array 成员（及分值） ZRANGEBYSCORE board 100 200 → [ada] ZREVRANGEBYSCORE R ZREVRANGEBYSCORE KEY max min [WITHSCORES] array 成员（及分值） ZREVRANGEBYSCORE board 200 100 → [ada] ZREMRANGEBYRANK R ⚠ ZREMRANGEBYRANK KEY start stop integer 删除成员数 ZREMRANGEBYRANK board 0 0 → 1 ZREMRANGEBYSCORE R ⚠ ZREMRANGEBYSCORE KEY min max integer 删除成员数 ZREMRANGEBYSCORE board 0 50 → 0 ZCLEAR W ZCLEAR KEY integer 删除成员数 ZCLEAR board → 1 说明 # ⚠ ZINCRBY、ZREMRANGEBYRANK 和 ZREMRANGEBYSCORE 被注册为读命令，尽管它们会修改数据。本地执行无害；在集群中它们的影响不会被复制，也无法在 leader 切换后存活。修复前：在客户端算好分值并用 ZADD 写入，用 ZREM 删除成员。 有序集合没有 TTL。 没有 ZEXPIRE/ZTTL；请清理并重建键（ZCLEAR），或把过期记账放在一个字符串键里。 分值按 int64 解析。像 1.5 这样的浮点分值会被拒绝；WITHSCORES 返回整数。 ZRANGEBYSCORE min max 两端都是闭区间；ZREVRANGEBYSCORE max min 的参数顺序相反，与 Redis 一致。 成员缺失时，ZRANK/ZREVRANK 返回 null，ZSCORE 同理。 所有区间读取都按分值排序，分值相同时再按成员排序。 "><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="commands"><title>有序集合 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/ title="Sorted sets"><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle checked>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/ class=active>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>有序集合</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#说明>说明</a></li></ul></nav></aside></header><article class=markdown><h1 id=有序集合>有序集合
+<a class=anchor href=#%e6%9c%89%e5%ba%8f%e9%9b%86%e5%90%88>#</a></h1><p>15 条命令。分值类型是 <strong>64 位整数</strong>，不是双精度浮点 —— 这是唯一会改变查询结果、而不只是线格式的差异。</p><table><thead><tr><th style=text-align:left>命令</th><th style=text-align:left>读写</th><th style=text-align:left>语法</th><th style=text-align:left>返回</th><th style=text-align:left>示例 → 回复</th></tr></thead><tbody><tr><td style=text-align:left><code>ZADD</code></td><td style=text-align:left>W</td><td style=text-align:left><code>ZADD KEY score MEMBER [score MEMBER ...]</code></td><td style=text-align:left><code>integer</code> 新增成员数</td><td style=text-align:left><code>ZADD board 100 ada 90 bob</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>ZINCRBY</code></td><td style=text-align:left>R ⚠</td><td style=text-align:left><code>ZINCRBY KEY increment MEMBER</code></td><td style=text-align:left><code>bulk</code> 新分值</td><td style=text-align:left><code>ZINCRBY board 5 ada</code> → <code>105</code></td></tr><tr><td style=text-align:left><code>ZREM</code></td><td style=text-align:left>W</td><td style=text-align:left><code>ZREM KEY MEMBER [MEMBER ...]</code></td><td style=text-align:left><code>integer</code> 删除成员数</td><td style=text-align:left><code>ZREM board bob</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>ZCARD</code></td><td style=text-align:left>R</td><td style=text-align:left><code>ZCARD KEY</code></td><td style=text-align:left><code>integer</code> 基数</td><td style=text-align:left><code>ZCARD board</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>ZCOUNT</code></td><td style=text-align:left>R</td><td style=text-align:left><code>ZCOUNT KEY min max</code></td><td style=text-align:left><code>integer</code> 分值区间内的成员数</td><td style=text-align:left><code>ZCOUNT board 0 200</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>ZSCORE</code></td><td style=text-align:left>R</td><td style=text-align:left><code>ZSCORE KEY MEMBER</code></td><td style=text-align:left><code>bulk</code> 分值，缺失为 <code>null</code></td><td style=text-align:left><code>ZSCORE board ada</code> → <code>105</code></td></tr><tr><td style=text-align:left><code>ZRANK</code></td><td style=text-align:left>R</td><td style=text-align:left><code>ZRANK KEY MEMBER</code></td><td style=text-align:left><code>integer</code> 升序排名（0 起），缺失为 <code>null</code></td><td style=text-align:left><code>ZRANK board ada</code> → <code>0</code></td></tr><tr><td style=text-align:left><code>ZREVRANK</code></td><td style=text-align:left>R</td><td style=text-align:left><code>ZREVRANK KEY MEMBER</code></td><td style=text-align:left><code>integer</code> 降序排名，缺失为 <code>null</code></td><td style=text-align:left><code>ZREVRANK board ada</code> → <code>0</code></td></tr><tr><td style=text-align:left><code>ZRANGE</code></td><td style=text-align:left>R</td><td style=text-align:left><code>ZRANGE KEY start stop [WITHSCORES]</code></td><td style=text-align:left><code>array</code> 成员（及分值）</td><td style=text-align:left><code>ZRANGE board 0 -1 WITHSCORES</code> → <code>[ada, 105]</code></td></tr><tr><td style=text-align:left><code>ZREVRANGE</code></td><td style=text-align:left>R</td><td style=text-align:left><code>ZREVRANGE KEY start stop [WITHSCORES]</code></td><td style=text-align:left><code>array</code> 成员（及分值）</td><td style=text-align:left><code>ZREVRANGE board 0 0</code> → <code>[ada]</code></td></tr><tr><td style=text-align:left><code>ZRANGEBYSCORE</code></td><td style=text-align:left>R</td><td style=text-align:left><code>ZRANGEBYSCORE KEY min max [WITHSCORES]</code></td><td style=text-align:left><code>array</code> 成员（及分值）</td><td style=text-align:left><code>ZRANGEBYSCORE board 100 200</code> → <code>[ada]</code></td></tr><tr><td style=text-align:left><code>ZREVRANGEBYSCORE</code></td><td style=text-align:left>R</td><td style=text-align:left><code>ZREVRANGEBYSCORE KEY max min [WITHSCORES]</code></td><td style=text-align:left><code>array</code> 成员（及分值）</td><td style=text-align:left><code>ZREVRANGEBYSCORE board 200 100</code> → <code>[ada]</code></td></tr><tr><td style=text-align:left><code>ZREMRANGEBYRANK</code></td><td style=text-align:left>R ⚠</td><td style=text-align:left><code>ZREMRANGEBYRANK KEY start stop</code></td><td style=text-align:left><code>integer</code> 删除成员数</td><td style=text-align:left><code>ZREMRANGEBYRANK board 0 0</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>ZREMRANGEBYSCORE</code></td><td style=text-align:left>R ⚠</td><td style=text-align:left><code>ZREMRANGEBYSCORE KEY min max</code></td><td style=text-align:left><code>integer</code> 删除成员数</td><td style=text-align:left><code>ZREMRANGEBYSCORE board 0 50</code> → <code>0</code></td></tr><tr><td style=text-align:left><code>ZCLEAR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>ZCLEAR KEY</code></td><td style=text-align:left><code>integer</code> 删除成员数</td><td style=text-align:left><code>ZCLEAR board</code> → <code>1</code></td></tr></tbody></table><h2 id=说明>说明
+<a class=anchor href=#%e8%af%b4%e6%98%8e>#</a></h2><ul><li><strong>⚠ <code>ZINCRBY</code>、<code>ZREMRANGEBYRANK</code> 和 <code>ZREMRANGEBYSCORE</code> 被注册为读命令</strong>，尽管它们会修改数据。本地执行无害；在集群中它们的影响不会被复制，也无法在 leader 切换后存活。修复前：在客户端算好分值并用 <code>ZADD</code> 写入，用 <code>ZREM</code> 删除成员。</li><li><strong>有序集合没有 TTL。</strong> 没有 <code>ZEXPIRE</code>/<code>ZTTL</code>；请清理并重建键（<code>ZCLEAR</code>），或把过期记账放在一个字符串键里。</li><li>分值按 <code>int64</code> 解析。像 <code>1.5</code> 这样的浮点分值会被拒绝；<code>WITHSCORES</code> 返回整数。</li><li><code>ZRANGEBYSCORE min max</code> 两端都是闭区间；<code>ZREVRANGEBYSCORE max min</code> 的参数顺序相反，与 Redis 一致。</li><li>成员缺失时，<code>ZRANK</code>/<code>ZREVRANK</code> 返回 <code>null</code>，<code>ZSCORE</code> 同理。</li><li>所有区间读取都按分值排序，分值相同时再按成员排序。</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#说明>说明</a></li></ul></nav></div></aside></main></body></html>

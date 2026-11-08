@@ -1,0 +1,131 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  存储驱动
+  #
+
+--storage-backend <name> 选择位于 ledis 数据模型之下的驱动。命令层是针对 store.driver.IDB
+编写的，所以同一套命令在每个后端上都能跑——变的是字节存放在哪里、由谁复制它们，以及这个驱动能信到
+什么程度。
+type IDB interface {
+    Close() error
+    Get(key []byte) ([]byte, error)
+    Put(key []byte, value []byte) error
+    Delete(key []byte) error
+    SyncPut(key []byte, value []byte) error
+    SyncDelete(key []byte) error
+    NewIterator() IIterator
+    NewWriteBatch() IWriteBatch
+    NewSnapshot() (ISnapshot, error)
+    Compact() error
+    GetStorageEngine() interface{}
+}
+
+  每个后端是什么
+  #
+
+
+  
+      
+          --storage-backend
+          数据在哪
+          复制方式
+          外部依赖
+      
+  
+  
+      
+          goleveldb （默认）
+          本地 LevelDB（纯 Go）
+          仅 Raft
+          —
+      
+      
+          badger
+          本地 BadgerDB v4，ZSTD 压缩
+          仅 Raft
+          —
+      
+      
+          hybriddb
+          本地 LevelDB + Ristretto 热缓存，按驱动暴露指标
+          仅 Raft
+          —
+      
+      
+          oss
+          S3 兼容对象存储，本地 LevelDB 索引 + Ristretto 缓存
+          仅 Raft
+          S3/MinIO 端点
+      
+      
+          ipfs
+          本地 LevelDB，其值按 CID 从 IPFS 取回
+          仅 Raft
+          IPFS API（不是网关）
+      
+      
+          ipfs-synckv
+          IPFS 作为真值来源 + 本地镜像 + 版本元数据，可选 AES-256
+          IPFS/ipfs-log P2P
+          IPFS API + P2P
+      
+      
+          crdt
+          本地 Badger + 基于 libp2p pubsub 的 icefiredb-crdt-kv
+          P2P CRDT
+          libp2p 对等节点
+      
+      
+          ipfs-log
+          基于 IPFS pubsub 的只追加 icefiredb-ipfs-log 存储
+          P2P 日志
+          IPFS + P2P
+      
+  
+
+leveldb（cgo 驱动）和 orbitdb 没有被编译进二进制：前者从未被 import，后者在
+main.go/flags.go 里被注释掉。传入这两个名字中的任何一个都会在启动时报 &ldquo;unknown driver&rdquo;。"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="存储驱动"><meta property="og:description" content=" 存储驱动 # --storage-backend <name> 选择位于 ledis 数据模型之下的驱动。命令层是针对 store.driver.IDB 编写的，所以同一套命令在每个后端上都能跑——变的是字节存放在哪里、由谁复制它们，以及这个驱动能信到 什么程度。
+type IDB interface { Close() error Get(key []byte) ([]byte, error) Put(key []byte, value []byte) error Delete(key []byte) error SyncPut(key []byte, value []byte) error SyncDelete(key []byte) error NewIterator() IIterator NewWriteBatch() IWriteBatch NewSnapshot() (ISnapshot, error) Compact() error GetStorageEngine() interface{} } 每个后端是什么 # --storage-backend 数据在哪 复制方式 外部依赖 goleveldb （默认） 本地 LevelDB（纯 Go） 仅 Raft — badger 本地 BadgerDB v4，ZSTD 压缩 仅 Raft — hybriddb 本地 LevelDB + Ristretto 热缓存，按驱动暴露指标 仅 Raft — oss S3 兼容对象存储，本地 LevelDB 索引 + Ristretto 缓存 仅 Raft S3/MinIO 端点 ipfs 本地 LevelDB，其值按 CID 从 IPFS 取回 仅 Raft IPFS API（不是网关） ipfs-synckv IPFS 作为真值来源 + 本地镜像 + 版本元数据，可选 AES-256 IPFS/ipfs-log P2P IPFS API + P2P crdt 本地 Badger + 基于 libp2p pubsub 的 icefiredb-crdt-kv P2P CRDT libp2p 对等节点 ipfs-log 基于 IPFS pubsub 的只追加 icefiredb-ipfs-log 存储 P2P 日志 IPFS + P2P leveldb（cgo 驱动）和 orbitdb 没有被编译进二进制：前者从未被 import，后者在 main.go/flags.go 里被注释掉。传入这两个名字中的任何一个都会在启动时报 “unknown driver”。"><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="deploy"><title>存储驱动 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/ title="Storage backends"><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle checked>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/ class=active>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>存储驱动</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#每个后端是什么>每个后端是什么</a></li><li><a href=#如何选择>如何选择</a></li><li><a href=#各后端的配置>各后端的配置</a></li><li><a href=#你能得到和得不到的保证>你能得到和得不到的保证</a></li><li><a href=#按驱动看测试覆盖>按驱动看测试覆盖</a></li></ul></nav></aside></header><article class=markdown><h1 id=存储驱动>存储驱动
+<a class=anchor href=#%e5%ad%98%e5%82%a8%e9%a9%b1%e5%8a%a8>#</a></h1><p><code>--storage-backend &lt;name></code> 选择位于 ledis 数据模型之下的驱动。命令层是针对 <code>store.driver.IDB</code>
+编写的，所以同一套命令在每个后端上都能跑——变的是字节存放在哪里、由谁复制它们，以及这个驱动能信到
+什么程度。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>IDB</span> <span style=color:#66d9ef>interface</span> {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Close</span>() <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Get</span>(<span style=color:#a6e22e>key</span> []<span style=color:#66d9ef>byte</span>) ([]<span style=color:#66d9ef>byte</span>, <span style=color:#66d9ef>error</span>)
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Put</span>(<span style=color:#a6e22e>key</span> []<span style=color:#66d9ef>byte</span>, <span style=color:#a6e22e>value</span> []<span style=color:#66d9ef>byte</span>) <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Delete</span>(<span style=color:#a6e22e>key</span> []<span style=color:#66d9ef>byte</span>) <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>SyncPut</span>(<span style=color:#a6e22e>key</span> []<span style=color:#66d9ef>byte</span>, <span style=color:#a6e22e>value</span> []<span style=color:#66d9ef>byte</span>) <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>SyncDelete</span>(<span style=color:#a6e22e>key</span> []<span style=color:#66d9ef>byte</span>) <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>NewIterator</span>() <span style=color:#a6e22e>IIterator</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>NewWriteBatch</span>() <span style=color:#a6e22e>IWriteBatch</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>NewSnapshot</span>() (<span style=color:#a6e22e>ISnapshot</span>, <span style=color:#66d9ef>error</span>)
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>Compact</span>() <span style=color:#66d9ef>error</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>GetStorageEngine</span>() <span style=color:#66d9ef>interface</span>{}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h2 id=每个后端是什么>每个后端是什么
+<a class=anchor href=#%e6%af%8f%e4%b8%aa%e5%90%8e%e7%ab%af%e6%98%af%e4%bb%80%e4%b9%88>#</a></h2><table><thead><tr><th style=text-align:left><code>--storage-backend</code></th><th style=text-align:left>数据在哪</th><th style=text-align:left>复制方式</th><th style=text-align:left>外部依赖</th></tr></thead><tbody><tr><td style=text-align:left><code>goleveldb</code> <em>（默认）</em></td><td style=text-align:left>本地 LevelDB（纯 Go）</td><td style=text-align:left>仅 Raft</td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>badger</code></td><td style=text-align:left>本地 BadgerDB v4，ZSTD 压缩</td><td style=text-align:left>仅 Raft</td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>hybriddb</code></td><td style=text-align:left>本地 LevelDB + Ristretto 热缓存，按驱动暴露指标</td><td style=text-align:left>仅 Raft</td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>oss</code></td><td style=text-align:left>S3 兼容对象存储，本地 LevelDB 索引 + Ristretto 缓存</td><td style=text-align:left>仅 Raft</td><td style=text-align:left>S3/MinIO 端点</td></tr><tr><td style=text-align:left><code>ipfs</code></td><td style=text-align:left>本地 LevelDB，其值按 CID 从 IPFS 取回</td><td style=text-align:left>仅 Raft</td><td style=text-align:left>IPFS API（不是网关）</td></tr><tr><td style=text-align:left><code>ipfs-synckv</code></td><td style=text-align:left>IPFS 作为真值来源 + 本地镜像 + 版本元数据，可选 AES-256</td><td style=text-align:left>IPFS/ipfs-log P2P</td><td style=text-align:left>IPFS API + P2P</td></tr><tr><td style=text-align:left><code>crdt</code></td><td style=text-align:left>本地 Badger + 基于 libp2p pubsub 的 <code>icefiredb-crdt-kv</code></td><td style=text-align:left>P2P CRDT</td><td style=text-align:left>libp2p 对等节点</td></tr><tr><td style=text-align:left><code>ipfs-log</code></td><td style=text-align:left>基于 IPFS pubsub 的只追加 <code>icefiredb-ipfs-log</code> 存储</td><td style=text-align:left>P2P 日志</td><td style=text-align:left>IPFS + P2P</td></tr></tbody></table><p><code>leveldb</code>（cgo 驱动）和 <code>orbitdb</code> <strong>没有</strong>被编译进二进制：前者从未被 import，后者在
+<code>main.go</code>/<code>flags.go</code> 里被注释掉。传入这两个名字中的任何一个都会在启动时报 &ldquo;unknown driver&rdquo;。</p><h2 id=如何选择>如何选择
+<a class=anchor href=#%e5%a6%82%e4%bd%95%e9%80%89%e6%8b%a9>#</a></h2><ul><li><strong>默认 / 大多数负载</strong> — <code>goleveldb</code>。纯 Go、无 cgo、内存可预测、无外部服务。</li><li><strong>写密集的本地负载</strong> — <code>badger</code>。注意该驱动打开时用的是很大的固定默认值（1 GB memtable、1 GB
+block cache、100 个 goroutine/compactor），所以主机规格要按此配置。</li><li><strong>能装进内存的读密集工作集</strong> — <code>hybriddb</code>。热层吸收读请求，该驱动会把 <code>read_operations</code>、
+<code>write_operations</code>、<code>bytes_read</code>、<code>errors</code> …… 注册进 <code>INFO</code>。</li><li><strong>必须比主机活得更久的数据</strong> — <code>oss</code>，配合 <code>--oss-endpoint</code>、<code>--oss-ak</code>、<code>--oss-sk</code>。每次写都
+进入对象存储，本地 LevelDB 索引让它仍然可寻址；本地磁盘要留着，因为索引在上面。</li><li><strong>多站点 / 去中心化</strong> — <code>ipfs-synckv</code> 或 <code>crdt</code>。两者都通过 libp2p pubsub 复制，用
+<code>--servicename</code>、<code>--nettopic</code>、<code>--datatopic</code> 配置（三者必须在所有节点上一致）。</li><li><strong>目前不能当通用后端用</strong> — <code>ipfs</code>。它的写路径把原始值存在本地，而读路径把存下来的字节当作 IPFS
+CID 去 <code>cat</code>，所以通过引擎写入的值取不回来。想要 IPFS 持久化就用 <code>ipfs-synckv</code>。</li></ul><h2 id=各后端的配置>各后端的配置
+<a class=anchor href=#%e5%90%84%e5%90%8e%e7%ab%af%e7%9a%84%e9%85%8d%e7%bd%ae>#</a></h2><table><thead><tr><th style=text-align:left>后端</th><th style=text-align:left>参数</th><th style=text-align:left>默认值</th></tr></thead><tbody><tr><td style=text-align:left><code>ipfs</code>、<code>ipfs-synckv</code></td><td style=text-align:left><code>--ipfs-endpoint</code></td><td style=text-align:left><code>http://localhost:5001</code>（API 端口，不是 <code>8080</code> 网关）</td></tr><tr><td style=text-align:left><code>ipfs-synckv</code></td><td style=text-align:left><code>--ipfs-synckv-key</code></td><td style=text-align:left>空 → 不加密；32 字节的密钥启用 AES-256</td></tr><tr><td style=text-align:left><code>ipfs-log</code></td><td style=text-align:left><code>--ipfs-log-dbname</code>，或环境变量 <code>IPFS_LOG_DBNAME</code></td><td style=text-align:left><code>ifdb-event-kv-ipfs-log</code></td></tr><tr><td style=text-align:left><code>oss</code></td><td style=text-align:left><code>--oss-endpoint</code>、<code>--oss-ak</code>、<code>--oss-sk</code></td><td style=text-align:left><code>http://localhost:9000</code> + 占位凭据</td></tr><tr><td style=text-align:left><code>crdt</code>、<code>ipfs-log</code></td><td style=text-align:left><code>--servicename</code>、<code>--nettopic</code>、<code>--datatopic</code></td><td style=text-align:left><code>icefiredb</code>、<code>icefiredb-net</code>、<code>icefiredb-data</code></td></tr></tbody></table><p><code>oss</code>、<code>ipfs</code> 和 <code>ipfs-synckv</code> 的热缓存容量<strong>不能</strong>从命令行配置：它是驱动里的常量 1024 MB。见
+<a href=/icefiredb_docs/zh/deploy/configuration/#%e4%bc%9a%e6%89%93%e5%8d%b0%e5%87%ba%e6%9d%a5%e4%bd%86%e6%b2%a1%e6%9c%89%e6%8e%a5%e7%ba%bf%e7%9a%84-flag>配置</a>。</p><h2 id=你能得到和得不到的保证>你能得到和得不到的保证
+<a class=anchor href=#%e4%bd%a0%e8%83%bd%e5%be%97%e5%88%b0%e5%92%8c%e5%be%97%e4%b8%8d%e5%88%b0%e7%9a%84%e4%bf%9d%e8%af%81>#</a></h2><p><strong>你能得到</strong></p><ul><li>每个后端上相同的命令语义，包括按类型分离的键空间和按类型分离的过期时间。</li><li>与后端无关的 Raft 快照/恢复：<code>writeSnapshot</code> 遍历驱动的快照，在 gzip 文件里以 <code>sds</code> 格式流式写出键/值对，
+所以在 <code>badger</code> 上做的备份可以恢复到全新的 <code>goleveldb</code> 节点（见
+<a href=/icefiredb_docs/zh/deploy/operations/>运维</a>）。</li><li><code>hybriddb</code>、<code>ipfs</code>、<code>ipfs-synckv</code>、<code>oss</code> 在 <code>INFO</code> 中提供后端指标。</li></ul><p><strong>你得不到</strong></p><ul><li><strong>没有跨后端的磁盘格式兼容性。</strong> 不要为已有的数据目录更换 <code>--storage-backend</code>；这些格式互不相关。</li><li><strong>去中心化驱动上没有"空值"区分。</strong> 它们把"缺失"和"空"合并，所以空字符串读回来是 nil 回复。这一点
+在
+<a href=/icefiredb_docs/zh/commands/compatibility/>兼容性</a>中已固定。</li><li><strong>没有驱动级的重试或修复。</strong> 失败的写会作为命令错误暴露出来；在 P2P 驱动上，暂时不可达的对等节点
+表现为数据缺失，直到日志追上。</li></ul><h2 id=按驱动看测试覆盖>按驱动看测试覆盖
+<a class=anchor href=#%e6%8c%89%e9%a9%b1%e5%8a%a8%e7%9c%8b%e6%b5%8b%e8%af%95%e8%a6%86%e7%9b%96>#</a></h2><table><thead><tr><th style=text-align:left>驱动</th><th style=text-align:left>测试</th><th style=text-align:left>说明</th></tr></thead><tbody><tr><td style=text-align:left><code>goleveldb</code></td><td style=text-align:left>引擎级兼容测试套件（<code>DRIVER=goleveldb make test-compat</code>）</td><td style=text-align:left>经由 ledisdb</td></tr><tr><td style=text-align:left><code>badger</code></td><td style=text-align:left><code>driver/badger/db_test.go</code> + 引擎套件（默认 <code>DRIVER=badger</code>）</td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>hybriddb</code></td><td style=text-align:left><code>driver/hybriddb/{db,iterator,snapshot,write_batch}_test.go</code></td><td style=text-align:left>—</td></tr><tr><td style=text-align:left><code>ipfs-synckv</code></td><td style=text-align:left><code>driver/ipfs-synckv/{db,iterator,singularity}_test.go</code></td><td style=text-align:left>需要 IPFS 守护进程</td></tr><tr><td style=text-align:left><code>oss</code></td><td style=text-align:left><code>driver/oss/s3_test.go</code></td><td style=text-align:left>需要 S3/MinIO（CI 跑的是 localstack）</td></tr><tr><td style=text-align:left><code>ipfs</code>、<code>crdt</code>、<code>ipfs-log</code></td><td style=text-align:left>本仓库中没有单元测试</td><td style=text-align:left>只能对着真实对等节点手工验证</td></tr></tbody></table><p>那张表才是"支持"的诚实版本：没有测试的驱动照样可能能用，但它哪天不再能用时，CI 里没有任何东西会告诉
+你。</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#每个后端是什么>每个后端是什么</a></li><li><a href=#如何选择>如何选择</a></li><li><a href=#各后端的配置>各后端的配置</a></li><li><a href=#你能得到和得不到的保证>你能得到和得不到的保证</a></li><li><a href=#按驱动看测试覆盖>按驱动看测试覆盖</a></li></ul></nav></div></aside></main></body></html>

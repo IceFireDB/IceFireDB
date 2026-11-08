@@ -1,0 +1,109 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  常见问题
+  #
+
+
+  它能替代 Redis 吗？
+  #
+
+它使用 RESP 协议，实现了 110 条命令，其中大多数与 Redis 语义一致，因此 Redis 客户端无需改动即可连接。
+但它不是可以直接顶替 Redis 的实现：没有 WRONGTYPE，没有 SELECT，没有事务，没有阻塞命令，键名
+上限为 1024 字节，还有三条有序集合命令不参与复制。迁移任何你在意的数据之前，请先读
+
+  兼容性。
+
+  支持哪些命令？
+  #
+
+110 条数据命令，外加 RAFT/CLUSTER/MACHINE/BARRIER/AUTH 系统命令。完整清单在
+
+  命令参考，每种数据类型一页，附回复类型与限额。
+
+  为什么 INFO memory 会失败？
+  #
+
+因为在这个引擎里 INFO 不接受参数。请用 INFO，再从回复里解析出 # Mem 段。见
+
+  可观测性。
+
+  为什么没有 WRONGTYPE 错误？
+  #
+
+因为存储模型为每种数据类型保留一个键空间，所以一个键名可以同时存放字符串、哈希和列表，而类型不符的
+命令是在该类型自己的视图上执行。同样也没有 TYPE 命令，所以类型安全是应用自己的责任。这一点由
+compat_test.go 锁定。
+
+  为什么我在 Go/Python 里的 HSCAN 会报解析错误？
+  #
+
+因为 HSCAN/SSCAN/ZSCAN 用最后一个字段名或成员名作为游标，而不是数字，而各客户端的类型化
+助手会把游标强制转成 int。请改用通用命令接口（Do、execute_command）。SCAN 自己的游标是不
+透明的 base64，配合 Scan 风格的助手没有问题。见
+  扫描。"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="常见问题"><meta property="og:description" content=" 常见问题 # 它能替代 Redis 吗？ # 它使用 RESP 协议，实现了 110 条命令，其中大多数与 Redis 语义一致，因此 Redis 客户端无需改动即可连接。 但它不是可以直接顶替 Redis 的实现：没有 WRONGTYPE，没有 SELECT，没有事务，没有阻塞命令，键名 上限为 1024 字节，还有三条有序集合命令不参与复制。迁移任何你在意的数据之前，请先读 兼容性。
+支持哪些命令？ # 110 条数据命令，外加 RAFT/CLUSTER/MACHINE/BARRIER/AUTH 系统命令。完整清单在 命令参考，每种数据类型一页，附回复类型与限额。
+为什么 INFO memory 会失败？ # 因为在这个引擎里 INFO 不接受参数。请用 INFO，再从回复里解析出 # Mem 段。见 可观测性。
+为什么没有 WRONGTYPE 错误？ # 因为存储模型为每种数据类型保留一个键空间，所以一个键名可以同时存放字符串、哈希和列表，而类型不符的 命令是在该类型自己的视图上执行。同样也没有 TYPE 命令，所以类型安全是应用自己的责任。这一点由 compat_test.go 锁定。
+为什么我在 Go/Python 里的 HSCAN 会报解析错误？ # 因为 HSCAN/SSCAN/ZSCAN 用最后一个字段名或成员名作为游标，而不是数字，而各客户端的类型化 助手会把游标强制转成 int。请改用通用命令接口（Do、execute_command）。SCAN 自己的游标是不 透明的 base64，配合 Scan 风格的助手没有问题。见 扫描。"><meta property="og:locale" content="zh"><meta property="og:type" content="website"><title>常见问题 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/ title=FAQ><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/index.xml title="IceFireDB 文档中心"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/ class=active>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>常见问题</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#它能替代-redis-吗>它能替代 Redis 吗？</a></li><li><a href=#支持哪些命令>支持哪些命令？</a></li><li><a href=#为什么-info-memory-会失败>为什么 <code>INFO memory</code> 会失败？</a></li><li><a href=#为什么没有-wrongtype-错误>为什么没有 <code>WRONGTYPE</code> 错误？</a></li><li><a href=#为什么我在-gopython-里的-hscan-会报解析错误>为什么我在 Go/Python 里的 <code>HSCAN</code> 会报解析错误？</a></li><li><a href=#如何配置它>如何配置它？</a></li><li><a href=#--hot-cache-size-是真实存在的-flag-吗><code>--hot-cache-size</code> 是真实存在的 flag 吗？</a></li><li><a href=#该用哪个存储后端>该用哪个存储后端？</a></li><li><a href=#如何扩展读能力>如何扩展读能力？</a></li><li><a href=#如何备份和恢复>如何备份和恢复？</a></li><li><a href=#能把-badger-的备份恢复到-goleveldb-节点吗>能把 <code>badger</code> 的备份恢复到 <code>goleveldb</code> 节点吗？</a></li><li><a href=#为什么从节点返回了--moved-0-addr>为什么从节点返回了 <code>-MOVED 0 &lt;addr></code>？</a></li><li><a href=#我在集群里的写入去哪了>我在集群里的写入去哪了？</a></li><li><a href=#为什么不能用超过-1024-字节的键>为什么不能用超过 1024 字节的键？</a></li><li><a href=#生产环境可用吗>生产环境可用吗？</a></li><li><a href=#有认证吗是按用户区分的吗>有认证吗？是按用户区分的吗？</a></li><li><a href=#支持事务pubsub流或-sql-吗>支持事务、pub/sub、流或 SQL 吗？</a></li><li><a href=#采用什么许可证>采用什么许可证？</a></li><li><a href=#我在哪里报-bug>我在哪里报 bug？</a></li></ul></nav></aside></header><article class=markdown><h1 id=常见问题>常见问题
+<a class=anchor href=#%e5%b8%b8%e8%a7%81%e9%97%ae%e9%a2%98>#</a></h1><h2 id=它能替代-redis-吗>它能替代 Redis 吗？
+<a class=anchor href=#%e5%ae%83%e8%83%bd%e6%9b%bf%e4%bb%a3-redis-%e5%90%97>#</a></h2><p>它使用 RESP 协议，实现了 110 条命令，其中大多数与 Redis 语义一致，因此 Redis 客户端无需改动即可连接。
+但它不是可以直接顶替 Redis 的实现：没有 <code>WRONGTYPE</code>，没有 <code>SELECT</code>，没有事务，没有阻塞命令，键名
+上限为 1024 字节，还有三条有序集合命令不参与复制。迁移任何你在意的数据之前，请先读
+<a href=/icefiredb_docs/zh/commands/compatibility/>兼容性</a>。</p><h2 id=支持哪些命令>支持哪些命令？
+<a class=anchor href=#%e6%94%af%e6%8c%81%e5%93%aa%e4%ba%9b%e5%91%bd%e4%bb%a4>#</a></h2><p>110 条数据命令，外加 <code>RAFT</code>/<code>CLUSTER</code>/<code>MACHINE</code>/<code>BARRIER</code>/<code>AUTH</code> 系统命令。完整清单在
+<a href=/icefiredb_docs/zh/commands/>命令参考</a>，每种数据类型一页，附回复类型与限额。</p><h2 id=为什么-info-memory-会失败>为什么 <code>INFO memory</code> 会失败？
+<a class=anchor href=#%e4%b8%ba%e4%bb%80%e4%b9%88-info-memory-%e4%bc%9a%e5%a4%b1%e8%b4%a5>#</a></h2><p>因为在这个引擎里 <code>INFO</code> 不接受参数。请用 <code>INFO</code>，再从回复里解析出 <code># Mem</code> 段。见
+<a href=/icefiredb_docs/zh/deploy/observability/#info>可观测性</a>。</p><h2 id=为什么没有-wrongtype-错误>为什么没有 <code>WRONGTYPE</code> 错误？
+<a class=anchor href=#%e4%b8%ba%e4%bb%80%e4%b9%88%e6%b2%a1%e6%9c%89-wrongtype-%e9%94%99%e8%af%af>#</a></h2><p>因为存储模型为每种数据类型保留一个键空间，所以一个键名可以同时存放字符串、哈希和列表，而类型不符的
+命令是在该类型自己的视图上执行。同样也没有 <code>TYPE</code> 命令，所以类型安全是应用自己的责任。这一点由
+<code>compat_test.go</code> 锁定。</p><h2 id=为什么我在-gopython-里的-hscan-会报解析错误>为什么我在 Go/Python 里的 <code>HSCAN</code> 会报解析错误？
+<a class=anchor href=#%e4%b8%ba%e4%bb%80%e4%b9%88%e6%88%91%e5%9c%a8-gopython-%e9%87%8c%e7%9a%84-hscan-%e4%bc%9a%e6%8a%a5%e8%a7%a3%e6%9e%90%e9%94%99%e8%af%af>#</a></h2><p>因为 <code>HSCAN</code>/<code>SSCAN</code>/<code>ZSCAN</code> 用<strong>最后一个字段名或成员名</strong>作为游标，而不是数字，而各客户端的类型化
+助手会把游标强制转成 <code>int</code>。请改用通用命令接口（<code>Do</code>、<code>execute_command</code>）。<code>SCAN</code> 自己的游标是不
+透明的 base64，配合 <code>Scan</code> 风格的助手没有问题。见
+<a href=/icefiredb_docs/zh/commands/scan/>扫描</a>。</p><h2 id=如何配置它>如何配置它？
+<a class=anchor href=#%e5%a6%82%e4%bd%95%e9%85%8d%e7%bd%ae%e5%ae%83>#</a></h2><p>只能用命令行 flag —— 没有配置文件。<code>--storage-backend</code>、<code>-a</code>、<code>-n</code>、<code>-d</code>、<code>-j</code>、<code>--auth</code>、
+<code>--tls-cert/--tls-key</code>、<code>--metrics</code>、<code>--pprof</code>，以及各驱动的 flag。带默认值的完整清单见
+<a href=/icefiredb_docs/zh/deploy/configuration/>配置</a>。</p><h2 id=--hot-cache-size-是真实存在的-flag-吗><code>--hot-cache-size</code> 是真实存在的 flag 吗？
+<a class=anchor href=#--hot-cache-size-%e6%98%af%e7%9c%9f%e5%ae%9e%e5%ad%98%e5%9c%a8%e7%9a%84-flag-%e5%90%97>#</a></h2><p>不是。<code>-h</code> 会把它打印出来，但它并没有被注册，所以传它会直接报错，缓存容量仍是驱动默认的 1024 MB。见
+<a href=/icefiredb_docs/zh/deploy/configuration/#%e4%bc%9a%e6%89%93%e5%8d%b0%e5%87%ba%e6%9d%a5%e4%bd%86%e6%b2%a1%e6%9c%89%e6%8e%a5%e7%ba%bf%e7%9a%84-flag>会打印出来但没有接线的 flag</a>。</p><h2 id=该用哪个存储后端>该用哪个存储后端？
+<a class=anchor href=#%e8%af%a5%e7%94%a8%e5%93%aa%e4%b8%aa%e5%ad%98%e5%82%a8%e5%90%8e%e7%ab%af>#</a></h2><p>除非你有别的理由，否则用 <code>goleveldb</code>。本地写入更重时用 <code>badger</code>，读密集工作集用 <code>hybriddb</code>，数据
+必须比主机活得更久时用 <code>oss</code>，多站点 P2P 用 <code>ipfs-synckv</code>/<code>crdt</code>。<code>ipfs</code> 驱动目前不能当作通用后端
+使用。见
+<a href=/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a>。</p><h2 id=如何扩展读能力>如何扩展读能力？
+<a class=anchor href=#%e5%a6%82%e4%bd%95%e6%89%a9%e5%b1%95%e8%af%bb%e8%83%bd%e5%8a%9b>#</a></h2><p>增加节点并用 <code>--openreads</code> 运行，让从节点提供读服务，或者把协议代理指向从节点。没有分片：每个节点
+持有全量数据集。见
+<a href=/icefiredb_docs/zh/deploy/clustering/>集群</a>。</p><h2 id=如何备份和恢复>如何备份和恢复？
+<a class=anchor href=#%e5%a6%82%e4%bd%95%e5%a4%87%e4%bb%bd%e5%92%8c%e6%81%a2%e5%a4%8d>#</a></h2><p>先 <code>RAFT SNAPSHOT NOW</code>，再用 <code>RAFT SNAPSHOT FILE &lt;id></code> 取文件，或者复制一个已静默的节点目录。恢复时
+用 <code>--restore &lt;file></code> 导入一个全新的数据目录，然后让其他节点重新加入。细节与注意事项见
+<a href=/icefiredb_docs/zh/deploy/operations/>运维</a>。</p><h2 id=能把-badger-的备份恢复到-goleveldb-节点吗>能把 <code>badger</code> 的备份恢复到 <code>goleveldb</code> 节点吗？
+<a class=anchor href=#%e8%83%bd%e6%8a%8a-badger-%e7%9a%84%e5%a4%87%e4%bb%bd%e6%81%a2%e5%a4%8d%e5%88%b0-goleveldb-%e8%8a%82%e7%82%b9%e5%90%97>#</a></h2><p><strong>快照</strong>可以（<code>state.bin</code> 是与后端无关的键/值流）。复制出来的数据目录不行 —— <code>main.db/</code> 与具体后端
+绑定，而且永远不要为已有的数据目录更改 <code>--storage-backend</code>。</p><h2 id=为什么从节点返回了--moved-0-addr>为什么从节点返回了 <code>-MOVED 0 &lt;addr></code>？
+<a class=anchor href=#%e4%b8%ba%e4%bb%80%e4%b9%88%e4%bb%8e%e8%8a%82%e7%82%b9%e8%bf%94%e5%9b%9e%e4%ba%86--moved-0-addr>#</a></h2><p>因为不带 <code>--openreads</code> 时，从节点拒绝读请求并重定向到主节点。所有键都使用槽位 <code>0</code>；没有分片。加上
+<code>--try-errors</code> 后，同样的回复会变成 <code>-TRY</code>。</p><h2 id=我在集群里的写入去哪了>我在集群里的写入去哪了？
+<a class=anchor href=#%e6%88%91%e5%9c%a8%e9%9b%86%e7%be%a4%e9%87%8c%e7%9a%84%e5%86%99%e5%85%a5%e5%8e%bb%e5%93%aa%e4%ba%86>#</a></h2><p>如果是 <code>ZINCRBY</code>、<code>ZREMRANGEBYRANK</code> 或 <code>ZREMRANGEBYSCORE</code>，那就没去哪：这三条被注册成读命令，所以
+只修改你发送到的那一个节点。请改用带算好分值的 <code>ZADD</code>，删除用 <code>ZREM</code>。</p><h2 id=为什么不能用超过-1024-字节的键>为什么不能用超过 1024 字节的键？
+<a class=anchor href=#%e4%b8%ba%e4%bb%80%e4%b9%88%e4%b8%8d%e8%83%bd%e7%94%a8%e8%b6%85%e8%bf%87-1024-%e5%ad%97%e8%8a%82%e7%9a%84%e9%94%ae>#</a></h2><p>因为 ledis 把键、字段以及集合/有序集合成员都限制在 1 KiB（值最大可到 1 GiB）。这是存储层的限制，
+不是策略。请保持键紧凑，并把长标识符在客户端做哈希。</p><h2 id=生产环境可用吗>生产环境可用吗？
+<a class=anchor href=#%e7%94%9f%e4%ba%a7%e7%8e%af%e5%a2%83%e5%8f%af%e7%94%a8%e5%90%97>#</a></h2><p>引擎以 <code>1.0.0-rc.1</code> 发布。本地后端（<code>goleveldb</code>、<code>badger</code>、<code>hybriddb</code>）、Raft 复制、快照、TLS/认证
+和可观测性都有 CI 覆盖（包括崩溃恢复、故障转移和分区测试）。去中心化驱动则参差不齐：<code>ipfs-synckv</code>
+有测试，<code>crdt</code>/<code>ipfs-log</code> 在本仓库里没有单元测试，<code>ipfs</code> 无法把值原样存取回来。风险请自行承担。</p><h2 id=有认证吗是按用户区分的吗>有认证吗？是按用户区分的吗？
+<a class=anchor href=#%e6%9c%89%e8%ae%a4%e8%af%81%e5%90%97%e6%98%af%e6%8c%89%e7%94%a8%e6%88%b7%e5%8c%ba%e5%88%86%e7%9a%84%e5%90%97>#</a></h2><p>只有一个共享 token（<code>--auth</code> 或 <code>ICEFIREDB_AUTH</code>），每条连接都必须提供，由所有节点共用。没有用户、
+角色，也没有按命令的权限。请把它和 TLS 一起用。见
+<a href=/icefiredb_docs/zh/deploy/security/>安全</a>。</p><h2 id=支持事务pubsub流或-sql-吗>支持事务、pub/sub、流或 SQL 吗？
+<a class=anchor href=#%e6%94%af%e6%8c%81%e4%ba%8b%e5%8a%a1pubsub%e6%b5%81%e6%88%96-sql-%e5%90%97>#</a></h2><p>这个二进制不支持。<code>MULTI</code>/<code>EXEC</code>、pub/sub、流和 SQL 都没有实现；pub/sub 是独立的二进制
+（
+<a href=/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a>），SQL 支持在
+<a href=/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a>/
+<a href=/icefiredb_docs/zh/icefiredb-sqlproxy/>SQLProxy</a> 里。</p><h2 id=采用什么许可证>采用什么许可证？
+<a class=anchor href=#%e9%87%87%e7%94%a8%e4%bb%80%e4%b9%88%e8%ae%b8%e5%8f%af%e8%af%81>#</a></h2><p>引擎是 Apache 2.0，PubSub 组件是 MIT。见各自目录下的 <code>LICENSE</code>。</p><h2 id=我在哪里报-bug>我在哪里报 bug？
+<a class=anchor href=#%e6%88%91%e5%9c%a8%e5%93%aa%e9%87%8c%e6%8a%a5-bug>#</a></h2><p><a href=https://github.com/IceFireDB/IceFireDB/issues>github.com/IceFireDB/IceFireDB/issues</a>。附上一份针对
+<code>make run</code> 的复现步骤，再加上 <code>INFO</code> 输出和所用的后端，分诊最快。</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#它能替代-redis-吗>它能替代 Redis 吗？</a></li><li><a href=#支持哪些命令>支持哪些命令？</a></li><li><a href=#为什么-info-memory-会失败>为什么 <code>INFO memory</code> 会失败？</a></li><li><a href=#为什么没有-wrongtype-错误>为什么没有 <code>WRONGTYPE</code> 错误？</a></li><li><a href=#为什么我在-gopython-里的-hscan-会报解析错误>为什么我在 Go/Python 里的 <code>HSCAN</code> 会报解析错误？</a></li><li><a href=#如何配置它>如何配置它？</a></li><li><a href=#--hot-cache-size-是真实存在的-flag-吗><code>--hot-cache-size</code> 是真实存在的 flag 吗？</a></li><li><a href=#该用哪个存储后端>该用哪个存储后端？</a></li><li><a href=#如何扩展读能力>如何扩展读能力？</a></li><li><a href=#如何备份和恢复>如何备份和恢复？</a></li><li><a href=#能把-badger-的备份恢复到-goleveldb-节点吗>能把 <code>badger</code> 的备份恢复到 <code>goleveldb</code> 节点吗？</a></li><li><a href=#为什么从节点返回了--moved-0-addr>为什么从节点返回了 <code>-MOVED 0 &lt;addr></code>？</a></li><li><a href=#我在集群里的写入去哪了>我在集群里的写入去哪了？</a></li><li><a href=#为什么不能用超过-1024-字节的键>为什么不能用超过 1024 字节的键？</a></li><li><a href=#生产环境可用吗>生产环境可用吗？</a></li><li><a href=#有认证吗是按用户区分的吗>有认证吗？是按用户区分的吗？</a></li><li><a href=#支持事务pubsub流或-sql-吗>支持事务、pub/sub、流或 SQL 吗？</a></li><li><a href=#采用什么许可证>采用什么许可证？</a></li><li><a href=#我在哪里报-bug>我在哪里报 bug？</a></li></ul></nav></div></aside></main></body></html>

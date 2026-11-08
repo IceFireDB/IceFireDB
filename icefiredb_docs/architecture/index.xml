@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Architecture on IceFireDB Documentation</title><link>https://docs.icefiredb.xyz/icefiredb_docs/architecture/</link><description>Recent content in Architecture on IceFireDB Documentation</description><generator>Hugo</generator><language>en</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/architecture/index.xml" rel="self" type="application/rss+xml"/><item><title>Overview</title><link>https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/</guid><description>&lt;h1 id="engine-overview">
+ Engine overview
+ &lt;a class="anchor" href="#engine-overview">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="startup-sequence">
+ Startup sequence
+ &lt;a class="anchor" href="#startup-sequence">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>main()&lt;/code> does a small, fixed amount of work, and the ordering matters:&lt;/p>
+&lt;ol>
+&lt;li>&lt;code>godotenv.Load()&lt;/code> — pick up &lt;code>.env&lt;/code> if present.&lt;/li>
+&lt;li>&lt;code>confInit(&amp;amp;conf)&lt;/code> — parse flags, resolve &lt;code>--auth&lt;/code> from the environment, validate TLS pairing and
+&lt;code>--advertise&lt;/code>, map &lt;code>--raft-backend&lt;/code> to &lt;code>leveldb&lt;/code>/&lt;code>bolt&lt;/code>.&lt;/li>
+&lt;li>&lt;code>conf.DataDirReady&lt;/code> is registered as a callback: when the Raft layer has prepared the node
+directory it opens the storage backend (&lt;code>openStorage&lt;/code>) and publishes &lt;code>ldb&lt;/code>. &lt;strong>The command handlers
+only work after this point&lt;/strong>, which is why &lt;code>/readyz&lt;/code> exists.&lt;/li>
+&lt;li>Backend metrics are registered with the &lt;code>INFO&lt;/code> collector (&lt;code>hybriddb&lt;/code>, &lt;code>ipfs&lt;/code>, &lt;code>ipfs-synckv&lt;/code>).&lt;/li>
+&lt;li>&lt;code>--pprof&lt;/code> and &lt;code>--metrics&lt;/code> servers start, if enabled — both are plain &lt;code>net/http&lt;/code> servers in
+goroutines.&lt;/li>
+&lt;li>&lt;code>conf.Snapshot&lt;/code>/&lt;code>Restore&lt;/code> are wired to &lt;code>snapshot.go&lt;/code>, connection hooks to the client counter, and
+&lt;code>rafthub.Main(conf)&lt;/code> takes over: recover the log, join a cluster if &lt;code>-j&lt;/code> was given, serve RESP.&lt;/li>
+&lt;/ol>
+&lt;h2 id="request-path">
+ Request path
+ &lt;a class="anchor" href="#request-path">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;strong>Writes&lt;/strong> (the 56 commands registered with &lt;code>AddWriteCommand&lt;/code>):&lt;/p></description></item><item><title>Protocol</title><link>https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/</guid><description>&lt;h1 id="protocol-layer">
+ Protocol layer
+ &lt;a class="anchor" href="#protocol-layer">#&lt;/a>
+&lt;/h1>
+&lt;p>The engine speaks &lt;strong>RESP&lt;/strong> — the Redis serialization protocol — so any Redis client works without a
+shim. This page covers what the protocol layer does beyond parsing bytes.&lt;/p>
+&lt;h2 id="one-socket-two-protocols">
+ One socket, two protocols
+ &lt;a class="anchor" href="#one-socket-two-protocols">#&lt;/a>
+&lt;/h2>
+&lt;p>There is exactly one TCP listener (&lt;code>tcp4&lt;/code>, address from &lt;code>-a&lt;/code>). On it arrive:&lt;/p>
+&lt;ol>
+&lt;li>&lt;strong>Client connections&lt;/strong>: RESP from applications.&lt;/li>
+&lt;li>&lt;strong>Peer connections&lt;/strong>: the Raft transport between nodes.&lt;/li>
+&lt;/ol>
+&lt;p>They are told apart by a sniffing listener: a peer opens the connection by writing a fixed magic
+marker followed by the cluster auth token (&lt;code>transportMarker&lt;/code> in
+&lt;code>vendor/github.com/tidwall/uhaha&lt;/code>), and anything that does not start with that marker is treated as a
+RESP client. This is why TLS, the port and &lt;code>--advertise&lt;/code> are shared between data and replication
+traffic — and why &lt;code>--advertise&lt;/code> must name the address peers can reach.&lt;/p></description></item><item><title>Network</title><link>https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/</guid><description>&lt;h1 id="network-layer">
+ Network layer
+ &lt;a class="anchor" href="#network-layer">#&lt;/a>
+&lt;/h1>
+&lt;p>Two independent networks exist, and they solve different problems. Confusing them is the most common
+architectural mistake when reading about IceFireDB.&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">&lt;/th>
+ &lt;th style="text-align: left">Intra-site network&lt;/th>
+ &lt;th style="text-align: left">Inter-site network&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">Purpose&lt;/td>
+ &lt;td style="text-align: left">One consistent copy of the data&lt;/td>
+ &lt;td style="text-align: left">Replicate across sites / regions&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Technology&lt;/td>
+ &lt;td style="text-align: left">Raft (hashicorp/raft)&lt;/td>
+ &lt;td style="text-align: left">libp2p + pubsub (&lt;code>crdt&lt;/code>, &lt;code>ipfs-log&lt;/code>, &lt;code>ipfs-synckv&lt;/code> drivers)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Topology&lt;/td>
+ &lt;td style="text-align: left">Leader + voters, quorum required&lt;/td>
+ &lt;td style="text-align: left">Peer-to-peer, no leader, eventual&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Configured by&lt;/td>
+ &lt;td style="text-align: left">&lt;code>-a&lt;/code>, &lt;code>-j&lt;/code>, &lt;code>--advertise&lt;/code>, &lt;code>--raft-backend&lt;/code>, &lt;code>--auth&lt;/code>, TLS&lt;/td>
+ &lt;td style="text-align: left">&lt;code>--servicename&lt;/code>, &lt;code>--nettopic&lt;/code>, &lt;code>--datatopic&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Enabled by&lt;/td>
+ &lt;td style="text-align: left">Always&lt;/td>
+ &lt;td style="text-align: left">Only with a P2P storage backend&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>A common deployment runs a Raft cluster per site (strong consistency inside), with one node per site
+using a P2P backend to exchange data between sites (eventual consistency across). The engine does not
+combine the two for you — they are separate layers, and the P2P layer is a property of the &lt;em>driver&lt;/em>, not
+of the server.&lt;/p></description></item><item><title>Storage</title><link>https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/</guid><description>&lt;h1 id="storage-layer">
+ Storage layer
+ &lt;a class="anchor" href="#storage-layer">#&lt;/a>
+&lt;/h1>
+&lt;p>Under the command handlers sits &lt;strong>ledis&lt;/strong>: a data model that turns five Redis types into key/value
+operations over a single &lt;code>driver.IDB&lt;/code>. It is the reason the same commands work on a local LevelDB file
+and on IPFS.&lt;/p>
+&lt;h2 id="per-type-keyspaces">
+ Per-type keyspaces
+ &lt;a class="anchor" href="#per-type-keyspaces">#&lt;/a>
+&lt;/h2>
+&lt;p>ledis does not store &amp;ldquo;a key with a type&amp;rdquo;. It stores separate physical keys per type, each prefixed with
+a type byte:&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Type&lt;/th>
+ &lt;th style="text-align: left">Prefix bytes&lt;/th>
+ &lt;th style="text-align: left">Physical keys per logical key&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">String&lt;/td>
+ &lt;td style="text-align: left">&lt;code>KVType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">the value&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Hash&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HashType&lt;/code>, &lt;code>HSizeType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">one entry per field + a size counter&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">List&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ListType&lt;/code>, &lt;code>LMetaType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">one entry per index + a meta record (head/tail/size)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Set&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SetType&lt;/code>, &lt;code>SSizeType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">one entry per member + a size counter&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">Sorted set&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSetType&lt;/code>, &lt;code>ZSizeType&lt;/code>, &lt;code>ZScoreType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">one entry per member + size counter + one index entry per (score, member)&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>Expirations are separate records too (&lt;code>ExpMetaType&lt;/code>, &lt;code>ExpTimeType&lt;/code>), which is why a TTL belongs to the
+type it was set on rather than to the key name.&lt;/p></description></item><item><title>Codec</title><link>https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/</guid><description>&lt;h1 id="codec-layer">
+ Codec layer
+ &lt;a class="anchor" href="#codec-layer">#&lt;/a>
+&lt;/h1>
+&lt;p>The &amp;ldquo;codec&amp;rdquo; in this engine is the mapping between protocol-level structures and the KV pairs ledis
+writes. It is not a serialization format you can choose — it is fixed by ledis and visible only through
+side effects such as key limits, ordering and migration.&lt;/p>
+&lt;h2 id="what-gets-encoded">
+ What gets encoded
+ &lt;a class="anchor" href="#what-gets-encoded">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Logical operation&lt;/th>
+ &lt;th style="text-align: left">Physical operations&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SET k v&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(KVType + k, v)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSET k f v&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(HashType + k + f, v)&lt;/code>, &lt;code>IncrBy(HSizeType + k, 1)&lt;/code> on a new field&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPUSH k v&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(ListType + k + index, v)&lt;/code>, update &lt;code>LMetaType + k&lt;/code> (head, tail, count)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SADD k m&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(SetType + k + m, nil)&lt;/code>, &lt;code>IncrBy(SSizeType + k, 1)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZADD k score m&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(ZSetType + k + m, score)&lt;/code>, &lt;code>Put(ZScoreType + k + score + m, nil)&lt;/code>, size counter&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXPIRE k s&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(ExpTimeType + k, timestamp)&lt;/code>, &lt;code>Put(ExpMetaType + k, …)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>Deletes are the inverse: a hash field delete removes one &lt;code>HashType&lt;/code> record and decrements the size
+counter, while &lt;code>HCLEAR&lt;/code> walks them all and removes the counters and expiry records too.&lt;/p></description></item></channel></rss>

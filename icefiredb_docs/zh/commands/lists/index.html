@@ -1,0 +1,169 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  列表
+  #
+
+18 条命令。列表以带索引的序列存储；其中两条命令会重建整个列表。
+
+  
+      
+          命令
+          读写
+          语法
+          返回
+          示例 → 回复
+      
+  
+  
+      
+          LPUSH
+          W
+          LPUSH KEY VALUE [VALUE ...]
+          integer 新长度
+          LPUSH q a b → 2
+      
+      
+          RPUSH
+          W
+          RPUSH KEY VALUE [VALUE ...]
+          integer 新长度
+          RPUSH q c → 3
+      
+      
+          LPOP
+          W
+          LPOP KEY
+          bulk 头部元素，空列表为 null
+          LPOP q → b
+      
+      
+          RPOP
+          W
+          RPOP KEY
+          bulk 尾部元素，空列表为 null
+          RPOP q → c
+      
+      
+          LLEN
+          R
+          LLEN KEY
+          integer 元素数量
+          LLEN q → 1
+      
+      
+          LINDEX
+          R
+          LINDEX KEY index
+          bulk，越界为 null
+          LINDEX q 0 → a
+      
+      
+          LRANGE
+          R
+          LRANGE KEY start stop
+          array（闭区间，负偏移从尾部计）
+          LRANGE q 0 -1 → [a]
+      
+      
+          LSET
+          W
+          LSET KEY index VALUE
+          +OK
+          LSET q 0 z → OK
+      
+      
+          LTRIM
+          W
+          LTRIM KEY start stop
+          +OK
+          LTRIM q 0 0 → OK
+      
+      
+          RPOPLPUSH
+          W
+          RPOPLPUSH source destination
+          bulk 被移动的元素，源为空为 null
+          RPOPLPUSH q backup → z
+      
+      
+          LINSERT
+          W
+          LINSERT KEY BEFORE|AFTER pivot VALUE
+          integer 新长度；0 基准值不存在；-1 键不存在
+          LINSERT q BEFORE z y → 2
+      
+      
+          LREM
+          W
+          LREM KEY count VALUE
+          integer 删除数量
+          LREM q 0 z → 1
+      
+      
+          LKEYEXISTS
+          R
+          LKEYEXISTS KEY
+          integer 0/1 —— 列表是否存在
+          LKEYEXISTS q → 1
+      
+      
+          LCLEAR
+          W
+          LCLEAR KEY
+          integer 删除元素数
+          LCLEAR q → 1
+      
+      
+          LMCLEAR
+          W
+          LMCLEAR KEY [KEY ...]
+          integer 删除列表数
+          LMCLEAR a b → 2
+      
+      
+          LEXPIRE
+          W
+          LEXPIRE KEY seconds
+          integer 1/0
+          LEXPIRE q 600 → 1
+      
+      
+          LEXPIREAT
+          W
+          LEXPIREAT KEY unixTime
+          integer 1/0
+          LEXPIREAT q 1767225600 → 1
+      
+      
+          LTTL
+          R
+          LTTL KEY
+          integer 剩余秒，无过期为 -1
+          LTTL q → 599
+      
+  
+
+
+  说明
+  #
+
+
+LPUSH q a b 得到 [b, a] —— 每个元素依次压入头部，与 Redis 一致。
+LREM KEY count VALUE：count > 0 从头部删，count < 0 从尾部删，count = 0 删除每一处出现。
+LINSERT 和 LREM 是 O(n)，而且不是事务性的。 存储层没有它们的原语，因此处理器会读取列表、清空它，再重新写入（并恢复 TTL）。整个过程发生在同一次 Raft apply 内，所以其他客户端观察不到半成品列表，但中途后端失败会留下被截断的列表。不要在热路径的长列表上使用它们 —— 优先用 LTRIM 或有界队列。
+没有 LPERSIST：处理器未注册。LCLEAR/LMCLEAR 删除整个列表及其 TTL。
+没有阻塞命令。 BLPOP/BRPOP 是刻意不注册的：在 Raft apply 循环里做阻塞读，要么卡住日志，要么在没有回滚路径的情况下消费掉队列。
+LRANGE 在 start > stop 时返回空数组；负索引从尾部计。
+"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="列表"><meta property="og:description" content=" 列表 # 18 条命令。列表以带索引的序列存储；其中两条命令会重建整个列表。
+命令 读写 语法 返回 示例 → 回复 LPUSH W LPUSH KEY VALUE [VALUE ...] integer 新长度 LPUSH q a b → 2 RPUSH W RPUSH KEY VALUE [VALUE ...] integer 新长度 RPUSH q c → 3 LPOP W LPOP KEY bulk 头部元素，空列表为 null LPOP q → b RPOP W RPOP KEY bulk 尾部元素，空列表为 null RPOP q → c LLEN R LLEN KEY integer 元素数量 LLEN q → 1 LINDEX R LINDEX KEY index bulk，越界为 null LINDEX q 0 → a LRANGE R LRANGE KEY start stop array（闭区间，负偏移从尾部计） LRANGE q 0 -1 → [a] LSET W LSET KEY index VALUE +OK LSET q 0 z → OK LTRIM W LTRIM KEY start stop +OK LTRIM q 0 0 → OK RPOPLPUSH W RPOPLPUSH source destination bulk 被移动的元素，源为空为 null RPOPLPUSH q backup → z LINSERT W LINSERT KEY BEFORE|AFTER pivot VALUE integer 新长度；0 基准值不存在；-1 键不存在 LINSERT q BEFORE z y → 2 LREM W LREM KEY count VALUE integer 删除数量 LREM q 0 z → 1 LKEYEXISTS R LKEYEXISTS KEY integer 0/1 —— 列表是否存在 LKEYEXISTS q → 1 LCLEAR W LCLEAR KEY integer 删除元素数 LCLEAR q → 1 LMCLEAR W LMCLEAR KEY [KEY ...] integer 删除列表数 LMCLEAR a b → 2 LEXPIRE W LEXPIRE KEY seconds integer 1/0 LEXPIRE q 600 → 1 LEXPIREAT W LEXPIREAT KEY unixTime integer 1/0 LEXPIREAT q 1767225600 → 1 LTTL R LTTL KEY integer 剩余秒，无过期为 -1 LTTL q → 599 说明 # LPUSH q a b 得到 [b, a] —— 每个元素依次压入头部，与 Redis 一致。 LREM KEY count VALUE：count > 0 从头部删，count < 0 从尾部删，count = 0 删除每一处出现。 LINSERT 和 LREM 是 O(n)，而且不是事务性的。 存储层没有它们的原语，因此处理器会读取列表、清空它，再重新写入（并恢复 TTL）。整个过程发生在同一次 Raft apply 内，所以其他客户端观察不到半成品列表，但中途后端失败会留下被截断的列表。不要在热路径的长列表上使用它们 —— 优先用 LTRIM 或有界队列。 没有 LPERSIST：处理器未注册。LCLEAR/LMCLEAR 删除整个列表及其 TTL。 没有阻塞命令。 BLPOP/BRPOP 是刻意不注册的：在 Raft apply 循环里做阻塞读，要么卡住日志，要么在没有回滚路径的情况下消费掉队列。 LRANGE 在 start > stop 时返回空数组；负索引从尾部计。 "><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="commands"><title>列表 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/ title=Lists><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle checked>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/ class=active>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>列表</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#说明>说明</a></li></ul></nav></aside></header><article class=markdown><h1 id=列表>列表
+<a class=anchor href=#%e5%88%97%e8%a1%a8>#</a></h1><p>18 条命令。列表以带索引的序列存储；其中两条命令会重建整个列表。</p><table><thead><tr><th style=text-align:left>命令</th><th style=text-align:left>读写</th><th style=text-align:left>语法</th><th style=text-align:left>返回</th><th style=text-align:left>示例 → 回复</th></tr></thead><tbody><tr><td style=text-align:left><code>LPUSH</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LPUSH KEY VALUE [VALUE ...]</code></td><td style=text-align:left><code>integer</code> 新长度</td><td style=text-align:left><code>LPUSH q a b</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>RPUSH</code></td><td style=text-align:left>W</td><td style=text-align:left><code>RPUSH KEY VALUE [VALUE ...]</code></td><td style=text-align:left><code>integer</code> 新长度</td><td style=text-align:left><code>RPUSH q c</code> → <code>3</code></td></tr><tr><td style=text-align:left><code>LPOP</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LPOP KEY</code></td><td style=text-align:left><code>bulk</code> 头部元素，空列表为 <code>null</code></td><td style=text-align:left><code>LPOP q</code> → <code>b</code></td></tr><tr><td style=text-align:left><code>RPOP</code></td><td style=text-align:left>W</td><td style=text-align:left><code>RPOP KEY</code></td><td style=text-align:left><code>bulk</code> 尾部元素，空列表为 <code>null</code></td><td style=text-align:left><code>RPOP q</code> → <code>c</code></td></tr><tr><td style=text-align:left><code>LLEN</code></td><td style=text-align:left>R</td><td style=text-align:left><code>LLEN KEY</code></td><td style=text-align:left><code>integer</code> 元素数量</td><td style=text-align:left><code>LLEN q</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>LINDEX</code></td><td style=text-align:left>R</td><td style=text-align:left><code>LINDEX KEY index</code></td><td style=text-align:left><code>bulk</code>，越界为 <code>null</code></td><td style=text-align:left><code>LINDEX q 0</code> → <code>a</code></td></tr><tr><td style=text-align:left><code>LRANGE</code></td><td style=text-align:left>R</td><td style=text-align:left><code>LRANGE KEY start stop</code></td><td style=text-align:left><code>array</code>（闭区间，负偏移从尾部计）</td><td style=text-align:left><code>LRANGE q 0 -1</code> → <code>[a]</code></td></tr><tr><td style=text-align:left><code>LSET</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LSET KEY index VALUE</code></td><td style=text-align:left><code>+OK</code></td><td style=text-align:left><code>LSET q 0 z</code> → <code>OK</code></td></tr><tr><td style=text-align:left><code>LTRIM</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LTRIM KEY start stop</code></td><td style=text-align:left><code>+OK</code></td><td style=text-align:left><code>LTRIM q 0 0</code> → <code>OK</code></td></tr><tr><td style=text-align:left><code>RPOPLPUSH</code></td><td style=text-align:left>W</td><td style=text-align:left><code>RPOPLPUSH source destination</code></td><td style=text-align:left><code>bulk</code> 被移动的元素，源为空为 <code>null</code></td><td style=text-align:left><code>RPOPLPUSH q backup</code> → <code>z</code></td></tr><tr><td style=text-align:left><code>LINSERT</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LINSERT KEY BEFORE|AFTER pivot VALUE</code></td><td style=text-align:left><code>integer</code> 新长度；<code>0</code> 基准值不存在；<code>-1</code> 键不存在</td><td style=text-align:left><code>LINSERT q BEFORE z y</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>LREM</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LREM KEY count VALUE</code></td><td style=text-align:left><code>integer</code> 删除数量</td><td style=text-align:left><code>LREM q 0 z</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>LKEYEXISTS</code></td><td style=text-align:left>R</td><td style=text-align:left><code>LKEYEXISTS KEY</code></td><td style=text-align:left><code>integer</code> 0/1 —— 列表是否存在</td><td style=text-align:left><code>LKEYEXISTS q</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>LCLEAR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LCLEAR KEY</code></td><td style=text-align:left><code>integer</code> 删除元素数</td><td style=text-align:left><code>LCLEAR q</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>LMCLEAR</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LMCLEAR KEY [KEY ...]</code></td><td style=text-align:left><code>integer</code> 删除列表数</td><td style=text-align:left><code>LMCLEAR a b</code> → <code>2</code></td></tr><tr><td style=text-align:left><code>LEXPIRE</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LEXPIRE KEY seconds</code></td><td style=text-align:left><code>integer</code> 1/0</td><td style=text-align:left><code>LEXPIRE q 600</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>LEXPIREAT</code></td><td style=text-align:left>W</td><td style=text-align:left><code>LEXPIREAT KEY unixTime</code></td><td style=text-align:left><code>integer</code> 1/0</td><td style=text-align:left><code>LEXPIREAT q 1767225600</code> → <code>1</code></td></tr><tr><td style=text-align:left><code>LTTL</code></td><td style=text-align:left>R</td><td style=text-align:left><code>LTTL KEY</code></td><td style=text-align:left><code>integer</code> 剩余秒，无过期为 <code>-1</code></td><td style=text-align:left><code>LTTL q</code> → <code>599</code></td></tr></tbody></table><h2 id=说明>说明
+<a class=anchor href=#%e8%af%b4%e6%98%8e>#</a></h2><ul><li><code>LPUSH q a b</code> 得到 <code>[b, a]</code> —— 每个元素依次压入头部，与 Redis 一致。</li><li><code>LREM KEY count VALUE</code>：<code>count > 0</code> 从头部删，<code>count &lt; 0</code> 从尾部删，<code>count = 0</code> 删除每一处出现。</li><li><strong><code>LINSERT</code> 和 <code>LREM</code> 是 O(n)，而且不是事务性的。</strong> 存储层没有它们的原语，因此处理器会读取列表、清空它，再重新写入（并恢复 TTL）。整个过程发生在同一次 Raft apply 内，所以其他客户端观察不到半成品列表，但中途后端失败会留下被截断的列表。不要在热路径的长列表上使用它们 —— 优先用 <code>LTRIM</code> 或有界队列。</li><li>没有 <code>LPERSIST</code>：处理器未注册。<code>LCLEAR</code>/<code>LMCLEAR</code> 删除整个列表及其 TTL。</li><li><strong>没有阻塞命令。</strong> <code>BLPOP</code>/<code>BRPOP</code> 是刻意不注册的：在 Raft apply 循环里做阻塞读，要么卡住日志，要么在没有回滚路径的情况下消费掉队列。</li><li><code>LRANGE</code> 在 <code>start > stop</code> 时返回空数组；负索引从尾部计。</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#说明>说明</a></li></ul></nav></div></aside></main></body></html>

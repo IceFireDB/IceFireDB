@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>架构 on IceFireDB 文档中心</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/</link><description>Recent content in 架构 on IceFireDB 文档中心</description><generator>Hugo</generator><language>zh</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/index.xml" rel="self" type="application/rss+xml"/><item><title>概览</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/</guid><description>&lt;h1 id="引擎概览">
+ 引擎概览
+ &lt;a class="anchor" href="#%e5%bc%95%e6%93%8e%e6%a6%82%e8%a7%88">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="启动顺序">
+ 启动顺序
+ &lt;a class="anchor" href="#%e5%90%af%e5%8a%a8%e9%a1%ba%e5%ba%8f">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>main()&lt;/code> 做的工作很少而且固定，顺序很关键：&lt;/p>
+&lt;ol>
+&lt;li>&lt;code>godotenv.Load()&lt;/code> —— 如果存在 &lt;code>.env&lt;/code> 就加载它。&lt;/li>
+&lt;li>&lt;code>confInit(&amp;amp;conf)&lt;/code> —— 解析 flag，从环境变量解析 &lt;code>--auth&lt;/code>，校验 TLS 配对与 &lt;code>--advertise&lt;/code>，
+把 &lt;code>--raft-backend&lt;/code> 映射为 &lt;code>leveldb&lt;/code>/&lt;code>bolt&lt;/code>。&lt;/li>
+&lt;li>注册 &lt;code>conf.DataDirReady&lt;/code> 回调：当 Raft 层准备好节点目录后，它打开存储驱动（&lt;code>openStorage&lt;/code>）并发布 &lt;code>ldb&lt;/code>。&lt;strong>命令处理器只有在这之后才可用&lt;/strong>，&lt;code>/readyz&lt;/code> 就是为此存在的。&lt;/li>
+&lt;li>后端指标注册到 &lt;code>INFO&lt;/code> 采集器（&lt;code>hybriddb&lt;/code>、&lt;code>ipfs&lt;/code>、&lt;code>ipfs-synckv&lt;/code>）。&lt;/li>
+&lt;li>如已启用，启动 &lt;code>--pprof&lt;/code> 与 &lt;code>--metrics&lt;/code> 服务器——两者都是跑在 goroutine 里的普通 &lt;code>net/http&lt;/code> 服务器。&lt;/li>
+&lt;li>把 &lt;code>conf.Snapshot&lt;/code>/&lt;code>Restore&lt;/code> 接到 &lt;code>snapshot.go&lt;/code>，把连接钩子接到客户端计数器，然后由 &lt;code>rafthub.Main(conf)&lt;/code> 接管：恢复日志、在给了 &lt;code>-j&lt;/code> 时加入集群、提供 RESP 服务。&lt;/li>
+&lt;/ol>
+&lt;h2 id="请求路径">
+ 请求路径
+ &lt;a class="anchor" href="#%e8%af%b7%e6%b1%82%e8%b7%af%e5%be%84">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;strong>写命令&lt;/strong>（通过 &lt;code>AddWriteCommand&lt;/code> 注册的 56 条命令）：&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>client → RESP parse → normalise (lowercase command name, args to strings)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> → leader check → append to Raft log → replicate → commit at quorum
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> → apply on every node in log order → handler → ledis → driver
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>命令处理器是在&lt;em>应用阶段&lt;/em>执行的，而不是在追加日志之前，这正是同样结果会出现在每个节点上的原因。因此，一个去读墙上时钟或 &lt;code>math/rand&lt;/code> 的处理器必然产生分歧——它必须使用 &lt;code>m.Now()&lt;/code>/&lt;code>m.Rand()&lt;/code>，而这两个值本身通过内部 &lt;code>TICK&lt;/code> 命令复制。&lt;/p></description></item><item><title>协议</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/</guid><description>&lt;h1 id="协议层">
+ 协议层
+ &lt;a class="anchor" href="#%e5%8d%8f%e8%ae%ae%e5%b1%82">#&lt;/a>
+&lt;/h1>
+&lt;p>引擎使用 &lt;strong>RESP&lt;/strong>——Redis 序列化协议——所以任何 Redis 客户端都能直接用，不需要适配层。本页讲协议层在解析字节之外还做了什么。&lt;/p>
+&lt;h2 id="一个-socket两种协议">
+ 一个 socket，两种协议
+ &lt;a class="anchor" href="#%e4%b8%80%e4%b8%aa-socket%e4%b8%a4%e7%a7%8d%e5%8d%8f%e8%ae%ae">#&lt;/a>
+&lt;/h2>
+&lt;p>全进程只有一个 TCP 监听（&lt;code>tcp4&lt;/code>，地址来自 &lt;code>-a&lt;/code>）。到达它上面的是两类连接：&lt;/p>
+&lt;ol>
+&lt;li>&lt;strong>客户端连接&lt;/strong>：应用发来的 RESP。&lt;/li>
+&lt;li>&lt;strong>对等连接&lt;/strong>：节点之间的 Raft 传输。&lt;/li>
+&lt;/ol>
+&lt;p>两者由一个嗅探式监听区分：对等节点建立连接时先写一个固定的 magic marker，再跟上集群认证 token（&lt;code>vendor/github.com/tidwall/uhaha&lt;/code> 中的 &lt;code>transportMarker&lt;/code>）；凡是不以该 marker 开头的，都会被当作 RESP 客户端。这就是 TLS、端口和 &lt;code>--advertise&lt;/code> 由数据流量与复制流量共用的原因——也是 &lt;code>--advertise&lt;/code> 必须写出对等节点可访问地址的原因。&lt;/p>
+&lt;h2 id="请求处理">
+ 请求处理
+ &lt;a class="anchor" href="#%e8%af%b7%e6%b1%82%e5%a4%84%e7%90%86">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">步骤&lt;/th>
+ &lt;th style="text-align: left">行为&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">解析&lt;/td>
+ &lt;td style="text-align: left">RESP 数组，另外支持内联（telnet 风格）命令&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">命令名&lt;/td>
+ &lt;td style="text-align: left">分发前统一转小写——命令名不区分大小写&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">流水线&lt;/td>
+ &lt;td style="text-align: left">支持：请求按顺序执行，回复按顺序写出&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">连接状态&lt;/td>
+ &lt;td style="text-align: left">每个连接只有 &lt;code>AUTH&lt;/code> 状态；没有按连接隔离的数据库，没有 &lt;code>SELECT&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">内置命令&lt;/td>
+ &lt;td style="text-align: left">&lt;code>PING&lt;/code>、&lt;code>ECHO&lt;/code>、&lt;code>QUIT&lt;/code>、&lt;code>AUTH&lt;/code>、&lt;code>SHUTDOWN&lt;/code> 在分发之前由服务器直接应答&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">其它一切&lt;/td>
+ &lt;td style="text-align: left">分发给命令表（110 条数据命令 + &lt;code>RAFT&lt;/code>/&lt;code>CLUSTER&lt;/code>/&lt;code>MACHINE&lt;/code>/&lt;code>BARRIER&lt;/code>/&lt;code>VERSION&lt;/code>）&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>未知命令回复 &lt;code>ERR unknown command '&amp;lt;name&amp;gt;'&lt;/code>。&lt;/p>
+&lt;h2 id="回复映射">
+ 回复映射
+ &lt;a class="anchor" href="#%e5%9b%9e%e5%a4%8d%e6%98%a0%e5%b0%84">#&lt;/a>
+&lt;/h2>
+&lt;p>命令处理器返回 Go 值，RESP 写出器按固定规则机械映射：&lt;/p></description></item><item><title>网络</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/</guid><description>&lt;h1 id="网络层">
+ 网络层
+ &lt;a class="anchor" href="#%e7%bd%91%e7%bb%9c%e5%b1%82">#&lt;/a>
+&lt;/h1>
+&lt;p>系统里存在两套彼此独立的网络，解决的是不同问题。读 IceFireDB 相关内容时，把两者混为一谈是最常见的架构错误。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">&lt;/th>
+ &lt;th style="text-align: left">站内网络&lt;/th>
+ &lt;th style="text-align: left">站间网络&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">用途&lt;/td>
+ &lt;td style="text-align: left">一份一致的数据副本&lt;/td>
+ &lt;td style="text-align: left">跨站点 / 跨地域复制&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">技术&lt;/td>
+ &lt;td style="text-align: left">Raft（hashicorp/raft）&lt;/td>
+ &lt;td style="text-align: left">libp2p + pubsub（&lt;code>crdt&lt;/code>、&lt;code>ipfs-log&lt;/code>、&lt;code>ipfs-synckv&lt;/code> 驱动）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">拓扑&lt;/td>
+ &lt;td style="text-align: left">主节点 + 投票者，需要多数派&lt;/td>
+ &lt;td style="text-align: left">对等网络，无主节点，最终一致&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">配置方式&lt;/td>
+ &lt;td style="text-align: left">&lt;code>-a&lt;/code>、&lt;code>-j&lt;/code>、&lt;code>--advertise&lt;/code>、&lt;code>--raft-backend&lt;/code>、&lt;code>--auth&lt;/code>、TLS&lt;/td>
+ &lt;td style="text-align: left">&lt;code>--servicename&lt;/code>、&lt;code>--nettopic&lt;/code>、&lt;code>--datatopic&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">启用方式&lt;/td>
+ &lt;td style="text-align: left">始终启用&lt;/td>
+ &lt;td style="text-align: left">仅在 P2P 存储驱动下启用&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>常见部署是每个站点跑一个 Raft 集群（站内强一致），每个站点再有一个节点使用 P2P 存储驱动在站点之间交换数据（跨站最终一致）。引擎不会替你合并这两层——它们是彼此独立的分层，而 P2P 层是&lt;em>驱动&lt;/em>的属性，不是服务器的属性。&lt;/p>
+&lt;h2 id="站内raft">
+ 站内：Raft
+ &lt;a class="anchor" href="#%e7%ab%99%e5%86%85raft">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>每个节点只监听一个 socket。对等连接用 transport marker 加认证 token 表明身份，所以复制流量和客户端流量共用同一个端口和同一份 TLS 证书。&lt;/li>
+&lt;li>Raft 日志与稳定存储位于 &lt;code>&amp;lt;data-dir&amp;gt;/IceFireDB/&amp;lt;node-id&amp;gt;/store/&lt;/code>，格式为 &lt;code>leveldb&lt;/code>（默认）或 &lt;code>bolt&lt;/code>（&lt;code>--raft-backend&lt;/code>）。&lt;/li>
+&lt;li>&lt;code>--advertise&lt;/code> 设置其它节点保存的本节点地址。不设置时使用绑定的地址，在 NAT 后面或容器里这是错的。&lt;/li>
+&lt;li>加入集群：&lt;code>-j &amp;lt;addr&amp;gt;&lt;/code>（节点自己加入），或在主节点上执行 &lt;code>RAFT SERVER ADD id address&lt;/code>。&lt;/li>
+&lt;li>快照：由 Raft 层生成，通过 &lt;code>writeSnapshot&lt;/code> 写入 &lt;code>snapshots/&amp;lt;id&amp;gt;/state.bin&lt;/code>；被快照覆盖的日志会被截断。&lt;/li>
+&lt;li>时钟：Raft 通过内部复制的 &lt;code>TICK&lt;/code> 命令驱动机器时钟（默认每 200 ms 一次），使依赖时间的命令在各副本间保持一致。&lt;code>--localtime&lt;/code> 用本地时间源替换远程时间源，更快，也更有风险。&lt;/li>
+&lt;/ul>
+&lt;h2 id="站间p2p-驱动">
+ 站间：P2P 驱动
+ &lt;a class="anchor" href="#%e7%ab%99%e9%97%b4p2p-%e9%a9%b1%e5%8a%a8">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;code>crdt&lt;/code>、&lt;code>ipfs-log&lt;/code> 和 &lt;code>ipfs-synckv&lt;/code> 驱动会在存储层里打开一个 libp2p host：&lt;/p></description></item><item><title>存储</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/</guid><description>&lt;h1 id="存储层">
+ 存储层
+ &lt;a class="anchor" href="#%e5%ad%98%e5%82%a8%e5%b1%82">#&lt;/a>
+&lt;/h1>
+&lt;p>命令处理器之下是 &lt;strong>ledis&lt;/strong>：一个把五种 Redis 类型转换成单个 &lt;code>driver.IDB&lt;/code> 上的键/值操作的数据模型。这也是同一组命令既能作用于本地 LevelDB 文件、又能作用于 IPFS 的原因。&lt;/p>
+&lt;h2 id="按类型的键空间">
+ 按类型的键空间
+ &lt;a class="anchor" href="#%e6%8c%89%e7%b1%bb%e5%9e%8b%e7%9a%84%e9%94%ae%e7%a9%ba%e9%97%b4">#&lt;/a>
+&lt;/h2>
+&lt;p>ledis 不存&amp;quot;带类型的键&amp;quot;。它按类型存彼此独立的物理键，每个都带一个类型字节前缀：&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">类型&lt;/th>
+ &lt;th style="text-align: left">前缀字节&lt;/th>
+ &lt;th style="text-align: left">每个逻辑键对应的物理键&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">字符串&lt;/td>
+ &lt;td style="text-align: left">&lt;code>KVType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">值本身&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">哈希&lt;/td>
+ &lt;td style="text-align: left">&lt;code>HashType&lt;/code>、&lt;code>HSizeType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">每个字段一条记录 + 一个大小计数器&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">列表&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ListType&lt;/code>、&lt;code>LMetaType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">每个索引一条记录 + 一条元数据记录（head/tail/size）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">集合&lt;/td>
+ &lt;td style="text-align: left">&lt;code>SetType&lt;/code>、&lt;code>SSizeType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">每个成员一条记录 + 一个大小计数器&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">有序集合&lt;/td>
+ &lt;td style="text-align: left">&lt;code>ZSetType&lt;/code>、&lt;code>ZSizeType&lt;/code>、&lt;code>ZScoreType&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">每个成员一条记录 + 大小计数器 + 每个（分值，成员）一条索引记录&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>过期时间也是独立记录（&lt;code>ExpMetaType&lt;/code>、&lt;code>ExpTimeType&lt;/code>），所以 TTL 属于设置它的那个类型，而不属于键名。&lt;/p>
+&lt;p>从客户端就能观察到的后果：&lt;/p>
+&lt;ul>
+&lt;li>同一名称下可以并存两种类型（见
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/commands/compatibility/">兼容性&lt;/a>）。&lt;/li>
+&lt;li>&lt;code>SCAN&lt;/code> 必须遍历五个键空间；它的游标里带五个子游标。&lt;/li>
+&lt;li>删除哈希（&lt;code>HCLEAR&lt;/code>）会移除很多物理键；&lt;code>DEL&lt;/code> 只移除字符串那一条。&lt;/li>
+&lt;/ul>
+&lt;h2 id="物理键编码">
+ 物理键编码
+ &lt;a class="anchor" href="#%e7%89%a9%e7%90%86%e9%94%ae%e7%bc%96%e7%a0%81">#&lt;/a>
+&lt;/h2>
+&lt;p>复合键采用长度前缀加分隔符，而不是哈希：&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>hash: [index][HashType][uint16 keyLen][key][&amp;#39;:&amp;#39;][field]
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>list: [index][ListType][uint16 keyLen][key][uint32 index]
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>zset: [index][ZScoreType][uint16 keyLen][key][sep][score][member]
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>有序集合的 &lt;code>sep&lt;/code> 按分值符号取两个字节之一，因此索引的字节序与分值的数值序一致——这正是 &lt;code>ZRANGEBYSCORE&lt;/code> 能做成范围扫描而不是全量排序的原因。成员记录按编码后的键排序，所以 &lt;code>SMEMBERS&lt;/code>/&lt;code>HKEYS&lt;/code> 的返回顺序是存储顺序，而不是插入顺序。&lt;/p></description></item><item><title>编解码</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/</guid><description>&lt;h1 id="编解码层">
+ 编解码层
+ &lt;a class="anchor" href="#%e7%bc%96%e8%a7%a3%e7%a0%81%e5%b1%82">#&lt;/a>
+&lt;/h1>
+&lt;p>这个引擎里的&amp;quot;编解码&amp;quot;指的是协议层结构与 ledis 写入的 KV 对之间的映射。它不是你可以选择的序列化格式——它由 ledis 固定，只能通过键限额、顺序、迁移这类副作用观察到。&lt;/p>
+&lt;h2 id="哪些东西被编码">
+ 哪些东西被编码
+ &lt;a class="anchor" href="#%e5%93%aa%e4%ba%9b%e4%b8%9c%e8%a5%bf%e8%a2%ab%e7%bc%96%e7%a0%81">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">逻辑操作&lt;/th>
+ &lt;th style="text-align: left">物理操作&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SET k v&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(KVType + k, v)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>HSET k f v&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">字段为新增时：&lt;code>Put(HashType + k + f, v)&lt;/code>、&lt;code>IncrBy(HSizeType + k, 1)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RPUSH k v&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(ListType + k + index, v)&lt;/code>，更新 &lt;code>LMetaType + k&lt;/code>（head、tail、count）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SADD k m&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(SetType + k + m, nil)&lt;/code>、&lt;code>IncrBy(SSizeType + k, 1)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ZADD k score m&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(ZSetType + k + m, score)&lt;/code>、&lt;code>Put(ZScoreType + k + score + m, nil)&lt;/code>、大小计数器&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>EXPIRE k s&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>Put(ExpTimeType + k, timestamp)&lt;/code>、&lt;code>Put(ExpMetaType + k, …)&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>删除是逆操作：删一个哈希字段会移除一条 &lt;code>HashType&lt;/code> 记录并递减大小计数器，而 &lt;code>HCLEAR&lt;/code> 会遍历全部字段，并连计数器和过期记录一起移除。&lt;/p></description></item></channel></rss>

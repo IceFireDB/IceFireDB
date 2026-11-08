@@ -1,0 +1,73 @@
+<!doctype html><html lang=en dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  Server
+  #
+
+Three commands in the data surface. Everything else an operator needs (RAFT, CLUSTER, MACHINE,
+BARRIER, AUTH, SHUTDOWN, VERSION) lives in 
+  System commands.
+
+  
+      
+          Cmd
+          RW
+          Syntax
+          Returns
+          Example → reply
+      
+  
+  
+      
+          INFO
+          R
+          INFO
+          bulk multi-line report
+          INFO → # Server\r\nversion…
+      
+      
+          FLUSHALL
+          W
+          FLUSHALL
+          integer keys removed
+          FLUSHALL → (integer) 42
+      
+      
+          FLUSHDB
+          W
+          FLUSHDB
+          integer keys removed — alias of FLUSHALL
+          FLUSHDB → (integer) 42
+      
+  
+
+
+  INFO takes no arguments
+  #
+
+INFO memory, INFO server and INFO replication are argument errors; the command is
+len(args) != 1 → wrong number of arguments. Ask for INFO and read the section you need out of the
+single reply. The sections and their fields are documented in
+
+  Observability."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/commands/server/"><meta property="og:site_name" content="IceFireDB Documentation"><meta property="og:title" content="Server"><meta property="og:description" content=" Server # Three commands in the data surface. Everything else an operator needs (RAFT, CLUSTER, MACHINE, BARRIER, AUTH, SHUTDOWN, VERSION) lives in System commands.
+Cmd RW Syntax Returns Example → reply INFO R INFO bulk multi-line report INFO → # Server\r\nversion… FLUSHALL W FLUSHALL integer keys removed FLUSHALL → (integer) 42 FLUSHDB W FLUSHDB integer keys removed — alias of FLUSHALL FLUSHDB → (integer) 42 INFO takes no arguments # INFO memory, INFO server and INFO replication are argument errors; the command is len(args) != 1 → wrong number of arguments. Ask for INFO and read the section you need out of the single reply. The sections and their fields are documented in Observability."><meta property="og:locale" content="en"><meta property="og:type" content="article"><meta property="article:section" content="commands"><title>Server | IceFireDB Documentation</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=zh href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/ title=服务器><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/en.search.min.10db600d22f359f1e7b2009bf0cef914bdcbccd1c88ece6aac603cdb3d863383.js integrity="sha256-ENtgDSLzWfHnsgCb8M75FL3LzNHIjs5qrGA82z2GM4M=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/><span>IceFireDB Documentation</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+English</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>中文</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/overview/>Overview</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>Getting started</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/>Deployment</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/configuration/>Configuration</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/clustering/>Clustering</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/storage-backends/>Storage backends</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/security/>Security</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/observability/>Observability</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/operations/>Operations</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/deploy/system-commands/>System commands</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle checked>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/>Command reference</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/strings/>Strings</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/hashes/>Hashes</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/lists/>Lists</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sets/>Sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/sorted-sets/>Sorted sets</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/scan/>Scan</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/server/ class=active>Server</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/commands/compatibility/>Compatibility</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/>Architecture</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/overview/>Overview</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/protocol/>Protocol</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/network/>Network</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/storage/>Storage</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/architecture/codec/>Codec</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/>Develop</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/clients/>Clients</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/building-and-testing/>Building and testing</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/benchmarking/>Benchmarking</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/develop/ecosystem/>Ecosystem</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/faqs/>FAQ</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/vocabulary/>Vocabulary</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>Server</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#info-takes-no-arguments><code>INFO</code> takes no arguments</a></li><li><a href=#flushdb-is-flushall><code>FLUSHDB</code> is <code>FLUSHALL</code></a></li><li><a href=#not-implemented>Not implemented</a></li></ul></nav></aside></header><article class=markdown><h1 id=server>Server
+<a class=anchor href=#server>#</a></h1><p>Three commands in the data surface. Everything else an operator needs (<code>RAFT</code>, <code>CLUSTER</code>, <code>MACHINE</code>,
+<code>BARRIER</code>, <code>AUTH</code>, <code>SHUTDOWN</code>, <code>VERSION</code>) lives in
+<a href=/icefiredb_docs/deploy/system-commands/>System commands</a>.</p><table><thead><tr><th style=text-align:left>Cmd</th><th style=text-align:left>RW</th><th style=text-align:left>Syntax</th><th style=text-align:left>Returns</th><th style=text-align:left>Example → reply</th></tr></thead><tbody><tr><td style=text-align:left><code>INFO</code></td><td style=text-align:left>R</td><td style=text-align:left><code>INFO</code></td><td style=text-align:left><code>bulk</code> multi-line report</td><td style=text-align:left><code>INFO</code> → <code># Server\r\nversion…</code></td></tr><tr><td style=text-align:left><code>FLUSHALL</code></td><td style=text-align:left>W</td><td style=text-align:left><code>FLUSHALL</code></td><td style=text-align:left><code>integer</code> keys removed</td><td style=text-align:left><code>FLUSHALL</code> → <code>(integer) 42</code></td></tr><tr><td style=text-align:left><code>FLUSHDB</code></td><td style=text-align:left>W</td><td style=text-align:left><code>FLUSHDB</code></td><td style=text-align:left><code>integer</code> keys removed — alias of <code>FLUSHALL</code></td><td style=text-align:left><code>FLUSHDB</code> → <code>(integer) 42</code></td></tr></tbody></table><h2 id=info-takes-no-arguments><code>INFO</code> takes no arguments
+<a class=anchor href=#info-takes-no-arguments>#</a></h2><p><code>INFO memory</code>, <code>INFO server</code> and <code>INFO replication</code> are <strong>argument errors</strong>; the command is
+<code>len(args) != 1 → wrong number of arguments</code>. Ask for <code>INFO</code> and read the section you need out of the
+single reply. The sections and their fields are documented in
+<a href=/icefiredb_docs/deploy/observability/#info>Observability</a>.</p><p><code>INFO</code> is a read command: the receiving node answers from its own state, and it is never replicated.</p><h2 id=flushdb-is-flushall><code>FLUSHDB</code> is <code>FLUSHALL</code>
+<a class=anchor href=#flushdb-is-flushall>#</a></h2><p>The engine has one logical database, so <code>FLUSHDB</code> is implemented as an alias of <code>FLUSHALL</code>. Both:</p><ul><li>are <strong>write</strong> commands, so they go through the Raft log and are replicated (that is why they return a
+count rather than <code>OK</code>);</li><li>delete every key in <strong>every</strong> per-type keyspace (<code>string</code>, <code>hash</code>, <code>list</code>, <code>set</code>, <code>zset</code>) including
+their expirations;</li><li>are unrecoverable — there is no undo and no soft delete. Treat them as root-equivalent operations.</li></ul><h2 id=not-implemented>Not implemented
+<a class=anchor href=#not-implemented>#</a></h2><table><thead><tr><th style=text-align:left>Command</th><th style=text-align:left>Status</th></tr></thead><tbody><tr><td style=text-align:left><code>SELECT</code></td><td style=text-align:left>Not implemented — one database, always index 0</td></tr><tr><td style=text-align:left><code>DBSIZE</code></td><td style=text-align:left>Not registered</td></tr><tr><td style=text-align:left><code>KEYS</code></td><td style=text-align:left>Not registered — use
+<a href=/icefiredb_docs/commands/scan/>SCAN</a></td></tr><tr><td style=text-align:left><code>MULTI</code> / <code>EXEC</code> / <code>WATCH</code></td><td style=text-align:left>Not implemented — no transactions in the command surface</td></tr><tr><td style=text-align:left><code>MONITOR</code></td><td style=text-align:left>Not exposed as a command</td></tr><tr><td style=text-align:left><code>CONFIG GET/SET</code></td><td style=text-align:left>Not implemented — configuration is flags only</td></tr></tbody></table></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#info-takes-no-arguments><code>INFO</code> takes no arguments</a></li><li><a href=#flushdb-is-flushall><code>FLUSHDB</code> is <code>FLUSHALL</code></a></li><li><a href=#not-implemented>Not implemented</a></li></ul></nav></div></aside></main></body></html>

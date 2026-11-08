@@ -1,0 +1,98 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content='
+  快速开始
+  #
+
+本页带你从一次干净的代码检出走到运行中的节点，然后是三节点集群，最后落在两件从 Redis 转过来的人
+最先遇到、也最容易意外的事上。
+
+  前置条件
+  #
+
+
+Go 1.27.3+。模块声明 go 1.26.0 并带 toolchain go1.27.3，CI 用 Go 1.27.3 构建与测试。
+make（可选 —— 每个 target 都只是一层薄薄的 go build）。
+一个 RESP 客户端：除类型化 scan 辅助工具外（见
+  兼容性），redis-cli
+足以应付一切。
+
+
+  1. 构建
+  #
+
+git clone https://github.com/IceFireDB/IceFireDB.git
+cd IceFireDB
+make localbuild          # → ./bin/IceFireDB
+make localbuild 就是 go build -ldflags "-X main.BuildVersion=<git sha> -X main.BuildDate=<date>"。
+make all 交叉编译整套发布矩阵（linux amd64/arm64/armv5/armv6/armv7）—— 发布时有用，开发时不必；
+make run 与 make run_dev 只是 go run .。'><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:type" content="website"><meta property="og:image" content="https://res.cloudinary.com/malloc/image/upload/v1666510486/icefiredb/logo_z8koem.png"><meta property="og:url" content="https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/"><meta property="og:site_name" content="IceFireDB 文档中心"><meta property="og:title" content="快速开始"><meta property="og:description" content=' 快速开始 # 本页带你从一次干净的代码检出走到运行中的节点，然后是三节点集群，最后落在两件从 Redis 转过来的人 最先遇到、也最容易意外的事上。
+前置条件 # Go 1.27.3+。模块声明 go 1.26.0 并带 toolchain go1.27.3，CI 用 Go 1.27.3 构建与测试。 make（可选 —— 每个 target 都只是一层薄薄的 go build）。 一个 RESP 客户端：除类型化 scan 辅助工具外（见 兼容性），redis-cli 足以应付一切。 1. 构建 # git clone https://github.com/IceFireDB/IceFireDB.git cd IceFireDB make localbuild # → ./bin/IceFireDB make localbuild 就是 go build -ldflags "-X main.BuildVersion=<git sha> -X main.BuildDate=<date>"。 make all 交叉编译整套发布矩阵（linux amd64/arm64/armv5/armv6/armv7）—— 发布时有用，开发时不必； make run 与 make run_dev 只是 go run .。'><meta property="og:locale" content="zh"><meta property="og:type" content="website"><title>快速开始 | IceFireDB 文档中心</title>
+<link rel=manifest href=/icefiredb_docs/manifest.json><link rel=icon href=/icefiredb_docs/favicon.ico type=image/x-icon><link rel=alternate hreflang=en href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/ title="Getting started"><link rel=stylesheet href=/icefiredb_docs/book.min.eab2970f6d091e7d6be613805820ac3c486642a27fbe7f600e4381f93d303300.css integrity="sha256-6rKXD20JHn1r5hOAWCCsPEhmQqJ/vn9gDkOB+T0wMwA=" crossorigin=anonymous><script defer src=/icefiredb_docs/flexsearch.min.js></script><script defer src=/icefiredb_docs/zh.search.min.bef33f37819b1f4246996275dbce647b9b9f86874e1783b33339db600a3697be.js integrity="sha256-vvM/N4GbH0JGmWJ1285ke5ufhodOF4OzMznbYAo2l74=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/index.xml title="IceFireDB 文档中心"></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/icefiredb_docs/zh/><span>IceFireDB 文档中心</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=搜索 aria-label=搜索 maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul class=book-languages><li><input type=checkbox id=languages class=toggle>
+<label for=languages class="flex justify-between"><a role=button class="flex align-center"><img src=/icefiredb_docs/svg/translate.svg class=book-icon alt=Languages>
+中文</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/getting-started/>English</a></li></ul></li></ul><ul><li><a href=https://www.icefiredb.xyz/ target=_blank rel=noopener>Official Site</a></li><li><a href=https://github.com/icefiredb target=_blank rel=noopener>Open Source</a></li></ul><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/overview/>概览</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/getting-started/ class=active>快速开始</a><ul></ul></li><li><input type=checkbox id=section-4876d517c61dc061de416e4372025d51 class=toggle>
+<label for=section-4876d517c61dc061de416e4372025d51 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/>部署</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/>配置</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/>集群</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/>存储驱动</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/>安全</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/>可观测性</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/>运维</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/>系统命令</a></li></ul></li><li><input type=checkbox id=section-68425a643779e00e0a5f42a9553dea87 class=toggle>
+<label for=section-68425a643779e00e0a5f42a9553dea87 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/>命令参考</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/strings/>字符串</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/hashes/>哈希</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/lists/>列表</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sets/>集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/sorted-sets/>有序集合</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/scan/>扫描</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/server/>服务器</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/commands/compatibility/>兼容性</a></li></ul></li><li><input type=checkbox id=section-e069f043da2440ea34dcdf43b57fa860 class=toggle>
+<label for=section-e069f043da2440ea34dcdf43b57fa860 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/>架构</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/overview/>概览</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/protocol/>协议</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/network/>网络</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/storage/>存储</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/architecture/codec/>编解码</a></li></ul></li><li><input type=checkbox id=section-67e2efe4effd998b3edcc032259bec66 class=toggle>
+<label for=section-67e2efe4effd998b3edcc032259bec66 class="flex justify-between"><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/>开发</a></label><ul><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/clients/>客户端</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/building-and-testing/>构建与测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/benchmarking/>基准测试</a></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/develop/ecosystem/>生态</a></li></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/faqs/>常见问题</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-pubsub/>IceFireDB-PubSub</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlite/>IceFireDB-SQLite</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-sqlproxy/>IceFireDB-SQLProxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/icefiredb-redis-proxy/>IceFireDB-Redis-Proxy</a><ul></ul></li><li><a href=https://docs.icefiredb.xyz/icefiredb_docs/zh/vocabulary/>术语表</a><ul></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/icefiredb_docs/svg/menu.svg class=book-icon alt=Menu>
+</label><strong>快速开始</strong>
+<label for=toc-control><img src=/icefiredb_docs/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#前置条件>前置条件</a></li><li><a href=#1-构建>1. 构建</a></li><li><a href=#2-运行单个节点>2. 运行单个节点</a></li><li><a href=#3-第一批命令>3. 第一批命令</a></li><li><a href=#4-三节点集群>4. 三节点集群</a></li><li><a href=#5-两件与-redis-不同的事>5. 两件与 Redis 不同的事</a></li><li><a href=#接下来>接下来</a></li></ul></nav></aside></header><article class=markdown><h1 id=快速开始>快速开始
+<a class=anchor href=#%e5%bf%ab%e9%80%9f%e5%bc%80%e5%a7%8b>#</a></h1><p>本页带你从一次干净的代码检出走到运行中的节点，然后是三节点集群，最后落在两件从 Redis 转过来的人
+最先遇到、也最容易意外的事上。</p><h2 id=前置条件>前置条件
+<a class=anchor href=#%e5%89%8d%e7%bd%ae%e6%9d%a1%e4%bb%b6>#</a></h2><ul><li><strong>Go 1.27.3+</strong>。模块声明 <code>go 1.26.0</code> 并带 <code>toolchain go1.27.3</code>，CI 用 Go 1.27.3 构建与测试。</li><li><code>make</code>（可选 —— 每个 target 都只是一层薄薄的 <code>go build</code>）。</li><li>一个 RESP 客户端：除类型化 scan 辅助工具外（见
+<a href=/icefiredb_docs/zh/commands/compatibility/>兼容性</a>），<code>redis-cli</code>
+足以应付一切。</li></ul><h2 id=1-构建>1. 构建
+<a class=anchor href=#1-%e6%9e%84%e5%bb%ba>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>git clone https://github.com/IceFireDB/IceFireDB.git
+</span></span><span style=display:flex><span>cd IceFireDB
+</span></span><span style=display:flex><span>make localbuild          <span style=color:#75715e># → ./bin/IceFireDB</span>
+</span></span></code></pre></div><p><code>make localbuild</code> 就是 <code>go build -ldflags "-X main.BuildVersion=&lt;git sha> -X main.BuildDate=&lt;date>"</code>。
+<code>make all</code> 交叉编译整套发布矩阵（linux amd64/arm64/armv5/armv6/armv7）—— 发布时有用，开发时不必；
+<code>make run</code> 与 <code>make run_dev</code> 只是 <code>go run .</code>。</p><h2 id=2-运行单个节点>2. 运行单个节点
+<a class=anchor href=#2-%e8%bf%90%e8%a1%8c%e5%8d%95%e4%b8%aa%e8%8a%82%e7%82%b9>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>./bin/IceFireDB -a 127.0.0.1:11001 -n <span style=color:#ae81ff>1</span> -d ./data -l info
+</span></span></code></pre></div><p>这一行把每个默认值都显式写了出来：绑定地址是 <code>127.0.0.1:11001</code>，节点 ID 是 <code>1</code>，数据目录是
+<code>data</code>，日志级别是 <code>info</code>。二进制会打印一段 banner，然后是 <code>start with Storage Engine: goleveldb</code>，
+接着是日志中的 Raft 部分。</p><p>状态写入每个节点各自的目录，因此多个节点可以共享同一个 <code>-d</code>：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-text data-lang=text><span style=display:flex><span>data/
+</span></span><span style=display:flex><span>└── IceFireDB/
+</span></span><span style=display:flex><span>    └── 1/
+</span></span><span style=display:flex><span>        ├── main.db/      # the ledis storage (driver-dependent)
+</span></span><span style=display:flex><span>        ├── store/        # Raft log + stable store (leveldb or bolt, see --raft-backend)
+</span></span><span style=display:flex><span>        └── snapshots/    # Raft snapshots, one directory per snapshot ID
+</span></span></code></pre></div><h2 id=3-第一批命令>3. 第一批命令
+<a class=anchor href=#3-%e7%ac%ac%e4%b8%80%e6%89%b9%e5%91%bd%e4%bb%a4>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>127.0.0.1:11001&gt; SET user:1 <span style=color:#e6db74>&#39;{&#34;name&#34;:&#34;ada&#34;}&#39;</span> EX <span style=color:#ae81ff>300</span>
+</span></span><span style=display:flex><span>OK
+</span></span><span style=display:flex><span>127.0.0.1:11001&gt; GET user:1
+</span></span><span style=display:flex><span><span style=color:#e6db74>&#34;{\&#34;name\&#34;:\&#34;ada\&#34;}&#34;</span>
+</span></span><span style=display:flex><span>127.0.0.1:11001&gt; TTL user:1
+</span></span><span style=display:flex><span><span style=color:#f92672>(</span>integer<span style=color:#f92672>)</span> <span style=color:#ae81ff>299</span>
+</span></span><span style=display:flex><span>127.0.0.1:11001&gt; HSET user:1 name ada
+</span></span><span style=display:flex><span><span style=color:#f92672>(</span>integer<span style=color:#f92672>)</span> <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>127.0.0.1:11001&gt; HGET user:1 name
+</span></span><span style=display:flex><span><span style=color:#e6db74>&#34;ada&#34;</span>
+</span></span><span style=display:flex><span>127.0.0.1:11001&gt; INFO
+</span></span><span style=display:flex><span>$...
+</span></span></code></pre></div><p>注意第 4 步：同一个键 <code>user:1</code> 同时持有一个字符串<strong>和</strong>一个哈希。这不是 bug —— 见
+<a href=/icefiredb_docs/zh/#5-%e4%b8%a4%e4%bb%b6%e4%b8%8e-redis-%e4%b8%8d%e5%90%8c%e7%9a%84%e4%ba%8b>第 5 步</a>。</p><h2 id=4-三节点集群>4. 三节点集群
+<a class=anchor href=#4-%e4%b8%89%e8%8a%82%e7%82%b9%e9%9b%86%e7%be%a4>#</a></h2><p>节点 1 是引导节点；节点 2 和 3 用 <code>-j</code> 加入它。每个节点保留自己的 <code>-d</code>（也可以共享父目录，节点 ID
+会把它们区分开）。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#75715e># node 1 — bootstrap</span>
+</span></span><span style=display:flex><span>./bin/IceFireDB -a 127.0.0.1:11001 -n <span style=color:#ae81ff>1</span> -d ./data &amp;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># node 2 — join</span>
+</span></span><span style=display:flex><span>./bin/IceFireDB -a 127.0.0.1:11002 -n <span style=color:#ae81ff>2</span> -d ./data -j 127.0.0.1:11001 &amp;
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># node 3 — join</span>
+</span></span><span style=display:flex><span>./bin/IceFireDB -a 127.0.0.1:11003 -n <span style=color:#ae81ff>3</span> -d ./data -j 127.0.0.1:11001 &amp;
+</span></span></code></pre></div><p>从任意节点检查拓扑：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> CLUSTER INFO
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> CLUSTER NODES
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> RAFT LEADER
+</span></span></code></pre></div><p>向主节点写入，从从节点读取：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11001</span> SET cluster:smoke ok      <span style=color:#75715e># leader → OK</span>
+</span></span><span style=display:flex><span>redis-cli -p <span style=color:#ae81ff>11002</span> GET cluster:smoke         <span style=color:#75715e># follower → -MOVED error unless --openreads</span>
+</span></span></code></pre></div><p>没有 <code>--openreads</code> 的从节点会返回重定向错误，而不是陈旧数据；需要从节点读时再加上 <code>--openreads</code>。
+成员变更、快照与故障处理见
+<a href=/icefiredb_docs/zh/deploy/clustering/>集群</a>。</p><h2 id=5-两件与-redis-不同的事>5. 两件与 Redis 不同的事
+<a class=anchor href=#5-%e4%b8%a4%e4%bb%b6%e4%b8%8e-redis-%e4%b8%8d%e5%90%8c%e7%9a%84%e4%ba%8b>#</a></h2><ol><li><strong>没有 <code>WRONGTYPE</code>。</strong> 引擎为每种数据类型维护独立的键空间，所以 <code>SET k v</code> 和 <code>HSET k f x</code> 可以
+同时成功；对错误类型执行的命令会读取该类型自己的（可能为空的）视图，而不是报错。如果你的应用
+依赖 <code>WRONGTYPE</code> 来保证类型安全，请在应用层检查类型。</li><li><strong>Scan 游标是不透明的，而对 <code>HSCAN</code> 来说游标就是名字。</strong> 把游标当整数解析的客户端辅助工具（例如
+go-redis 的类型化 <code>HScan</code>）不可用；请改用通用命令 API。</li></ol><p>这两点，加上另外八处偏差，都在
+<a href=/icefiredb_docs/zh/commands/compatibility/>兼容性</a>中。</p><h2 id=接下来>接下来
+<a class=anchor href=#%e6%8e%a5%e4%b8%8b%e6%9d%a5>#</a></h2><ul><li><a href=/icefiredb_docs/zh/deploy/configuration/>配置</a> —— 完整的 flag 集合与默认值，包括 TLS、认证、指标与 pprof。</li><li><a href=/icefiredb_docs/zh/commands/>命令参考</a> —— 110 条引擎命令，外加 <code>RAFT</code>/<code>CLUSTER</code> 系统命令。</li><li><a href=/icefiredb_docs/zh/develop/clients/>客户端</a> —— 可直接复制粘贴的 <code>redis-cli</code>、Go、Python 与 Node 示例。</li><li><a href=/icefiredb_docs/zh/deploy/operations/>运维</a> —— 备份、恢复、滚动升级、健康检查。</li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#前置条件>前置条件</a></li><li><a href=#1-构建>1. 构建</a></li><li><a href=#2-运行单个节点>2. 运行单个节点</a></li><li><a href=#3-第一批命令>3. 第一批命令</a></li><li><a href=#4-三节点集群>4. 三节点集群</a></li><li><a href=#5-两件与-redis-不同的事>5. 两件与 Redis 不同的事</a></li><li><a href=#接下来>接下来</a></li></ul></nav></div></aside></main></body></html>

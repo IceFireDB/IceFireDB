@@ -1,0 +1,467 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>部署 on IceFireDB 文档中心</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/</link><description>Recent content in 部署 on IceFireDB 文档中心</description><generator>Hugo</generator><language>zh</language><atom:link href="https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/index.xml" rel="self" type="application/rss+xml"/><item><title>配置</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/configuration/</guid><description>&lt;h1 id="配置">
+ 配置
+ &lt;a class="anchor" href="#%e9%85%8d%e7%bd%ae">#&lt;/a>
+&lt;/h1>
+&lt;p>NoSQL 引擎&lt;strong>没有配置文件&lt;/strong>。每一项设置都是一个命令行 flag，在启动时由 &lt;code>flags.go&lt;/code> 解析一次。（工作
+目录中的 &lt;code>.env&lt;/code> 文件同样会被加载 —— 见
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/#%e7%8e%af%e5%a2%83%e5%8f%98%e9%87%8f">环境变量&lt;/a>。）&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -h &lt;span style="color:#75715e"># prints the usage block below&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="基本选项">
+ 基本选项
+ &lt;a class="anchor" href="#%e5%9f%ba%e6%9c%ac%e9%80%89%e9%a1%b9">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Flag&lt;/th>
+ &lt;th style="text-align: left">含义&lt;/th>
+ &lt;th style="text-align: left">默认值&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-a addr&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">绑定地址（&lt;code>host:port&lt;/code>）&lt;/td>
+ &lt;td style="text-align: left">&lt;code>127.0.0.1:11001&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-n id&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">节点 ID —— 同时也是 Raft 服务器 ID 和数据子目录名&lt;/td>
+ &lt;td style="text-align: left">&lt;code>1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-d dir&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">数据目录&lt;/td>
+ &lt;td style="text-align: left">&lt;code>data&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-j addr&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">要加入的集群的主节点地址&lt;/td>
+ &lt;td style="text-align: left">&lt;em>(空 —— 引导新集群)&lt;/em>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-l level&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">日志级别：&lt;code>debug&lt;/code>、&lt;code>verb&lt;/code>、&lt;code>info&lt;/code>、&lt;code>warn&lt;/code>、&lt;code>silent&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>info&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>-h&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">打印用法并退出&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>-n&lt;/code> 是&lt;strong>标识符，不是端口&lt;/strong>。端口来自 &lt;code>-a&lt;/code>。两个节点可以共享 &lt;code>-d&lt;/code>，因为每个节点都写入
+&lt;code>&amp;lt;dir&amp;gt;/IceFireDB/&amp;lt;node-id&amp;gt;/&lt;/code>；但两个节点不能共享同一个节点 ID。&lt;/p>
+&lt;h2 id="安全选项">
+ 安全选项
+ &lt;a class="anchor" href="#%e5%ae%89%e5%85%a8%e9%80%89%e9%a1%b9">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">Flag&lt;/th>
+ &lt;th style="text-align: left">含义&lt;/th>
+ &lt;th style="text-align: left">默认值&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>--auth token&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">集群认证令牌，由所有节点和所有客户端共享&lt;/td>
+ &lt;td style="text-align: left">&lt;em>(空 —— 认证关闭)&lt;/em>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>--tls-cert path&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">TLS 证书（PEM）&lt;/td>
+ &lt;td style="text-align: left">&lt;em>(空)&lt;/em>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>--tls-key path&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">TLS 私钥（PEM）&lt;/td>
+ &lt;td style="text-align: left">&lt;em>(空)&lt;/em>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>--tls-cert&lt;/code> 与 &lt;code>--tls-key&lt;/code> 必须成对提供；只提供其中一个会导致启动错误。&lt;code>--auth&lt;/code> 也可以从
+&lt;code>ICEFIREDB_AUTH&lt;/code> 读取，两者都设置时以命令行为准。完整行为，包括该令牌保护什么、不保护什么，见
+
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/deploy/security/">安全&lt;/a>。&lt;/p></description></item><item><title>集群</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/clustering/</guid><description>&lt;h1 id="集群">
+ 集群
+ &lt;a class="anchor" href="#%e9%9b%86%e7%be%a4">#&lt;/a>
+&lt;/h1>
+&lt;p>集群是一组共享同一份 Raft 日志的节点。每条写命令都会追加到该日志，并由每个节点重放，因此所有节点
+收敛到同一状态；读命令由收到它的那个节点在本地应答。&lt;/p>
+&lt;h2 id="引导与加入">
+ 引导与加入
+ &lt;a class="anchor" href="#%e5%bc%95%e5%af%bc%e4%b8%8e%e5%8a%a0%e5%85%a5">#&lt;/a>
+&lt;/h2>
+&lt;p>第一个节点不需要额外 flag：&lt;code>-j&lt;/code> 为空即表示「开启一个新集群」。之后每个节点用
+&lt;code>-j &amp;lt;leader-or-any-node-address&amp;gt;&lt;/code> 加入：&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -n &lt;span style="color:#ae81ff">1&lt;/span> -a 127.0.0.1:11001 -d ./data
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -n &lt;span style="color:#ae81ff">2&lt;/span> -a 127.0.0.1:11002 -d ./data -j 127.0.0.1:11001
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -n &lt;span style="color:#ae81ff">3&lt;/span> -a 127.0.0.1:11003 -d ./data -j 127.0.0.1:11001
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>加入时，节点用 &lt;code>AUTH&lt;/code>（若设置了 &lt;code>--auth&lt;/code>/&lt;code>ICEFIREDB_AUTH&lt;/code>）和 TLS（若配置了证书）连接该地址，请求
+当前的集群状态，把自己加进去，然后从日志追赶。在同一数据目录上重启的节点不需要再次 &lt;code>-j&lt;/code> —— 它会从
+已持久化的 Raft 状态重新加入。&lt;/p>
+&lt;p>当绑定地址不是对等节点应当拨号的那个地址时（容器、NAT、多网卡），请使用 &lt;code>--advertise&lt;/code>：&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -n &lt;span style="color:#ae81ff">2&lt;/span> -a 0.0.0.0:11001 --advertise 10.0.0.12:11001 -d /var/lib/icefiredb -j 10.0.0.11:11001
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>通告地址就是客户端在 &lt;code>-MOVED&lt;/code> 重定向中收到的地址，也是其他节点写入 Raft 配置的地址，因此它必须
+&lt;strong>对对等节点可达，也对客户端可达&lt;/strong>。&lt;/p>
+&lt;h2 id="一致性模型">
+ 一致性模型
+ &lt;a class="anchor" href="#%e4%b8%80%e8%87%b4%e6%80%a7%e6%a8%a1%e5%9e%8b">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">操作&lt;/th>
+ &lt;th style="text-align: left">在哪里执行&lt;/th>
+ &lt;th style="text-align: left">保证&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">写命令（&lt;code>SET&lt;/code>、&lt;code>HSET&lt;/code>、&lt;code>RPUSH&lt;/code>、…）&lt;/td>
+ &lt;td style="text-align: left">只在主节点执行，经 Raft 日志&lt;/td>
+ &lt;td style="text-align: left">在每个节点上按相同顺序应用；写入在多数派提交后才被确认&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">读命令，未启用 &lt;code>--openreads&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">收到它的节点；在从节点上会被拒绝&lt;/td>
+ &lt;td style="text-align: left">从节点返回 &lt;code>-MOVED 0 &amp;lt;leader&amp;gt;&lt;/code>；客户端向主节点重试&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">读命令，启用 &lt;code>--openreads&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">任意节点&lt;/td>
+ &lt;td style="text-align: left">可能返回陈旧数据（本地日志已应用到的状态）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>RAFT …&lt;/code>、&lt;code>CLUSTER …&lt;/code>、&lt;code>MACHINE&lt;/code>、&lt;code>BARRIER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">收到它的节点&lt;/td>
+ &lt;td style="text-align: left">管理操作，不复制&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>启用 &lt;code>--try-errors&lt;/code> 后，重定向错误变成 &lt;code>-TRY &amp;lt;leader&amp;gt;&lt;/code>，且 &lt;code>CLUSTER&lt;/code> 命令被禁用；这是为那些需要
+区分「去别处重试」与「集群把我重定向了」的客户端准备的。&lt;/p></description></item><item><title>存储驱动</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/storage-backends/</guid><description>&lt;h1 id="存储驱动">
+ 存储驱动
+ &lt;a class="anchor" href="#%e5%ad%98%e5%82%a8%e9%a9%b1%e5%8a%a8">#&lt;/a>
+&lt;/h1>
+&lt;p>&lt;code>--storage-backend &amp;lt;name&amp;gt;&lt;/code> 选择位于 ledis 数据模型之下的驱动。命令层是针对 &lt;code>store.driver.IDB&lt;/code>
+编写的，所以同一套命令在每个后端上都能跑——变的是字节存放在哪里、由谁复制它们，以及这个驱动能信到
+什么程度。&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">IDB&lt;/span> &lt;span style="color:#66d9ef">interface&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Close&lt;/span>() &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Get&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) ([]&lt;span style="color:#66d9ef">byte&lt;/span>, &lt;span style="color:#66d9ef">error&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Put&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>, &lt;span style="color:#a6e22e">value&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Delete&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">SyncPut&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>, &lt;span style="color:#a6e22e">value&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">SyncDelete&lt;/span>(&lt;span style="color:#a6e22e">key&lt;/span> []&lt;span style="color:#66d9ef">byte&lt;/span>) &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">NewIterator&lt;/span>() &lt;span style="color:#a6e22e">IIterator&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">NewWriteBatch&lt;/span>() &lt;span style="color:#a6e22e">IWriteBatch&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">NewSnapshot&lt;/span>() (&lt;span style="color:#a6e22e">ISnapshot&lt;/span>, &lt;span style="color:#66d9ef">error&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">Compact&lt;/span>() &lt;span style="color:#66d9ef">error&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">GetStorageEngine&lt;/span>() &lt;span style="color:#66d9ef">interface&lt;/span>{}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="每个后端是什么">
+ 每个后端是什么
+ &lt;a class="anchor" href="#%e6%af%8f%e4%b8%aa%e5%90%8e%e7%ab%af%e6%98%af%e4%bb%80%e4%b9%88">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">&lt;code>--storage-backend&lt;/code>&lt;/th>
+ &lt;th style="text-align: left">数据在哪&lt;/th>
+ &lt;th style="text-align: left">复制方式&lt;/th>
+ &lt;th style="text-align: left">外部依赖&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>goleveldb&lt;/code> &lt;em>（默认）&lt;/em>&lt;/td>
+ &lt;td style="text-align: left">本地 LevelDB（纯 Go）&lt;/td>
+ &lt;td style="text-align: left">仅 Raft&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>badger&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">本地 BadgerDB v4，ZSTD 压缩&lt;/td>
+ &lt;td style="text-align: left">仅 Raft&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>hybriddb&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">本地 LevelDB + Ristretto 热缓存，按驱动暴露指标&lt;/td>
+ &lt;td style="text-align: left">仅 Raft&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>oss&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">S3 兼容对象存储，本地 LevelDB 索引 + Ristretto 缓存&lt;/td>
+ &lt;td style="text-align: left">仅 Raft&lt;/td>
+ &lt;td style="text-align: left">S3/MinIO 端点&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ipfs&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">本地 LevelDB，其值按 CID 从 IPFS 取回&lt;/td>
+ &lt;td style="text-align: left">仅 Raft&lt;/td>
+ &lt;td style="text-align: left">IPFS API（不是网关）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ipfs-synckv&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">IPFS 作为真值来源 + 本地镜像 + 版本元数据，可选 AES-256&lt;/td>
+ &lt;td style="text-align: left">IPFS/ipfs-log P2P&lt;/td>
+ &lt;td style="text-align: left">IPFS API + P2P&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>crdt&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">本地 Badger + 基于 libp2p pubsub 的 &lt;code>icefiredb-crdt-kv&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">P2P CRDT&lt;/td>
+ &lt;td style="text-align: left">libp2p 对等节点&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ipfs-log&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">基于 IPFS pubsub 的只追加 &lt;code>icefiredb-ipfs-log&lt;/code> 存储&lt;/td>
+ &lt;td style="text-align: left">P2P 日志&lt;/td>
+ &lt;td style="text-align: left">IPFS + P2P&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>leveldb&lt;/code>（cgo 驱动）和 &lt;code>orbitdb&lt;/code> &lt;strong>没有&lt;/strong>被编译进二进制：前者从未被 import，后者在
+&lt;code>main.go&lt;/code>/&lt;code>flags.go&lt;/code> 里被注释掉。传入这两个名字中的任何一个都会在启动时报 &amp;ldquo;unknown driver&amp;rdquo;。&lt;/p></description></item><item><title>安全</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/security/</guid><description>&lt;h1 id="安全">
+ 安全
+ &lt;a class="anchor" href="#%e5%ae%89%e5%85%a8">#&lt;/a>
+&lt;/h1>
+&lt;p>引擎有三个与安全相关的面：RESP 监听器、Raft 传输，以及可选的管理 HTTP 服务。它们共用一个凭据和一份
+证书。&lt;/p>
+&lt;h2 id="传输加密tls">
+ 传输加密（TLS）
+ &lt;a class="anchor" href="#%e4%bc%a0%e8%be%93%e5%8a%a0%e5%af%86tls">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB --tls-cert ./server.crt --tls-key ./server.key -a 0.0.0.0:11001 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ul>
+&lt;li>两个参数必须一起给出——只给其中一个会在启动时报错。&lt;/li>
+&lt;li>TLS 作用于&lt;strong>唯一的监听 socket&lt;/strong>。RESP 客户端和 Raft 传输都到达它上面，服务端通过嗅探首字节来分辨
+哪个是哪个。没有第二个端口。&lt;/li>
+&lt;li>因此 &lt;code>--advertise&lt;/code> 的值必须是节点和客户端使用的 TLS 地址。&lt;/li>
+&lt;li>客户端也必须走 TLS：&lt;code>redis-cli --tls --cacert ./ca.crt -h host -p 11001&lt;/code>，或等效的客户端选项
+（&lt;code>go-redis&lt;/code>：&lt;code>TLSConfig&lt;/code>；Python &lt;code>redis.Redis(ssl=True)&lt;/code>；Node &lt;code>tls: {}&lt;/code>）。&lt;/li>
+&lt;li>证书需要为客户端使用的名字提供一个 &lt;code>DNS:&lt;/code> SAN；服务端会把第一个 DNS SAN 复制进用于出站连接的
+&lt;code>tls.Config.ServerName&lt;/code>。&lt;/li>
+&lt;li>&lt;strong>没有客户端证书。&lt;/strong> &lt;code>tls.Config&lt;/code> 只用 &lt;code>Certificates&lt;/code> 构建，所以既没有 mTLS，也没有客户端身份。
+节点之间用共享 token 认证，而不是证书。&lt;/li>
+&lt;/ul>
+&lt;h2 id="集群授权">
+ 集群授权
+ &lt;a class="anchor" href="#%e9%9b%86%e7%be%a4%e6%8e%88%e6%9d%83">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>export ICEFIREDB_AUTH&lt;span style="color:#f92672">=&lt;/span>&lt;span style="color:#e6db74">&amp;#39;openssl rand -hex 32&amp;#39;&lt;/span> &lt;span style="color:#75715e"># preferred: not visible in the process list&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB -a 0.0.0.0:11001 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># or&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>./bin/IceFireDB --auth &lt;span style="color:#e6db74">&amp;#39;&amp;lt;token&amp;gt;&amp;#39;&lt;/span> -a 0.0.0.0:11001 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>它做什么：&lt;/p></description></item><item><title>可观测性</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/observability/</guid><description>&lt;h1 id="可观测性">
+ 可观测性
+ &lt;a class="anchor" href="#%e5%8f%af%e8%a7%82%e6%b5%8b%e6%80%a7">#&lt;/a>
+&lt;/h1>
+&lt;p>有三种方式能看到节点在做什么：HTTP 端点、&lt;code>INFO&lt;/code> 命令和 pprof。三者都需要显式开启。&lt;/p>
+&lt;h2 id="http-端点">
+ HTTP 端点
+ &lt;a class="anchor" href="#http-%e7%ab%af%e7%82%b9">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>./bin/IceFireDB --metrics --metrics-addr 127.0.0.1:11002 -d /var/lib/icefiredb
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">路径&lt;/th>
+ &lt;th style="text-align: left">响应&lt;/th>
+ &lt;th style="text-align: left">用途&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>/healthz&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">只要进程还活着就返回 &lt;code>200 ok&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">存活探针&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>/readyz&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">存储驱动初始化完成后返回 &lt;code>200 ready&lt;/code>；在此之前返回 &lt;code>503 not ready&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">就绪探针 / 上线门禁&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>/metrics&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Prometheus 文本格式&lt;/td>
+ &lt;td style="text-align: left">抓取&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>服务端是一个普通的 &lt;code>http.Server&lt;/code>，&lt;code>ReadHeaderTimeout&lt;/code> 为 5 秒；它没有认证，所以留在回环地址或私有
+网卡上（见
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/deploy/security/">安全&lt;/a>）。&lt;/p>
+&lt;h3 id="暴露的指标">
+ 暴露的指标
+ &lt;a class="anchor" href="#%e6%9a%b4%e9%9c%b2%e7%9a%84%e6%8c%87%e6%a0%87">#&lt;/a>
+&lt;/h3>
+&lt;p>注册表不是全局那个——它注册的正好是：&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">指标&lt;/th>
+ &lt;th style="text-align: left">类型&lt;/th>
+ &lt;th style="text-align: left">含义&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>icefiredb_connected_clients&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">gauge&lt;/td>
+ &lt;td style="text-align: left">当前打开的 RESP 连接数&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>go_*&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">collector&lt;/td>
+ &lt;td style="text-align: left">Go 运行时（goroutine、GC、memstats……）&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>process_*&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">collector&lt;/td>
+ &lt;td style="text-align: left">进程 CPU、RSS、FD、启动时间&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;strong>没有&lt;/strong> Raft 指标，没有按命令的计数器，也没有延迟直方图。命令和存储的计数器改放在 &lt;code>INFO&lt;/code> 里（见
+下文）。抓取间隔和告警应当依赖 &lt;code>up&lt;/code>、&lt;code>icefiredb_connected_clients&lt;/code> 以及容器层面的信号。&lt;/p></description></item><item><title>运维</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/operations/</guid><description>&lt;h1 id="运维">
+ 运维
+ &lt;a class="anchor" href="#%e8%bf%90%e7%bb%b4">#&lt;/a>
+&lt;/h1>
+&lt;p>单节点或 Raft 集群的备份、恢复、升级与故障恢复。所有东西的单位是&lt;strong>节点目录&lt;/strong>：
+&lt;code>&amp;lt;data-dir&amp;gt;/IceFireDB/&amp;lt;node-id&amp;gt;/&lt;/code>。&lt;/p>
+&lt;h2 id="磁盘上有什么">
+ 磁盘上有什么
+ &lt;a class="anchor" href="#%e7%a3%81%e7%9b%98%e4%b8%8a%e6%9c%89%e4%bb%80%e4%b9%88">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">路径&lt;/th>
+ &lt;th style="text-align: left">内容&lt;/th>
+ &lt;th style="text-align: left">备份方式&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>main.db/&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">所选驱动格式的 ledis 存储&lt;/td>
+ &lt;td style="text-align: left">复制该目录&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>store/&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Raft 日志 + 稳定存储（&lt;code>leveldb&lt;/code> 或 &lt;code>bolt&lt;/code>）&lt;/td>
+ &lt;td style="text-align: left">复制该目录&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>snapshots/&amp;lt;id&amp;gt;/state.bin&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">Raft 状态机快照：gzip 头（start/ts/seed）+ &lt;code>sds&lt;/code> 键/值流&lt;/td>
+ &lt;td style="text-align: left">&lt;code>RAFT SNAPSHOT&lt;/code>，或复制该目录&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>state.bin&lt;/code> 与后端无关：&lt;code>writeSnapshot&lt;/code> 遍历驱动的快照，把 &lt;code>key, value&lt;/code> 对写进一个 gzip 流。这就是为什么在
+&lt;code>badger&lt;/code> 节点上做的快照可以恢复到 &lt;code>goleveldb&lt;/code> 节点，而 &lt;code>main.db/&lt;/code> 目录本身永远不行。请把这个文件当作不透明的：
+整体复制（或用 &lt;code>RAFT SNAPSHOT READ&lt;/code> 按窗口读取），再用 &lt;code>--restore&lt;/code> 交回去 —— 不要解压或修改它。&lt;/p>
+&lt;h2 id="备份">
+ 备份
+ &lt;a class="anchor" href="#%e5%a4%87%e4%bb%bd">#&lt;/a>
+&lt;/h2>
+&lt;p>&lt;strong>方案 A——快照状态机（推荐，可移植）&lt;/strong>&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-bash" data-lang="bash">&lt;span style="display:flex;">&lt;span>redis-cli -p &lt;span style="color:#ae81ff">11001&lt;/span> RAFT SNAPSHOT NOW &lt;span style="color:#75715e"># returns the new snapshot id&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-cli -p &lt;span style="color:#ae81ff">11001&lt;/span> RAFT SNAPSHOT LIST &lt;span style="color:#75715e"># ids and sizes&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>redis-cli -p &lt;span style="color:#ae81ff">11001&lt;/span> RAFT SNAPSHOT FILE &amp;lt;id&amp;gt; &lt;span style="color:#75715e"># absolute path on the server&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># copy that file off the host:&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>scp db1:/var/lib/icefiredb/IceFireDB/1/snapshots/&amp;lt;id&amp;gt;/state.bin ./backup-&lt;span style="color:#66d9ef">$(&lt;/span>date +%F&lt;span style="color:#66d9ef">)&lt;/span>.sds
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>对于很大或带宽受限的快照，按窗口读它，而不是复制文件：&lt;/p></description></item><item><title>系统命令</title><link>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://docs.icefiredb.xyz/icefiredb_docs/zh/deploy/system-commands/</guid><description>&lt;h1 id="系统命令">
+ 系统命令
+ &lt;a class="anchor" href="#%e7%b3%bb%e7%bb%9f%e5%91%bd%e4%bb%a4">#&lt;/a>
+&lt;/h1>
+&lt;p>
+ &lt;a href="https://docs.icefiredb.xyz/icefiredb_docs/icefiredb_docs/zh/commands/">命令参考&lt;/a>里的 110 条命令是数据面。在它们之下还有第二个面，由 Raft/RESP 层提供，运维
+依赖它。它不属于 Redis 命令集，所以记在这里。&lt;/p>
+&lt;p>这些命令除非特别说明，否则都不经过 Raft 日志，并且 &lt;code>--try-errors&lt;/code> 会禁用 &lt;code>CLUSTER&lt;/code> 家族。&lt;/p>
+&lt;h2 id="连接">
+ 连接
+ &lt;a class="anchor" href="#%e8%bf%9e%e6%8e%a5">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">回复&lt;/th>
+ &lt;th style="text-align: left">说明&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>PING [message]&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>PONG&lt;/code>，或该 message&lt;/td>
+ &lt;td style="text-align: left">在分发之前处理&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>ECHO message&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">该 message&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>AUTH token&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>OK&lt;/code> / &lt;code>-unauthorized&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">设置 &lt;code>--auth&lt;/code> 时必须最先发送&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>QUIT&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>OK&lt;/code>，然后连接关闭&lt;/td>
+ &lt;td style="text-align: left">—&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>SHUTDOWN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;em>（无——进程退出）&lt;/em>&lt;/td>
+ &lt;td style="text-align: left">从客户端角度看等价于 &lt;code>SIGKILL&lt;/code>；配置了 &lt;code>AUTH&lt;/code> 时要求先认证&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="machine">
+ Machine
+ &lt;a class="anchor" href="#machine">#&lt;/a>
+&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">命令&lt;/th>
+ &lt;th style="text-align: left">回复&lt;/th>
+ &lt;th style="text-align: left">含义&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>VERSION&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">bulk string&lt;/td>
+ &lt;td style="text-align: left">引擎版本，例如 &lt;code>1.0.0-rc.1&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MACHINE&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>now&lt;/code>、&lt;code>uptime&lt;/code>、&lt;code>boottime&lt;/code> 的映射（纳秒）&lt;/td>
+ &lt;td style="text-align: left">时间来自 Raft 时钟，所以每个节点一致&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>MACHINE HUMAN&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">同样的键，RFC3339 / duration 形式&lt;/td>
+ &lt;td style="text-align: left">人类可读的变体&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&lt;code>BARRIER&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">&lt;code>OK&lt;/code>&lt;/td>
+ &lt;td style="text-align: left">一个空操作的&lt;strong>写&lt;/strong>：它返回时，该客户端此前发出的每个写都已应用&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;p>&lt;code>BARRIER&lt;/code> 是跨客户端或跨节点获得读己之写（read-your-writes）保证的方式：在主节点上发送 &lt;code>BARRIER&lt;/code>，
+然后用 &lt;code>--openreads&lt;/code> 在从节点上读。&lt;/p></description></item></channel></rss>
