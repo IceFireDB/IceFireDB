@@ -146,36 +146,8 @@ func handleInboundSQL(m *mysqlProxy, s *p2p.Message, txConn map[string]*client.C
 	}
 }
 
-var DMLSQL = []string{
-	"BEGIN",
-	"BEGIN TRANSACTION",
-	"COMMIT",
-	"END TRANSACTION",
-	"ROLLBACK",
-	"INSERT",
-	"UPDATE",
-	"DELETE",
-	"CREATE",
-	"ALERT",
-	"DROP",
-}
-
-func isDML(sql string) bool {
-	prefix := sql
-	if len(sql) > 20 {
-		prefix = sql[:20]
-	}
-	prefix = strings.ToUpper(prefix)
-	for _, v := range DMLSQL {
-		if strings.HasPrefix(prefix, v) {
-			return true
-		}
-	}
-	return false
-}
-
 func broadcast(sql string, accessType string) {
-	if !isDML(sql) {
+	if !classifySQL(sql).replicateSafe() {
 		return
 	}
 

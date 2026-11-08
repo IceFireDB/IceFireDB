@@ -26,12 +26,12 @@ func (h *Handle) UseDB(c *server.Conn, dbName string) error {
 
 func (h *Handle) HandleQuery(c *server.Conn, query string) (res *mysql.Result, err error) {
 	// Check if this is a readonly connection attempting a write
-	if h.conn.GetUser() == config.Get().Mysql.Readonly.User && isDML(query) {
+	if h.conn.GetUser() == config.Get().Mysql.Readonly.User && classifySQL(query).Write {
 		return nil, errors.New("readonly user cannot execute write operations")
 	}
 
 	res, err = h.conn.Execute(query)
-	if err == nil && isDML(query) {
+	if err == nil && classifySQL(query).Write {
 		// Determine access type based on connection user
 		accessType := "admin"
 		if h.conn.GetUser() == config.Get().Mysql.Readonly.User {
@@ -56,7 +56,7 @@ func (h *Handle) HandleStmtPrepare(c *server.Conn, query string) (int, int, any,
 
 func (h *Handle) HandleStmtExecute(c *server.Conn, context any, query string, args []any) (*mysql.Result, error) {
 	// Check if this is a readonly connection attempting a write
-	if h.conn.GetUser() == config.Get().Mysql.Readonly.User && isDML(query) {
+	if h.conn.GetUser() == config.Get().Mysql.Readonly.User && classifySQL(query).Write {
 		return nil, errors.New("readonly user cannot execute write operations")
 	}
 
@@ -65,7 +65,7 @@ func (h *Handle) HandleStmtExecute(c *server.Conn, context any, query string, ar
 		return nil, errors.New("other error")
 	}
 	res, err := stmt.Execute(args...)
-	if err == nil && isDML(query) {
+	if err == nil && classifySQL(query).Write {
 		// Determine access type based on connection user
 		accessType := "admin"
 		if h.conn.GetUser() == config.Get().Mysql.Readonly.User {
