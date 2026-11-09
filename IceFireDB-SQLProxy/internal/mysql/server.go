@@ -41,7 +41,6 @@ func Run(ctx context.Context) error {
 		return fmt.Errorf("listen on %s: %w", cfg.Server.Addr, err)
 	}
 
-	ms.closed.Store(false)
 	logrus.Infof("IceFireDB-SQLProxy %s serving MySQL protocol on %s", Version, cfg.Server.Addr)
 
 	if cfg.P2P.Enable {
@@ -65,7 +64,6 @@ func Run(ctx context.Context) error {
 		case <-stopWatcher:
 			return
 		}
-		ms.closed.Store(true)
 		_ = ln.Close()
 	}, nil)
 

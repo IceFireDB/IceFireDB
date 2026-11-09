@@ -14,7 +14,6 @@ import (
 	"github.com/IceFireDB/IceFireDB/IceFireDB-SQLProxy/pkg/mysql/server"
 
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 )
 
 const (
@@ -34,7 +33,6 @@ type mysqlProxy struct {
 	server       *server.Server
 	credential   server.CredentialProvider
 	pLock        sync.RWMutex
-	closed       atomic.Value
 	adminPool    *client.Pool
 	readonlyPool *client.Pool
 	// tenants maps an authenticated proxy user to its role.
