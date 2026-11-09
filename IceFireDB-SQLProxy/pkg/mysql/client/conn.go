@@ -264,7 +264,6 @@ func (c *Conn) FieldList(table string, wildcard string) ([]*Field, error) {
 			fs = append(fs, f)
 		}
 	}
-	return nil, fmt.Errorf("field list error")
 }
 
 func (c *Conn) SetAutoCommit(n bool) error {

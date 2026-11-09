@@ -42,6 +42,8 @@ type (
 		}
 
 		readyConnection chan Connection
+		stop            chan struct{}
+		stopOnce        sync.Once
 	}
 
 	ConnectionStats struct {
@@ -115,6 +117,7 @@ func NewPool(
 		},
 
 		readyConnection: make(chan Connection),
+		stop:            make(chan struct{}),
 	}
 
 	pool.synchro.idleConnections = make([]Connection, 0, pool.maxIdle)
@@ -131,6 +134,38 @@ func NewPool(
 	go pool.closeOldIdleConnections()
 
 	return pool, nil
+}
+
+// Close stops the pool's background maintenance and closes the idle connections. It
+// does not wait for connections in use: their owners return them with PutConn, which
+// closes them once the pool is stopped.
+func (pool *Pool) Close() {
+	pool.stopOnce.Do(func() {
+		close(pool.stop)
+	})
+
+	pool.synchro.Lock()
+	idle := pool.synchro.idleConnections
+	pool.synchro.idleConnections = nil
+	pool.synchro.stats.TotalCount -= len(idle)
+	pool.synchro.stats.IdleCount = 0
+	pool.synchro.Unlock()
+
+	for _, connection := range idle {
+		if connection.conn != nil {
+			_ = connection.conn.Close()
+		}
+	}
+}
+
+// stopping reports whether Close has been called.
+func (pool *Pool) stopping() bool {
+	select {
+	case <-pool.stop:
+		return true
+	default:
+		return false
+	}
 }
 
 func (pool *Pool) GetStats(stats *ConnectionStats) {
@@ -231,6 +266,9 @@ func (pool *Pool) newConnectionProducer() {
 	var err error
 
 	for {
+		if pool.stopping() {
+			return
+		}
 		connection.conn = nil
 
 		pool.synchro.Lock()
@@ -240,7 +278,11 @@ func (pool *Pool) newConnectionProducer() {
 			if pool.synchro.stats.TotalCount >= pool.maxAlive {
 				// Can't create more connections
 				pool.synchro.Unlock()
-				time.Sleep(10 * time.Millisecond)
+				select {
+				case <-pool.stop:
+					return
+				case <-time.After(10 * time.Millisecond):
+				}
 				continue
 			}
 			pool.synchro.stats.TotalCount++ // "Reserving" new connection
@@ -299,8 +341,15 @@ func (pool *Pool) closeOldIdleConnections() {
 	var toPing []Connection
 
 	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
-	for range ticker.C {
+	for {
+		select {
+		case <-pool.stop:
+			return
+		case <-ticker.C:
+		}
+
 		toPing = pool.getOldIdleConnections(toPing[:0])
 		if len(toPing) == 0 {
 			continue
