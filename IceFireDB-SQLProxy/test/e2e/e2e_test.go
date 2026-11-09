@@ -24,6 +24,8 @@ import (
 )
 
 const (
+	rootUser      = "root"
+	rootPassword  = "rootpass"
 	mysqlUser     = "sqlproxy"
 	mysqlPassword = "sqlproxypass"
 	readerUser    = "reader"
@@ -70,6 +72,7 @@ func TestReplicationEndToEnd(t *testing.T) {
 	waitFor(t, repliceTimeout, "nodes to connect", func() bool {
 		return nodeB.peers(t) >= 1
 	})
+	waitForReplication(t, nodeA.proxyAddr, mysqlAddr, schemaB)
 
 	t.Run("autocommit write reaches the peer", func(t *testing.T) {
 		execSQL(t, nodeA.proxyAddr, "INSERT INTO t (id, v) VALUES (1, 'autocommit')")
@@ -143,7 +146,10 @@ func startMySQL(t *testing.T) string {
 	// mysql_native_password keeps the test independent of the caching_sha2 RSA exchange.
 	args := []string{
 		"run", "-d", "--name", name,
-		"-e", "MYSQL_ROOT_PASSWORD=rootpass",
+		"-e", "MYSQL_ROOT_PASSWORD=" + rootPassword,
+		// Without MYSQL_ROOT_HOST the image creates root@localhost only, which the
+		// seeding connection below (from the host, over TCP) cannot use.
+		"-e", "MYSQL_ROOT_HOST=%",
 		"-e", "MYSQL_DATABASE=" + schemaA,
 		"-e", "MYSQL_USER=" + mysqlUser,
 		"-e", "MYSQL_PASSWORD=" + mysqlPassword,
@@ -156,6 +162,12 @@ func startMySQL(t *testing.T) string {
 		t.Fatalf("start mysql container: %v\n%s", err, out)
 	}
 	t.Cleanup(func() {
+		// The container is removed below, so its log has to be captured here to be useful.
+		if t.Failed() {
+			if out, err := exec.Command("docker", "logs", "--tail", "100", name).CombinedOutput(); err == nil {
+				t.Logf("mysql log:\n%s", out)
+			}
+		}
 		_ = exec.Command("docker", "rm", "-f", name).Run()
 	})
 
@@ -176,7 +188,9 @@ func startMySQL(t *testing.T) string {
 func seedSchema(t *testing.T, mysqlAddr string) {
 	t.Helper()
 
-	conn := dialAsMySQL(t, mysqlAddr, mysqlUser, mysqlPassword, schemaA)
+	// The image grants MYSQL_USER rights on MYSQL_DATABASE only, so creating the peer
+	// schema and the read-only user needs the root account.
+	conn := dialAsMySQL(t, mysqlAddr, rootUser, rootPassword, schemaA)
 	defer conn.Close()
 
 	for _, stmt := range []string{
@@ -185,7 +199,6 @@ func seedSchema(t *testing.T, mysqlAddr string) {
 		fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED WITH mysql_native_password BY '%s'", readerUser, readerPass),
 		"GRANT SELECT ON " + schemaA + ".* TO '" + readerUser + "'@'%'",
 		"GRANT SELECT ON " + schemaB + ".* TO '" + readerUser + "'@'%'",
-		"FLUSH PRIVILEGES",
 		"CREATE TABLE IF NOT EXISTS " + schemaA + ".t (id INT PRIMARY KEY, v VARCHAR(64))",
 		"CREATE TABLE IF NOT EXISTS " + schemaB + ".t (id INT PRIMARY KEY, v VARCHAR(64))",
 	} {
@@ -211,13 +224,9 @@ type node struct {
 
 func (n *node) peerID() string { return n.peerIDVal }
 
-func startNode(t *testing.T, spec nodeSpec) *node {
-	t.Helper()
-
-	proxyPort := freePort(t)
-	debugPort := freePort(t)
-	dir := t.TempDir()
-
+// renderConfig produces a node's configuration file. It is separate from startNode so a
+// test can prove the YAML this suite ships parses, without needing a container.
+func renderConfig(spec nodeSpec, proxyPort, debugPort int, mysqlAddr string) string {
 	peers := "[]"
 	if len(spec.peers) > 0 {
 		quoted := make([]string, 0, len(spec.peers))
@@ -227,7 +236,7 @@ func startNode(t *testing.T, spec nodeSpec) *node {
 		peers = "[" + strings.Join(quoted, ", ") + "]"
 	}
 
-	conf := fmt.Sprintf(`server:
+	return fmt.Sprintf(`server:
   addr: "127.0.0.1:%d"
   idleTimeout: 60
   writeTimeout: 60
@@ -270,11 +279,21 @@ p2p:
   bootstrapPeers: %s
 `,
 		proxyPort, debugPort,
-		mysqlHostPort(t), mysqlUser, mysqlPassword, spec.schema,
-		mysqlHostPort(t), readerUser, readerPass, spec.schema,
+		mysqlAddr, mysqlUser, mysqlPassword, spec.schema,
+		mysqlAddr, readerUser, readerPass, spec.schema,
 		proxyUser, proxyPass, readonlyTenant, readonlyTenantP,
 		p2pToken, peers,
 	)
+}
+
+func startNode(t *testing.T, spec nodeSpec) *node {
+	t.Helper()
+
+	proxyPort := freePort(t)
+	debugPort := freePort(t)
+	dir := t.TempDir()
+
+	conf := renderConfig(spec, proxyPort, debugPort, mysqlHostPort(t))
 
 	confPath := filepath.Join(dir, "config.yaml")
 	if err := os.WriteFile(confPath, []byte(conf), 0o600); err != nil {
@@ -476,6 +495,45 @@ func mustExec(t *testing.T, conn *client.Conn, statement string) {
 	}
 }
 
+// rowMatches reports whether the peer's schema already holds want for id.
+func rowMatches(mysqlAddr, db string, id int, want string) bool {
+	conn, err := client.Connect(mysqlAddr, mysqlUser, mysqlPassword, db)
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+
+	result, err := conn.Execute(fmt.Sprintf("SELECT v FROM t WHERE id = %d", id))
+	if err != nil || len(result.Values) == 0 {
+		return false
+	}
+	return string(result.Values[0][0].AsString()) == want
+}
+
+// waitForReplication publishes a warm-up write until the peer applies it. Gossipsub grafts
+// a peer a heartbeat or two after it connects, and a write published before that is lost —
+// best-effort replication makes no delivery guarantee — so the test waits for the channel
+// to be live rather than racing it.
+func waitForReplication(t *testing.T, proxyAddr, mysqlAddr, peerSchema string) {
+	t.Helper()
+
+	deadline := time.Now().Add(repliceTimeout)
+	for attempt := 1; time.Now().Before(deadline); attempt++ {
+		want := fmt.Sprintf("warmup-%d", attempt)
+		execSQL(t, proxyAddr, fmt.Sprintf("REPLACE INTO t (id, v) VALUES (100, '%s')", want))
+
+		probeUntil := time.Now().Add(3 * time.Second)
+		for time.Now().Before(probeUntil) {
+			if rowMatches(mysqlAddr, peerSchema, 100, want) {
+				t.Logf("replication became ready after %d warm-up write(s)", attempt)
+				return
+			}
+			time.Sleep(pollInterval)
+		}
+	}
+	t.Fatalf("replication never became ready: no warm-up write reached %s", peerSchema)
+}
+
 func rowExists(t *testing.T, mysqlAddr, db string, id int) bool {
 	t.Helper()
 	conn := dialAsMySQL(t, mysqlAddr, mysqlUser, mysqlPassword, db)
@@ -491,22 +549,7 @@ func rowExists(t *testing.T, mysqlAddr, db string, id int) bool {
 func waitForRow(t *testing.T, mysqlAddr, db string, id int, want string) {
 	t.Helper()
 	waitFor(t, repliceTimeout, fmt.Sprintf("row %d to appear in %s", id, db), func() bool {
-		conn := dialAsMySQL(t, mysqlAddr, mysqlUser, mysqlPassword, db)
-		defer conn.Close()
-
-		result, err := conn.Execute(fmt.Sprintf("SELECT v FROM t WHERE id = %d", id))
-		if err != nil {
-			return false
-		}
-		if len(result.Values) == 0 {
-			return false
-		}
-		got := string(result.Values[0][0].AsString())
-		if got != want {
-			t.Logf("row %d in %s = %q, want %q", id, db, got, want)
-			return false
-		}
-		return true
+		return rowMatches(mysqlAddr, db, id, want)
 	})
 }
 
