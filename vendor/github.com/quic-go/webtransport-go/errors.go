@@ -41,6 +41,9 @@ const (
 	// WTSessionGoneErrorCode is the error code of the WT_SESSION_GONE error.
 	WTSessionGoneErrorCode quic.StreamErrorCode = 0x170d7b68
 
+	// WTFlowControlErrorCode is the error code of the WT_FLOW_CONTROL_ERROR error.
+	WTFlowControlErrorCode quic.StreamErrorCode = 0x045d4487
+
 	// WTRequirementsNotMetErrorCode is the error code of the
 	// WT_REQUIREMENTS_NOT_MET error.
 	WTRequirementsNotMetErrorCode quic.ApplicationErrorCode = 0x212c0d48
@@ -83,7 +86,7 @@ func (e *SessionError) Is(target error) bool {
 }
 
 // RequirementsNotMetError is returned when the peer doesn't advertise
-// the required HTTP/3 or WebTransport capabilities.
+// the required QUIC, HTTP/3 or WebTransport capabilities.
 type RequirementsNotMetError struct {
 	Message string
 }

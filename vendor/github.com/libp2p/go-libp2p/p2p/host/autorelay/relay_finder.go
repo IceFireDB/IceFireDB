@@ -167,17 +167,13 @@ func (rf *relayFinder) cleanupDisconnectedPeers(ctx context.Context) {
 
 func (rf *relayFinder) background(ctx context.Context) {
 	peerSourceRateLimiter := make(chan struct{}, 1)
-	rf.refCount.Add(1)
-	go func() {
-		defer rf.refCount.Done()
+	rf.refCount.Go(func() {
 		rf.findNodes(ctx, peerSourceRateLimiter)
-	}()
+	})
 
-	rf.refCount.Add(1)
-	go func() {
-		defer rf.refCount.Done()
+	rf.refCount.Go(func() {
 		rf.handleNewCandidates(ctx)
-	}()
+	})
 
 	now := rf.conf.clock.Now()
 	bootDelayTimer := rf.conf.clock.InstantTimer(now.Add(rf.conf.bootDelay))
@@ -663,13 +659,13 @@ func (rf *relayFinder) connectToRelay(ctx context.Context, cand *candidate) (*ci
 		}
 	}
 
-	rf.candidateMx.Lock()
-	rf.backoff[id] = rf.conf.clock.Now()
-	rf.candidateMx.Unlock()
 	var err error
 	if cand.supportsRelayV2 {
 		rsvp, err = circuitv2.Reserve(ctx, rf.host, cand.ai)
 		if err != nil {
+			rf.candidateMx.Lock()
+			rf.backoff[id] = rf.conf.clock.Now()
+			rf.candidateMx.Unlock()
 			err = fmt.Errorf("failed to reserve slot: %w", err)
 		}
 	}
@@ -779,11 +775,9 @@ func (rf *relayFinder) Start() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	rf.ctxCancel = cancel
-	rf.refCount.Add(1)
-	go func() {
-		defer rf.refCount.Done()
+	rf.refCount.Go(func() {
 		rf.background(ctx)
-	}()
+	})
 	return nil
 }
 

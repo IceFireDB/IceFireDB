@@ -142,25 +142,32 @@ func (b BytesDataProvider) Bytes(ifi *net.Interface) []byte {
 // WriteTo sends a multicast message to interfaces.
 func (mc *Conn) WriteTo(dataProv DataProvider, to net.Addr) (int, error) {
 	// Send a multicast message directory when recipient "to" address is not multicast.
-	if uaddr, ok := to.(*net.UDPAddr); ok && !uaddr.IP.IsMulticast() {
+	if uaddr, ok := to.(*net.UDPAddr); !ok || !uaddr.IP.IsMulticast() || len(mc.ifps) == 0 {
 		return mc.writeToIfi(dataProv, to, nil)
 	}
 	// Send a multicast message to all interfaces (iflist).
 	sum := 0
+	var lastErr error
 	for _, ifi := range mc.ifps {
-		ssdplog.Printf("WriteTo: ifi=%+v", ifi)
 		n, err := mc.writeToIfi(dataProv, to, ifi)
 		if err != nil {
-			return 0, err
+			ssdplog.Printf("failed to write to %s: %s", ifi.Name, err)
+			lastErr = err
+			continue
 		}
 		sum += n
+	}
+	if sum == 0 && lastErr != nil {
+		return 0, lastErr
 	}
 	return sum, nil
 }
 
 func (mc *Conn) writeToIfi(dataProv DataProvider, to net.Addr, ifi *net.Interface) (int, error) {
-	if err := mc.pconn.SetMulticastInterface(ifi); err != nil {
-		return 0, err
+	if ifi != nil {
+		if err := mc.pconn.SetMulticastInterface(ifi); err != nil {
+			return 0, err
+		}
 	}
 	return mc.pconn.WriteTo(dataProv.Bytes(ifi), nil, to)
 }

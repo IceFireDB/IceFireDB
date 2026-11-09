@@ -468,6 +468,8 @@ func (pg *peerGater) RecvRPC(rpc *RPC) {}
 
 func (pg *peerGater) SendRPC(rpc *RPC, p peer.ID) {}
 
+func (pg *peerGater) SendRPCCompleted(rpc *RPC, p peer.ID, writeDuration time.Duration) {}
+
 func (pg *peerGater) DropRPC(rpc *RPC, p peer.ID) {}
 
 func (pg *peerGater) UndeliverableMessage(msg *Message) {}

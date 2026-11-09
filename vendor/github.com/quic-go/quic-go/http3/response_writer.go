@@ -16,7 +16,8 @@ import (
 	"golang.org/x/net/http/httpguts"
 )
 
-// The HTTPStreamer allows taking over a HTTP/3 stream. The interface is implemented by the http.ResponseWriter.
+// HTTPStreamer allows an HTTP handler to take over an HTTP/3 stream.
+// It is implemented by the [http.ResponseWriter] passed to HTTP/3 handlers.
 // When a stream is taken over, it's the caller's responsibility to close the stream.
 type HTTPStreamer interface {
 	HTTPStream() *Stream
@@ -167,7 +168,7 @@ func (w *responseWriter) doWrite(p []byte) (int, error) {
 	if !w.headerWritten {
 		w.sniffContentType(w.smallResponseBuf)
 		if err := w.writeHeader(w.status); err != nil {
-			return 0, maybeReplaceError(err)
+			return 0, err
 		}
 		w.headerWritten = true
 	}
@@ -187,11 +188,11 @@ func (w *responseWriter) doWrite(p []byte) (int, error) {
 		})
 	}
 	if _, err := w.str.writeUnframed(w.buf); err != nil {
-		return 0, maybeReplaceError(err)
+		return 0, err
 	}
 	if len(w.smallResponseBuf) > 0 {
 		if _, err := w.str.writeUnframed(w.smallResponseBuf); err != nil {
-			return 0, maybeReplaceError(err)
+			return 0, err
 		}
 		w.smallResponseBuf = nil
 	}
@@ -200,7 +201,7 @@ func (w *responseWriter) doWrite(p []byte) (int, error) {
 		var err error
 		n, err = w.str.writeUnframed(p)
 		if err != nil {
-			return n, maybeReplaceError(err)
+			return n, err
 		}
 	}
 	return n, nil
@@ -329,7 +330,7 @@ func (w *responseWriter) writeTrailers() error {
 	if written {
 		w.trailerWritten = true
 	}
-	return err
+	return maybeReplaceError(err)
 }
 
 func (w *responseWriter) HTTPStream() *Stream {

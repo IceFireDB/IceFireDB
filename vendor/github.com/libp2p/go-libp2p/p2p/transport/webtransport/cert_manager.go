@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -128,10 +129,8 @@ func (m *certManager) background(hostKey ic.PrivKey) {
 	d := m.currentConfig.End().Add(-clockSkewAllowance).Sub(m.clock.Now())
 	log.Debug("setting timer", "duration", d.String())
 	t := m.clock.Timer(d)
-	m.refCount.Add(1)
 
-	go func() {
-		defer m.refCount.Done()
+	m.refCount.Go(func() {
 		defer t.Stop()
 
 		for {
@@ -150,7 +149,7 @@ func (m *certManager) background(hostKey ic.PrivKey) {
 				m.mx.Unlock()
 			}
 		}
-	}()
+	})
 }
 
 func (m *certManager) GetConfig() *tls.Config {
@@ -165,8 +164,17 @@ func (m *certManager) AddrComponent() ma.Multiaddr {
 	return m.addrComp
 }
 
+// SerializedCertHashes returns the multihash-encoded hashes of the currently
+// valid certificates. The caller owns the returned slice: cacheSerializedCertHashes
+// reuses the backing array across rotations, so handing out the manager's own
+// slice would let a caller observe it change underneath them.
+//
+// The copy is shallow. The hash byte slices are shared with the manager and
+// must be treated as read-only.
 func (m *certManager) SerializedCertHashes() [][]byte {
-	return m.serializedCertHashes
+	m.mx.RLock()
+	defer m.mx.RUnlock()
+	return slices.Clone(m.serializedCertHashes)
 }
 
 func (m *certManager) cacheSerializedCertHashes() error {

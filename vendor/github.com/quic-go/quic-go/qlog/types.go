@@ -51,6 +51,14 @@ const (
 	InitiatorRemote Initiator = "remote"
 )
 
+// Direction identifies the sending or receiving side of an endpoint.
+type Direction string
+
+const (
+	DirectionSending   Direction = "sending"
+	DirectionReceiving Direction = "receiving"
+)
+
 type streamType protocol.StreamType
 
 func (s streamType) String() string {
@@ -295,10 +303,11 @@ const (
 	ConnectionCloseTriggerStatelessReset ConnectionCloseTrigger = "stateless_reset"
 )
 
-// DatagramID is a unique identifier for a datagram
-type DatagramID uint32
+// DatagramPayloadChecksum is the CRC32c checksum of a UDP datagram payload.
+// ponytail: zero means absent; use an optional value if zero-valued checksums need to be logged.
+type DatagramPayloadChecksum uint32
 
-// CalculateDatagramID computes a DatagramID for a given packet
-func CalculateDatagramID(packet []byte) DatagramID {
-	return DatagramID(crc32.ChecksumIEEE(packet))
+// CalculateDatagramPayloadChecksum computes the checksum of a UDP datagram payload.
+func CalculateDatagramPayloadChecksum(payload []byte) DatagramPayloadChecksum {
+	return DatagramPayloadChecksum(crc32.Checksum(payload, crc32.MakeTable(crc32.Castagnoli)))
 }

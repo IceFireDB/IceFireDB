@@ -10,16 +10,6 @@ import (
 	"github.com/quic-go/quic-go/qlogwriter"
 )
 
-type mtuDiscoverer interface {
-	// Start starts the MTU discovery process.
-	// It's unnecessary to call ShouldSendProbe before that.
-	Start(now monotime.Time)
-	ShouldSendProbe(now monotime.Time) bool
-	CurrentSize() protocol.ByteCount
-	GetPing(now monotime.Time) (ping ackhandler.Frame, datagramSize protocol.ByteCount)
-	Reset(now monotime.Time, start, max protocol.ByteCount)
-}
-
 const (
 	// At some point, we have to stop searching for a higher MTU.
 	// We're happy to send a packet that's 10 bytes smaller than the actual MTU.
@@ -107,8 +97,6 @@ type mtuFinder struct {
 	qlogger qlogwriter.Recorder
 }
 
-var _ mtuDiscoverer = &mtuFinder{}
-
 func newMTUDiscoverer(
 	rttStats *utils.RTTStats,
 	start, max protocol.ByteCount,
@@ -180,9 +168,9 @@ func (f *mtuFinder) CurrentSize() protocol.ByteCount {
 	return f.min
 }
 
-func (f *mtuFinder) Reset(now monotime.Time, start, max protocol.ByteCount) {
+func (f *mtuFinder) Reset(start, max protocol.ByteCount) {
 	f.generation++
-	f.lastProbeTime = now
+	f.lastProbeTime = 0
 	f.lastProbeWasLost = false
 	f.inFlight = protocol.InvalidByteCount
 	f.init(start, max)

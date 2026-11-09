@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"slices"
 	"time"
@@ -74,7 +75,7 @@ type AutoNATConfig struct {
 
 type Security struct {
 	ID          protocol.ID
-	Constructor interface{}
+	Constructor any
 }
 
 // Config describes a set of settings for a libp2p node
@@ -124,6 +125,8 @@ type Config struct {
 	MultiaddrResolver network.MultiaddrDNSResolver
 
 	DisablePing bool
+
+	DisableNonPublicAddrPublishing bool
 
 	Routing RoutingC
 
@@ -290,9 +293,11 @@ func (cfg *Config) makeAutoNATV2Host() (host.Host, error) {
 func (cfg *Config) addTransports() ([]fx.Option, error) {
 	fxopts := []fx.Option{
 		fx.WithLogger(func() fxevent.Logger {
-			return &fxevent.SlogLogger{
+			l := &fxevent.SlogLogger{
 				Logger: log.With("system", "fx"),
 			}
+			l.UseLogLevel(slog.LevelDebug)
+			return l
 		}),
 		fx.Provide(fx.Annotate(tptu.New, fx.ParamTags(`name:"security"`))),
 		fx.Supply(cfg.Muxers),
@@ -442,21 +447,22 @@ func (cfg *Config) addTransports() ([]fx.Option, error) {
 
 func (cfg *Config) newBasicHost(swrm *swarm.Swarm, eventBus event.Bus, an *autonatv2.AutoNAT, o bhost.ObservedAddrsManager) (*bhost.BasicHost, error) {
 	h, err := bhost.NewHost(swrm, &bhost.HostOpts{
-		EventBus:             eventBus,
-		ConnManager:          cfg.ConnManager,
-		AddrsFactory:         cfg.AddrsFactory,
-		NATManager:           cfg.NATManager,
-		EnablePing:           !cfg.DisablePing,
-		UserAgent:            cfg.UserAgent,
-		ProtocolVersion:      cfg.ProtocolVersion,
-		EnableHolePunching:   cfg.EnableHolePunching,
-		HolePunchingOptions:  cfg.HolePunchingOptions,
-		EnableRelayService:   cfg.EnableRelayService,
-		RelayServiceOpts:     cfg.RelayServiceOpts,
-		EnableMetrics:        !cfg.DisableMetrics,
-		PrometheusRegisterer: cfg.PrometheusRegisterer,
-		AutoNATv2:            an,
-		ObservedAddrsManager: o,
+		EventBus:                       eventBus,
+		ConnManager:                    cfg.ConnManager,
+		AddrsFactory:                   cfg.AddrsFactory,
+		NATManager:                     cfg.NATManager,
+		EnablePing:                     !cfg.DisablePing,
+		UserAgent:                      cfg.UserAgent,
+		ProtocolVersion:                cfg.ProtocolVersion,
+		EnableHolePunching:             cfg.EnableHolePunching,
+		HolePunchingOptions:            cfg.HolePunchingOptions,
+		EnableRelayService:             cfg.EnableRelayService,
+		RelayServiceOpts:               cfg.RelayServiceOpts,
+		EnableMetrics:                  !cfg.DisableMetrics,
+		PrometheusRegisterer:           cfg.PrometheusRegisterer,
+		DisableNonPublicAddrPublishing: cfg.DisableNonPublicAddrPublishing,
+		AutoNATv2:                      an,
+		ObservedAddrsManager:           o,
 	})
 	if err != nil {
 		return nil, err

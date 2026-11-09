@@ -70,7 +70,7 @@ func ListenAddrs(addrs ...ma.Multiaddr) Option {
 // * Host
 // * Network
 // * Peerstore
-func Security(name string, constructor interface{}) Option {
+func Security(name string, constructor any) Option {
 	return func(cfg *Config) error {
 		if cfg.Insecure {
 			return fmt.Errorf("cannot use security transports with an insecure libp2p configuration")
@@ -99,7 +99,7 @@ func Muxer(name string, muxer network.Multiplexer) Option {
 	}
 }
 
-func QUICReuse(constructor interface{}, opts ...quicreuse.Option) Option {
+func QUICReuse(constructor any, opts ...quicreuse.Option) Option {
 	return func(cfg *Config) error {
 		tag := `group:"quicreuseopts"`
 		typ := reflect.ValueOf(constructor).Type()
@@ -141,7 +141,7 @@ func QUICReuse(constructor interface{}, opts ...quicreuse.Option) Option {
 // * Public Key
 // * Address filter (filter.Filter)
 // * Peerstore
-func Transport(constructor interface{}, opts ...interface{}) Option {
+func Transport(constructor any, opts ...any) Option {
 	return func(cfg *Config) error {
 		// generate a random identifier, so that fx can associate the constructor with its options
 		b := make([]byte, 8)
@@ -437,6 +437,21 @@ func NATManager(nm config.NATManagerC) Option {
 func Ping(enable bool) Option {
 	return func(cfg *Config) error {
 		cfg.DisablePing = !enable
+		return nil
+	}
+}
+
+// NonPublicAddrPublishing controls whether the host advertises addresses that
+// are not in a globally-routable range (RFC 1918 private, RFC 6598 CGNAT,
+// link-local, loopback, ULA, IPv6 documentation/multicast/reserved space)
+// through the peerstore and signed peer records. Multiaddrs without an IP
+// component such as /p2p-circuit are not affected.
+//
+// Defaults to true for backward compatibility. Set to false on public-facing
+// nodes to avoid leaking internal topology through identify and DHT records.
+func NonPublicAddrPublishing(enable bool) Option {
+	return func(cfg *Config) error {
+		cfg.DisableNonPublicAddrPublishing = !enable
 		return nil
 	}
 }

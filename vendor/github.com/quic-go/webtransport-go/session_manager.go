@@ -10,10 +10,15 @@ import (
 )
 
 type unestablishedSession struct {
-	Streams    []*quic.Stream
-	UniStreams []*quic.ReceiveStream
+	Streams    []streamWithHeader[*quic.Stream]
+	UniStreams []streamWithHeader[*quic.ReceiveStream]
 
 	Timer *time.Timer
+}
+
+type streamWithHeader[T any] struct {
+	Stream    T
+	HeaderLen uint64
 }
 
 type sessionEntry struct {
@@ -43,7 +48,7 @@ func newSessionManager(timeout time.Duration) *sessionManager {
 // If the WebTransport session has not yet been established,
 // the stream is buffered until the session is established.
 // If that takes longer than timeout, the stream is reset.
-func (m *sessionManager) AddStream(str *quic.Stream, id sessionID) {
+func (m *sessionManager) AddStream(str *quic.Stream, id sessionID, headerLen uint64) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 
@@ -60,11 +65,14 @@ func (m *sessionManager) AddStream(str *quic.Stream, id sessionID) {
 		m.sessions[id] = entry
 	}
 	if entry.Session != nil {
-		entry.Session.addIncomingStream(str)
+		entry.Session.addIncomingStream(str, headerLen)
 		return
 	}
 
-	entry.Unestablished.Streams = append(entry.Unestablished.Streams, str)
+	entry.Unestablished.Streams = append(
+		entry.Unestablished.Streams,
+		streamWithHeader[*quic.Stream]{Stream: str, HeaderLen: headerLen},
+	)
 	m.resetTimer(id)
 }
 
@@ -72,7 +80,7 @@ func (m *sessionManager) AddStream(str *quic.Stream, id sessionID) {
 // If the WebTransport session has not yet been established,
 // the stream is buffered until the session is established.
 // If that takes longer than timeout, the stream is reset.
-func (m *sessionManager) AddUniStream(str *quic.ReceiveStream, id sessionID) {
+func (m *sessionManager) AddUniStream(str *quic.ReceiveStream, id sessionID, headerLen uint64) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 
@@ -88,11 +96,14 @@ func (m *sessionManager) AddUniStream(str *quic.ReceiveStream, id sessionID) {
 		m.sessions[id] = entry
 	}
 	if entry.Session != nil {
-		entry.Session.addIncomingUniStream(str)
+		entry.Session.addIncomingUniStream(str, headerLen)
 		return
 	}
 
-	entry.Unestablished.UniStreams = append(entry.Unestablished.UniStreams, str)
+	entry.Unestablished.UniStreams = append(
+		entry.Unestablished.UniStreams,
+		streamWithHeader[*quic.ReceiveStream]{Stream: str, HeaderLen: headerLen},
+	)
 	m.resetTimer(id)
 }
 
@@ -117,11 +128,11 @@ func (m *sessionManager) onTimer(id sessionID) {
 		return
 	}
 	for _, str := range sessionEntry.Unestablished.Streams {
-		str.CancelRead(WTBufferedStreamRejectedErrorCode)
-		str.CancelWrite(WTBufferedStreamRejectedErrorCode)
+		str.Stream.CancelRead(WTBufferedStreamRejectedErrorCode)
+		str.Stream.CancelWrite(WTBufferedStreamRejectedErrorCode)
 	}
 	for _, uniStr := range sessionEntry.Unestablished.UniStreams {
-		uniStr.CancelRead(WTBufferedStreamRejectedErrorCode)
+		uniStr.Stream.CancelRead(WTBufferedStreamRejectedErrorCode)
 	}
 	delete(m.sessions, id)
 }
@@ -138,10 +149,10 @@ func (m *sessionManager) AddSession(id sessionID, s *Session) {
 		// This can happen when we receive streams for this WebTransport session before we complete
 		// the Extended CONNECT request.
 		for _, str := range entry.Unestablished.Streams {
-			s.addIncomingStream(str)
+			s.addIncomingStream(str.Stream, str.HeaderLen)
 		}
 		for _, uniStr := range entry.Unestablished.UniStreams {
-			s.addIncomingUniStream(uniStr)
+			s.addIncomingUniStream(uniStr.Stream, uniStr.HeaderLen)
 		}
 		if entry.Unestablished.Timer != nil {
 			entry.Unestablished.Timer.Stop()

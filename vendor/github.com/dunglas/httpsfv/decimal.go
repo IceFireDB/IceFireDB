@@ -22,23 +22,21 @@ func marshalDecimal(b io.StringWriter, d float64) error {
 	const TH = 0.001
 
 	rounded := math.RoundToEven(d/TH) * TH
-	i, frac := math.Modf(rounded)
+	i, _ := math.Modf(rounded)
 
 	if i < -999999999999 || i > 999999999999 {
 		return ErrInvalidDecimal
 	}
 
-	if _, err := b.WriteString(strings.TrimRight(strconv.FormatFloat(rounded, 'f', 3, 64), "0")); err != nil {
-		return err
+	s := strings.TrimRight(strconv.FormatFloat(rounded, 'f', 3, 64), "0")
+	// Ensure at least one digit after the decimal point.
+	if strings.HasSuffix(s, ".") {
+		s += "0"
 	}
 
-	if frac == 0 {
-		_, err := b.WriteString("0")
+	_, err := b.WriteString(s)
 
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func parseDecimal(s *scanner, decSepOff int, str string, neg bool) (float64, error) {
