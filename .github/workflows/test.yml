@@ -285,3 +285,52 @@ jobs:
         run: go mod tidy && go mod vendor
       - name: Run SQLite unit tests
         run: cd IceFireDB-SQLite && go test -v -count=1 ./internal/sqlite/...
+
+  sqlproxy:
+    name: SQLProxy unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 1.27.3
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Vet
+        run: |
+          cd IceFireDB-SQLProxy
+          go vet ./...
+
+      - name: Test
+        run: |
+          cd IceFireDB-SQLProxy
+          go test -race -count=1 ./...
+
+  sqlproxy-e2e:
+    name: SQLProxy end-to-end (MySQL 8 + two nodes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 1.27.3
+
+      - name: Install dependencies
+        run: go mod download
+
+      # The suite starts its own MySQL 8 container and two proxy processes, writes through
+      # one, and asserts the writes land in the other node's schema.
+      - name: End-to-end
+        run: |
+          cd IceFireDB-SQLProxy
+          make e2e
+
+      - name: Proxy logs on failure
+        if: failure()
+        run: docker ps -a
