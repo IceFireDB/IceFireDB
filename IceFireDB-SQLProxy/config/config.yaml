@@ -1,7 +1,10 @@
 server:
   addr: ":33306" # The port on which the proxy listens, mysql-server, supports direct connection of mysql-client
 
-debug:  # Control to enable debug mode
+# Optional debug endpoints, served on 127.0.0.1 only:
+#   /healthz  upstream MySQL, pool and p2p status (503 when an upstream is down)
+#   /metrics  Prometheus text format (replication published/dropped/failed/applied)
+debug:
   enable: true
   port: 17878
 
@@ -25,9 +28,13 @@ mysql:
     maxIdle: 4
 
 # Tenant list
+# `role` is optional: admin (default) may write, readonly may only read.
 userlist:
   - user: host1
     password: host1
+  # - user: report
+  #   password: report
+  #   role: readonly
 
 # p2p config for different access levels
 p2p:
@@ -39,3 +46,11 @@ p2p:
   serviceDiscoverMode: "advertise"
   nodeHostIp: "127.0.0.1"
   nodeHostPort: 0
+  # Shared HMAC-SHA256 secret used to authenticate replicated writes. Leave it
+  # unset only for a private trial: without it any peer that joins the topic can
+  # execute writes on this node.
+  # authToken: "change-me"
+  # Optional libp2p peer ID allow list. Empty means every peer that joins the topic
+  # is accepted.
+  # allowedPeers:
+  #   - "12D3KooW..."
