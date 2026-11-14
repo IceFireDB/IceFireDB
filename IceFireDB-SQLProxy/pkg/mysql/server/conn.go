@@ -67,6 +67,10 @@ func NewConn(conn net.Conn, user string, password string, h Handler) (*Conn, err
 		connectionID:       atomic.AddUint32(&baseConnID, 1),
 		stmts:              make(map[uint32]*Stmt),
 		salt:               salt,
+		// Report autocommit on, which is how the proxy runs client statements until the
+		// client sends BEGIN. Clients (JDBC, PDO, the mysql CLI) read this flag to decide
+		// whether they are in an explicit transaction.
+		status: SERVER_STATUS_AUTOCOMMIT,
 	}
 	c.closed.Set(false)
 
@@ -96,6 +100,10 @@ func NewCustomizedConn(conn net.Conn, serverConf *Server, p CredentialProvider, 
 		connectionID:       atomic.AddUint32(&baseConnID, 1),
 		stmts:              make(map[uint32]*Stmt),
 		salt:               salt,
+		// Report autocommit on, which is how the proxy runs client statements until the
+		// client sends BEGIN. Clients (JDBC, PDO, the mysql CLI) read this flag to decide
+		// whether they are in an explicit transaction.
+		status: SERVER_STATUS_AUTOCOMMIT,
 	}
 	c.closed.Set(false)
 
@@ -125,6 +133,10 @@ func NewClientConn(conn net.Conn, serverConf *Server, p CredentialProvider, hp H
 		connectionID:       atomic.AddUint32(&baseConnID, 1),
 		stmts:              make(map[uint32]*Stmt),
 		salt:               salt,
+		// Report autocommit on, which is how the proxy runs client statements until the
+		// client sends BEGIN. Clients (JDBC, PDO, the mysql CLI) read this flag to decide
+		// whether they are in an explicit transaction.
+		status: SERVER_STATUS_AUTOCOMMIT,
 	}
 	c.closed.Set(false)
 	if err := c.handshake(); err != nil {
