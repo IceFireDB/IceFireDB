@@ -3,6 +3,7 @@ package quic
 import (
 	"fmt"
 	"slices"
+	"sync"
 
 	"github.com/quic-go/quic-go/internal/protocol"
 	"github.com/quic-go/quic-go/internal/qerr"
@@ -20,6 +21,7 @@ type connIDManager struct {
 	queue []newConnID
 
 	highestProbingID uint64
+	pathMx           sync.Mutex
 	pathProbing      map[pathID]newConnID // initialized lazily
 
 	handshakeComplete         bool
@@ -62,6 +64,9 @@ func (h *connIDManager) AddFromPreferredAddress(connID protocol.ConnectionID, re
 }
 
 func (h *connIDManager) Add(f *wire.NewConnectionIDFrame) error {
+	h.pathMx.Lock()
+	defer h.pathMx.Unlock()
+
 	if err := h.add(f); err != nil {
 		return err
 	}
@@ -181,20 +186,22 @@ func (h *connIDManager) updateConnectionID() {
 	h.activeConnectionID = front.ConnectionID
 	h.activeStatelessResetToken = &front.StatelessResetToken
 	h.packetsSinceLastChange = 0
-	h.packetsPerConnectionID = protocol.PacketsPerConnectionID/2 + uint32(h.rand.Int31n(protocol.PacketsPerConnectionID))
+	h.packetsPerConnectionID = protocol.PacketsPerConnectionID/2 + h.rand.Uint32N(protocol.PacketsPerConnectionID)
 	h.addStatelessResetToken(*h.activeStatelessResetToken)
 }
 
 func (h *connIDManager) Close() {
+	h.pathMx.Lock()
+	defer h.pathMx.Unlock()
+
 	h.closed = true
 	if h.activeStatelessResetToken != nil {
 		h.removeStatelessResetToken(*h.activeStatelessResetToken)
 	}
-	if h.pathProbing != nil {
-		for _, entry := range h.pathProbing {
-			h.removeStatelessResetToken(entry.StatelessResetToken)
-		}
+	for _, entry := range h.pathProbing {
+		h.removeStatelessResetToken(entry.StatelessResetToken)
 	}
+	clear(h.pathProbing)
 }
 
 // is called when the server performs a Retry
@@ -252,6 +259,9 @@ func (h *connIDManager) SetHandshakeComplete() {
 // When called with the same pathID, it will return the same connection ID,
 // unless the peer requested that this connection ID be retired.
 func (h *connIDManager) GetConnIDForPath(id pathID) (protocol.ConnectionID, bool) {
+	h.pathMx.Lock()
+	defer h.pathMx.Unlock()
+
 	h.assertNotClosed()
 	// if we're using zero-length connection IDs, we don't need to change the connection ID
 	if h.activeConnectionID.Len() == 0 {
@@ -277,11 +287,8 @@ func (h *connIDManager) GetConnIDForPath(id pathID) (protocol.ConnectionID, bool
 }
 
 func (h *connIDManager) RetireConnIDForPath(pathID pathID) {
-	h.assertNotClosed()
-	// if we're using zero-length connection IDs, we don't need to change the connection ID
-	if h.activeConnectionID.Len() == 0 {
-		return
-	}
+	h.pathMx.Lock()
+	defer h.pathMx.Unlock()
 
 	entry, ok := h.pathProbing[pathID]
 	if !ok {
@@ -295,6 +302,9 @@ func (h *connIDManager) RetireConnIDForPath(pathID pathID) {
 }
 
 func (h *connIDManager) IsActiveStatelessResetToken(token protocol.StatelessResetToken) bool {
+	h.pathMx.Lock()
+	defer h.pathMx.Unlock()
+
 	if h.activeStatelessResetToken != nil {
 		if *h.activeStatelessResetToken == token {
 			return true

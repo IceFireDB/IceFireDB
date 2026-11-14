@@ -10,7 +10,6 @@
   <a href="http://libp2p.io/"><img src="https://img.shields.io/badge/project-libp2p-yellow.svg?style=flat-square" /></a>
   <a href="https://pkg.go.dev/github.com/libp2p/go-libp2p"><img src="https://pkg.go.dev/badge/github.com/libp2p/go-libp2p.svg" alt="Go Reference"></a>
   <a href="https://discuss.libp2p.io"><img src="https://img.shields.io/discourse/https/discuss.libp2p.io/posts.svg"/></a>
-  <a href="https://marcopolo.github.io/FlakyTests/"><img src="https://marcopolo.github.io/FlakyTests/current-score.svg"/></a>
 </p>
 
 # Table of Contents <!-- omit in toc -->
@@ -29,7 +28,7 @@
 libp2p is the product of a long, and arduous quest of understanding -- a deep dive into the internet's network stack, and plentiful peer-to-peer protocols from the past. Building large-scale peer-to-peer systems has been complex and difficult in the last 15 years, and libp2p is a way to fix that. It is a "network stack" -- a protocol suite -- that cleanly separates concerns, and enables sophisticated applications to only use the protocols they absolutely need, without giving up interoperability and upgradeability. libp2p grew out of IPFS, but it is built so that lots of people can use it, for lots of different projects.
 
 To learn more, check out the following resources:
-- [**Our documentation**](https://docs.libp2p.io)
+- [**Our documentation**](https://libp2p.io/docs)
 - [**Our community discussion forum**](https://discuss.libp2p.io)
 - [**The libp2p Specification**](https://github.com/libp2p/specs)
 - [**js-libp2p implementation**](https://github.com/libp2p/js-libp2p)
@@ -146,7 +145,6 @@ Some notable users of go-libp2p are:
 - [EdgeVPN](https://github.com/mudler/edgevpn) - A decentralized, immutable, portable VPN and reverse proxy over p2p.
 - [Kairos](https://github.com/kairos-io/kairos) - A Kubernetes-focused, Cloud Native Linux meta-distribution.
 - [Oasis Core](https://github.com/oasisprotocol/oasis-core) - The consensus and runtime layers of the [Oasis protocol](https://oasisprotocol.org/).
-- [Spacemesh](https://github.com/spacemeshos/go-spacemesh/) - The Go implementation of the [Spacemesh protocol](https://spacemesh.io/), a novel layer one blockchain
 - [Tau](https://github.com/taubyte/tau/) - Open source distributed Platform as a Service (PaaS)
 
 Please open a pull request if you want your project (min. 250 GitHub stars) to be added here.

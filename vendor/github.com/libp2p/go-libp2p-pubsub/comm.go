@@ -234,12 +234,15 @@ func (p *PubSub) handleSendingMessages(ctx context.Context, s network.Stream, ou
 			return err
 		}
 
+		start := time.Now()
 		_, err = s.Write(out)
+		writeDuration := time.Since(start)
 		if err != nil {
 			p.rpcLogger.Debug("failed to send message", "peer", s.Conn().RemotePeer(), "rpc", rpc, "err", err)
 			return err
 		}
 		p.rpcLogger.Debug("sent", "peer", s.Conn().RemotePeer(), "rpc", rpc)
+		p.tracer.SendRPCCompleted(rpc, s.Conn().RemotePeer(), writeDuration)
 		return nil
 	}
 

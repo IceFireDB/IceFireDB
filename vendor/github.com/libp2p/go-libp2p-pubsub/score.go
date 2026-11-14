@@ -838,6 +838,8 @@ func (ps *peerScore) RecvRPC(rpc *RPC) {}
 
 func (ps *peerScore) SendRPC(rpc *RPC, p peer.ID) {}
 
+func (ps *peerScore) SendRPCCompleted(rpc *RPC, p peer.ID, writeDuration time.Duration) {}
+
 func (ps *peerScore) DropRPC(rpc *RPC, p peer.ID) {}
 
 func (ps *peerScore) UndeliverableMessage(msg *Message) {}

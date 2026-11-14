@@ -44,7 +44,9 @@ func ttlIsConnected(ttl time.Duration) bool {
 
 type peerRecordState struct {
 	Envelope *record.Envelope
-	Seq      uint64
+	// Seq is the sequence number from the stored signed peer record. Newer
+	// records (higher Seq) supersede older ones for the same peer.
+	Seq uint64
 }
 
 // Essentially Go stdlib's Priority Queue example
@@ -165,6 +167,12 @@ func (rc realclock) Now() time.Time {
 const (
 	defaultMaxSignedPeerRecords = 100_000
 	defaultMaxUnconnectedAddrs  = 1_000_000
+	// defaultMaxAddrsPerPeer caps the unconnected addresses stored per
+	// peer. Sized well above observed real-world maxima (~26 for
+	// well-connected multi-transport nodes) to leave honest peers
+	// untouched while bounding DHT pollution from third parties gossiping
+	// stale or misconfigured peerstore contents.
+	defaultMaxAddrsPerPeer = 64
 )
 
 // memoryAddrBook manages addresses.
@@ -174,6 +182,7 @@ type memoryAddrBook struct {
 	signedPeerRecords    map[peer.ID]*peerRecordState
 	maxUnconnectedAddrs  int
 	maxSignedPeerRecords int
+	maxAddrsPerPeer      int
 
 	refCount sync.WaitGroup
 	cancel   func()
@@ -196,6 +205,7 @@ func NewAddrBook(opts ...AddrBookOption) *memoryAddrBook {
 		clock:                realclock{},
 		maxUnconnectedAddrs:  defaultMaxUnconnectedAddrs,
 		maxSignedPeerRecords: defaultMaxSignedPeerRecords,
+		maxAddrsPerPeer:      defaultMaxAddrsPerPeer,
 	}
 	for _, opt := range opts {
 		opt(ab)
@@ -228,6 +238,18 @@ func WithMaxAddresses(n int) AddrBookOption {
 func WithMaxSignedPeerRecords(n int) AddrBookOption {
 	return func(b *memoryAddrBook) error {
 		b.maxSignedPeerRecords = n
+		return nil
+	}
+}
+
+// WithMaxAddressesPerPeer caps the unconnected addresses stored per peer.
+// When the cap is full, adding a new addr evicts the unconnected entry
+// with the nearest expiry. Addresses held by a live connection
+// (TTL >= ConnectedAddrTTL) bypass the cap and survive eviction. Pass 0
+// or a negative value to disable the cap. Defaults to 64.
+func WithMaxAddressesPerPeer(n int) AddrBookOption {
+	return func(b *memoryAddrBook) error {
+		b.maxAddrsPerPeer = n
 		return nil
 	}
 }
@@ -289,8 +311,23 @@ func (mab *memoryAddrBook) AddAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Du
 	mab.addAddrs(p, addrs, ttl)
 }
 
-// ConsumePeerRecord adds addresses from a signed peer.PeerRecord, which will expire after the given TTL.
-// See https://godoc.org/github.com/libp2p/go-libp2p/core/peerstore#CertifiedAddrBook for more details.
+// ConsumePeerRecord adds addresses from a signed peer.PeerRecord, which will
+// expire after the given TTL. See
+// https://godoc.org/github.com/libp2p/go-libp2p/core/peerstore#CertifiedAddrBook
+// for more details.
+//
+// The signed peer record's Seq is treated as monotonic per peer: a record with
+// a Seq lower than the last accepted one is rejected. Equal Seq is accepted as
+// a TTL refresh.
+//
+// When a newer signed record is accepted, addrs that were present in the
+// previously stored signed record but absent in the new one are evicted, so
+// the peerstore reflects the peer's current self-advertised set instead of
+// the union of every record we have ever seen. Unsigned addrs (added via
+// AddAddr / SetAddr from sources like DHT gossip, or from an identify
+// exchange where the peer did not send a signed record) are not touched, and
+// addrs held by a live connection (TTL >= ConnectedAddrTTL) are also kept so
+// active sessions are not dropped.
 func (mab *memoryAddrBook) ConsumePeerRecord(recordEnvelope *record.Envelope, ttl time.Duration) (bool, error) {
 	r, err := recordEnvelope.Record()
 	if err != nil {
@@ -316,6 +353,33 @@ func (mab *memoryAddrBook) ConsumePeerRecord(recordEnvelope *record.Envelope, tt
 	if !found && len(mab.signedPeerRecords) >= mab.maxSignedPeerRecords {
 		return false, errors.New("too many signed peer records")
 	}
+
+	// Drop addrs from the previous signed record that are absent in the
+	// new one; addrs held by a live connection are preserved so we don't
+	// drop an active session if the peer rotates its advertised set. The
+	// prior addr set is recovered by decoding the stored envelope; that
+	// call caches on first access (core/record/envelope.go), so repeated
+	// lookups are cheap.
+	if found {
+		if prevRec := prevSignedAddrs(lastState); len(prevRec) > 0 {
+			newAddrSet := make(map[string]struct{}, len(rec.Addrs))
+			for _, a := range rec.Addrs {
+				newAddrSet[string(a.Bytes())] = struct{}{}
+			}
+			for _, a := range prevRec {
+				key := string(a.Bytes())
+				if _, still := newAddrSet[key]; still {
+					continue
+				}
+				ea, ok := mab.addrs.Addrs[rec.PeerID][key]
+				if !ok || ea.IsConnected() {
+					continue
+				}
+				mab.addrs.Delete(ea)
+			}
+		}
+	}
+
 	mab.signedPeerRecords[rec.PeerID] = &peerRecordState{
 		Envelope: recordEnvelope,
 		Seq:      rec.Seq,
@@ -324,10 +388,65 @@ func (mab *memoryAddrBook) ConsumePeerRecord(recordEnvelope *record.Envelope, tt
 	return true, nil
 }
 
+// prevSignedAddrs returns the addrs from the stored signed peer record, or
+// nil if the envelope is absent or can't be decoded. Envelope.Record() caches
+// its result, so repeated calls are cheap.
+func prevSignedAddrs(s *peerRecordState) []ma.Multiaddr {
+	if s == nil || s.Envelope == nil {
+		return nil
+	}
+	r, err := s.Envelope.Record()
+	if err != nil {
+		return nil
+	}
+	pr, ok := r.(*peer.PeerRecord)
+	if !ok {
+		return nil
+	}
+	return pr.Addrs
+}
+
 func (mab *memoryAddrBook) maybeDeleteSignedPeerRecordUnlocked(p peer.ID) {
 	if len(mab.addrs.Addrs[p]) == 0 {
 		delete(mab.signedPeerRecords, p)
 	}
+}
+
+// numUnconnectedAddrsForPeerUnlocked returns how many of p's stored addrs
+// are not held by a live connection.
+func (mab *memoryAddrBook) numUnconnectedAddrsForPeerUnlocked(p peer.ID) int {
+	n := 0
+	for _, a := range mab.addrs.Addrs[p] {
+		if !a.IsConnected() {
+			n++
+		}
+	}
+	return n
+}
+
+// evictNearestExpiryUnconnectedForPeerUnlocked drops p's unconnected addr
+// with the earliest expiry. Returns false when every remaining addr for p
+// is held by a live connection; the caller must then drop the incoming
+// addr.
+//
+// Shorter-TTL entries (e.g. DHT gossip at TempAddrTTL) expire sooner than
+// identify-written peer-vouched addrs (RecentlyConnectedAddrTTL), so the
+// rule sheds gossip first without classifying sources.
+func (mab *memoryAddrBook) evictNearestExpiryUnconnectedForPeerUnlocked(p peer.ID) bool {
+	var victim *expiringAddr
+	for _, a := range mab.addrs.Addrs[p] {
+		if a.IsConnected() {
+			continue
+		}
+		if victim == nil || a.Expiry.Before(victim.Expiry) {
+			victim = a
+		}
+	}
+	if victim == nil {
+		return false
+	}
+	mab.addrs.Delete(victim)
+	return true
 }
 
 func (mab *memoryAddrBook) addAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Duration) {
@@ -364,6 +483,15 @@ func (mab *memoryAddrBook) addAddrsUnlocked(p peer.ID, addrs []ma.Multiaddr, ttl
 		}
 		a, found := mab.addrs.FindAddr(p, addr)
 		if !found {
+			// Enforce the per-peer cap on unconnected addrs. Entries held
+			// by a live connection are not counted. A non-positive cap
+			// disables the check.
+			if mab.maxAddrsPerPeer > 0 && !ttlIsConnected(ttl) && mab.numUnconnectedAddrsForPeerUnlocked(p) >= mab.maxAddrsPerPeer {
+				if !mab.evictNearestExpiryUnconnectedForPeerUnlocked(p) {
+					// Every existing addr is protected; drop the new one.
+					continue
+				}
+			}
 			// not found, announce it.
 			entry := &expiringAddr{Addr: addr, Expiry: exp, TTL: ttl, Peer: p}
 			mab.addrs.Insert(entry)
@@ -429,6 +557,13 @@ func (mab *memoryAddrBook) SetAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Du
 			if ttl > 0 {
 				if !ttlIsConnected(ttl) && mab.addrs.NumUnconnectedAddrs() >= mab.maxUnconnectedAddrs {
 					continue
+				}
+				// Same per-peer cap check as addAddrsUnlocked: bound
+				// how many unconnected addrs we keep for one peer.
+				if mab.maxAddrsPerPeer > 0 && !ttlIsConnected(ttl) && mab.numUnconnectedAddrsForPeerUnlocked(p) >= mab.maxAddrsPerPeer {
+					if !mab.evictNearestExpiryUnconnectedForPeerUnlocked(p) {
+						continue
+					}
 				}
 				entry := &expiringAddr{Addr: addr, Expiry: exp, TTL: ttl, Peer: p}
 				mab.addrs.Insert(entry)

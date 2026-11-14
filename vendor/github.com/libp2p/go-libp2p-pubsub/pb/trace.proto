@@ -22,6 +22,7 @@ message TraceEvent {
   optional Leave leave = 14;
   optional Graft graft = 15;
   optional Prune prune = 16;
+  optional SendRPCCompleted sendRPCCompleted = 17;
 
   enum Type {
     PUBLISH_MESSAGE = 0;
@@ -37,6 +38,7 @@ message TraceEvent {
     LEAVE = 10;
     GRAFT = 11;
     PRUNE = 12;
+    SEND_RPC_COMPLETED = 13;
   }
 
   message PublishMessage {
@@ -80,6 +82,12 @@ message TraceEvent {
   message SendRPC {
     optional bytes sendTo = 1;
     optional RPCMeta meta = 2;
+  }
+
+  message SendRPCCompleted {
+    optional bytes sendTo = 1;
+    optional RPCMeta meta = 2;
+    optional int64 writeDurationNanos = 3;
   }
 
   message DropRPC {

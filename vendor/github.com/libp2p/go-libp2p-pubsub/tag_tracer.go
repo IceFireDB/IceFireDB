@@ -260,9 +260,10 @@ func (t *tagTracer) RejectMessage(msg *Message, reason string) {
 	}
 }
 
-func (t *tagTracer) OnClosedOutboundStream(peer.ID)    {}
-func (t *tagTracer) ThrottlePeer(p peer.ID)            {}
-func (t *tagTracer) RecvRPC(rpc *RPC)                  {}
-func (t *tagTracer) SendRPC(rpc *RPC, p peer.ID)       {}
-func (t *tagTracer) DropRPC(rpc *RPC, p peer.ID)       {}
-func (t *tagTracer) UndeliverableMessage(msg *Message) {}
+func (t *tagTracer) OnClosedOutboundStream(peer.ID)                {}
+func (t *tagTracer) ThrottlePeer(p peer.ID)                        {}
+func (t *tagTracer) RecvRPC(rpc *RPC)                              {}
+func (t *tagTracer) SendRPC(rpc *RPC, p peer.ID)                   {}
+func (t *tagTracer) SendRPCCompleted(*RPC, peer.ID, time.Duration) {}
+func (t *tagTracer) DropRPC(rpc *RPC, p peer.ID)                   {}
+func (t *tagTracer) UndeliverableMessage(msg *Message)             {}

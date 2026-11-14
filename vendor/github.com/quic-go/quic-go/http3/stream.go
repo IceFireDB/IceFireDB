@@ -25,6 +25,8 @@ type datagramStream interface {
 	SetDeadline(time.Time) error
 	SetReadDeadline(time.Time) error
 	SetWriteDeadline(time.Time) error
+	SetPriority(urgency int8, incremental bool)
+	TryWriteAll([]byte) error
 	SendDatagram(b []byte) error
 	ReceiveDatagram(ctx context.Context) ([]byte, error)
 
@@ -76,7 +78,10 @@ func (s *Stream) Read(b []byte) (int, error) {
 		for {
 			frame, err := s.frameParser.ParseNext(s.qlogger)
 			if err != nil {
-				return 0, err
+				if errors.Is(err, errPriorityUpdateForPush) {
+					s.conn.CloseWithError(quic.ApplicationErrorCode(ErrCodeFrameUnexpected), "")
+				}
+				return 0, maybeReplaceError(err)
 			}
 			switch f := frame.(type) {
 			case *dataFrame:
@@ -91,7 +96,7 @@ func (s *Stream) Read(b []byte) (int, error) {
 					return 0, errors.New("additional HEADERS frame received after trailers")
 				}
 				s.parsedTrailer = true
-				return 0, s.parseTrailer(s.datagramStream, f)
+				return 0, maybeReplaceError(s.parseTrailer(s.datagramStream, f))
 			default:
 				s.conn.CloseWithError(quic.ApplicationErrorCode(ErrCodeFrameUnexpected), "")
 				// parseNextFrame skips over unknown frame types
@@ -109,7 +114,7 @@ func (s *Stream) Read(b []byte) (int, error) {
 		n, err = s.datagramStream.Read(b)
 	}
 	s.bytesRemainingInFrame -= uint64(n)
-	return n, err
+	return n, maybeReplaceError(err)
 }
 
 func (s *Stream) hasMoreData() bool {
@@ -129,28 +134,58 @@ func (s *Stream) Write(b []byte) (int, error) {
 			Frame: qlog.Frame{Frame: qlog.DataFrame{}},
 		})
 	}
-	if _, err := s.datagramStream.Write(s.buf); err != nil {
+	if _, err := s.writeUnframed(s.buf); err != nil {
 		return 0, err
 	}
-	return s.datagramStream.Write(b)
+	return s.writeUnframed(b)
+}
+
+// TryWriteAll writes b in a DATA frame if the entire frame can be queued immediately.
+// It returns [quic.ErrWouldBlock] without queueing anything otherwise.
+func (s *Stream) TryWriteAll(b []byte) error {
+	data := make([]byte, 0, frameHeaderLen+len(b))
+	data = (&dataFrame{Length: uint64(len(b))}).Append(data)
+	data = append(data, b...)
+	if err := s.datagramStream.TryWriteAll(data); err != nil {
+		return maybeReplaceError(err)
+	}
+	if s.qlogger != nil {
+		s.qlogger.RecordEvent(qlog.FrameCreated{
+			StreamID: s.StreamID(),
+			Raw: qlog.RawInfo{
+				Length:        len(data),
+				PayloadLength: len(b),
+			},
+			Frame: qlog.Frame{Frame: qlog.DataFrame{}},
+		})
+	}
+	return nil
 }
 
 func (s *Stream) writeUnframed(b []byte) (int, error) {
-	return s.datagramStream.Write(b)
+	n, err := s.datagramStream.Write(b)
+	return n, maybeReplaceError(err)
 }
 
 func (s *Stream) StreamID() quic.StreamID {
 	return s.datagramStream.StreamID()
 }
 
+// QlogTrace returns the qlog trace of the underlying QUIC connection.
+// It is nil if qlog is not enabled.
+func (s *Stream) QlogTrace() qlogwriter.Trace {
+	return s.conn.conn.QlogTrace()
+}
+
 func (s *Stream) SendDatagram(b []byte) error {
 	// TODO: reject if datagrams are not negotiated (yet)
-	return s.datagramStream.SendDatagram(b)
+	return maybeReplaceError(s.datagramStream.SendDatagram(b))
 }
 
 func (s *Stream) ReceiveDatagram(ctx context.Context) ([]byte, error) {
 	// TODO: reject if datagrams are not negotiated (yet)
-	return s.datagramStream.ReceiveDatagram(ctx)
+	b, err := s.datagramStream.ReceiveDatagram(ctx)
+	return b, maybeReplaceError(err)
 }
 
 // A RequestStream is a low-level abstraction representing an HTTP/3 request stream.
@@ -160,6 +195,7 @@ func (s *Stream) ReceiveDatagram(ctx context.Context) ([]byte, error) {
 //
 // This is only needed for advanced use case, e.g. WebTransport and the various
 // MASQUE proxying protocols.
+// Stream and application errors are returned as *[Error], possibly wrapped.
 type RequestStream struct {
 	str *Stream
 
@@ -199,8 +235,8 @@ func newRequestStream(
 
 // Read reads data from the underlying stream.
 //
-// It can only be used after the request has been sent (using SendRequestHeader)
-// and the response has been consumed (using ReadResponse).
+// It can only be used after the request has been sent using [RequestStream.SendRequestHeader]
+// and [RequestStream.ReadResponse] has returned the response.
 func (s *RequestStream) Read(b []byte) (int, error) {
 	if s.responseBody == nil {
 		return 0, errors.New("http3: invalid use of RequestStream.Read before ReadResponse")
@@ -213,14 +249,29 @@ func (s *RequestStream) StreamID() quic.StreamID {
 	return s.str.StreamID()
 }
 
+// QlogTrace returns the qlog trace of the underlying QUIC connection.
+// It is nil if qlog is not enabled.
+func (s *RequestStream) QlogTrace() qlogwriter.Trace {
+	return s.str.QlogTrace()
+}
+
 // Write writes data to the stream.
 //
-// It can only be used after the request has been sent (using SendRequestHeader).
+// It can only be used after the request has been sent using [RequestStream.SendRequestHeader].
 func (s *RequestStream) Write(b []byte) (int, error) {
 	if !s.sentRequest {
 		return 0, errors.New("http3: invalid use of RequestStream.Write before SendRequestHeader")
 	}
 	return s.str.Write(b)
+}
+
+// TryWriteAll writes b if the entire DATA frame can be queued immediately.
+// It can only be used after the request has been sent using [RequestStream.SendRequestHeader].
+func (s *RequestStream) TryWriteAll(b []byte) error {
+	if !s.sentRequest {
+		return errors.New("http3: invalid use of RequestStream.TryWriteAll before SendRequestHeader")
+	}
+	return s.str.TryWriteAll(b)
 }
 
 // Close closes the send-direction of the stream.
@@ -247,23 +298,23 @@ func (s *RequestStream) Context() context.Context {
 	return s.str.Context()
 }
 
-// SetReadDeadline sets the deadline for Read calls.
+// SetReadDeadline sets the deadline for [RequestStream.Read] calls.
 func (s *RequestStream) SetReadDeadline(t time.Time) error {
 	return s.str.SetReadDeadline(t)
 }
 
-// SetWriteDeadline sets the deadline for Write calls.
+// SetWriteDeadline sets the deadline for [RequestStream.Write] calls.
 func (s *RequestStream) SetWriteDeadline(t time.Time) error {
 	return s.str.SetWriteDeadline(t)
 }
 
 // SetDeadline sets the read and write deadlines associated with the stream.
-// It is equivalent to calling both SetReadDeadline and SetWriteDeadline.
+// It is equivalent to calling both [RequestStream.SetReadDeadline] and [RequestStream.SetWriteDeadline].
 func (s *RequestStream) SetDeadline(t time.Time) error {
 	return s.str.SetDeadline(t)
 }
 
-// SendDatagrams send a new HTTP Datagram (RFC 9297).
+// SendDatagram sends a new HTTP Datagram (RFC 9297).
 //
 // It is only possible to send datagrams if the server enabled support for this extension.
 // It is recommended (though not required) to send the request before calling this method,
@@ -274,17 +325,15 @@ func (s *RequestStream) SendDatagram(b []byte) error {
 
 // ReceiveDatagram receives HTTP Datagrams (RFC 9297).
 //
-// It is only possible if support for HTTP Datagrams was enabled, using the EnableDatagram
-// option on the [Transport].
+// It is only possible if HTTP Datagram support was enabled using [Transport.EnableDatagrams].
 func (s *RequestStream) ReceiveDatagram(ctx context.Context) ([]byte, error) {
 	return s.str.ReceiveDatagram(ctx)
 }
 
 // SendRequestHeader sends the HTTP request.
 //
-// It can only used for requests that don't have a request body.
+// It can only be used for requests that don't have a request body.
 // It is invalid to call it more than once.
-// It is invalid to call it after Write has been called.
 func (s *RequestStream) SendRequestHeader(req *http.Request) error {
 	if req.Body != nil && req.Body != http.NoBody {
 		return errors.New("http3: invalid use of RequestStream.SendRequestHeader with a request that has a request body")
@@ -302,30 +351,33 @@ func (s *RequestStream) sendRequestHeader(req *http.Request) error {
 	}
 	s.isConnect = req.Method == http.MethodConnect
 	s.sentRequest = true
-	return s.requestWriter.WriteRequestHeader(s.str.datagramStream, req, s.requestedGzip, s.str.StreamID(), s.str.qlogger)
+	return maybeReplaceError(s.requestWriter.WriteRequestHeader(s.str.datagramStream, req, s.requestedGzip, s.str.StreamID(), s.str.qlogger))
 }
 
 // sendRequestTrailer sends request trailers to the stream.
 // It should be called after the request body has been fully written.
 func (s *RequestStream) sendRequestTrailer(req *http.Request) error {
-	return s.requestWriter.WriteRequestTrailer(s.str.datagramStream, req, s.str.StreamID(), s.str.qlogger)
+	return maybeReplaceError(s.requestWriter.WriteRequestTrailer(s.str.datagramStream, req, s.str.StreamID(), s.str.qlogger))
 }
 
 // ReadResponse reads the HTTP response from the stream.
 //
-// It must be called after sending the request (using SendRequestHeader).
+// It must be called after sending the request using [RequestStream.SendRequestHeader].
 // It is invalid to call it more than once.
-// It doesn't set Response.Request and Response.TLS.
-// It is invalid to call it after Read has been called.
+// It doesn't set [http.Response.Request] or [http.Response.TLS].
 func (s *RequestStream) ReadResponse() (*http.Response, error) {
 	if !s.sentRequest {
 		return nil, errors.New("http3: invalid use of RequestStream.ReadResponse before SendRequestHeader")
 	}
 	frame, err := s.str.frameParser.ParseNext(s.str.qlogger)
 	if err != nil {
+		if errors.Is(err, errPriorityUpdateForPush) {
+			s.str.conn.CloseWithError(quic.ApplicationErrorCode(ErrCodeFrameUnexpected), "")
+			return nil, err
+		}
 		s.str.CancelRead(quic.StreamErrorCode(ErrCodeFrameError))
 		s.str.CancelWrite(quic.StreamErrorCode(ErrCodeFrameError))
-		return nil, fmt.Errorf("http3: parsing frame failed: %w", err)
+		return nil, fmt.Errorf("http3: parsing frame failed: %w", maybeReplaceError(err))
 	}
 	hf, ok := frame.(*headersFrame)
 	if !ok {
@@ -338,12 +390,12 @@ func (s *RequestStream) ReadResponse() (*http.Response, error) {
 		s.str.CancelWrite(quic.StreamErrorCode(ErrCodeFrameError))
 		return nil, fmt.Errorf("http3: HEADERS frame too large: %d bytes (max: %d)", hf.Length, s.maxHeaderBytes)
 	}
-	headerBlock := make([]byte, hf.Length)
-	if _, err := io.ReadFull(s.str.datagramStream, headerBlock); err != nil {
+	headerBlock, err := readHeaderBlock(s.str.datagramStream, hf.Length)
+	if err != nil {
 		maybeQlogInvalidHeadersFrame(s.str.qlogger, s.str.StreamID(), hf.Length)
 		s.str.CancelRead(quic.StreamErrorCode(ErrCodeRequestIncomplete))
 		s.str.CancelWrite(quic.StreamErrorCode(ErrCodeRequestIncomplete))
-		return nil, fmt.Errorf("http3: failed to read response headers: %w", err)
+		return nil, fmt.Errorf("http3: failed to read response headers: %w", maybeReplaceError(err))
 	}
 	decodeFn := s.decoder.Decode(headerBlock)
 	var hfs []qpack.HeaderField
@@ -357,8 +409,7 @@ func (s *RequestStream) ReadResponse() (*http.Response, error) {
 	}
 	if err != nil {
 		errCode := ErrCodeMessageError
-		var qpackErr *qpackError
-		if errors.As(err, &qpackErr) {
+		if _, ok := errors.AsType[*qpackError](err); ok {
 			errCode = ErrCodeQPACKDecompressionFailed
 		}
 		s.str.CancelRead(quic.StreamErrorCode(errCode))
@@ -377,7 +428,7 @@ func (s *RequestStream) ReadResponse() (*http.Response, error) {
 	if (isInformational || isNoContent || isSuccessfulConnect) && res.ContentLength == -1 {
 		res.ContentLength = 0
 	}
-	if s.requestedGzip && res.Header.Get("Content-Encoding") == "gzip" {
+	if s.requestedGzip && !isSuccessfulConnect && res.Header.Get("Content-Encoding") == "gzip" {
 		res.Header.Del("Content-Encoding")
 		res.Header.Del("Content-Length")
 		res.ContentLength = -1

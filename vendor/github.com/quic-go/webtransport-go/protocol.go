@@ -1,5 +1,7 @@
 package webtransport
 
+import "io"
+
 const (
 	// settingsEnableWebtransportDraft06 is the value for ENABLE_WEBTRANSPORT
 	// that was used up until draft-ietf-webtrans-http3-06.
@@ -40,4 +42,18 @@ func isWebTransportProtocol(s string) bool {
 // bidirectional streams, whose QUIC stream IDs are divisible by 4.
 func isValidSessionID(id uint64) bool {
 	return id%4 == 0
+}
+
+type byteCountingReader struct {
+	io.ByteReader
+
+	BytesRead uint64
+}
+
+func (r *byteCountingReader) ReadByte() (byte, error) {
+	b, err := r.ByteReader.ReadByte()
+	if err == nil {
+		r.BytesRead++
+	}
+	return b, err
 }

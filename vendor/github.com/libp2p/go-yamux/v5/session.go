@@ -379,7 +379,7 @@ func (s *Session) startMeasureRTT() {
 }
 
 // 0 if we don't yet have a measurement
-func (s *Session) getRTT() time.Duration {
+func (s *Session) RTT() time.Duration {
 	return time.Duration(atomic.LoadInt64(&s.rtt))
 }
 

@@ -48,23 +48,17 @@ type holePuncher struct {
 
 	tracer *tracer
 	filter AddrFilter
-
-	// Prior to https://github.com/libp2p/go-libp2p/pull/3044, go-libp2p would
-	// pick the opposite roles for client/server a hole punch. Setting this to
-	// true preserves that behavior
-	legacyBehavior bool
 }
 
-func newHolePuncher(h host.Host, ids identify.IDService, listenAddrs func() []ma.Multiaddr, tracer *tracer, filter AddrFilter) *holePuncher {
+func newHolePuncher(h host.Host, ids identify.IDService, listenAddrs func() []ma.Multiaddr, directDialTimeout time.Duration, tracer *tracer, filter AddrFilter) *holePuncher {
 	hp := &holePuncher{
-		host:        h,
-		ids:         ids,
-		active:      make(map[peer.ID]struct{}),
-		tracer:      tracer,
-		filter:      filter,
-		listenAddrs: listenAddrs,
-
-		legacyBehavior: true,
+		host:              h,
+		ids:               ids,
+		active:            make(map[peer.ID]struct{}),
+		tracer:            tracer,
+		filter:            filter,
+		listenAddrs:       listenAddrs,
+		directDialTimeout: directDialTimeout,
 	}
 	hp.ctx, hp.ctxCancel = context.WithCancel(context.Background())
 	h.Network().Notify((*netNotifiee)(hp))
@@ -141,6 +135,13 @@ func (hp *holePuncher) directConnect(rp peer.ID) error {
 
 	// hole punch
 	for i := 1; i <= maxRetries; i++ {
+		isClient := false
+		// On the last attempt we switch roles in case the connection is
+		// being made with a client with switched roles. Common for peers
+		// running go-libp2p prior to v0.41.
+		if i == maxRetries {
+			isClient = true
+		}
 		addrs, obsAddrs, rtt, err := hp.initiateHolePunch(rp)
 		if err != nil {
 			hp.tracer.ProtocolError(rp, err)
@@ -161,10 +162,6 @@ func (hp *holePuncher) directConnect(rp peer.ID) error {
 			hp.tracer.StartHolePunch(rp, addrs, rtt)
 			hp.tracer.HolePunchAttempt(pi.ID)
 			ctx, cancel := context.WithTimeout(hp.ctx, hp.directDialTimeout)
-			isClient := true
-			if hp.legacyBehavior {
-				isClient = false
-			}
 			err := holePunchConnect(ctx, hp.host, pi, isClient)
 			cancel()
 			dt := time.Since(start)
@@ -282,9 +279,7 @@ func (nn *netNotifiee) Connected(_ network.Network, conn network.Conn) {
 	// Hole punch if it's an inbound proxy connection.
 	// If we already have a direct connection with the remote peer, this will be a no-op.
 	if conn.Stat().Direction == network.DirInbound && isRelayAddress(conn.RemoteMultiaddr()) {
-		hs.refCount.Add(1)
-		go func() {
-			defer hs.refCount.Done()
+		hs.refCount.Go(func() {
 
 			select {
 			// waiting for Identify here will allow us to access the peer's public and observed addresses
@@ -298,7 +293,7 @@ func (nn *netNotifiee) Connected(_ network.Network, conn network.Conn) {
 			if err != nil {
 				log.Debug("attempt to perform DirectConnect failed", "remote_peer", conn.RemotePeer(), "err", err)
 			}
-		}()
+		})
 	}
 }
 

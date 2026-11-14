@@ -19,7 +19,8 @@ import (
 	"github.com/quic-go/quic-go/qlogwriter"
 )
 
-// ErrServerClosed is returned by the [Listener] or [EarlyListener]'s Accept method after a call to Close.
+// ErrServerClosed is returned by [Listener.Accept] or [EarlyListener.Accept]
+// after [Listener.Close] or [EarlyListener.Close] is called, respectively.
 var ErrServerClosed = errServerClosed{}
 
 type errServerClosed struct{}
@@ -33,6 +34,20 @@ type packetHandler interface {
 	destroy(error)
 	closeWithTransportError(qerr.TransportErrorCode)
 }
+
+const (
+	// max0RTTQueueingDuration is the maximum time that we store 0-RTT packets in order to wait for the corresponding Initial to be received.
+	max0RTTQueueingDuration = 100 * time.Millisecond
+
+	// max0RTTQueues is the maximum number of connections that we buffer 0-RTT packets for.
+	max0RTTQueues = 32
+
+	// max0RTTQueueLen is the maximum number of 0-RTT packets that we buffer for each connection.
+	// When a new connection is created, all buffered packets are passed to the connection immediately.
+	// To avoid blocking, this value has to be smaller than MaxConnUnprocessedPackets.
+	// To avoid packets being dropped as undecryptable by the connection, this value has to be smaller than MaxUndecryptablePackets.
+	max0RTTQueueLen = 31
+)
 
 type zeroRTTQueue struct {
 	packets    []receivedPacket
@@ -132,7 +147,7 @@ func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
 }
 
 // Close closes the listener.
-// Accept will return [ErrServerClosed] as soon as all connections in the accept queue have been accepted.
+// [Listener.Accept] will return [ErrServerClosed] as soon as all connections in the accept queue have been accepted.
 // QUIC handshakes that are still in flight will be rejected with a CONNECTION_REFUSED error.
 // Already established (accepted) connections will be unaffected.
 func (l *Listener) Close() error {
@@ -164,7 +179,7 @@ func (l *EarlyListener) Accept(ctx context.Context) (*Conn, error) {
 }
 
 // Close closes the listener.
-// Accept will return [ErrServerClosed] as soon as all connections in the accept queue have been accepted.
+// [EarlyListener.Accept] will return [ErrServerClosed] as soon as all connections in the accept queue have been accepted.
 // Early connections that are still in flight will be rejected with a CONNECTION_REFUSED error.
 // Already established (accepted) connections will be unaffected.
 func (l *EarlyListener) Close() error {
@@ -211,15 +226,15 @@ func listenUDP(addr string) (*net.UDPConn, error) {
 	return net.ListenUDP("udp", udpAddr)
 }
 
-// Listen listens for QUIC connections on a given net.PacketConn.
+// Listen listens for QUIC connections on a given [net.PacketConn].
 // If the PacketConn satisfies the [OOBCapablePacketConn] interface (as a [net.UDPConn] does),
-// ECN and packet info support will be enabled. In this case, ReadMsgUDP and WriteMsgUDP
-// will be used instead of ReadFrom and WriteTo to read/write packets.
-// A single net.PacketConn can only be used for a single call to Listen.
+// ECN and packet info support will be enabled. In this case, packets will be read in batches,
+// and [OOBCapablePacketConn.WriteMsgUDP] will be used instead of [net.PacketConn.WriteTo].
+// A single [net.PacketConn] can only be used for a single call to Listen.
 //
-// The tls.Config must not be nil and must contain a certificate configuration.
-// Furthermore, it must define an application control (using [NextProtos]).
-// The quic.Config may be nil, in that case the default values will be used.
+// The [tls.Config] must not be nil and must contain a certificate configuration.
+// Furthermore, it must define an application protocol using [tls.Config.NextProtos].
+// The [Config] may be nil, in which case the default values will be used.
 //
 // This is a convenience function. More advanced use cases should instantiate a [Transport],
 // which offers configuration options for a more fine-grained control of the connection establishment,
@@ -577,7 +592,7 @@ func (s *baseServer) handle0RTTPacket(p receivedPacket) bool {
 	}
 
 	if q, ok := s.zeroRTTQueues[connID]; ok {
-		if len(q.packets) >= protocol.Max0RTTQueueLen {
+		if len(q.packets) >= max0RTTQueueLen {
 			if s.qlogger != nil {
 				v, _ := wire.ParseVersion(p.data)
 				s.qlogger.RecordEvent(qlog.PacketDropped{
@@ -596,7 +611,7 @@ func (s *baseServer) handle0RTTPacket(p receivedPacket) bool {
 		return true
 	}
 
-	if len(s.zeroRTTQueues) >= protocol.Max0RTTQueues {
+	if len(s.zeroRTTQueues) >= max0RTTQueues {
 		if s.qlogger != nil {
 			v, _ := wire.ParseVersion(p.data)
 			s.qlogger.RecordEvent(qlog.PacketDropped{
@@ -613,7 +628,7 @@ func (s *baseServer) handle0RTTPacket(p receivedPacket) bool {
 	}
 	queue := &zeroRTTQueue{packets: make([]receivedPacket, 1, 8)}
 	queue.packets[0] = p
-	expiration := p.rcvTime.Add(protocol.Max0RTTQueueingDuration)
+	expiration := p.rcvTime.Add(max0RTTQueueingDuration)
 	queue.expiration = expiration
 	if s.nextZeroRTTCleanup.IsZero() || s.nextZeroRTTCleanup.After(expiration) {
 		s.nextZeroRTTCleanup = expiration
