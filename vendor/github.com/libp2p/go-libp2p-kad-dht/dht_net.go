@@ -9,7 +9,6 @@ import (
 	"github.com/libp2p/go-libp2p-kad-dht/internal/metrics"
 	"github.com/libp2p/go-libp2p-kad-dht/internal/net"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/libp2p/go-msgio"
 	"go.uber.org/zap"
@@ -68,7 +67,7 @@ func (dht *IpfsDHT) handleNewMessage(s network.Stream) bool {
 			}
 			return false
 		}
-		err = proto.Unmarshal(msgbytes, &req)
+		err = pb.Unmarshal(msgbytes, &req)
 		r.ReleaseMsg(msgbytes)
 		if err != nil {
 			if c := baseLogger.Check(zap.DebugLevel, "error unmarshaling message"); c != nil {

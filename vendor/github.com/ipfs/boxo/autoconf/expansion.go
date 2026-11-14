@@ -1,7 +1,7 @@
 package autoconf
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"slices"
 	"strings"
 )
@@ -40,7 +40,7 @@ func selectRandom(items []string) string {
 	if len(items) == 0 {
 		return ""
 	}
-	return items[rand.Intn(len(items))]
+	return items[rand.IntN(len(items))]
 }
 
 // ExpandDNSResolvers expands DNS resolvers with "auto" values replaced by autoconf values.

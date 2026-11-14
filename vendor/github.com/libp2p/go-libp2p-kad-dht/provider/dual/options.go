@@ -37,6 +37,8 @@ type config struct {
 	connectivityCheckOnlineInterval  [2]time.Duration
 	connectivityCheckOfflineInterval [2]time.Duration
 
+	sendProviderRecordTimeout [2]time.Duration
+
 	maxWorkers               [2]int
 	dedicatedPeriodicWorkers [2]int
 	dedicatedBurstWorkers    [2]int
@@ -57,6 +59,7 @@ func getOpts(opts []Option, d *dual.DHT) (config, error) {
 
 		offlineDelay:                    [2]time.Duration{provider.DefaultOfflineDelay, provider.DefaultOfflineDelay},
 		connectivityCheckOnlineInterval: [2]time.Duration{provider.DefaultConnectivityCheckOnlineInterval, provider.DefaultConnectivityCheckOnlineInterval},
+		sendProviderRecordTimeout:       [2]time.Duration{provider.DefaultSendProviderRecordTimeout, provider.DefaultSendProviderRecordTimeout},
 		loggerNames:                     [2]string{DefaultLoggerNameLAN, DefaultLoggerNameWAN},
 
 		maxWorkers:               [2]int{4, 4},
@@ -157,8 +160,8 @@ func WithDatastoreWAN(ds datastore.Batching) Option {
 
 func withReprovideInterval(reprovideInterval time.Duration, dhts ...uint8) Option {
 	return func(cfg *config) error {
-		if reprovideInterval <= 0 {
-			return fmt.Errorf("reprovide interval must be positive, got %s", reprovideInterval)
+		if reprovideInterval < 0 {
+			return fmt.Errorf("reprovide interval must be >= 0 (use 0 to disable the schedule), got %s", reprovideInterval)
 		}
 		for _, dht := range dhts {
 			cfg.reprovideInterval[dht] = reprovideInterval
@@ -167,14 +170,23 @@ func withReprovideInterval(reprovideInterval time.Duration, dhts ...uint8) Optio
 	}
 }
 
+// WithReprovideInterval sets the reprovide interval for both the LAN and
+// WAN providers. See [provider.WithReprovideInterval] for the no-schedule
+// (burst-only) semantics when set to 0.
 func WithReprovideInterval(reprovideInterval time.Duration) Option {
 	return withReprovideInterval(reprovideInterval, lanID, wanID)
 }
 
+// WithReprovideIntervalLAN sets the reprovide interval for the LAN
+// provider. See [provider.WithReprovideInterval] for the no-schedule
+// (burst-only) semantics when set to 0.
 func WithReprovideIntervalLAN(reprovideInterval time.Duration) Option {
 	return withReprovideInterval(reprovideInterval, lanID)
 }
 
+// WithReprovideIntervalWAN sets the reprovide interval for the WAN
+// provider. See [provider.WithReprovideInterval] for the no-schedule
+// (burst-only) semantics when set to 0.
 func WithReprovideIntervalWAN(reprovideInterval time.Duration) Option {
 	return withReprovideInterval(reprovideInterval, wanID)
 }
@@ -273,6 +285,37 @@ func WithConnectivityCheckOfflineIntervalLAN(offlineInterval time.Duration) Opti
 
 func WithConnectivityCheckOfflineIntervalWAN(offlineInterval time.Duration) Option {
 	return withConnectivityCheckOfflineInterval(offlineInterval, wanID)
+}
+
+func withSendProviderRecordTimeout(timeout time.Duration, dhts ...uint8) Option {
+	return func(cfg *config) error {
+		if timeout <= 0 {
+			return fmt.Errorf("send provider record timeout must be greater than 0, got %s", timeout)
+		}
+		for _, dht := range dhts {
+			cfg.sendProviderRecordTimeout[dht] = timeout
+		}
+		return nil
+	}
+}
+
+// WithSendProviderRecordTimeout sets the per-peer ADD_PROVIDER RPC timeout
+// for both the LAN and WAN providers. See
+// [provider.WithSendProviderRecordTimeout].
+func WithSendProviderRecordTimeout(timeout time.Duration) Option {
+	return withSendProviderRecordTimeout(timeout, lanID, wanID)
+}
+
+// WithSendProviderRecordTimeoutLAN sets the per-peer ADD_PROVIDER RPC timeout
+// for the LAN provider. See [provider.WithSendProviderRecordTimeout].
+func WithSendProviderRecordTimeoutLAN(timeout time.Duration) Option {
+	return withSendProviderRecordTimeout(timeout, lanID)
+}
+
+// WithSendProviderRecordTimeoutWAN sets the per-peer ADD_PROVIDER RPC timeout
+// for the WAN provider. See [provider.WithSendProviderRecordTimeout].
+func WithSendProviderRecordTimeoutWAN(timeout time.Duration) Option {
+	return withSendProviderRecordTimeout(timeout, wanID)
 }
 
 func withMaxWorkers(maxWorkers int, dhts ...uint8) Option {

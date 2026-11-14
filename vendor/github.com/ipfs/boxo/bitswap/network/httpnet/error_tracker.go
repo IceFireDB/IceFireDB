@@ -29,7 +29,9 @@ func (et *errorTracker) stopTracking(p peer.ID) {
 	et.mux.Unlock()
 }
 
-// logErrors adds n to the current error count for p. If the total count is above the threshold, then an error is returned. If n is 0, the the total count is reset to 0.
+// logErrors adds n to the current error count for p. If the total count is
+// above the threshold, then an error is returned. If n is 0, the total count
+// is reset to 0.
 func (et *errorTracker) logErrors(p peer.ID, n int, threshold int) error {
 	et.mux.Lock()
 	defer et.mux.Unlock()

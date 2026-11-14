@@ -1,7 +1,7 @@
 /*
-	Package containing Token struct and TokenType info.
-	Tokens are the lingua-franca used between all the refmt packages.
-	Users typically do not refer to these types.
+Package containing Token struct and TokenType info.
+Tokens are the lingua-franca used between all the refmt packages.
+Users typically do not refer to these types.
 */
 package tok
 
@@ -102,16 +102,16 @@ func (tt TokenType) IsSpecial() bool {
 }
 
 /*
-	Checks if the content of two tokens is the same.
-	Tokens are considered the same if their type one of the special
-	consts (map/array open/close) and that type and the optional length field are equal;
-	or, if type indicates a value, then they are the same if those values are equal.
-	In either path, values that are *not* specified as relevant by the Token's Type
-	are disregarded in the comparison.
+Checks if the content of two tokens is the same.
+Tokens are considered the same if their type one of the special
+consts (map/array open/close) and that type and the optional length field are equal;
+or, if type indicates a value, then they are the same if those values are equal.
+In either path, values that are *not* specified as relevant by the Token's Type
+are disregarded in the comparison.
 
-	If the Token.Type is not valid, the result will be false.
+If the Token.Type is not valid, the result will be false.
 
-	This method is primarily useful for testing.
+This method is primarily useful for testing.
 */
 func IsTokenEqual(t1, t2 Token) bool {
 	if t1.Type != t2.Type {

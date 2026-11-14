@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: CC0-1.0
+//
 // Written in 2012 by Dmitry Chestnykh.
 //
 // To the extent possible under law, the author have dedicated all copyright
@@ -10,14 +12,28 @@
 
 package bbloom
 
-// Hash returns the 64-bit SipHash-2-4 of the given byte slice with two 64-bit
-// parts of 128-bit key: k0 and k1.
+// SipHash-2-4 initialization constants.
+const (
+	sipC0 = 0x736f6d6570736575
+	sipC1 = 0x646f72616e646f6d
+	sipC2 = 0x6c7967656e657261
+	sipC3 = 0x7465646279746573
+)
+
+// Default SipHash keys (the original hardcoded values: 0xdeadbeaf, 0xfaebdaed).
+const (
+	defaultK0 = uint64(0xdeadbeaf)
+	defaultK1 = uint64(0xfaebdaed)
+)
+
+// sipHash returns the 64-bit SipHash-2-4 of the given byte slice using
+// the bloom filter's k0/k1 keys, split into two parts for double-hashing.
 func (bl *Bloom) sipHash(p []byte) (l, h uint64) {
 	// Initialization.
-	v0 := uint64(8317987320269560794) // k0 ^ 0x736f6d6570736575
-	v1 := uint64(7237128889637516672) // k1 ^ 0x646f72616e646f6d
-	v2 := uint64(7816392314733513934) // k0 ^ 0x6c7967656e657261
-	v3 := uint64(8387220255325274014) // k1 ^ 0x7465646279746573
+	v0 := bl.k0 ^ sipC0
+	v1 := bl.k1 ^ sipC1
+	v2 := bl.k0 ^ sipC2
+	v3 := bl.k1 ^ sipC3
 	t := uint64(len(p)) << 56
 
 	// Compression.
@@ -220,6 +236,9 @@ func (bl *Bloom) sipHash(p []byte) (l, h uint64) {
 	hash := v0 ^ v1 ^ v2 ^ v3
 	h = hash >> bl.shift
 	l = hash << bl.shift >> bl.shift
+	if bl.hashVersion >= 1 {
+		l |= 1 // force odd so l is coprime to 2^sizeExp (issue #11)
+	}
 	return l, h
 
 }

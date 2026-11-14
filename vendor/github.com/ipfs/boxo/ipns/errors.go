@@ -46,3 +46,20 @@ var ErrInvalidName = errors.New("name is invalid")
 
 // ErrInvalidPath is returned when an IPNS [Record] has an invalid path.
 var ErrInvalidPath = errors.New("value is not a valid content path")
+
+// ErrMetadataNotFound is returned when an IPNS metadata dictionary key does not exist.
+var ErrMetadataNotFound = errors.New("metadata key not found in record")
+
+// ErrMetadataConflict is returned when a metadata key uses a reserved IPNS field name.
+var ErrMetadataConflict = errors.New("metadata key uses reserved name")
+
+// ErrMetadataEmptyKey is returned when an empty string is used as a metadata key.
+var ErrMetadataEmptyKey = errors.New("metadata key must not be empty")
+
+// ErrMetadataUnsupportedType is returned when a metadata value has an unsupported
+// Go type. Supported types: string, []byte, int64, int, and bool.
+var ErrMetadataUnsupportedType = errors.New("unsupported metadata value type")
+
+// ErrMetadataValueNotSet is returned when accessing an uninitialized [MetadataValue]
+// (the zero value of the struct).
+var ErrMetadataValueNotSet = errors.New("metadata value is not set")

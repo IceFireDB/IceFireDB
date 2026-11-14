@@ -3,6 +3,7 @@ package dht
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -36,15 +37,64 @@ const (
 	ModeAutoServer
 )
 
+// BootstrapOrderOpt selects which peers the DHT dials first when its routing
+// table is empty.
+type BootstrapOrderOpt = dhtcfg.BootstrapOrderOpt
+
+const (
+	// BootstrapFirst dials the bootstrap peers first, and the peers saved
+	// from the previous routing table only if the bootstrap peers fail or
+	// none are configured.
+	BootstrapFirst BootstrapOrderOpt = iota
+	// PersistedFirst dials the peers saved from the previous routing table
+	// first, and the bootstrap peers only if fewer of them answer than a
+	// lookup queries at once (see Concurrency) within 20 seconds.
+	PersistedFirst
+	// Concurrent dials the saved peers and the bootstrap peers at the same
+	// time.
+	Concurrent
+)
+
 // DefaultPrefix is the application specific prefix attached to all DHT protocols by default.
 const DefaultPrefix protocol.ID = amino.ProtocolPrefix
 
 type Option = dhtcfg.Option
 
-// ProviderStore sets the provider storage manager.
-func ProviderStore(ps records.ProviderStore) Option {
+// ValueDatastore gives the value store (records under /pk, /ipns, …) its own
+// physical datastore. When unset, values share the datastore configured with
+// Datastore. Value records are namespaced by a per-record-type key prefix, so a
+// shared datastore never collides with provider records.
+func ValueDatastore(dstore ds.Batching) Option {
 	return func(c *dhtcfg.Config) error {
-		c.ProviderStore = ps
+		c.ValueDatastore = dstore
+		return nil
+	}
+}
+
+// ProviderDatastore gives the provider store its own physical datastore. When
+// unset, provider records share the datastore configured with Datastore. This
+// is useful, for example, to keep ephemeral provider records off a durable
+// value datastore.
+//
+// Custom ProviderStore implementations cannot be injected; the DHT always runs
+// the built-in provider manager, configured through this option and
+// ProviderManagerOpts. DHT instances given the same provider datastore see
+// each other's flushed provider records, and records.Cache controls the read
+// cache in front of it. Each instance buffers its own writes in memory and
+// commits them as one batch when the buffer fills or on Close, so a record can
+// stay invisible to the other instances until its writer flushes.
+func ProviderDatastore(dstore ds.Batching) Option {
+	return func(c *dhtcfg.Config) error {
+		c.ProviderDatastore = dstore
+		return nil
+	}
+}
+
+// ProviderManagerOptions specifies the options passed to the the
+// provider manager storing provide records.
+func ProviderManagerOpts(opts ...records.Option) Option {
+	return func(pm *dhtcfg.Config) error {
+		pm.ProviderManagerOpts = opts
 		return nil
 	}
 }
@@ -214,9 +264,24 @@ func LookupCheckConcurrency(n int) Option {
 // For example, a record may contain an ipns entry with an EOL saying its valid
 // until the year 2020 (a great time in the future). For that record to stick around
 // it must be rebroadcasted more frequently than once every 'MaxRecordAge'
+//
+// A non-positive maxAge disables age-based expiry: records are then kept
+// regardless of age (subject to any other validity they carry, such as an ipns
+// EOL), rather than being treated as immediately expired.
 func MaxRecordAge(maxAge time.Duration) Option {
 	return func(c *dhtcfg.Config) error {
 		c.MaxRecordAge = maxAge
+		return nil
+	}
+}
+
+// ValueGCInterval sets how often the DHT sweeps the datastore to delete value
+// records older than MaxRecordAge. A non-positive interval, or a non-positive
+// MaxRecordAge, disables the background sweep; expired records are still
+// discarded lazily when read. Defaults to amino.DefaultValueGCInterval.
+func ValueGCInterval(interval time.Duration) Option {
+	return func(c *dhtcfg.Config) error {
+		c.ValueGCInterval = interval
 		return nil
 	}
 }
@@ -292,6 +357,41 @@ func BootstrapPeersFunc(getBootstrapPeers func() []peer.AddrInfo) Option {
 	return func(c *dhtcfg.Config) error {
 		c.BootstrapPeers = getBootstrapPeers
 		return nil
+	}
+}
+
+// RoutingTablePersistence saves the routing table peers to the Datastore every
+// interval and when the DHT closes. The next time the routing table is empty,
+// for example after a restart, the DHT dials the saved peers alongside the
+// bootstrap peers, in the order set by BootstrapOrder. Zero disables both.
+// Close the DHT before its host: a closed host can dial no address, so there
+// is nothing left to save.
+//
+// Without bootstrap peers, the DHT dials only the saved peers. A DHT with no
+// bootstrap peers and persistence disabled dials no peer on its own.
+func RoutingTablePersistence(interval time.Duration) Option {
+	return func(c *dhtcfg.Config) error {
+		if interval < 0 {
+			return fmt.Errorf("routing table persistence interval must not be negative, got %s", interval)
+		}
+		c.RoutingTable.PersistInterval = interval
+		return nil
+	}
+}
+
+// BootstrapOrder sets which peers the DHT dials first when its routing table
+// is empty: the bootstrap peers, or the peers saved by RoutingTablePersistence.
+//
+// The default is BootstrapFirst.
+func BootstrapOrder(order BootstrapOrderOpt) Option {
+	return func(c *dhtcfg.Config) error {
+		switch order {
+		case BootstrapFirst, PersistedFirst, Concurrent:
+			c.BootstrapOrder = order
+			return nil
+		default:
+			return fmt.Errorf("unknown bootstrap order %d", order)
+		}
 	}
 }
 

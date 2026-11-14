@@ -44,6 +44,19 @@ func NewBlock(data []byte) *BasicBlock {
 	}
 }
 
+// NewBlockWithPrefix creates a new Block that contains the given data and a
+// CID calculated usign the given Prefix.
+func NewBlockWithPrefix(data []byte, prefix cid.Prefix) (*BasicBlock, error) {
+	c, err := prefix.Sum(data)
+	if err != nil {
+		return nil, err
+	}
+	return &BasicBlock{
+		data: data,
+		cid:  c,
+	}, nil
+}
+
 // NewBlockWithCid creates a new block when the hash of the data
 // is already known, this is used to save time in situations where
 // we are able to be confident that the data is correct.

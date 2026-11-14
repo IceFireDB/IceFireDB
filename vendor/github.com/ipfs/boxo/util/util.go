@@ -5,13 +5,10 @@ package util
 import (
 	"crypto/subtle"
 	"errors"
-	"io"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime/debug"
 	"strings"
-	"time"
 
 	b58 "github.com/mr-tron/base58/base58"
 	mh "github.com/multiformats/go-multihash"
@@ -52,22 +49,6 @@ func ExpandPathnames(paths []string) ([]string, error) {
 		out = append(out, abspath)
 	}
 	return out, nil
-}
-
-// NewTimeSeededRand returns a random bytes reader
-// which has been initialized with the current time.
-//
-// Deprecated: use github.com/ipfs/go-test/random instead.
-func NewTimeSeededRand() io.Reader {
-	return NewSeededRand(time.Now().UnixNano())
-}
-
-// NewSeededRand returns a random bytes reader
-// initialized with the given seed.
-//
-// Deprecated: use github.com/ipfs/go-test/random instead.
-func NewSeededRand(seed int64) io.Reader {
-	return rand.New(rand.NewSource(seed))
 }
 
 // GetenvBool is the way to check an env var as a boolean

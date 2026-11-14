@@ -12,9 +12,9 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 )
 
-// BitSwapNetwork provides network connectivity for BitSwap sessions.
+// BitSwapNetwork provides network connectivity for Bitswap sessions.
 type BitSwapNetwork interface {
-	// SendMessage sends a BitSwap message to a peer.
+	// SendMessage sends a Bitswap message to a peer.
 	SendMessage(
 		context.Context,
 		peer.ID,

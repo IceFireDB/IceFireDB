@@ -23,7 +23,7 @@ func (d *Encoder) Reset() {
 }
 
 /*
-	A json.Encoder is a TokenSink implementation that emits json bytes.
+A json.Encoder is a TokenSink implementation that emits json bytes.
 */
 type Encoder struct {
 	wr  io.Writer

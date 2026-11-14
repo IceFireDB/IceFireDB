@@ -6,12 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"math/rand"
+	"math/rand/v2"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/multiformats/go-base32"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/multiformats/go-multihash"
@@ -32,7 +32,6 @@ import (
 	ds "github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	logging "github.com/ipfs/go-log/v2"
-	"google.golang.org/protobuf/proto"
 
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/amino"
@@ -80,11 +79,18 @@ type FullRT struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	enableValues, enableProviders bool
-	Validator                     record.Validator
-	ProviderManager               *records.ProviderManager
-	datastore                     ds.Datastore
-	h                             host.Host
+	// Validator applies validation and selection to records fetched from and
+	// stored in the DHT. It is set from the DHT Validator option and must not
+	// be reassigned after NewFullRT: the value store captures it at
+	// construction, so a later assignment changes lookup-side behavior only and
+	// splits validation between the two.
+	Validator record.Validator
+	// ProviderManager is nil when providers are disabled, which is possible on
+	// any protocol prefix but the Amino one, since Validate only enforces
+	// providers there. Check for nil before using it.
+	ProviderManager *records.ProviderManager
+	valueStore      *records.ValueStore
+	h               host.Host
 
 	crawlerInterval time.Duration
 	lastCrawlTime   time.Time
@@ -119,6 +125,11 @@ type FullRT struct {
 	peerConnectednessSubscriber event.Subscription
 
 	ipDiversityFilterLimit int
+
+	// shuffle randomises the provider order received from queried peers before
+	// the count cap, so the providers we keep and surface are spread across the
+	// returned set rather than always its first entries.
+	shuffle func(n int, swap func(i, j int))
 }
 
 // NewFullRT creates a DHT client that tracks the full network. It takes a protocol prefix for the given network,
@@ -185,10 +196,30 @@ func NewFullRT(h host.Host, protocolPrefix protocol.ID, options ...Option) (*Ful
 	ctx, cancel := context.WithCancel(context.Background())
 
 	self := h.ID()
-	pm, err := records.NewProviderManager(ctx, self, h.Peerstore(), dhtcfg.Datastore, fullrtcfg.pmOpts...)
-	if err != nil {
-		cancel()
-		return nil, err
+
+	// A nil store marks its subsystem as absent, which is what the routing
+	// methods below gate on. Stores stay nil only when the caller disables the
+	// subsystem, which Validate permits on any prefix but the Amino one.
+	var pm *records.ProviderManager
+	if dhtcfg.EnableProviders {
+		// Options are last-wins, so the fullrt-native ones override any that
+		// arrived through DHTOption.
+		pmOpts := slices.Concat(dhtcfg.ProviderManagerOpts, fullrtcfg.pmOpts)
+		pm, err = records.NewProviderManager(self, h.Peerstore(), dhtcfg.ProviderDS(), pmOpts...)
+		if err != nil {
+			cancel()
+			_ = sub.Close()
+			return nil, err
+		}
+	}
+
+	// FullRT builds its config by hand rather than from Defaults, so MaxRecordAge
+	// is zero unless the caller sets it and no value GC ever runs. At the default
+	// value records never expire; a caller who sets MaxRecordAge gets lazy expiry
+	// on read, but records are still never swept from disk.
+	var valueStore *records.ValueStore
+	if dhtcfg.EnableValues {
+		valueStore = records.NewValueStore(dhtcfg.ValueDS(), dhtcfg.Validator, dhtcfg.MaxRecordAge)
 	}
 
 	var bsPeers []*peer.AddrInfo
@@ -202,16 +233,15 @@ func NewFullRT(h host.Host, protocolPrefix protocol.ID, options ...Option) (*Ful
 		ctx:    ctx,
 		cancel: cancel,
 
-		enableValues:    dhtcfg.EnableValues,
-		enableProviders: dhtcfg.EnableProviders,
 		Validator:       dhtcfg.Validator,
 		ProviderManager: pm,
-		datastore:       dhtcfg.Datastore,
+		valueStore:      valueStore,
 		h:               h,
 		crawler:         fullrtcfg.crawler,
 		messageSender:   ms,
 		protoMessenger:  protoMessenger,
 		filterFromTable: kaddht.PublicQueryFilter,
+		shuffle:         rand.Shuffle,
 		rt:              trie.New(),
 		keyToPeerMap:    make(map[string]peer.ID),
 		bucketSize:      dhtcfg.BucketSize,
@@ -395,7 +425,16 @@ func (dht *FullRT) runCrawler(ctx context.Context) {
 func (dht *FullRT) Close() error {
 	dht.cancel()
 	dht.wg.Wait()
-	return dht.ProviderManager.Close()
+
+	// A disabled subsystem has no store, so only close the ones constructed.
+	var errs []error
+	if dht.ProviderManager != nil {
+		errs = append(errs, dht.ProviderManager.Close())
+	}
+	if dht.valueStore != nil {
+		errs = append(errs, dht.valueStore.Close())
+	}
+	return errors.Join(errs...)
 }
 
 func (dht *FullRT) Bootstrap(ctx context.Context) (err error) {
@@ -554,7 +593,7 @@ func (dht *FullRT) PutValue(ctx context.Context, key string, value []byte, opts 
 	ctx, end := tracer.PutValue(dhtName, ctx, key, value, opts...)
 	defer func() { end(err) }()
 
-	if !dht.enableValues {
+	if dht.valueStore == nil {
 		return routing.ErrNotSupported
 	}
 
@@ -622,7 +661,7 @@ func (dht *FullRT) GetValue(ctx context.Context, key string, opts ...routing.Opt
 	ctx, end := tracer.GetValue(dhtName, ctx, key, opts...)
 	defer func() { end(result, err) }()
 
-	if !dht.enableValues {
+	if dht.valueStore == nil {
 		return nil, routing.ErrNotSupported
 	}
 
@@ -659,7 +698,7 @@ func (dht *FullRT) SearchValue(ctx context.Context, key string, opts ...routing.
 	ctx, end := tracer.SearchValue(dhtName, ctx, key, opts...)
 	defer func() { ch, err = end(ch, err) }()
 
-	if !dht.enableValues {
+	if dht.valueStore == nil {
 		return nil, routing.ErrNotSupported
 	}
 
@@ -890,7 +929,7 @@ func (dht *FullRT) Provide(ctx context.Context, key cid.Cid, brdcst bool) (err e
 	ctx, end := tracer.Provide(dhtName, ctx, key, brdcst)
 	defer func() { end(err) }()
 
-	if !dht.enableProviders {
+	if dht.ProviderManager == nil {
 		return routing.ErrNotSupported
 	} else if !key.Defined() {
 		return errors.New("invalid cid: undefined")
@@ -899,7 +938,9 @@ func (dht *FullRT) Provide(ctx context.Context, key cid.Cid, brdcst bool) (err e
 	logger.Debugw("providing", "cid", key, "mh", internal.LoggableProviderRecordBytes(keyMH))
 
 	// add self locally
-	dht.ProviderManager.AddProvider(ctx, keyMH, peer.AddrInfo{ID: dht.h.ID()})
+	if err := dht.ProviderManager.AddProvider(ctx, keyMH, peer.AddrInfo{ID: dht.h.ID()}); err != nil {
+		logger.Warnw("failed to add self as provider", "mh", internal.LoggableProviderRecordBytes(keyMH), "error", err)
+	}
 	if !brdcst {
 		return nil
 	}
@@ -1034,7 +1075,7 @@ func (dht *FullRT) ProvideMany(ctx context.Context, keys []multihash.Multihash) 
 	ctx, end := tracer.ProvideMany(dhtName, ctx, keys)
 	defer func() { end(err) }()
 
-	if !dht.enableProviders {
+	if dht.ProviderManager == nil {
 		return routing.ErrNotSupported
 	}
 
@@ -1070,7 +1111,7 @@ func (dht *FullRT) PutMany(ctx context.Context, keys []string, values [][]byte) 
 	ctx, span := internal.StartSpan(ctx, "FullRT.PutMany", trace.WithAttributes(attribute.Int("NumKeys", len(keys))))
 	defer span.End()
 
-	if !dht.enableValues {
+	if dht.valueStore == nil {
 		return routing.ErrNotSupported
 	}
 
@@ -1300,7 +1341,7 @@ func divideByChunkSize(keys []peer.ID, chunkSize int) [][]peer.ID {
 
 // FindProviders searches until the context expires.
 func (dht *FullRT) FindProviders(ctx context.Context, c cid.Cid) ([]peer.AddrInfo, error) {
-	if !dht.enableProviders {
+	if dht.ProviderManager == nil {
 		return nil, routing.ErrNotSupported
 	} else if !c.Defined() {
 		return nil, errors.New("invalid cid: undefined")
@@ -1322,7 +1363,7 @@ func (dht *FullRT) FindProvidersAsync(ctx context.Context, key cid.Cid, count in
 	ctx, end := tracer.FindProvidersAsync(dhtName, ctx, key, count)
 	defer func() { ch = end(ch, nil) }()
 
-	if !dht.enableProviders || !key.Defined() {
+	if dht.ProviderManager == nil || !key.Defined() {
 		peerOut := make(chan peer.AddrInfo)
 		close(peerOut)
 		return peerOut
@@ -1410,6 +1451,12 @@ func (dht *FullRT) findProvidersAsyncRoutine(ctx context.Context, key multihash.
 
 		logger.Debugf("%d provider entries", len(provs))
 
+		// The remote returns providers in an unspecified order. Shuffle before
+		// the count-capped loop below so the subset we keep and surface is
+		// spread across the returned providers rather than always the first
+		// ones the remote happened to list.
+		dht.shuffle(len(provs), func(i, j int) { provs[i], provs[j] = provs[j], provs[i] })
+
 		// Add unique providers from request, up to 'count'
 		for _, prov := range provs {
 			dht.maybeAddAddrs(prov.ID, prov.Addrs, peerstore.TempAddrTTL)
@@ -1476,9 +1523,7 @@ func (dht *FullRT) FindPeer(ctx context.Context, id peer.ID) (pi peer.AddrInfo, 
 	newAddrs := make([]ma.Multiaddr, 0)
 
 	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		addrsSoFar := make(map[string]struct{})
 		for {
 			select {
@@ -1498,7 +1543,7 @@ func (dht *FullRT) FindPeer(ctx context.Context, id peer.ID) (pi peer.AddrInfo, 
 				return
 			}
 		}
-	}()
+	})
 
 	fn := func(ctx context.Context, p peer.ID) error {
 		// For DHT query command
@@ -1565,64 +1610,17 @@ var _ routing.Routing = (*FullRT)(nil)
 func (dht *FullRT) getLocal(ctx context.Context, key string) (*recpb.Record, error) {
 	logger.Debugw("finding value in datastore", "key", internal.LoggableRecordKeyString(key))
 
-	rec, err := dht.getRecordFromDatastore(ctx, mkDsKey(key))
+	rec, err := dht.valueStore.Get(ctx, key)
 	if err != nil {
 		logger.Warnw("get local failed", "key", internal.LoggableRecordKeyString(key), "error", err)
 		return nil, err
-	}
-
-	// Double check the key. Can't hurt.
-	if rec != nil && string(rec.GetKey()) != key {
-		logger.Errorw("BUG: found a DHT record that didn't match it's key", "expected", internal.LoggableRecordKeyString(key), "got", rec.GetKey())
-		return nil, nil
-
 	}
 	return rec, nil
 }
 
 // putLocal stores the key value pair in the datastore
 func (dht *FullRT) putLocal(ctx context.Context, key string, rec *recpb.Record) error {
-	data, err := proto.Marshal(rec)
-	if err != nil {
-		logger.Warnw("failed to put marshal record for local put", "error", err, "key", internal.LoggableRecordKeyString(key))
-		return err
-	}
-
-	return dht.datastore.Put(ctx, mkDsKey(key), data)
-}
-
-func mkDsKey(s string) ds.Key {
-	return ds.NewKey(base32.RawStdEncoding.EncodeToString([]byte(s)))
-}
-
-// returns nil, nil when either nothing is found or the value found doesn't properly validate.
-// returns nil, some_error when there's a *datastore* error (i.e., something goes very wrong)
-func (dht *FullRT) getRecordFromDatastore(ctx context.Context, dskey ds.Key) (*recpb.Record, error) {
-	buf, err := dht.datastore.Get(ctx, dskey)
-	if err == ds.ErrNotFound {
-		return nil, nil
-	}
-	if err != nil {
-		logger.Errorw("error retrieving record from datastore", "key", dskey, "error", err)
-		return nil, err
-	}
-	rec := new(recpb.Record)
-	err = proto.Unmarshal(buf, rec)
-	if err != nil {
-		// Bad data in datastore, log it but don't return an error, we'll just overwrite it
-		logger.Errorw("failed to unmarshal record from datastore", "key", dskey, "error", err)
-		return nil, nil
-	}
-
-	err = dht.Validator.Validate(string(rec.GetKey()), rec.GetValue())
-	if err != nil {
-		// Invalid record in datastore, probably expired but don't return an error,
-		// we'll just overwrite it
-		logger.Debugw("local record verify failed", "key", rec.GetKey(), "error", err)
-		return nil, nil
-	}
-
-	return rec, nil
+	return dht.valueStore.Put(ctx, key, rec)
 }
 
 // FindLocal looks for a peer with a given ID connected to this dht and returns the peer and the table it was found in.

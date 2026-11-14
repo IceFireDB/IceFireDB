@@ -35,10 +35,9 @@ func (d *Decoder) decodeString() (string, error) {
 	// which we don't want to pass onto the parser.
 	d.r.Unreadn1()
 	// Parse!
-	s, ok := parseString(d.r.StopTrack())
-	if !ok {
-		//return string(s), fmt.Errorf("string parse misc fail")
-	}
+	// FIXME: parseString returns an ok bool that we currently ignore;
+	// callers expect strings to round-trip even when parsing fails.
+	s, _ := parseString(d.r.StopTrack())
 	// Swallow the trailing quote again.
 	d.r.Readn1()
 	return string(s), nil

@@ -8,7 +8,8 @@ import (
 
 // Headers is an HTTP middleware that sets the configured headers in all requests.
 type Headers struct {
-	headers map[string][]string
+	headers         map[string][]string
+	exposeXIpfsPath bool
 }
 
 // NewHeaders creates a new [Headers] middleware that applies the given headers
@@ -23,6 +24,15 @@ func NewHeaders(headers map[string][]string) *Headers {
 		h.headers[http.CanonicalHeaderKey(k)] = v
 	}
 
+	return h
+}
+
+// WithDeprecatedXIpfsPath includes the legacy X-Ipfs-Path header in the
+// default Access-Control-Expose-Headers set added by [Headers.ApplyCors].
+// Call it before [Headers.ApplyCors], and only when the gateway is
+// configured to send the header (see [Config.DeprecatedXIpfsPath]).
+func (h *Headers) WithDeprecatedXIpfsPath() *Headers {
+	h.exposeXIpfsPath = true
 	return h
 }
 
@@ -70,15 +80,18 @@ func (h *Headers) ApplyCors() *Headers {
 			"X-Requested-With",
 		}, h.headers[ACAHeadersName]...))
 
-	h.headers[ACEHeadersName] = cleanHeaderSet(
-		append([]string{
-			"Content-Length",
-			"Content-Range",
-			"X-Chunked-Output",
-			"X-Stream-Output",
-			"X-Ipfs-Path",
-			"X-Ipfs-Roots",
-		}, h.headers[ACEHeadersName]...))
+	exposeHeaders := []string{
+		"Content-Length",
+		"Content-Range",
+		"X-Chunked-Output",
+		"X-Stream-Output",
+		"Ipfs-Uri",
+		"X-Ipfs-Roots",
+	}
+	if h.exposeXIpfsPath {
+		exposeHeaders = append(exposeHeaders, "X-Ipfs-Path")
+	}
+	h.headers[ACEHeadersName] = cleanHeaderSet(append(exposeHeaders, h.headers[ACEHeadersName]...))
 
 	return h
 }

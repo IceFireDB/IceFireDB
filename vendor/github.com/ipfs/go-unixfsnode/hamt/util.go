@@ -95,12 +95,9 @@ func bitField(nd data.UnixFSData) (bitfield.Bitfield, error) {
 	if fanout > maximumHamtWidth {
 		return nil, fmt.Errorf("hamt witdh (%d) exceed maximum allowed (%d)", fanout, maximumHamtWidth)
 	}
-	bf, err := bitfield.NewBitfield(fanout)
-	if err != nil {
-		return nil, err
-	}
-	bf.SetBytes(nd.FieldData().Must().Bytes())
-	return bf, nil
+	// FromBytes rejects a bitmap wider than the fanout, which would otherwise
+	// address children the shard cannot hold.
+	return bitfield.FromBytes(fanout, nd.FieldData().Must().Bytes())
 }
 
 func checkLogTwo(v int) error {
