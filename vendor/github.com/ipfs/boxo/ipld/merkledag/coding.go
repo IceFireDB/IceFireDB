@@ -104,6 +104,15 @@ func (n *ProtoNode) marshalImmutable() (*immutableProtoNode, error) {
 	if err != nil {
 		return nil, err
 	}
+	switch order := DefaultPBNodeFieldOrder; order {
+	case PBNodeLinksFirst:
+	case PBNodeDataFirst:
+		if n.data != nil {
+			enc = moveDataFirst(enc, len(n.data))
+		}
+	default:
+		return nil, fmt.Errorf("unknown PBNodeFieldOrder %d", order)
+	}
 	return &immutableProtoNode{enc, nd.(dagpb.PBNode)}, nil
 }
 

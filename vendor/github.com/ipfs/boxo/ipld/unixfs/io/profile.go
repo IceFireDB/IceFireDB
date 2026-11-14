@@ -1,11 +1,21 @@
 package io
 
 import (
-	"github.com/alecthomas/units"
 	chunk "github.com/ipfs/boxo/chunker"
+	mdag "github.com/ipfs/boxo/ipld/merkledag"
 	"github.com/ipfs/boxo/ipld/unixfs/importer/helpers"
 	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
+)
+
+const (
+	_       = iota
+	unitKiB = 1 << (10 * iota)
+	unitMiB
+	unitGiB
+	untiTiB
+	untiEiB
+	untiZiB
 )
 
 // UnixFSProfile defines a set of UnixFS import settings for CID determinism.
@@ -47,6 +57,21 @@ type UnixFSProfile struct {
 	// HAMTShardWidth is the fanout for HAMT directory nodes.
 	// Must be a power of 2 and multiple of 8.
 	HAMTShardWidth int
+
+	// PBNodeFieldOrder controls the order of the top-level PBNode fields in
+	// serialized dag-pb blocks. merkledag.PBNodeLinksFirst (the zero value)
+	// is the canonical DAG-PB order, pinned explicitly by every named
+	// profile. merkledag.PBNodeDataFirst is a low-level opt-in knob from
+	// IPIP-550 (https://github.com/ipfs/specs/pull/550) for writers that
+	// need streaming-friendly blocks; no named profile selects it. Enabling
+	// it changes the CID of every dag-pb node that has both Data and Links:
+	// directories, HAMT shards, and the root and intermediate nodes of
+	// files larger than one chunk. Single-chunk raw-leaf files keep their
+	// CIDs. Links-first data touched through the directory API is
+	// re-encoded in the new order when it is stored again (for example MFS
+	// directories on their next change), so CIDs change without a content
+	// change.
+	PBNodeFieldOrder mdag.PBNodeFieldOrder
 }
 
 // Predefined profiles matching IPIP-499 specifications.
@@ -67,12 +92,13 @@ var (
 	UnixFS_v0_2015 = UnixFSProfile{
 		CIDVersion:         0,
 		MhType:             mh.SHA2_256,
-		ChunkSize:          int64(256 * units.KiB),
+		ChunkSize:          int64(256 * unitKiB),
 		FileDAGWidth:       174,
 		RawLeaves:          false, // dag-pb leaves for CIDv0
-		HAMTShardingSize:   int(256 * units.KiB),
+		HAMTShardingSize:   int(256 * unitKiB),
 		HAMTSizeEstimation: SizeEstimationLinks,
 		HAMTShardWidth:     256,
+		PBNodeFieldOrder:   mdag.PBNodeLinksFirst, // canonical order, pinned
 	}
 
 	// UnixFS_v1_2025 matches the unixfs-v1-2025 profile from IPIP-499.
@@ -81,12 +107,13 @@ var (
 	UnixFS_v1_2025 = UnixFSProfile{
 		CIDVersion:         1,
 		MhType:             mh.SHA2_256,
-		ChunkSize:          int64(1 * units.MiB),
+		ChunkSize:          int64(1 * unitMiB),
 		FileDAGWidth:       1024,
 		RawLeaves:          true, // raw leaves for CIDv1
-		HAMTShardingSize:   int(256 * units.KiB),
+		HAMTShardingSize:   int(256 * unitKiB),
 		HAMTSizeEstimation: SizeEstimationBlock,
 		HAMTShardWidth:     256,
+		PBNodeFieldOrder:   mdag.PBNodeLinksFirst, // canonical order, pinned
 	}
 )
 
@@ -94,9 +121,16 @@ var (
 // This affects all subsequent file and directory import operations.
 // Note: RawLeaves and CidBuilder are not globals; pass them to DAG builder options.
 //
-// Thread safety: this function modifies global variables and is not safe
-// for concurrent use. Call it once during program initialization, before
-// starting any imports. Do not call from multiple goroutines.
+// The settings written here (chunk.DefaultBlockSize,
+// helpers.DefaultLinksPerBlock, HAMTShardingSize, HAMTSizeEstimation,
+// DefaultShardWidth and merkledag.DefaultPBNodeFieldOrder) are process-wide
+// globals rather than per-call options: threading them through every
+// producer and consumer of the import pipeline would amount to a rewrite.
+// Call ApplyGlobals once at startup, before the first import, and do not
+// call it again while the process runs. The globals are read on every
+// import without synchronization, and a ProtoNode that was already encoded
+// keeps its cached bytes and CID until it is mutated (see
+// merkledag.DefaultPBNodeFieldOrder).
 func (p UnixFSProfile) ApplyGlobals() {
 	// File settings
 	chunk.DefaultBlockSize = p.ChunkSize
@@ -106,6 +140,9 @@ func (p UnixFSProfile) ApplyGlobals() {
 	HAMTShardingSize = p.HAMTShardingSize
 	HAMTSizeEstimation = p.HAMTSizeEstimation
 	DefaultShardWidth = p.HAMTShardWidth
+
+	// dag-pb encoding settings
+	mdag.DefaultPBNodeFieldOrder = p.PBNodeFieldOrder
 }
 
 // CidBuilder returns a cid.Builder configured for this profile.

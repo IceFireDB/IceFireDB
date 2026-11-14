@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/alecthomas/units"
 	"github.com/ipfs/boxo/files"
 	mdag "github.com/ipfs/boxo/ipld/merkledag"
 	format "github.com/ipfs/boxo/ipld/unixfs"
@@ -41,7 +40,7 @@ var ErrInvalidHAMTFanout = errors.New("HAMT fanout must be a positive power of 2
 //
 // Thread safety: this global is not safe for concurrent modification.
 // Set it once during program initialization, before starting any imports.
-var HAMTShardingSize = int(256 * units.KiB)
+var HAMTShardingSize = int(256 * unitKiB)
 
 // DefaultShardWidth is the default value used for hamt sharding width.
 // Needs to be a power of two (shard entry size) and multiple of 8 (bitfield size).

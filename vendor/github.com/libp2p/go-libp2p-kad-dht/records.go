@@ -23,7 +23,7 @@ func (dht *IpfsDHT) GetPublicKey(ctx context.Context, p peer.ID) (ci.PubKey, err
 	ctx, span := internal.StartSpan(ctx, "IpfsDHT.GetPublicKey", trace.WithAttributes(attribute.Stringer("PeerID", p)))
 	defer span.End()
 
-	if !dht.enableValues {
+	if dht.valueStore == nil {
 		return nil, routing.ErrNotSupported
 	}
 

@@ -91,6 +91,26 @@ func (i *handler) serveDefaults(ctx context.Context, w http.ResponseWriter, r *h
 		return false
 	}
 
+	// Check content size limits before streaming any data, and before
+	// setting response headers so 410 responses stay clean.
+	// Size comes from the UnixFS root block (no child blocks fetched).
+	// Applies to both regular and range requests: if the underlying file
+	// exceeds the limit, even a small byte range is rejected.
+	{
+		var sz int64
+		if headResp != nil {
+			sz = headResp.bytesSize
+		} else {
+			sz = getResp.bytesSize
+		}
+		if i.exceedsMaxUnixFSDAGResponseSize(w, r, sz) {
+			return false
+		}
+		if i.exceedsMaxDeserializedResponseSize(w, r, sz) {
+			return false
+		}
+	}
+
 	setIpfsRootsHeader(w, rq, &pathMetadata)
 
 	// On deserialized responses, we prefer Last-Modified from pathMetadata

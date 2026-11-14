@@ -1,5 +1,8 @@
-// Package client implements the IPFS exchange interface with the BitSwap
-// bilateral exchange protocol.
+// Package client implements the IPFS exchange interface with the [Bitswap]
+// bilateral exchange protocol (see [interaction pattern]).
+//
+// [Bitswap]: https://specs.ipfs.tech/bitswap-protocol/
+// [interaction pattern]: https://specs.ipfs.tech/bitswap-protocol/#bitswap-1-2-0-interaction-pattern
 package client
 
 import (
@@ -148,6 +151,9 @@ func WithDefaultProviderQueryManager(defaultProviderQueryManager bool) Option {
 // Setting this to false restores the previous broadcast behavior of sending
 // broadcasts to all peers, and ignores all other BroadcastControl options.
 // Default is false (disabled).
+//
+// For an overview of how the options interact, see
+// https://github.com/ipfs/boxo/blob/main/docs/broadcastcontrol.md
 func BroadcastControlEnable(enable bool) Option {
 	return func(bs *Client) {
 		bs.bcastControl.Enable = enable
@@ -156,7 +162,9 @@ func BroadcastControlEnable(enable bool) Option {
 
 // BroadcastControlMaxPeers sets a hard limit on the number of peers to send
 // broadcasts to. A value of 0 means no broadcasts are sent. A value of -1
-// means there is no limit. Default is -1 (unlimited).
+// means there is no limit. The limit counts every send, including sends to
+// local and peered peers that otherwise always receive broadcasts. Default is
+// -1 (unlimited).
 func BroadcastControlMaxPeers(limit int) Option {
 	return func(bs *Client) {
 		bs.bcastControl.MaxPeers = limit
@@ -164,9 +172,11 @@ func BroadcastControlMaxPeers(limit int) Option {
 }
 
 // BroadcastControlLocalPeers enables or disables broadcast control for peers
-// on the local network. If false, than always broadcast to peers on the local
-// network. If true, apply broadcast control to local peers. Default is false
-// (always broadcast to local peers).
+// on the local network. If false, then always broadcast to peers on the local
+// network. If true, apply broadcast control to local peers. A peer counts as
+// local when any of its known addresses is private or loopback, and also when
+// it has no known addresses. Default is false (always broadcast to local
+// peers).
 func BroadcastControlLocalPeers(enable bool) Option {
 	return func(bs *Client) {
 		bs.bcastControl.LocalPeers = enable
@@ -174,9 +184,11 @@ func BroadcastControlLocalPeers(enable bool) Option {
 }
 
 // BroadcastControlPeeredPeers enables or disables broadcast control for peers
-// configured for peering. If false, than always broadcast to peers configured
-// for peering. If true, apply broadcast control to peered peers. Default is
-// false (always broadcast to peered peers).
+// configured for peering. If false, then always broadcast to peers configured
+// for peering. If true, apply broadcast control to peered peers. Peered peers
+// are those protected in the host's ConnManager under the peering.ConnmgrTag
+// tag, as done by the boxo/peering service. Default is false (always
+// broadcast to peered peers).
 func BroadcastControlPeeredPeers(enable bool) Option {
 	return func(bs *Client) {
 		bs.bcastControl.PeeredPeers = enable
@@ -185,17 +197,17 @@ func BroadcastControlPeeredPeers(enable bool) Option {
 
 // BroadcastControlMaxRandomPeers sets the number of peers to broadcast to
 // anyway, even though broadcast control logic has determined that they are
-// not broadcast targets. Setting this to a non-zero value ensures at least
-// this number of random peers receives a broadcast. This may be helpful in
-// cases where peers that are not receiving broadcasts may have wanted blocks.
-// Default is 0 (no random broadcasts).
+// not broadcast targets. Setting this to a non-zero value sends a broadcast
+// to up to this number of random peers. This may be helpful in cases where
+// peers that are not receiving broadcasts may have wanted blocks. Default is
+// 0 (no random broadcasts).
 func BroadcastControlMaxRandomPeers(n int) Option {
 	return func(bs *Client) {
 		bs.bcastControl.MaxRandomPeers = n
 	}
 }
 
-// BroadcastControlSendToPendingPeers, enables or disables sending broadcasts
+// BroadcastControlSendToPendingPeers enables or disables sending broadcasts
 // to any peers to which there is a pending message to send. When enabled, this
 // sends broadcasts to many more peers, but does so in a way that does not
 // increase the number of separate broadcast messages. There is still the
@@ -428,7 +440,7 @@ func (bs *Client) GetBlock(ctx context.Context, k cid.Cid) (blocks.Block, error)
 }
 
 // GetBlocks returns a channel where the caller may receive blocks that
-// correspond to the provided |keys|. Returns an error if BitSwap is unable to
+// correspond to the provided |keys|. Returns an error if Bitswap is unable to
 // begin this request within the deadline enforced by the context.
 //
 // If [WithTraceBlock] option is set true, then returns a channel of

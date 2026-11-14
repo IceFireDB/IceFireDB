@@ -26,6 +26,17 @@ const (
 	carOrderKey               = "car-order"
 )
 
+// carTruncationMessage is appended to a CAR response that failed partway
+// through, the same way withRetrievalTimeout marks a response it cuts short.
+// CAR has no in-band way to say "this stream is incomplete", so the bytes
+// themselves are made invalid where the next block header would start.
+//
+// It says nothing about why. The client already knows which DAG it asked for,
+// and the underlying error names the path it stopped at, which can run to
+// thousands of segments and means nothing to the caller. Operators get the
+// detail from the gateway log and the X-Stream-Error trailer.
+const carTruncationMessage = "\n\n[Gateway Error: CAR stream truncated, response is incomplete]"
+
 // serveCAR returns a CAR stream for specific DAG+selector
 func (i *handler) serveCAR(ctx context.Context, w http.ResponseWriter, r *http.Request, rq *requestData) bool {
 	ctx, span := spanTrace(ctx, "Handler.ServeCAR", trace.WithAttributes(attribute.String("path", rq.immutablePath.String())))
@@ -73,6 +84,24 @@ func (i *handler) serveCAR(ctx context.Context, w http.ResponseWriter, r *http.R
 		return false
 	}
 
+	// Check DAG size limit before streaming the CAR. This requires a
+	// lightweight Head call; the root block is cached in the blockstore
+	// so GetCAR will not re-fetch it from the network.
+	// If Head fails we fail closed rather than bypassing the cap: an
+	// operator-configured size limit must never be silently skipped due
+	// to a transient backend error.
+	if i.config.MaxUnixFSDAGResponseSize > 0 {
+		_, headResp, headErr := i.backend.Head(ctx, rq.immutablePath)
+		if !i.handleRequestErrors(w, r, rq.contentPath, headErr) {
+			return false
+		}
+		sz := headResp.bytesSize
+		headResp.Close()
+		if i.exceedsMaxUnixFSDAGResponseSize(w, r, sz) {
+			return false
+		}
+	}
+
 	md, carFile, err := i.backend.GetCAR(ctx, rq.immutablePath, params)
 	if !i.handleRequestErrors(w, r, rq.contentPath, err) {
 		return false
@@ -100,6 +129,14 @@ func (i *handler) serveCAR(ctx context.Context, w http.ResponseWriter, r *http.R
 		// Due to this, we suggest client always verify that
 		// the received CAR stream response is matching requested DAG selector
 		w.Header().Set("X-Stream-Error", streamErr.Error())
+
+		// The status line and headers are long gone, so the trailer above is
+		// the only in-band signal and most clients never see it, and neither do
+		// reverse proxies or CDNs in front of this gateway. Append a marker so
+		// the stream stops being a well-formed CAR: a reader hits it where it
+		// expects the next block header and fails, instead of accepting a short
+		// DAG as complete. Same approach withRetrievalTimeout already uses.
+		fmt.Fprint(w, carTruncationMessage)
 		return false
 	}
 

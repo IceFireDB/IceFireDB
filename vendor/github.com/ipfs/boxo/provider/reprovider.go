@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	oldqueue "github.com/ipfs/boxo/provider/internal/queue"
 	"github.com/ipfs/boxo/verifcid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -37,6 +36,13 @@ const (
 	// MAGIC: Maximum duration during which no workers are available to provide a
 	// cid before a warning is triggered.
 	provideDelayWarnDuration = 15 * time.Second
+
+	// batchReadSize is number of CIDs to read from provide queue in one visit.
+	batchReadSize = 2048
+
+	// dedupCacheSize is the number of CIDs which deduplication is done across.
+	// Set to 0 is disable deduplication.
+	dedupCacheSize = 0
 )
 
 var log = logging.Logger("provider")
@@ -147,19 +153,7 @@ func New(ds datastore.Batching, opts ...Option) (System, error) {
 	}
 
 	s.ds = namespace.Wrap(ds, s.keyPrefix)
-
-	// TODO: Remove this after kubo v0.39 is released.
-	//
-	// Remove any items from the old queue.
-	cleaned, err := oldqueue.ClearDatastore(s.ds)
-	if err != nil {
-		log.Error(err)
-	}
-	if cleaned != 0 {
-		log.Infof("removed %d cids from old provide queue", cleaned)
-	}
-
-	s.q = dsqueue.New(s.ds, "provide", dsqueue.WithDedupCacheSize(2048))
+	s.q = dsqueue.New(s.ds, "provide", dsqueue.WithDedupCacheSize(dedupCacheSize))
 
 	// This is after the options processing so we do not have to worry about leaking a context if there is an
 	// initialization error processing the options
@@ -291,7 +285,6 @@ func (s *reprovider) run() {
 
 func (s *reprovider) provideWorker() {
 	defer s.closewg.Done()
-	provCh := s.q.Out()
 
 	provideFunc := func(ctx context.Context, c cid.Cid) {
 		log.Debugf("provider worker: providing %s", c)
@@ -347,17 +340,29 @@ func (s *reprovider) provideWorker() {
 		}
 	}
 
-	for data := range provCh {
+	provideCid := func(data []byte) {
 		c, err := cid.Parse(data)
 		if err != nil {
 			log.Errorf("invalid cid read from queue: %s", err)
-			continue
+			return
 		}
 		if err = verifcid.ValidateCid(s.allowlist, c); err != nil {
 			log.Errorf("insecure hash in reprovider, %s (%s)", c, err)
-			continue
+			return
 		}
 		provideOperation(s.ctx, c)
+	}
+
+	for data := range s.q.Out() {
+		provideCid(data)
+		buf, err := s.q.GetN(batchReadSize)
+		if err != nil {
+			log.Errorf("error fetching data from queue: %s", err)
+			continue
+		}
+		for _, data = range buf {
+			provideCid(data)
+		}
 	}
 }
 

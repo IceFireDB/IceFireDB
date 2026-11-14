@@ -456,6 +456,12 @@ func loadTerminalEntity(ctx context.Context, c cid.Cid, blk blocks.Block, lsys *
 			}
 		}
 
+		// The reader must span the full block (not a slice from `from`): for
+		// JSON/CBOR codecs, [serveDefaults] hands this reader to [serveCodecRaw],
+		// which calls [seekToStartOfFirstRange] again before [serveContent].
+		// That second Seek is to an absolute offset in the underlying buffer, so
+		// if we slice the buffer here the codec handler positions the reader at
+		// the wrong byte and the response body is silently corrupted.
 		f := files.NewBytesFile(blockData)
 		size := int64(len(blockData))
 		from := int64(0)
@@ -470,7 +476,11 @@ func loadTerminalEntity(ctx context.Context, c cid.Cid, blk blocks.Block, lsys *
 					return nil, fmt.Errorf("invalid car backend range: negative start bigger than the file size")
 				}
 			}
-			if _, err := f.Seek(from, io.SeekStart); err != nil {
+			s, ok := f.(io.Seeker)
+			if !ok {
+				return nil, fmt.Errorf("file does not support seeking")
+			}
+			if _, err := s.Seek(from, io.SeekStart); err != nil {
 				return nil, err
 			}
 		}

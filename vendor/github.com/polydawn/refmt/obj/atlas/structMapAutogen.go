@@ -32,7 +32,7 @@ func exploreFields(rt reflect.Type, tagName string, sorter KeySortMode) []Struct
 	next := []StructMapEntry{{Type: rt}}
 
 	// Count of queued names for current level and the next.
-	count := map[reflect.Type]int{}
+	var count map[reflect.Type]int
 	nextCount := map[reflect.Type]int{}
 
 	// Types already visited at an earlier level.

@@ -75,12 +75,16 @@ func doRequestA(ctx context.Context, url string, domain string) ([]net.IPAddr, u
 
 	var ttl uint32
 	result := make([]net.IPAddr, 0, len(r.Answer))
+	first := true
 	for _, rr := range r.Answer {
 		switch v := rr.(type) {
 		case *dns.A:
 			result = append(result, net.IPAddr{IP: v.A})
-			if ttl == 0 || v.Hdr.Ttl < ttl {
+			// RFC 2181 wants differing TTLs in an RRset treated as the lowest
+			// one; a genuine TTL of 0 must not be mistaken for unset.
+			if first || v.Hdr.Ttl < ttl {
 				ttl = v.Hdr.Ttl
+				first = false
 			}
 		default:
 			log.Warnf("unexpected DNS resource record %+v", rr)
@@ -103,12 +107,14 @@ func doRequestAAAA(ctx context.Context, url string, domain string) ([]net.IPAddr
 
 	var ttl uint32
 	result := make([]net.IPAddr, 0, len(r.Answer))
+	first := true
 	for _, rr := range r.Answer {
 		switch v := rr.(type) {
 		case *dns.AAAA:
 			result = append(result, net.IPAddr{IP: v.AAAA})
-			if ttl == 0 || v.Hdr.Ttl < ttl {
+			if first || v.Hdr.Ttl < ttl {
 				ttl = v.Hdr.Ttl
+				first = false
 			}
 
 		default:
@@ -132,12 +138,14 @@ func doRequestTXT(ctx context.Context, url string, domain string) ([]string, uin
 
 	var ttl uint32
 	var result []string
+	first := true
 	for _, rr := range r.Answer {
 		switch v := rr.(type) {
 		case *dns.TXT:
 			result = append(result, v.Txt...)
-			if ttl == 0 || v.Hdr.Ttl < ttl {
+			if first || v.Hdr.Ttl < ttl {
 				ttl = v.Hdr.Ttl
+				first = false
 			}
 
 		default:

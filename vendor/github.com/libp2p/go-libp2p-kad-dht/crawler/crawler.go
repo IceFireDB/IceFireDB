@@ -12,6 +12,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/libp2p/go-msgio"
 	"github.com/libp2p/go-msgio/pbio"
 
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
@@ -94,7 +95,7 @@ func (ms *messageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Me
 		return nil, err
 	}
 
-	r := pbio.NewDelimitedReader(s, network.MessageSizeMax)
+	r := msgio.NewVarintReaderSize(s, network.MessageSizeMax)
 	defer func() { _ = s.Close() }()
 
 	msg := new(pb.Message)
@@ -106,13 +107,18 @@ func (ms *messageSender) SendRequest(ctx context.Context, p peer.ID, pmes *pb.Me
 	return msg, nil
 }
 
-func ctxReadMsg(ctx context.Context, rc pbio.ReadCloser, mes *pb.Message) error {
+func ctxReadMsg(ctx context.Context, r msgio.ReadCloser, mes *pb.Message) error {
 	errc := make(chan error, 1)
-	go func(r pbio.ReadCloser) {
+	go func() {
 		defer close(errc)
-		err := r.ReadMsg(mes)
-		errc <- err
-	}(rc)
+		data, err := r.ReadMsg()
+		defer r.ReleaseMsg(data)
+		if err != nil {
+			errc <- err
+			return
+		}
+		errc <- pb.Unmarshal(data, mes)
+	}()
 
 	select {
 	case err := <-errc:

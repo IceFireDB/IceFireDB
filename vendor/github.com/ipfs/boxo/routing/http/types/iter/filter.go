@@ -14,24 +14,25 @@ type FilterIter[T any] struct {
 }
 
 func (f *FilterIter[T]) Next() bool {
-	if f.done {
-		return false
+	// Loop, don't recurse. Recursing adds a stack frame per rejected value.
+	for {
+		if f.done {
+			return false
+		}
+
+		ok := f.iter.Next()
+		f.done = !ok
+
+		if f.done {
+			return false
+		}
+
+		f.val = f.iter.Val()
+
+		if f.f(f.val) {
+			return true
+		}
 	}
-
-	ok := f.iter.Next()
-	f.done = !ok
-
-	if f.done {
-		return false
-	}
-
-	f.val = f.iter.Val()
-
-	if f.f(f.val) {
-		return true
-	}
-
-	return f.Next()
 }
 
 func (f *FilterIter[T]) Val() T {

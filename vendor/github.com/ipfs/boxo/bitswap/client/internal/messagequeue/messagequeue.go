@@ -31,7 +31,7 @@ const (
 	// for latency calculation (as opposed to discarding it as an outlier)
 	maxValidLatency = 30 * time.Second
 	// rebroadcastInterval is the minimum amount of time that must elapse before
-	// resending wants to a peer
+	// re-sending wants to a peer
 	rebroadcastInterval = 30 * time.Second
 	// sendErrorBackoff is the time to wait before retrying to connect after
 	// an error when trying to send a message
@@ -446,7 +446,7 @@ func (mq *MessageQueue) RebroadcastNow() {
 	}
 }
 
-// Startup starts the processing of messages and rebroadcasting.
+// Startup starts the processing of messages and re-broadcasting.
 func (mq *MessageQueue) Startup() {
 	go mq.runQueue()
 }
@@ -524,7 +524,7 @@ func (mq *MessageQueue) runQueue() {
 	}
 }
 
-// Periodically resend the list of wants to the peer
+// Periodically re-send the list of wants to the peer
 func (mq *MessageQueue) rebroadcastWantlist(now time.Time, interval time.Duration) {
 	mq.wllock.Lock()
 	// Transfer wants from the rebroadcast lists into the pending lists.
@@ -552,7 +552,7 @@ func (mq *MessageQueue) sendMessage() {
 		// If we fail to initialize the sender, the networking layer will
 		// emit a Disconnect event and the MessageQueue will get cleaned up
 		log.Infof("Could not open message sender to peer %s: %s", mq.p, err)
-		// do not shudown the queue here, wait for Disconnect to arrive.
+		// do not shutdown the queue here, wait for Disconnect to arrive.
 		return
 	}
 
@@ -580,10 +580,10 @@ func (mq *MessageQueue) sendMessage() {
 		mq.logOutgoingMessage(wantlist)
 
 		if err = sender.SendMsg(mq.ctx, message); err != nil {
-			// If the message couldn't be sent, the networking layer will
-			// emit a Disconnect event and the MessageQueue will get cleaned up
+			// If the message can not be sent, the networking layer emits a
+			// Disconnect event and the MessageQueue is cleaned up.
 			log.Infof("Could not send message to peer %s: %s", mq.p, err)
-			// do not shudown the queue here, wait for Disconnect to arrive.
+			// do not shutdown the queue here, wait for Disconnect to arrive.
 			return
 		}
 
@@ -593,10 +593,10 @@ func (mq *MessageQueue) sendMessage() {
 		// Set a timer to wait for responses
 		mq.simulateDontHaveWithTimeout(wantlist)
 
-		// If the message was too big and only a subset of wants could be sent,
-		// send more if the the workcount is above the cutoff. Otherwise,
-		// schedule sending the rest of the wants in the next iteration of the
-		// event loop.
+		// If the message is too big and only a subset of wants can be sent,
+		// send more if the work count is above the cutoff. Otherwise, schedule
+		// sending the rest of the wants in the next iteration of the event
+		// loop.
 		pendingWork := mq.pendingWorkCount()
 		if pendingWork < sendMessageCutoff {
 			if pendingWork > 0 {
@@ -621,8 +621,8 @@ func (mq *MessageQueue) simulateDontHaveWithTimeout(wantlist []bsmsg.Entry) {
 
 	for _, entry := range wantlist {
 		if entry.WantType == pb.Message_Wantlist_Block && entry.SendDontHave {
-			// Unlikely, but just in case check that the block hasn't been
-			// received in the interim
+			// Unlikely, but just in case check that the block has not been
+			// received in the interim.
 			c := entry.Cid
 			if mq.peerWants.sent.Has(c) {
 				wants = append(wants, c)

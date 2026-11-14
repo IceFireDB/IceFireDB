@@ -12,7 +12,7 @@ import (
 type Resolver interface {
 	// Resolve resolves a path through this node, stopping at any link boundary
 	// and returning the object found as well as the remaining path to traverse
-	Resolve(path []string) (interface{}, []string, error)
+	Resolve(path []string) (any, []string, error)
 
 	// Tree lists all paths within the object under 'path', and up to the given depth.
 	// To list the entire object (similar to `find .`) pass "" and -1
