@@ -35,6 +35,12 @@ var (
 	metricsAddr string
 	// debug
 	debug bool
+	// networkMode select network transport mode
+	networkMode string
+	// webrtcStunServers STUN servers for WebRTC
+	webrtcStunServers string
+	// webrtcTurnServers TURN servers for WebRTC
+	webrtcTurnServers string
 )
 
 func init() {
