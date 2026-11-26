@@ -6,7 +6,7 @@ import (
 	mhreg "github.com/multiformats/go-multihash/core"
 
 	_ "github.com/multiformats/go-multihash/register/all"
-	_ "github.com/multiformats/go-multihash/register/miniosha256"
+	_ "github.com/multiformats/go-multihash/register/sha256"
 )
 
 // Register is an alias for Register in the core package.
@@ -18,7 +18,7 @@ func Register(indicator uint64, hasherFactory func() hash.Hash) {
 	mhreg.Register(indicator, hasherFactory)
 }
 
-// Register is an alias for Register in the core package.
+// GetHasher is an alias for GetHasher in the core package.
 //
 // Consider using the core package instead of this multihash package;
 // that package does not introduce transitive dependencies except for those you opt into,

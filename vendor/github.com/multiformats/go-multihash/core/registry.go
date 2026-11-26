@@ -75,9 +75,9 @@ func RegisterVariableSize(indicator uint64, hasherFactory func(sizeHint int) (ha
 //
 // The actual hashers available are determined by what has been registered.
 // The registry automatically contains those hashers which are available in the golang standard libraries
-// (which includes md5, sha1, sha256, sha384, sha512, and the "identity" mulithash, among others).
+// (which includes md5, sha1, sha256, sha384, sha512, and the "identity" multihash, among others).
 // Other hash implementations can be made available by using the Register function.
-// The 'go-mulithash/register/*' packages can also be imported to gain more common hash functions.
+// The 'go-multihash/register/*' packages can also be imported to gain more common hash functions.
 //
 // If an error is returned, it will match `errors.Is(err, ErrSumNotSupported)`.
 func GetHasher(indicator uint64) (hash.Hash, error) {

@@ -6,7 +6,7 @@
 //		_ "github.com/multiformats/go-multihash/register/sha256"
 //	)
 //
-// This package an implementation of sha256 using the go std, this is recomanded
+// This package an implementation of sha256 using the go std, this is recommended
 // if you are using go1.21 or above.
 package sha256
 
