@@ -74,15 +74,35 @@ func (r *mhReader) ReadMultihash() (Multihash, error) {
 		return nil, errors.New("digest too long, supporting only <= 2^31-1")
 	}
 
-	buf := make([]byte, varint.UvarintSize(code)+varint.UvarintSize(length)+int(length))
+	// length is untrusted: grow buf as digest bytes arrive, so allocation
+	// tracks input received rather than the claimed length.
+	prefixLen := varint.UvarintSize(code) + varint.UvarintSize(length)
+	total := prefixLen + int(length)
+	buf := make([]byte, prefixLen, min(total, prefixLen+digestPrealloc))
 	n := varint.PutUvarint(buf, code)
-	n += varint.PutUvarint(buf[n:], length)
-	if _, err := io.ReadFull(r.r, buf[n:]); err != nil {
-		return nil, err
+	varint.PutUvarint(buf[n:], length)
+
+	for len(buf) < total {
+		if len(buf) == cap(buf) {
+			buf = append(make([]byte, 0, min(2*cap(buf), total)), buf...)
+		}
+		m, err := io.ReadFull(r.r, buf[len(buf):cap(buf)])
+		buf = buf[:len(buf)+m]
+		if err != nil {
+			// As a single io.ReadFull would: EOF only if no digest bytes arrived.
+			if err == io.EOF && len(buf) > prefixLen {
+				err = io.ErrUnexpectedEOF
+			}
+			return nil, err
+		}
 	}
 
 	return Cast(buf)
 }
+
+// digestPrealloc is the digest capacity allocated before any digest bytes
+// arrive. Typical digests fit within it.
+const digestPrealloc = 64 << 10
 
 type mhWriter struct {
 	w io.Writer

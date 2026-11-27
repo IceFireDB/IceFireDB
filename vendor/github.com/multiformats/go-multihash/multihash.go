@@ -165,7 +165,7 @@ func uvarint(buf []byte) (uint64, []byte, error) {
 type DecodedMultihash struct {
 	Code   uint64
 	Name   string
-	Length int    // Length is just int as it is type of len() opearator
+	Length int    // Length is just int as it is type of len() operator
 	Digest []byte // Digest holds the raw multihash bytes
 }
 
@@ -227,7 +227,7 @@ func Decode(buf []byte) (*DecodedMultihash, error) {
 	// leak dm the compiler will use a stack allocation instead.
 	// If you do not outline this &dm always heap allocate since the pointer is
 	// returned which cause a heap allocation because Decode's stack frame is
-	// about to disapear.
+	// about to disappear.
 	dm, err := decode(buf)
 	if err != nil {
 		return nil, err

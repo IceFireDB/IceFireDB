@@ -1,5 +1,5 @@
 /*
-This package has no purpose except to perform registration of mulithashes.
+This package has no purpose except to perform registration of multihashes.
 
 It is meant to be used as a side-effecting import, e.g.
 

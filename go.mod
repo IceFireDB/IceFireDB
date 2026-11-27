@@ -44,7 +44,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/mr-tron/base58 v1.3.0
 	github.com/multiformats/go-multiaddr v0.16.1
-	github.com/multiformats/go-multihash v0.2.3
+	github.com/multiformats/go-multihash v0.3.0
 	github.com/pingcap/check v0.0.0-20211026125417-57bd13f7b5f0
 	github.com/pingcap/errors v0.11.4
 	github.com/redis/go-redis/v9 v9.23.0
@@ -285,17 +285,17 @@ require (
 	go.uber.org/zap/exp v0.3.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
-	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/exp v0.0.0-20260718201538-764159d718ef // indirect
-	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.60.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/telemetry v0.0.0-20260811182544-a038080d80e5 // indirect
-	golang.org/x/term v0.46.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/mod v0.42.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/telemetry v0.0.0-20261009151841-97e8ea77aa2a // indirect
+	golang.org/x/term v0.48.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.49.0 // indirect
+	golang.org/x/tools v0.52.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect
