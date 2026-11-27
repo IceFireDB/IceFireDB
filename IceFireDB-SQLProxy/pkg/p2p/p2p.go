@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -23,6 +24,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	"github.com/mr-tron/base58/base58"
+	ma "github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multihash"
 	"github.com/sirupsen/logrus"
 )
@@ -59,7 +61,20 @@ and a Peer Discovery service is created from this Kademlia DHT. The PubSub handl
 created on the host using the peer discovery service created prior.
 */
 
-func NewP2P(serviceName string, nodeHostIP string, nodeHostPort int) *P2P {
+// Options controls how a node joins the network.
+type Options struct {
+	// Bootstrap enables the public Kademlia DHT, which is how nodes discover each other
+	// by service name without being configured with addresses. It requires reachability
+	// of the public bootstrap peers, so a private network should turn it off and list
+	// Peers instead.
+	Bootstrap bool
+	// Peers are multiaddrs dialled at startup, for example
+	// "/ip4/10.0.0.5/tcp/4001/p2p/12D3KooW...". With Bootstrap off this is the only way
+	// a node learns about its peers.
+	Peers []string
+}
+
+func NewP2P(serviceName string, nodeHostIP string, nodeHostPort int, opts Options) *P2P {
 	// Setup a background context
 	ctx := context.Background()
 
@@ -69,11 +84,13 @@ func NewP2P(serviceName string, nodeHostIP string, nodeHostPort int) *P2P {
 	logrus.Infoln("Setup the p2p host,listen on", nodehost.Addrs())
 	log.Println("MY P2P Node ID", nodehost.ID())
 
-	// Bootstrap the Kad DHT
-	bootstrapDHT(ctx, nodehost, kaddht)
+	if opts.Bootstrap {
+		// Bootstrap the Kad DHT
+		bootstrapDHT(ctx, nodehost, kaddht)
 
-	// Debug log
-	logrus.Debugln("Bootstrapped the Kademlia DHT and Connected to Bootstrap Peers")
+		// Debug log
+		logrus.Debugln("Bootstrapped the Kademlia DHT and Connected to Bootstrap Peers")
+	}
 
 	// Create a peer discovery service using the Kad DHT
 	routingdiscovery := discoveryRouting.NewRoutingDiscovery(kaddht)
@@ -85,8 +102,7 @@ func NewP2P(serviceName string, nodeHostIP string, nodeHostPort int) *P2P {
 	// Debug log
 	logrus.Debugln("Created the PubSub Handler.")
 
-	// Return the P2P object
-	return &P2P{
+	p := &P2P{
 		Ctx:       ctx,
 		Host:      nodehost,
 		KadDHT:    kaddht,
@@ -94,6 +110,70 @@ func NewP2P(serviceName string, nodeHostIP string, nodeHostPort int) *P2P {
 		PubSub:    pubsubhandler,
 		service:   serviceName,
 	}
+
+	if len(opts.Peers) > 0 {
+		connected, err := p.ConnectToPeers(opts.Peers)
+		if err != nil {
+			logrus.Errorf("connected to %d/%d configured p2p peers: %v", connected, len(opts.Peers), err)
+		} else {
+			logrus.Infof("connected to %d/%d configured p2p peers", connected, len(opts.Peers))
+		}
+	}
+
+	return p
+}
+
+// PeerID returns this node's libp2p identity, which is what p2p.allowedPeers lists.
+func (p *P2P) PeerID() string {
+	if p == nil || p.Host == nil {
+		return ""
+	}
+	return p.Host.ID().String()
+}
+
+// Addrs returns the multiaddrs this node is reachable at. They are the values to put in
+// another node's p2p.bootstrapPeers.
+func (p *P2P) Addrs() []string {
+	if p == nil || p.Host == nil {
+		return nil
+	}
+	var out []string
+	for _, addr := range p.Host.Addrs() {
+		out = append(out, fmt.Sprintf("%s/p2p/%s", addr.String(), p.Host.ID()))
+	}
+	return out
+}
+
+// ConnectToPeers dials each multiaddr and reports how many connections succeeded.
+func (p *P2P) ConnectToPeers(addrs []string) (int, error) {
+	if p == nil || p.Host == nil {
+		return 0, errors.New("p2p host is not initialised")
+	}
+
+	connected := 0
+	var errs []error
+	for _, addr := range addrs {
+		maddr, err := ma.NewMultiaddr(addr)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("invalid multiaddr %q: %w", addr, err))
+			continue
+		}
+		info, err := peer.AddrInfoFromP2pAddr(maddr)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("multiaddr %q carries no peer id: %w", addr, err))
+			continue
+		}
+		ctx, cancel := context.WithTimeout(p.Ctx, 10*time.Second)
+		err = p.Host.Connect(ctx, *info)
+		cancel()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("connect %s: %w", addr, err))
+			continue
+		}
+		connected++
+	}
+
+	return connected, errors.Join(errs...)
 }
 
 // A method of P2P to connect to service peers.

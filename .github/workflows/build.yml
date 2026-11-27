@@ -65,15 +65,20 @@ jobs:
         with:
           go-version: 1.27.3
 
+      # IceFireDB-SQLProxy has no go.mod of its own: it is a package subtree of the root
+      # module, so the dependency graph comes from the repository root (and vendor/).
       - name: Install dependencies
+        run: go mod download
+
+      - name: Vet
         run: |
           cd IceFireDB-SQLProxy
-          go mod tidy && go mod vendor
+          go vet ./...
 
       - name: Build
         run: |
           cd IceFireDB-SQLProxy
-          make
+          make build
 
   build-icefiredb-pubsub:
     runs-on: ubuntu-latest

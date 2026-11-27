@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -14,10 +13,18 @@ import (
 	"github.com/urfave/cli"
 )
 
+// Set by the Makefile through -ldflags; empty in a plain `go build`.
+var (
+	BuildVersion = ""
+	BuildDate    = ""
+)
+
 func main() {
 	app := cli.NewApp()
 
 	app.Name = "IceFireDB-SQLProxy"
+	app.Version = version()
+	app.Usage = "MySQL protocol proxy that replicates writes across an IceFireDB p2p network"
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
@@ -42,17 +49,14 @@ func main() {
 		}
 		logrus.SetLevel(lv)
 		// init config
-		confPath := c.String("config")
-		config.InitConfig(confPath)
-		return nil
+		return config.InitConfig(c.String("config"))
 	}
 	app.Action = func(c *cli.Context) error {
 		ctx, cancel := context.WithCancel(context.Background())
-		go exitSignal(cancel)
-		if err := mysql.Run(ctx); err != nil {
-			return err
-		}
-		return nil
+		defer cancel()
+
+		watchSignals(cancel)
+		return mysql.Run(ctx)
 	}
 	if err := app.Run(os.Args); err != nil {
 		logrus.Errorf("failed to run application: %v", err)
@@ -60,19 +64,43 @@ func main() {
 	}
 }
 
-func exitSignal(cancel context.CancelFunc) {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
-	for sig := range sigs {
-		switch sig {
-		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
-			cancel()
-			fmt.Println("Bye!")
-			os.Exit(0)
-		case syscall.SIGHUP:
-			fmt.Println("+++++++++++++++++++++++++++++")
-		default:
-			fmt.Println(sig)
-		}
+// version renders the release version plus the build identity, so a bug report names the
+// exact commit it came from.
+func version() string {
+	v := mysql.Version
+	if BuildVersion != "" {
+		v += " (" + BuildVersion + ")"
 	}
+	if BuildDate != "" {
+		v += " built " + BuildDate
+	}
+	return v
+}
+
+// watchSignals cancels ctx on the first termination signal so that connections drain and
+// the upstream pools close. A second signal exits immediately, for operators who cannot
+// wait for the drain.
+func watchSignals(cancel context.CancelFunc) {
+	sigs := make(chan os.Signal, 2)
+	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
+
+	go func() {
+		shuttingDown := false
+		for sig := range sigs {
+			switch sig {
+			case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
+				if shuttingDown {
+					logrus.Warnf("second %s received, exiting without draining", sig)
+					os.Exit(1)
+				}
+				shuttingDown = true
+				logrus.Infof("%s received, shutting down", sig)
+				cancel()
+			case syscall.SIGHUP:
+				logrus.Info("SIGHUP ignored: the configuration is read at startup only")
+			default:
+				logrus.Infof("ignoring signal %s", sig)
+			}
+		}
+	}()
 }

@@ -23,6 +23,11 @@ func (m *Message) GetData() []byte {
 	return []byte(m.Content)
 }
 
+// outboundBuffer is how many replication messages may be queued for publishing
+// before further ones are dropped. Dropping is deliberate: a slow topic must never
+// stall a client's write path, which is what an unbuffered send would do.
+const outboundBuffer = 256
+
 // PubSub wraps libp2p pubsub with our custom message handling
 type PubSub struct {
 	*pubsub.PubSub
@@ -49,7 +54,7 @@ func JoinPubSub(p2p *P2P, name string, topicName string) (*PubSub, error) {
 		Topic:    topic,
 		Sub:      sub,
 		Inbound:  make(chan *Message),
-		Outbound: make(chan string),
+		Outbound: make(chan string, outboundBuffer),
 	}
 
 	go ps.handleInbound(p2p.Ctx)
@@ -73,6 +78,17 @@ func (ps *PubSub) handleInbound(ctx context.Context) {
 	}
 }
 
+// Publish queues a payload for the topic without blocking. It reports false when the
+// queue is full and the payload was dropped; the caller is expected to count that.
+func (ps *PubSub) Publish(payload []byte) bool {
+	select {
+	case ps.Outbound <- string(payload):
+		return true
+	default:
+		return false
+	}
+}
+
 func (ps *PubSub) handleOutbound(ctx context.Context) {
 	for msg := range ps.Outbound {
 		if err := ps.Topic.Publish(ctx, []byte(msg)); err != nil {
@@ -81,8 +97,13 @@ func (ps *PubSub) handleOutbound(ctx context.Context) {
 	}
 }
 
-// Exit closes the pubsub channels
+// Exit closes the subscription and topic. It is safe to call on a node that only got
+// part way through joining the topic, which is what a failed startup looks like.
 func (ps *PubSub) Exit() {
-	ps.Sub.Cancel()
-	ps.Topic.Close()
+	if ps.Sub != nil {
+		ps.Sub.Cancel()
+	}
+	if ps.Topic != nil {
+		_ = ps.Topic.Close()
+	}
 }
