@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -61,8 +62,8 @@ func New(d *dual.DHT, opts ...Option) (*SweepingProvider, error) {
 			provider.WithReplicationFactor(dht.BucketSize()),
 			provider.WithSelfAddrs(dht.FilteredAddrs),
 			provider.WithRouter(dht),
-			provider.WithAddLocalRecord(func(h mh.Multihash) error {
-				return dht.Provide(dht.Context(), cid.NewCidV1(cid.Raw, h), false)
+			provider.WithAddLocalRecord(func(ctx context.Context, h mh.Multihash) error {
+				return dht.Provide(ctx, cid.NewCidV1(cid.Raw, h), false)
 			}),
 			provider.WithResumeCycle(cfg.resumeCycle[i]),
 			provider.WithMessageSender(cfg.msgSenders[i]),
@@ -70,6 +71,7 @@ func New(d *dual.DHT, opts ...Option) (*SweepingProvider, error) {
 			provider.WithMaxReprovideDelay(cfg.maxReprovideDelay[i]),
 			provider.WithOfflineDelay(cfg.offlineDelay[i]),
 			provider.WithConnectivityCheckOnlineInterval(cfg.connectivityCheckOnlineInterval[i]),
+			provider.WithSendProviderRecordTimeout(cfg.sendProviderRecordTimeout[i]),
 			provider.WithMaxWorkers(cfg.maxWorkers[i]),
 			provider.WithDedicatedPeriodicWorkers(cfg.dedicatedPeriodicWorkers[i]),
 			provider.WithDedicatedBurstWorkers(cfg.dedicatedBurstWorkers[i]),
@@ -126,8 +128,8 @@ func (s *SweepingProvider) Close() error {
 	if s.cleanupFuncs != nil {
 		// Cleanup keystore and datastore if we created them
 		var errs []error
-		for i := len(s.cleanupFuncs) - 1; i >= 0; i-- { // LIFO: last-added is cleaned up first
-			if f := s.cleanupFuncs[i]; f != nil {
+		for _, f := range slices.Backward(s.cleanupFuncs) { // LIFO: last-added is cleaned up first
+			if f != nil {
 				if err := f(); err != nil {
 					errs = append(errs, err)
 				}

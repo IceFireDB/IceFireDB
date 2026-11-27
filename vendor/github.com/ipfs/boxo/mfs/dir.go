@@ -45,6 +45,14 @@ type Directory struct {
 
 	prov    provider.MultihashProvider
 	chunker chunker.SplitterGen // inherited from parent, nil means default
+
+	// fetchTimeout bounds a single DAG read done while this directory's lock
+	// is held (looking up a child, walking a HAMT shard). Zero means no bound.
+	// When set, a block that is missing locally and cannot be fetched from the
+	// network within the timeout fails with a deadline error instead of
+	// blocking forever under the lock, which would wedge every operation queued
+	// behind it. Inherited from the parent, set at the root via WithFetchTimeout.
+	fetchTimeout time.Duration
 }
 
 // NewDirectory constructs a new MFS directory.
@@ -84,30 +92,35 @@ func NewDirectory(ctx context.Context, name string, node ipld.Node, parent paren
 		unixfsDir:    db,
 		prov:         prov,
 		entriesCache: make(map[string]FSNode),
-		chunker:      parent.getChunker(), // inherit from parent
+		chunker:      parent.getChunker(),      // inherit from parent
+		fetchTimeout: parent.getFetchTimeout(), // inherit from parent
 	}, nil
 }
 
-// NewEmptyDirectory creates an empty MFS directory with the given options.
+// NewEmptyDirectory creates an empty MFS directory with the given [Option]s.
 // The directory is added to the DAGService. To create a new MFS
-// root use NewEmptyRootFolder instead.
-func NewEmptyDirectory(ctx context.Context, name string, parent parent, dserv ipld.DAGService, prov provider.MultihashProvider, opts MkdirOpts) (*Directory, error) {
+// root use [NewEmptyRoot] instead.
+func NewEmptyDirectory(ctx context.Context, name string, p parent, dserv ipld.DAGService, prov provider.MultihashProvider, opts ...Option) (*Directory, error) {
+	return newEmptyDirectory(ctx, name, p, dserv, prov, resolveOpts(opts))
+}
+
+func newEmptyDirectory(ctx context.Context, name string, p parent, dserv ipld.DAGService, prov provider.MultihashProvider, o options) (*Directory, error) {
 	dirOpts := []uio.DirectoryOption{
-		uio.WithMaxLinks(opts.MaxLinks),
-		uio.WithMaxHAMTFanout(opts.MaxHAMTFanout),
-		uio.WithStat(opts.Mode, opts.ModTime),
-		uio.WithCidBuilder(opts.CidBuilder),
+		uio.WithMaxLinks(o.maxLinks),
+		uio.WithMaxHAMTFanout(o.maxHAMTFanout),
+		uio.WithStat(o.mode, o.modTime),
+		uio.WithCidBuilder(o.cidBuilder),
 	}
-	if opts.SizeEstimationMode != nil {
-		dirOpts = append(dirOpts, uio.WithSizeEstimationMode(*opts.SizeEstimationMode))
+	if o.sizeEstimationMode != nil {
+		dirOpts = append(dirOpts, uio.WithSizeEstimationMode(*o.sizeEstimationMode))
 	}
 	db, err := uio.NewDirectory(dserv, dirOpts...)
 	if err != nil {
 		return nil, err
 	}
 	// Set HAMTShardingSize after creation (not a DirectoryOption)
-	if opts.HAMTShardingSize > 0 {
-		db.SetHAMTShardingSize(opts.HAMTShardingSize)
+	if o.hamtShardingSize > 0 {
+		db.SetHAMTShardingSize(o.hamtShardingSize)
 	}
 
 	nd, err := db.GetNode()
@@ -123,15 +136,15 @@ func NewEmptyDirectory(ctx context.Context, name string, parent parent, dserv ip
 	// note: we don't provide the empty unixfs dir as it is always local.
 
 	// Use chunker from opts if set, otherwise inherit from parent
-	c := opts.Chunker
+	c := o.chunker
 	if c == nil {
-		c = parent.getChunker()
+		c = p.getChunker()
 	}
 
 	return &Directory{
 		inode: inode{
 			name:       name,
-			parent:     parent,
+			parent:     p,
 			dagService: dserv,
 		},
 		ctx:          ctx,
@@ -139,6 +152,7 @@ func NewEmptyDirectory(ctx context.Context, name string, parent parent, dserv ip
 		prov:         prov,
 		entriesCache: make(map[string]FSNode),
 		chunker:      c,
+		fetchTimeout: p.getFetchTimeout(),
 	}, nil
 }
 
@@ -150,6 +164,28 @@ func (d *Directory) GetCidBuilder() cid.Builder {
 // getChunker implements the parent interface.
 func (d *Directory) getChunker() chunker.SplitterGen {
 	return d.chunker
+}
+
+// getFetchTimeout implements the parent interface.
+func (d *Directory) getFetchTimeout() time.Duration {
+	return d.fetchTimeout
+}
+
+// getContext implements the parent interface.
+func (d *Directory) getContext() context.Context {
+	return d.ctx
+}
+
+// opContext returns a context for a single under-lock DAG read (a child
+// lookup or HAMT-shard walk). When a fetch timeout is configured it bounds the
+// read so a locally-missing block fails with a deadline error instead of
+// blocking forever on the network while d.lock is held. The caller must call
+// the returned cancel func.
+func (d *Directory) opContext() (context.Context, context.CancelFunc) {
+	if d.fetchTimeout <= 0 {
+		return d.ctx, func() {}
+	}
+	return context.WithTimeout(d.ctx, d.fetchTimeout)
 }
 
 // SetCidBuilder sets the CID builder
@@ -181,7 +217,9 @@ func (d *Directory) localUpdate(c child) (*dag.ProtoNode, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	err := d.unixfsDir.AddChild(d.ctx, c.Name, c.Node)
+	octx, cancel := d.opContext()
+	err := d.unixfsDir.AddChild(octx, c.Name, c.Node)
+	cancel()
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +323,9 @@ func (d *Directory) Uncache(name string) {
 // childFromDag searches through this directories dag node for a child link
 // with the given name
 func (d *Directory) childFromDag(name string) (ipld.Node, error) {
-	return d.unixfsDir.Find(d.ctx, name)
+	ctx, cancel := d.opContext()
+	defer cancel()
+	return d.unixfsDir.Find(ctx, name)
 }
 
 // childUnsync returns the child under this directory by the given name
@@ -368,15 +408,19 @@ func (d *Directory) ForEachEntry(ctx context.Context, f func(NodeListing) error)
 	})
 }
 
+// Mkdir creates a child directory that inherits settings from this directory.
 func (d *Directory) Mkdir(name string) (*Directory, error) {
-	return d.MkdirWithOpts(name, MkdirOpts{
-		MaxLinks:         d.unixfsDir.GetMaxLinks(),
-		MaxHAMTFanout:    d.unixfsDir.GetMaxHAMTFanout(),
-		HAMTShardingSize: d.unixfsDir.GetHAMTShardingSize(),
-	})
+	var o options
+	o.fillFrom(d)
+	return d.mkdirWithOpts(name, o)
 }
 
-func (d *Directory) MkdirWithOpts(name string, opts MkdirOpts) (*Directory, error) {
+// MkdirWithOpts creates a child directory with explicit [Option]s.
+func (d *Directory) MkdirWithOpts(name string, opts ...Option) (*Directory, error) {
+	return d.mkdirWithOpts(name, resolveOpts(opts))
+}
+
+func (d *Directory) mkdirWithOpts(name string, o options) (*Directory, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -392,11 +436,7 @@ func (d *Directory) MkdirWithOpts(name string, opts MkdirOpts) (*Directory, erro
 		}
 	}
 
-	// hector: no idea why this option is overridden, but it must be to
-	// keep backwards compatibility. CidBuilder from the options is
-	// manually set in `Mkdir` (ops.go) though.
-	opts.CidBuilder = d.GetCidBuilder()
-	dirobj, err := NewEmptyDirectory(d.ctx, name, d, d.dagService, d.prov, opts)
+	dirobj, err := newEmptyDirectory(d.ctx, name, d, d.dagService, d.prov, o)
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +446,9 @@ func (d *Directory) MkdirWithOpts(name string, opts MkdirOpts) (*Directory, erro
 		return nil, err
 	}
 
-	err = d.unixfsDir.AddChild(d.ctx, name, ndir)
+	octx, cancel := d.opContext()
+	err = d.unixfsDir.AddChild(octx, name, ndir)
+	cancel()
 	if err != nil {
 		return nil, err
 	}
@@ -419,9 +461,19 @@ func (d *Directory) Unlink(name string) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
+	if child, ok := d.entriesCache[name]; ok {
+		switch c := child.(type) {
+		case *File:
+			c.unlinked.Store(true)
+		case *Directory:
+			c.unlinked.Store(true)
+		}
+	}
 	delete(d.entriesCache, name)
 
-	return d.unixfsDir.RemoveChild(d.ctx, name)
+	octx, cancel := d.opContext()
+	defer cancel()
+	return d.unixfsDir.RemoveChild(octx, name)
 }
 
 func (d *Directory) Flush() error {
@@ -455,7 +507,9 @@ func (d *Directory) AddChild(name string, nd ipld.Node) error {
 		}
 	}
 
-	return d.unixfsDir.AddChild(d.ctx, name, nd)
+	octx, cancel := d.opContext()
+	defer cancel()
+	return d.unixfsDir.AddChild(octx, name, nd)
 }
 
 func (d *Directory) cacheSync(clean bool) error {
@@ -465,7 +519,9 @@ func (d *Directory) cacheSync(clean bool) error {
 			return err
 		}
 
-		err = d.unixfsDir.AddChild(d.ctx, name, nd)
+		octx, cancel := d.opContext()
+		err = d.unixfsDir.AddChild(octx, name, nd)
+		cancel()
 		if err != nil {
 			return err
 		}
@@ -526,6 +582,20 @@ func (d *Directory) getNode(cacheClean bool) (ipld.Node, error) {
 	return nd.Copy(), err
 }
 
+// Mode returns the directory's POSIX permission bits from UnixFS metadata.
+// Returns 0 when no mode is stored.
+func (d *Directory) Mode() (os.FileMode, error) {
+	nd, err := d.GetNode()
+	if err != nil {
+		return 0, err
+	}
+	fsn, err := ft.ExtractFSNode(nd)
+	if err != nil {
+		return 0, err
+	}
+	return fsn.Mode() & 0xFFF, nil
+}
+
 func (d *Directory) SetMode(mode os.FileMode) error {
 	nd, err := d.GetNode()
 	if err != nil {
@@ -550,6 +620,20 @@ func (d *Directory) SetMode(mode os.FileMode) error {
 
 	d.unixfsDir.SetStat(mode, time.Time{})
 	return nil
+}
+
+// ModTime returns the directory's last modification time from UnixFS metadata.
+// Returns zero time when no mtime is stored.
+func (d *Directory) ModTime() (time.Time, error) {
+	nd, err := d.GetNode()
+	if err != nil {
+		return time.Time{}, err
+	}
+	fsn, err := ft.ExtractFSNode(nd)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return fsn.ModTime(), nil
 }
 
 func (d *Directory) SetModTime(ts time.Time) error {
@@ -581,6 +665,11 @@ func (d *Directory) setNodeData(data []byte, links []*ipld.Link) error {
 	nd := dag.NodeWithData(data)
 	nd.SetLinks(links)
 
+	// Preserve previous node's CidBuilder
+	if builder := d.unixfsDir.GetCidBuilder(); builder != nil {
+		nd.SetCidBuilder(builder)
+	}
+
 	err := d.dagService.Add(d.ctx, nd)
 	if err != nil {
 		return err
@@ -605,11 +694,11 @@ func (d *Directory) setNodeData(data []byte, links []*ipld.Link) error {
 		return err
 	}
 
-	// We need to carry our desired settings.
-	// Note: SizeEstimationMode is set at creation time and cannot be changed.
+	// Carry over settings that are not persisted in the DAG node.
 	db.SetMaxLinks(d.unixfsDir.GetMaxLinks())
 	db.SetMaxHAMTFanout(d.unixfsDir.GetMaxHAMTFanout())
 	db.SetHAMTShardingSize(d.unixfsDir.GetHAMTShardingSize())
+	db.SetSizeEstimationMode(d.unixfsDir.GetSizeEstimationMode())
 	d.unixfsDir = db
 
 	return nil

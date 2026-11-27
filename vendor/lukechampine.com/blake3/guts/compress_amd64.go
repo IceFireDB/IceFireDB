@@ -21,80 +21,59 @@ func compressBlocksAVX2(out *[512]byte, msgs *[16]uint32, cv *[8]uint32, counter
 //go:noescape
 func compressParentsAVX2(parents *[8][8]uint32, cvs *[16][8]uint32, key *[8]uint32, flags uint32)
 
-func compressBufferAVX512(buf *[MaxSIMD * ChunkSize]byte, buflen int, key *[8]uint32, counter uint64, flags uint32) Node {
-	var cvs [MaxSIMD][8]uint32
-	compressChunksAVX512(&cvs, buf, key, counter, flags)
-	numChunks := uint64(buflen / ChunkSize)
-	if buflen%ChunkSize != 0 {
-		// use non-asm for remainder
-		partialChunk := buf[buflen-buflen%ChunkSize : buflen]
-		cvs[numChunks] = ChainingValue(CompressChunk(partialChunk, key, counter+numChunks, flags))
-		numChunks++
+//go:noescape
+func compressNodeSSE41(out *[16]uint32, cv *[8]uint32, block *[16]uint32, counter uint64, blockLen uint32, flags uint32)
+
+func compressNode(out *[16]uint32, cv *[8]uint32, block *[16]uint32, counter uint64, blockLen uint32, flags uint32) {
+	if haveSSE41 {
+		compressNodeSSE41(out, cv, block, counter, blockLen, flags)
+	} else {
+		compressNodeGeneric(out, cv, block, counter, blockLen, flags)
 	}
-	return mergeSubtrees(&cvs, numChunks, key, flags)
 }
 
-func compressBufferAVX2(buf *[MaxSIMD * ChunkSize]byte, buflen int, key *[8]uint32, counter uint64, flags uint32) Node {
-	var cvs [MaxSIMD][8]uint32
-	cvHalves := (*[2][8][8]uint32)(unsafe.Pointer(&cvs))
-	bufHalves := (*[2][8 * ChunkSize]byte)(unsafe.Pointer(buf))
-	compressChunksAVX2(&cvHalves[0], &bufHalves[0], key, counter, flags)
-	numChunks := uint64(buflen / ChunkSize)
-	if numChunks > 8 {
-		compressChunksAVX2(&cvHalves[1], &bufHalves[1], key, counter+8, flags)
+//go:noescape
+func compressChunkPairAVX2(cvs *[2][8]uint32, p0 *byte, p1 *byte, blocks uint64, key *[8]uint32, counter uint64, flags uint32, flagsEnd uint32)
+
+func compressChunkBlocks(cv *[8]uint32, blocks []byte, counter uint64, flags uint32) {
+	if !haveAVX2 {
+		compressChunkBlocksGeneric(cv, blocks, counter, flags)
+		return
 	}
-	if buflen%ChunkSize != 0 {
-		// use non-asm for remainder
-		partialChunk := buf[buflen-buflen%ChunkSize : buflen]
-		cvs[numChunks] = ChainingValue(CompressChunk(partialChunk, key, counter+numChunks, flags))
-		numChunks++
-	}
-	return mergeSubtrees(&cvs, numChunks, key, flags)
+	// NOTE: the routine compresses two chunks at once, so pass it the same
+	// chunk twice. This is still faster than compressing one block at a time.
+	var cvs [2][8]uint32
+	compressChunkPairAVX2(&cvs, &blocks[0], &blocks[0], uint64(len(blocks)/BlockSize), cv, counter, flags, 0)
+	*cv = cvs[0]
 }
 
-// CompressBuffer compresses up to MaxSIMD chunks in parallel and returns their
-// root node.
-func CompressBuffer(buf *[MaxSIMD * ChunkSize]byte, buflen int, key *[8]uint32, counter uint64, flags uint32) Node {
-	if buflen <= ChunkSize {
-		return CompressChunk(buf[:buflen], key, counter, flags)
-	}
+func compressChunks(cvs *[MaxSIMD][8]uint32, buf *[MaxSIMD * ChunkSize]byte, n int, key *[8]uint32, counter uint64, flags uint32) {
 	switch {
-	case haveAVX512 && buflen >= ChunkSize*2:
-		return compressBufferAVX512(buf, buflen, key, counter, flags)
-	case haveAVX2 && buflen >= ChunkSize*2:
-		return compressBufferAVX2(buf, buflen, key, counter, flags)
+	case haveAVX512 && n >= 3:
+		compressChunksAVX512(cvs, buf, key, counter, flags)
+	case haveAVX2 && n == 2:
+		compressChunkPairAVX2((*[2][8]uint32)(cvs[:2]), &buf[0], &buf[ChunkSize], ChunkSize/BlockSize, key, counter, flags, FlagChunkEnd)
+	case haveAVX2 && n >= 3:
+		cvHalves := (*[2][8][8]uint32)(unsafe.Pointer(cvs))
+		bufHalves := (*[2][8 * ChunkSize]byte)(unsafe.Pointer(buf))
+		compressChunksAVX2(&cvHalves[0], &bufHalves[0], key, counter, flags)
+		if n > 8 {
+			compressChunksAVX2(&cvHalves[1], &bufHalves[1], key, counter+8, flags)
+		}
 	default:
-		return compressBufferGeneric(buf, buflen, key, counter, flags)
+		compressChunksGeneric(cvs, buf, n, key, counter, flags)
 	}
 }
 
-// CompressChunk compresses a single chunk, returning its final (uncompressed)
-// node.
-func CompressChunk(chunk []byte, key *[8]uint32, counter uint64, flags uint32) Node {
-	n := Node{
-		CV:       *key,
-		Counter:  counter,
-		BlockLen: BlockSize,
-		Flags:    flags | FlagChunkStart,
+func compressParents(cvs *[MaxSIMD][8]uint32, n int, key *[8]uint32, flags uint32) {
+	if haveAVX2 && n >= 3 {
+		compressParentsAVX2((*[8][8]uint32)(unsafe.Pointer(cvs)), cvs, key, flags)
+	} else {
+		compressParentsGeneric(cvs, n, key, flags)
 	}
-	blockBytes := (*[64]byte)(unsafe.Pointer(&n.Block))[:]
-	for len(chunk) > BlockSize {
-		copy(blockBytes, chunk)
-		chunk = chunk[BlockSize:]
-		n.CV = ChainingValue(n)
-		n.Flags &^= FlagChunkStart
-	}
-	// pad last block with zeros
-	n.Block = [16]uint32{}
-	copy(blockBytes, chunk)
-	n.BlockLen = uint32(len(chunk))
-	n.Flags |= FlagChunkEnd
-	return n
 }
 
-// CompressBlocks compresses MaxSIMD copies of n with successive counter values,
-// storing the results in out.
-func CompressBlocks(out *[MaxSIMD * BlockSize]byte, n Node) {
+func compressBlocks(out *[MaxSIMD * BlockSize]byte, n Node) {
 	switch {
 	case haveAVX512:
 		compressBlocksAVX512(out, &n.Block, &n.CV, n.Counter, n.BlockLen, n.Flags)
@@ -103,35 +82,6 @@ func CompressBlocks(out *[MaxSIMD * BlockSize]byte, n Node) {
 		compressBlocksAVX2(&outs[0], &n.Block, &n.CV, n.Counter, n.BlockLen, n.Flags)
 		compressBlocksAVX2(&outs[1], &n.Block, &n.CV, n.Counter+8, n.BlockLen, n.Flags)
 	default:
-		outs := (*[MaxSIMD][64]byte)(unsafe.Pointer(out))
-		compressBlocksGeneric(outs, n)
+		compressBlocksGeneric(out, n)
 	}
-}
-
-func mergeSubtrees(cvs *[MaxSIMD][8]uint32, numCVs uint64, key *[8]uint32, flags uint32) Node {
-	if !haveAVX2 {
-		return mergeSubtreesGeneric(cvs, numCVs, key, flags)
-	}
-	for numCVs > 2 {
-		if numCVs%2 == 0 {
-			compressParentsAVX2((*[8][8]uint32)(unsafe.Pointer(cvs)), cvs, key, flags)
-		} else {
-			keep := cvs[numCVs-1]
-			compressParentsAVX2((*[8][8]uint32)(unsafe.Pointer(cvs)), cvs, key, flags)
-			cvs[numCVs/2] = keep
-			numCVs++
-		}
-		numCVs /= 2
-	}
-	return ParentNode(cvs[0], cvs[1], key, flags)
-}
-
-// BytesToWords converts an array of 64 bytes to an array of 16 bytes.
-func BytesToWords(bytes [64]byte) [16]uint32 {
-	return *(*[16]uint32)(unsafe.Pointer(&bytes))
-}
-
-// WordsToBytes converts an array of 16 words to an array of 64 bytes.
-func WordsToBytes(words [16]uint32) [64]byte {
-	return *(*[64]byte)(unsafe.Pointer(&words))
 }

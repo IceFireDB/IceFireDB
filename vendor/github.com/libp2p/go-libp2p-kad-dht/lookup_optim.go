@@ -265,6 +265,10 @@ func (os *optimisticState) waitForRPCs() {
 	rpcCount := len(os.peerStates)
 	os.peerStatesLk.RUnlock()
 
+	if rpcCount == 0 {
+		return
+	}
+
 	// returnThreshold can't be larger than the total number issued RPCs
 	if os.returnThreshold > rpcCount {
 		os.returnThreshold = rpcCount

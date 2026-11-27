@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -299,11 +299,17 @@ func bootstrapRound(ctx context.Context, host host.Host, cfg BootstrapConfig) er
 	// Retrieving them here makes sure we remain observant of changes to client configuration.
 	peers := cfg.BootstrapPeers()
 
-	if len(peers) > 0 {
-		numToDial -= int(peersConnect(ctx, host, peers, numToDial, true))
-		if numToDial <= 0 {
-			return nil
-		}
+	if len(peers) == 0 {
+		// The backup list is a fallback for when configured bootstrap peers
+		// are unreachable (ipfs/kubo#8856). With no configured peers there is
+		// nothing to fall back from.
+		log.Debugf("%s bootstrap skipped -- no bootstrap peers configured", id)
+		return nil
+	}
+
+	numToDial -= int(peersConnect(ctx, host, peers, numToDial, true))
+	if numToDial <= 0 {
+		return nil
 	}
 
 	if cfg.loadBackupBootstrapPeers == nil {

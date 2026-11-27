@@ -111,8 +111,54 @@ func NewPrioritizedProvider(streams ...KeyChanFunc) KeyChanFunc {
 			last := len(streams) - 1
 			for i, stream := range streams {
 				if err := handleStream(stream, i < last); err != nil {
-					log.Warnf("error in prioritized strategy while handling CID stream %d: %w", i, err)
-					return
+					log.Errorf("error in prioritized strategy while handling CID stream %d: %s", i, err)
+					continue // best-effort: e.g. MFS flush error should not prevent pinned content from being provided
+				}
+			}
+		}()
+
+		return outCh, nil
+	}
+}
+
+// NewConcatProvider concatenates multiple KeyChanFunc streams into one,
+// running them sequentially in order. All CIDs from each stream are
+// forwarded to the output channel without deduplication.
+//
+// Use this when the input streams are already deduplicated externally
+// (e.g. via a shared [walker.VisitedTracker]). For streams that may
+// produce overlapping CIDs, use [NewPrioritizedProvider] instead, which
+// maintains its own visited set.
+//
+// Like [NewPrioritizedProvider], a failure in one stream's KeyChanFunc
+// is logged and skipped -- remaining streams still run.
+func NewConcatProvider(streams ...KeyChanFunc) KeyChanFunc {
+	return func(ctx context.Context) (<-chan cid.Cid, error) {
+		outCh := make(chan cid.Cid)
+
+		go func() {
+			defer close(outCh)
+			for i, stream := range streams {
+				ch, err := stream(ctx)
+				if err != nil {
+					log.Errorf("error in concat strategy while handling CID stream %d: %s", i, err)
+					continue
+				}
+			drain:
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case c, ok := <-ch:
+						if !ok {
+							break drain
+						}
+						select {
+						case <-ctx.Done():
+							return
+						case outCh <- c:
+						}
+					}
 				}
 			}
 		}()

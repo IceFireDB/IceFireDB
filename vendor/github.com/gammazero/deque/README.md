@@ -2,8 +2,7 @@
 
 [![GoDoc](https://pkg.go.dev/badge/github.com/gammazero/deque)](https://pkg.go.dev/github.com/gammazero/deque)
 [![Build Status](https://github.com/gammazero/deque/actions/workflows/go.yml/badge.svg)](https://github.com/gammazero/deque/actions/workflows/go.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/gammazero/deque)](https://goreportcard.com/report/github.com/gammazero/deque)
-[![codecov](https://codecov.io/gh/gammazero/deque/branch/master/graph/badge.svg)](https://codecov.io/gh/gammazero/deque)
+[![codecov](https://codecov.io/gh/gammazero/deque/graph/badge.svg?token=LGS6XRID3D)](https://codecov.io/gh/gammazero/deque)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Fast ring-buffer deque ([double-ended queue](https://en.wikipedia.org/wiki/Double-ended_queue)) implementation.
@@ -22,9 +21,9 @@ Deque generalizes a queue and a stack, to efficiently add and remove items at ei
 
 ## Ring-buffer Performance
 
-This deque implementation is optimized for CPU and GC performance. The circular buffer automatically re-sizes by powers of two, growing when additional capacity is needed and shrinking when only a quarter of the capacity is used, and uses bitwise arithmetic for all calculations. Since growth is by powers of two, adding elements will only cause O(log n) allocations. A base capacity can be set, with `SetBaseCap`, so that there is no resizing at or below that specified amount. The Deque can also be grown, using `Grow`, to ensure sufficient storage for n additional items, to prevent resizing when adding a number of itmes.
+This deque implementation is optimized for CPU and GC performance. The circular buffer automatically re-sizes by powers of two, growing when additional capacity is needed and shrinking when only a quarter of the capacity is used, and uses bitwise arithmetic for all calculations. Since growth is by powers of two, adding elements will only cause O(log n) allocations. A base capacity can be set, with `SetBaseCap`, so that there is no resizing at or below that specified amount. The Deque can also be grown, using `Grow`, to ensure sufficient storage for n additional items, to prevent resizing when adding a number of items.
 
-The ring-buffer implementation improves memory and time performance with fewer GC pauses, compared to implementations based on slices or linked lists. By wrapping around the buffer, previously used space is reused, making allocation unnecessary until all buffer capacity is used. The ring buffer implementation performs best when resizes are infrequest, as is the case when items moving in and out of the Deque are balanced or when the base capacity is large enough to rarely require a resize.
+The ring-buffer implementation improves memory and time performance with fewer GC pauses, compared to implementations based on slices or linked lists. By wrapping around the buffer, previously used space is reused, making allocation unnecessary until all buffer capacity is used. The ring buffer implementation performs best when resizes are infrequent, as is the case when items moving in and out of the Deque are balanced or when the base capacity is large enough to rarely require a resize.
 
 For maximum speed, this deque implementation leaves concurrency safety up to the application to provide, however the application chooses, if needed at all.
 
@@ -40,7 +39,7 @@ Deque uses generics to create a Deque that contains items of the type specified.
     var intDeque deque.Deque[int]
 ```
 
-Deque supports iterators that allow traversal or removal of items. When removing items this is useful to avoid intermediate resizes of the internal buffer. It also allows Deque to be used with the stdlib [`slices.Collect`](https://pkg.go.dev/slices#Collect), [`slices.Sorted`](https://pkg.go.dev/slices#Sorted), and others that take [`iter.Seq`](https://pkg.go.dev/iter#Seq) argumments.
+Deque supports iterators that allow traversal or removal of items. When removing items this is useful to avoid intermediate resizes of the internal buffer. It also allows Deque to be used with the stdlib [`slices.Collect`](https://pkg.go.dev/slices#Collect), [`slices.Sorted`](https://pkg.go.dev/slices#Sorted), and others that take [`iter.Seq`](https://pkg.go.dev/iter#Seq) arguments.
 
 ## Example
 

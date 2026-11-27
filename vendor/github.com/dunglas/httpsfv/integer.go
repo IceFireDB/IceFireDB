@@ -59,20 +59,20 @@ func parseNumber(s *scanner) (interface{}, error) {
 	)
 
 	for s.off < len(s.data) {
-		size := s.off - start
-		if (t == typeInteger && (size >= 15)) || size >= 16 {
-			return 0, &UnmarshalError{s.off, ErrNumberOutOfRange}
-		}
-
 		c := s.data[s.off]
 		if isDigit(c) {
 			s.off++
+
+			// The length limit applies to the consumed digits, not to the delimiter that follows them.
+			if size := s.off - start; (t == typeInteger && size > 15) || size > 16 {
+				return 0, &UnmarshalError{s.off, ErrNumberOutOfRange}
+			}
 
 			continue
 		}
 
 		if t == typeInteger && c == '.' {
-			if size > maxDigit {
+			if s.off-start > maxDigit {
 				return 0, &UnmarshalError{s.off, ErrNumberOutOfRange}
 			}
 

@@ -1,19 +1,10 @@
-//go:build darwin || linux || netbsd || openbsd || freebsd || dragonfly || js || wasip1
+//go:build darwin || linux || netbsd || openbsd || freebsd || dragonfly || wasip1
 
 package files
 
-import (
-	"os"
-	"strings"
-	"syscall"
-)
+import "syscall"
 
-var invalidChars = `/` + "\x00"
-
-func isValidFilename(filename string) bool {
-	return !strings.ContainsAny(filename, invalidChars)
-}
-
-func createNewFile(path string) (*os.File, error) {
-	return os.OpenFile(path, os.O_EXCL|os.O_CREATE|os.O_WRONLY|syscall.O_NOFOLLOW, 0o666)
-}
+// noFollowFlag adds O_NOFOLLOW to createNewFile in filewriter_posix.go,
+// preventing symlink-traversal races where syscall supports the flag.
+// GOOS=js falls back to 0 (no protection).
+const noFollowFlag = syscall.O_NOFOLLOW

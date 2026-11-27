@@ -2,7 +2,6 @@
 
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/koron/go-ssdp)](https://pkg.go.dev/github.com/koron/go-ssdp)
 [![Actions/Go](https://github.com/koron/go-ssdp/workflows/Go/badge.svg)](https://github.com/koron/go-ssdp/actions?query=workflow%3AGo)
-[![Go Report Card](https://goreportcard.com/badge/github.com/koron/go-ssdp)](https://goreportcard.com/report/github.com/koron/go-ssdp)
 
 Based on <https://tools.ietf.org/html/draft-cai-ssdp-v1-03>.
 

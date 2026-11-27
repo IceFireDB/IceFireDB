@@ -16,7 +16,7 @@ import (
 // IPNSResolver implements [Resolver] for IPNS Records. This resolver always returns
 // a TTL if the record is still valid. It happens as follows:
 //
-//  1. Provisory TTL is chosen: record TTL if it exists, otherwise `ipns.DefaultRecordTTL`.
+//  1. Provisory TTL is chosen: record TTL (floored at 0) if it exists, otherwise `ipns.DefaultRecordTTL`.
 //  2. If provisory TTL expires before EOL, then returned TTL is duration between EOL and now.
 //  3. If record is expired, 0 is returned as TTL.
 type IPNSResolver struct {
@@ -135,7 +135,9 @@ func (r *IPNSResolver) resolveOnceAsync(ctx context.Context, p path.Path, option
 func calculateBestTTL(rec *ipns.Record) (time.Duration, error) {
 	ttl := DefaultResolverCacheTTL
 	if recordTTL, err := rec.TTL(); err == nil {
-		ttl = recordTTL
+		// A record may report a negative TTL; floor it at zero rather than
+		// letting a negative duration propagate to callers.
+		ttl = max(0, recordTTL)
 	}
 
 	switch eol, err := rec.Validity(); err {

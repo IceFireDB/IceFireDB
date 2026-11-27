@@ -42,6 +42,18 @@ const (
 	// is also known as Provider Record Expiration Interval.
 	DefaultProvideValidity = 48 * time.Hour
 
+	// DefaultMaxRecordAge is the default time that a value record (PutValue
+	// record, such as /pk or /ipns) is kept before it needs to be republished.
+	// It is independent of DefaultProvideValidity, which governs provider
+	// records.
+	DefaultMaxRecordAge = 48 * time.Hour
+
+	// DefaultValueGCInterval is the default interval between background sweeps
+	// that delete value records older than MaxRecordAge. It only bounds how long
+	// expired records linger on disk before being reclaimed; expired records are
+	// never served, since reads age-check independently of the sweep.
+	DefaultValueGCInterval = 24 * time.Hour
+
 	// DefaultProviderAddrTTL is the TTL to keep the multi addresses of
 	// provider peers around. Those addresses are returned alongside provider.
 	// After it expires, the returned records will require an extra lookup, to

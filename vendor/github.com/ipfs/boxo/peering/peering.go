@@ -3,7 +3,7 @@ package peering
 import (
 	"context"
 	"errors"
-	"math/rand"
+	"math/rand/v2"
 	"slices"
 	"strconv"
 	"sync"
@@ -97,14 +97,14 @@ func (ph *peerHandler) stop() {
 
 func (ph *peerHandler) nextBackoff() time.Duration {
 	if ph.nextDelay < maxBackoff {
-		ph.nextDelay += ph.nextDelay/2 + time.Duration(rand.Int63n(int64(ph.nextDelay)))
+		ph.nextDelay += ph.nextDelay/2 + time.Duration(rand.Int64N(int64(ph.nextDelay)))
 	}
 
 	// If we've gone over the max backoff, reduce it under the max.
 	if ph.nextDelay > maxBackoff {
 		ph.nextDelay = maxBackoff
 		// randomize the backoff a bit (10%).
-		ph.nextDelay -= time.Duration(rand.Int63n(int64(maxBackoff) * maxBackoffJitter / 100))
+		ph.nextDelay -= time.Duration(rand.Int64N(int64(maxBackoff) * maxBackoffJitter / 100))
 	}
 
 	return ph.nextDelay

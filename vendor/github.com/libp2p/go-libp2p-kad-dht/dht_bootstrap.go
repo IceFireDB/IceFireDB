@@ -18,7 +18,11 @@ var minRTRefreshThreshold = 10
 
 const (
 	periodicBootstrapInterval = 2 * time.Minute
-	maxNBoostrappers          = 2
+
+	// maxNBoostrappers is the fewest peers a node starts its first refresh
+	// from, so that no single peer, stale or misbehaving, decides its view of
+	// the network. A second peer costs one more dial.
+	maxNBoostrappers = 2
 )
 
 func init() {
@@ -62,7 +66,7 @@ func (dht *IpfsDHT) Bootstrap(ctx context.Context) (err error) {
 	defer func() { end(err) }()
 
 	dht.fixRTIfNeeded()
-	dht.rtRefreshManager.RefreshNoWait()
+	dht.requestRefresh()
 	return nil
 }
 

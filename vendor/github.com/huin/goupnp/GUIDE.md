@@ -45,6 +45,8 @@ type RouterClient interface {
 		NewExternalIPAddress string,
 		err error,
 	)
+
+	LocalAddr() net.IP
 }
 
 func PickRouterClient(ctx context.Context) (RouterClient, error) {
@@ -116,7 +118,7 @@ func GetIPAndForwardPort(ctx context.Context) error {
 		// port number.
 		1234,
 		// Internal address on the LAN we want to forward to.
-		"192.168.1.6",
+		client.LocalAddr().String(),
 		// Enabled:
 		true,
 		// Informational description for the client requesting the port forwarding.

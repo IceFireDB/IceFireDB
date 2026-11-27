@@ -1,6 +1,7 @@
-// Package unixfs implements a data format for files in the IPFS filesystem It
-// is not the only format in ipfs, but it is the one that the filesystem
-// assumes
+// Package unixfs implements the [UnixFS] data format for describing files,
+// directories, and symlinks in IPFS.
+//
+// [UnixFS]: https://specs.ipfs.tech/unixfs/
 package unixfs
 
 import (
@@ -58,7 +59,7 @@ func FilePBData(data []byte, totalsize uint64) []byte {
 	typ := pb.Data_File
 	pbfile.Type = &typ
 	pbfile.Data = data
-	pbfile.Filesize = proto.Uint64(totalsize)
+	pbfile.Filesize = new(totalsize)
 
 	data, err := proto.Marshal(pbfile)
 	if err != nil {
@@ -77,7 +78,7 @@ func FilePBDataWithStat(data []byte, totalsize uint64, mode os.FileMode, mtime t
 	typ := pb.Data_File
 	pbfile.Type = &typ
 	pbfile.Data = data
-	pbfile.Filesize = proto.Uint64(totalsize)
+	pbfile.Filesize = new(totalsize)
 
 	pbDataAddStat(pbfile, mode, mtime)
 
@@ -119,11 +120,11 @@ func FolderPBDataWithStat(mode os.FileMode, mtime time.Time) []byte {
 
 func pbDataAddStat(data *pb.Data, mode os.FileMode, mtime time.Time) {
 	if mode != 0 {
-		data.Mode = proto.Uint32(files.ModePermsToUnixPerms(mode))
+		data.Mode = new(files.ModePermsToUnixPerms(mode))
 	}
 	if !mtime.IsZero() {
 		data.Mtime = &pb.IPFSTimestamp{
-			Seconds: proto.Int64(mtime.Unix()),
+			Seconds: new(mtime.Unix()),
 		}
 
 		if nanos := uint32(mtime.Nanosecond()); nanos > 0 {
@@ -138,7 +139,7 @@ func WrapData(b []byte) []byte {
 	typ := pb.Data_Raw
 	pbdata.Data = b
 	pbdata.Type = &typ
-	pbdata.Filesize = proto.Uint64(uint64(len(b)))
+	pbdata.Filesize = new(uint64(len(b)))
 
 	out, err := proto.Marshal(pbdata)
 	if err != nil {
@@ -175,16 +176,16 @@ func HAMTShardDataWithStat(data []byte, fanout uint64, hashType uint64, mode os.
 	pbdata := new(pb.Data)
 	typ := pb.Data_HAMTShard
 	pbdata.Type = &typ
-	pbdata.HashType = proto.Uint64(hashType)
+	pbdata.HashType = new(hashType)
 	pbdata.Data = data
-	pbdata.Fanout = proto.Uint64(fanout)
+	pbdata.Fanout = new(fanout)
 
 	if mode != 0 {
-		pbdata.Mode = proto.Uint32(files.ModePermsToUnixPerms(mode))
+		pbdata.Mode = new(files.ModePermsToUnixPerms(mode))
 	}
 	if !mtime.IsZero() {
 		pbdata.Mtime = &pb.IPFSTimestamp{
-			Seconds: proto.Int64(mtime.Unix()),
+			Seconds: new(mtime.Unix()),
 		}
 		if nanos := uint32(mtime.Nanosecond()); nanos > 0 {
 			pbdata.Mtime.Nanos = &nanos
@@ -314,7 +315,7 @@ func (n *FSNode) BlockSizes() []uint64 {
 // RemoveAllBlockSizes removes all the child block sizes of this node.
 func (n *FSNode) RemoveAllBlockSizes() {
 	n.format.Blocksizes = []uint64{}
-	n.format.Filesize = proto.Uint64(uint64(len(n.Data())))
+	n.format.Filesize = new(uint64(len(n.Data())))
 }
 
 // GetBytes marshals this node as a protobuf message.
@@ -351,7 +352,7 @@ func (n *FSNode) SetData(newData []byte) {
 // by a signed difference (`filesizeDiff`).
 // TODO: Add assert to check for `Filesize` > 0?
 func (n *FSNode) UpdateFilesize(filesizeDiff int64) {
-	n.format.Filesize = proto.Uint64(uint64(
+	n.format.Filesize = new(uint64(
 		int64(n.format.GetFilesize()) + filesizeDiff))
 }
 
@@ -449,9 +450,9 @@ func (n *FSNode) SetModTime(ts time.Time) {
 		n.format.Mtime = &pb.IPFSTimestamp{}
 	}
 
-	n.format.Mtime.Seconds = proto.Int64(ts.Unix())
+	n.format.Mtime.Seconds = new(ts.Unix())
 	if ts.Nanosecond() > 0 {
-		n.format.Mtime.Nanos = proto.Uint32(uint32(ts.Nanosecond()))
+		n.format.Mtime.Nanos = new(uint32(ts.Nanosecond()))
 	} else {
 		n.format.Mtime.Nanos = nil
 	}
@@ -497,7 +498,7 @@ func (m *Metadata) Bytes() ([]byte, error) {
 // result of calling m.Bytes().
 func BytesForMetadata(m *Metadata) ([]byte, error) {
 	pbd := new(pb.Data)
-	pbd.Filesize = proto.Uint64(m.Size)
+	pbd.Filesize = new(m.Size)
 	typ := pb.Data_Metadata
 	pbd.Type = &typ
 	mdd, err := m.Bytes()

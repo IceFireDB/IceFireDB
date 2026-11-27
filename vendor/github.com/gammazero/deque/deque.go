@@ -3,6 +3,8 @@ package deque
 import (
 	"fmt"
 	"iter"
+	"math/bits"
+	"unsafe"
 )
 
 // minCapacity is the smallest capacity that deque may have. Must be power of 2
@@ -202,8 +204,8 @@ func (q *Deque[T]) At(i int) T {
 }
 
 // Set assigns the item to index i in the queue. Set indexes the deque the same
-// as [At] but perform the opposite operation. If the index is invalid, the call
-// panics.
+// as [At] but performs the opposite operation. If the index is invalid, the
+// call panics.
 func (q *Deque[T]) Set(i int, item T) {
 	q.checkRange(i)
 	// bitwise modulus
@@ -211,15 +213,24 @@ func (q *Deque[T]) Set(i int, item T) {
 }
 
 // Iter returns a go iterator to range over all items in the Deque, yielding
-// each item from front (index 0) to back (index Len()-1). Modification of
-// Deque during iteration panics.
+// each item from front (index 0) to back (index Len()-1). Advancing to the
+// next item panics if the loop body left the Deque with a different head,
+// tail, or item count. Changes made before breaking out of the loop or while
+// handling the last item are not detected, since no further item is read.
+// Changes that leave these the same, such as [Set], [Swap], or a push followed
+// by a pop at the same end, are allowed. If q is nil, the iterator yields
+// nothing.
 func (q *Deque[T]) Iter() iter.Seq[T] {
 	return func(yield func(T) bool) {
+		if q.Len() == 0 {
+			return
+		}
 		origHead := q.head
 		origTail := q.tail
+		origCount := q.count
 		head := origHead
-		for range q.Len() {
-			if q.head != origHead || q.tail != origTail {
+		for range origCount {
+			if q.head != origHead || q.tail != origTail || q.count != origCount {
 				panic("deque: modified during iteration")
 			}
 			if !yield(q.buf[head]) {
@@ -231,15 +242,24 @@ func (q *Deque[T]) Iter() iter.Seq[T] {
 }
 
 // RIter returns a reverse go iterator to range over all items in the Deque,
-// yielding each item from back (index Len()-1) to front (index 0).
-// Modification of Deque during iteration panics.
+// yielding each item from back (index Len()-1) to front (index 0). Advancing
+// to the next item panics if the loop body left the Deque with a different
+// head, tail, or item count. Changes made before breaking out of the loop or
+// while handling the last item are not detected, since no further item is
+// read. Changes that leave these the same, such as [Set], [Swap], or a push
+// followed by a pop at the same end, are allowed. If q is nil, the iterator
+// yields nothing.
 func (q *Deque[T]) RIter() iter.Seq[T] {
 	return func(yield func(T) bool) {
+		if q.Len() == 0 {
+			return
+		}
 		origHead := q.head
 		origTail := q.tail
+		origCount := q.count
 		tail := origTail
-		for range q.Len() {
-			if q.head != origHead || q.tail != origTail {
+		for range origCount {
+			if q.head != origHead || q.tail != origTail || q.count != origCount {
 				panic("deque: modified during iteration")
 			}
 			tail = q.prev(tail)
@@ -277,7 +297,7 @@ func (q *Deque[T]) Clear() {
 // another allocation. If n is negative, Grow panics.
 func (q *Deque[T]) Grow(n int) {
 	if n < 0 {
-		panic("deque.Grow: negative count")
+		panic("deque: cannot grow with negative count")
 	}
 	c := q.Cap()
 	l := q.Len()
@@ -287,13 +307,18 @@ func (q *Deque[T]) Grow(n int) {
 	}
 
 	if c == 0 {
-		c = minCapacity
+		// First allocation must honor the base capacity, as growIfFull does.
+		if q.minCap == 0 {
+			q.minCap = minCapacity
+		}
+		c = q.minCap
 	}
 
 	newLen := l + n
-	for c < newLen {
-		c <<= 1
+	if newLen < l {
+		panic("deque: capacity out of range")
 	}
+	c = nextPower2(c, newLen)
 	if l == 0 {
 		q.buf = make([]T, c)
 		q.head = 0
@@ -316,6 +341,9 @@ func (q *Deque[T]) Grow(n int) {
 //		b.PushBack(a.At(i))
 //	}
 func (q *Deque[T]) Copy(src Deque[T]) int {
+	if unsafe.SliceData(q.buf) == unsafe.SliceData(src.buf) {
+		return q.Len()
+	}
 	q.Clear()
 	q.Grow(src.Len())
 	n := src.CopyOutSlice(q.buf)
@@ -334,7 +362,7 @@ func (q *Deque[T]) Copy(src Deque[T]) int {
 // is an efficient shortcut for
 //
 //	for i := 0; i < q.Len(); i++ {
-//		x = append(out, q.At(i))
+//		out = append(out, q.At(i))
 //	}
 func (q *Deque[T]) AppendToSlice(out []T) []T {
 	if q.count == 0 {
@@ -368,12 +396,13 @@ func (q *Deque[T]) CopyInSlice(in []T) {
 	if len(q.buf) < len(in) {
 		newCap := len(q.buf)
 		if newCap == 0 {
-			newCap = minCapacity
-			q.minCap = minCapacity
+			// First allocation must honor the base capacity, as growIfFull does.
+			if q.minCap == 0 {
+				q.minCap = minCapacity
+			}
+			newCap = q.minCap
 		}
-		for newCap < len(in) {
-			newCap <<= 1
-		}
+		newCap = nextPower2(newCap, len(in))
 		q.buf = make([]T, newCap)
 	} else if len(q.buf) > len(in) {
 		q.Clear()
@@ -504,12 +533,12 @@ func (q *Deque[T]) RIndex(f func(T) bool) int {
 // Insert is used to insert an element into the middle of the queue, before the
 // element at the specified index. Insert(0,e) is the same as PushFront(e) and
 // Insert(Len(),e) is the same as PushBack(e). Out of range indexes result in
-// pushing the item onto the front of back of the deque.
+// pushing the item onto the front or back of the deque.
 //
 // Important: Deque is optimized for O(1) operations at the ends of the queue,
-// not for operations in the the middle. Complexity of this function is
-// constant plus linear in the lesser of the distances between the index and
-// either of the ends of the queue.
+// not for operations in the middle. Complexity of this function is constant
+// plus linear in the lesser of the distances between the index and either of
+// the ends of the queue.
 func (q *Deque[T]) Insert(at int, item T) {
 	if at <= 0 {
 		q.PushFront(item)
@@ -545,9 +574,9 @@ func (q *Deque[T]) Insert(at int, item T) {
 // index is out of range.
 //
 // Important: Deque is optimized for O(1) operations at the ends of the queue,
-// not for operations in the the middle. Complexity of this function is
-// constant plus linear in the lesser of the distances between the index and
-// either of the ends of the queue.
+// not for operations in the middle. Complexity of this function is constant
+// plus linear in the lesser of the distances between the index and either of
+// the ends of the queue.
 func (q *Deque[T]) Remove(at int) T {
 	q.checkRange(at)
 	rm := (q.head + at) & (len(q.buf) - 1)
@@ -571,11 +600,7 @@ func (q *Deque[T]) Remove(at int) T {
 // SetBaseCap sets a base capacity so that at least the specified number of
 // items can always be stored without resizing.
 func (q *Deque[T]) SetBaseCap(baseCap int) {
-	minCap := minCapacity
-	for minCap < baseCap {
-		minCap <<= 1
-	}
-	q.minCap = minCap
+	q.minCap = nextPower2(minCapacity, baseCap)
 }
 
 // Swap exchanges the two values at idxA and idxB. It panics if either index is
@@ -596,6 +621,19 @@ func (q *Deque[T]) checkRange(i int) {
 	if i < 0 || i >= q.count {
 		panic(fmt.Sprintf("deque: index out of range %d with length %d", i, q.Len()))
 	}
+}
+
+func nextPower2(c, n int) int {
+	// maxPower2 is the maximum power of two that a buffer size can grow to.
+	const maxPower2 = 1 << (bits.UintSize - 2)
+
+	if n > maxPower2 {
+		panic("deque: capacity out of range")
+	}
+	for c < n {
+		c <<= 1
+	}
+	return c
 }
 
 // prev returns the previous buffer position wrapping around buffer.
@@ -623,7 +661,7 @@ func (q *Deque[T]) growIfFull() {
 	q.resize(q.count << 1)
 }
 
-// shrinkIfExcess resize down if the buffer 1/4 full.
+// shrinkIfExcess resizes down if the buffer is 1/4 full.
 func (q *Deque[T]) shrinkIfExcess() {
 	if len(q.buf) > q.minCap && (q.count<<2) == len(q.buf) {
 		q.resize(q.count << 1)
@@ -647,9 +685,9 @@ func (q *Deque[T]) shrinkToFit() {
 	}
 }
 
-// resize resizes the deque to fit exactly twice its current contents. This is
-// used to grow the queue when it is full, and also to shrink it when it is
-// only a quarter full.
+// resize resizes the deque to have the specified capacity, copying the
+// contends from the old buffer to the new buffer.. This is used to grow the
+// queue when it is full, and also to shrink it when it is one a quarter full.
 func (q *Deque[T]) resize(newSize int) {
 	newBuf := make([]T, newSize)
 	if q.tail > q.head {

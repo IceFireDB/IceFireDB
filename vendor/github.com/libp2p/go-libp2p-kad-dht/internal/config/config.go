@@ -28,6 +28,10 @@ const DefaultPrefix protocol.ID = amino.ProtocolPrefix
 // ModeOpt describes what mode the dht should operate in
 type ModeOpt int
 
+// BootstrapOrderOpt selects which peers the DHT dials first when its routing
+// table is empty.
+type BootstrapOrderOpt int
+
 // QueryFilterFunc is a filter applied when considering peers to dial when querying
 type QueryFilterFunc func(dht any, ai peer.AddrInfo) bool
 
@@ -37,19 +41,26 @@ type RouteTableFilterFunc func(dht any, p peer.ID) bool
 
 // Config is a structure containing all the options that can be used when constructing a DHT.
 type Config struct {
-	Datastore              ds.Batching
-	Validator              record.Validator
-	ValidatorChanged       bool // if true implies that the validator has been changed and that Defaults should not be used
-	Mode                   ModeOpt
-	ProtocolPrefix         protocol.ID
-	V1ProtocolOverride     protocol.ID
-	BucketSize             int
-	Concurrency            int
-	Resiliency             int
-	MaxRecordAge           time.Duration
-	EnableProviders        bool
-	EnableValues           bool
-	ProviderStore          records.ProviderStore
+	Datastore           ds.Batching
+	Validator           record.Validator
+	ValidatorChanged    bool // if true implies that the validator has been changed and that Defaults should not be used
+	Mode                ModeOpt
+	ProtocolPrefix      protocol.ID
+	V1ProtocolOverride  protocol.ID
+	BucketSize          int
+	Concurrency         int
+	Resiliency          int
+	MaxRecordAge        time.Duration
+	ValueGCInterval     time.Duration
+	EnableProviders     bool
+	EnableValues        bool
+	ProviderManagerOpts []records.Option
+	// ValueDatastore and ProviderDatastore optionally give the value store and
+	// the provider store their own physical datastore. When nil, each falls back
+	// to Datastore. Record keys are namespaced by a per-record-type prefix, so a
+	// shared Datastore stays collision-free.
+	ValueDatastore         ds.Batching
+	ProviderDatastore      ds.Batching
 	QueryPeerFilter        QueryFilterFunc
 	LookupCheckConcurrency int
 	MsgSenderBuilder       func(h host.Host, protos []protocol.ID) pb.MessageSenderWithDisconnect
@@ -62,9 +73,13 @@ type Config struct {
 		CheckInterval       time.Duration
 		PeerFilter          RouteTableFilterFunc
 		DiversityFilter     peerdiversity.PeerIPGroupFilter
+		// PersistInterval is how often the routing table is saved to the
+		// Datastore; zero disables saving and seeding from saved peers.
+		PersistInterval time.Duration
 	}
 
 	BootstrapPeers func() []peer.AddrInfo
+	BootstrapOrder BootstrapOrderOpt
 	AddressFilter  func([]ma.Multiaddr) []ma.Multiaddr
 	OnRequestHook  func(ctx context.Context, s network.Stream, req *pb.Message)
 
@@ -78,6 +93,24 @@ type Config struct {
 
 func EmptyQueryFilter(_ any, ai peer.AddrInfo) bool { return true }
 func EmptyRTFilter(_ any, p peer.ID) bool           { return true }
+
+// ValueDS returns the datastore backing the value store: the ValueDatastore
+// override when set, else the shared Datastore.
+func (c *Config) ValueDS() ds.Batching {
+	if c.ValueDatastore != nil {
+		return c.ValueDatastore
+	}
+	return c.Datastore
+}
+
+// ProviderDS returns the datastore backing the provider store: the
+// ProviderDatastore override when set, else the shared Datastore.
+func (c *Config) ProviderDS() ds.Batching {
+	if c.ProviderDatastore != nil {
+		return c.ProviderDatastore
+	}
+	return c.Datastore
+}
 
 // Apply applies the given options to this Option
 func (c *Config) Apply(opts ...Option) error {
@@ -127,8 +160,10 @@ var Defaults = func(o *Config) error {
 	o.RoutingTable.RefreshInterval = 10 * time.Minute
 	o.RoutingTable.AutoRefresh = true
 	o.RoutingTable.PeerFilter = EmptyRTFilter
+	o.RoutingTable.PersistInterval = time.Hour
 
-	o.MaxRecordAge = records.ProvideValidity
+	o.MaxRecordAge = amino.DefaultMaxRecordAge
+	o.ValueGCInterval = amino.DefaultValueGCInterval
 
 	o.BucketSize = amino.DefaultBucketSize
 	o.Concurrency = amino.DefaultConcurrency

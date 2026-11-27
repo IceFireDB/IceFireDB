@@ -82,7 +82,7 @@ func (pm *ProtocolMessenger) PutValue(ctx context.Context, p peer.ID, rec *recpb
 		return err
 	}
 
-	if !bytes.Equal(rpmes.GetRecord().Value, pmes.GetRecord().Value) {
+	if !bytes.Equal(rpmes.GetRecord().GetValue(), pmes.GetRecord().Value) {
 		const errStr = "value not put correctly"
 		logger.Infow(errStr, "put-message", pmes, "get-message", rpmes)
 		return errors.New(errStr)
@@ -254,8 +254,8 @@ func (pm *ProtocolMessenger) Ping(ctx context.Context, p peer.ID) (err error) {
 	if err != nil {
 		return fmt.Errorf("sending request: %w", err)
 	}
-	if resp.Type != Message_PING {
-		return fmt.Errorf("got unexpected response type: %v", resp.Type)
+	if resp.GetType() != Message_PING {
+		return fmt.Errorf("got unexpected response type: %v", resp.GetType())
 	}
 	return nil
 }
