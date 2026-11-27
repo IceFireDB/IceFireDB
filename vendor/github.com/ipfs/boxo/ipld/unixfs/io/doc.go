@@ -37,5 +37,20 @@
 //   - [UnixFS_v0_2015]: Legacy CIDv0 settings (256 KiB chunks, dag-pb leaves)
 //   - [UnixFS_v1_2025]: Modern CIDv1 settings (1 MiB chunks, raw leaves)
 //
-// See https://specs.ipfs.tech/ipips/ipip-0499/ for specification details.
+// Both pin the canonical links-first dag-pb field order. Writers that need
+// the streaming-friendly Data-first order can opt in via the low-level
+// [UnixFSProfile.PBNodeFieldOrder] knob (IPIP-550); no named profile
+// selects it, and enabling it changes CIDs.
+//
+// See https://specs.ipfs.tech/ipips/ipip-0499/ and
+// https://github.com/ipfs/specs/pull/550 for specification details.
+//
+// # Global Settings
+//
+// [UnixFSProfile.ApplyGlobals] writes a profile into package-level variables
+// ([HAMTShardingSize], [HAMTSizeEstimation], [DefaultShardWidth],
+// chunk.DefaultBlockSize, helpers.DefaultLinksPerBlock and
+// merkledag.DefaultPBNodeFieldOrder). They are read on every import without
+// synchronization, so apply a profile once at startup, before the first
+// import, and do not change these variables while the process runs.
 package io

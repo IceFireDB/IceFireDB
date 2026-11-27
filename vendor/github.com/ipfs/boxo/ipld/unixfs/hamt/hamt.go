@@ -176,6 +176,12 @@ func NewHamtFromDag(dserv ipld.DAGService, nd ipld.Node) (*Shard, error) {
 		return nil, err
 	}
 
+	// A bitmap wider than the fanout would address children the shard cannot
+	// hold, and makeChilder copies it in without room to spare.
+	if len(fsn.Data()) > len(ds.childer.bitfield) {
+		return nil, fmt.Errorf("hamt bitfield of %d bytes exceeds fanout of %d", len(fsn.Data()), size)
+	}
+
 	ds.childer.makeChilder(fsn.Data(), pbnd.Links())
 
 	ds.hashFunc = fsn.HashType()

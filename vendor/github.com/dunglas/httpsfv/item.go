@@ -39,7 +39,7 @@ func (i Item) marshalSFV(b *strings.Builder) error {
 // https://httpwg.org/specs/rfc9651.html#parse-item.
 func UnmarshalItem(v []string) (Item, error) {
 	s := &scanner{
-		data: strings.Join(v, ","),
+		data: strings.Join(v, ", "),
 	}
 
 	s.scanWhileSp()

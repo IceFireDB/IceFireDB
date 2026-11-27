@@ -1,11 +1,12 @@
-# Get relative paths of all "main" packages
-MAIN_PACKAGE ?= $(shell go list -f '{{if (eq .Name "main")}}.{{slice .ImportPath (len .Module.Path)}}{{end}}' ./...)
-
 TEST_PACKAGE ?= ./...
 
 .PHONY: build
 build:
-	go build -gcflags '-e' ./...
+	@if [ -n "$$(go list -f '{{if (eq .Name "main")}}{{.ImportPath}}{{end}}' ./...)" ] ; then \
+	  ( set -x ; go build -o _build/ -gcflags '-e' ./... ) ; \
+	else \
+	  ( set -x ; go build -gcflags '-e' ./... ) ; \
+	fi
 
 .PHONY: test
 test:
@@ -42,7 +43,8 @@ staticcheck:
 
 .PHONY: clean
 clean:
-	go clean
+	go clean ./...
+	rm -rf _build/
 	rm -f tags
 	rm -f tmp/_cover.out tmp/cover.html
 
@@ -54,21 +56,5 @@ upgradable:
 upgradable-all:
 	@go list -m -u -f '{{if .Update}}{{.Path}} {{.Version}} [{{.Update.Version}}]{{end}}' all
 
-# Build all "main" packages
-.PHONY: main-build
-main-build:
-	@for d in $(MAIN_PACKAGE) ; do \
-	  echo "cd $$d && go build -gcflags '-e'" ; \
-	  ( cd $$d && go build -gcflags '-e' ) ; \
-	done
-
-# Clean all "main" packages
-.PHONY: main-clean
-main-clean:
-	@for d in $(MAIN_PACKAGE) ; do \
-	  echo "cd $$d && go clean" ; \
-	  ( cd $$d && go clean ) ; \
-	done
-
 # based on: github.com/koron-go/_skeleton/Makefile
-# $Hash:93a5966a0297543bcdd82a4dd9c2d60232a1b02c49cfa0b4341fdb71$
+# $Hash:5740dbd08ad1f0dabc56331f39d2b32d2512dfcd36d26344add2c78e$

@@ -42,7 +42,7 @@ func (mach *unmarshalMachineWildcard) Step(driver *Unmarshaller, slab *unmarshal
 func (mach *unmarshalMachineWildcard) prepareDemux(driver *Unmarshaller, slab *unmarshalSlab, tok *Token) (done bool, err error) {
 	// If a "tag" is set in the token, we try to follow that as a hint for
 	//  any specifically customized behaviors for how this should be unmarshalled.
-	if tok.Tagged == true {
+	if tok.Tagged {
 		atlasEntry, exists := slab.atlas.GetEntryByTag(tok.Tag)
 		if !exists {
 			return true, fmt.Errorf("missing an unmarshaller for tag %v", tok.Tag)

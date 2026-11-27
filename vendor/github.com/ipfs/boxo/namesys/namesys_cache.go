@@ -31,8 +31,14 @@ func (ns *namesys) cacheGet(name string) (path.Path, time.Duration, time.Time, b
 		return nil, 0, time.Now(), false
 	}
 
-	if time.Now().Before(entry.cacheEOL) {
-		return entry.val, entry.ttl, entry.lastMod, true
+	// The TTL of a cache hit is the entry's remaining cache lifetime, capped
+	// to the entry TTL: it starts at the entry TTL bounded by maxCacheTTL and
+	// shrinks as the entry ages, so a caller (and any Cache-Control max-age
+	// derived from this) never holds the value past the moment this cache
+	// re-resolves it. The clock is read once so a hit racing entry expiry
+	// cannot report a negative TTL.
+	if remaining := time.Until(entry.cacheEOL); remaining > 0 {
+		return entry.val, min(entry.ttl, remaining), entry.lastMod, true
 	}
 
 	// We do not delete the entry from the cache. Removals are handled by the
@@ -61,10 +67,11 @@ func (ns *namesys) cacheSet(name string, val path.Path, ttl time.Duration, lastM
 	}
 
 	// The cache TTL is capped at the configured maxCacheTTL. If not
-	// configured, the entry TTL will always be used.
+	// configured, the entry TTL will always be used. A non-positive cap
+	// disables retention entirely (kubo's offline node passes 0 for this).
 	cacheTTL := ttl
-	if ns.maxCacheTTL != nil && cacheTTL > *ns.maxCacheTTL {
-		cacheTTL = *ns.maxCacheTTL
+	if ns.maxCacheTTL != nil {
+		cacheTTL = min(cacheTTL, max(0, *ns.maxCacheTTL))
 	}
 	cacheEOL := time.Now().Add(cacheTTL)
 
@@ -75,6 +82,18 @@ func (ns *namesys) cacheSet(name string, val path.Path, ttl time.Duration, lastM
 		lastMod:  lastMod,
 		cacheEOL: cacheEOL,
 	})
+}
+
+// capTTL bounds a TTL to the configured maximum cache TTL, so an operator
+// capping cache staleness caps the TTL reported to callers the same way. A
+// non-positive cap only disables the cache (callers such as kubo's offline
+// node pass 0 to mean exactly that) and leaves the reported TTL untouched:
+// the record's validity is a property of the record, not of local caching.
+func (ns *namesys) capTTL(ttl time.Duration) time.Duration {
+	if ns.maxCacheTTL != nil && *ns.maxCacheTTL > 0 && ttl > *ns.maxCacheTTL {
+		return *ns.maxCacheTTL
+	}
+	return ttl
 }
 
 func (ns *namesys) cacheInvalidate(name string) {

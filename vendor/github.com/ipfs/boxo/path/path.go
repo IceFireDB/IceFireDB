@@ -129,6 +129,10 @@ func FromCid(cid cid.Cid) ImmutablePath {
 // The given string is cleaned through [gopath.Clean], but preserving the final
 // trailing slash. This function returns an error when the given string is not
 // a valid content path.
+//
+// NewPath is strict: it accepts only canonical content paths (/ipfs, /ipns,
+// /ipld). To also accept native IPFS URIs such as ipfs://{cid}, use
+// [NewPathFromURI].
 func NewPath(str string) (Path, error) {
 	segments := StringToSegments(str)
 

@@ -100,11 +100,6 @@ func (wf *WebFile) Close() error {
 	return wf.body.Close()
 }
 
-// TODO: implement
-func (wf *WebFile) Seek(offset int64, whence int) (int64, error) {
-	return 0, ErrNotSupported
-}
-
 func (wf *WebFile) Size() (int64, error) {
 	if err := wf.start(); err != nil {
 		return 0, err

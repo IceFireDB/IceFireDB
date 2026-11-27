@@ -2,7 +2,6 @@
 package blake3 // import "lukechampine.com/blake3"
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"hash"
@@ -24,10 +23,17 @@ type Hasher struct {
 
 	// log(n) set of Merkle subtree roots, at most one per height.
 	stack   [64][8]uint32
-	counter uint64 // number of buffers hashed; also serves as a bit vector indicating which stack elems are occupied
+	counter uint64 // number of chunks hashed; also serves as a bit vector indicating which stack elems are occupied
 
-	buf    [guts.ChunkSize]byte
+	// Input is buffered until MaxSIMD chunks can be compressed at once.
+	buf    [guts.MaxSIMD * guts.ChunkSize]byte
 	buflen int
+
+	// If the input so far ends on a buffer boundary, last is the root node of
+	// its final buffer, which is not merged into the stack until more input
+	// arrives: if it is the end of the input, it is merged differently.
+	last     guts.Node
+	haveLast bool
 }
 
 func (h *Hasher) hasSubtreeAtHeight(i int) bool {
@@ -48,7 +54,14 @@ func (h *Hasher) pushSubtree(cv [8]uint32, height int) {
 // rootNode computes the root of the Merkle tree. It does not modify the
 // stack.
 func (h *Hasher) rootNode() guts.Node {
-	n := guts.CompressChunk(h.buf[:h.buflen], &h.key, h.counter, h.flags)
+	if h.haveLast {
+		return h.finalize(h.last)
+	}
+	return h.finalize(guts.CompressBuffer(&h.buf, h.buflen, &h.key, h.counter, h.flags))
+}
+
+// finalize merges n, the root of the final subtree, with the stack.
+func (h *Hasher) finalize(n guts.Node) guts.Node {
 	for i := bits.TrailingZeros64(h.counter); i < bits.Len64(h.counter); i++ {
 		if h.hasSubtreeAtHeight(i) {
 			n = guts.ParentNode(h.stack[i], guts.ChainingValue(n), &h.key, h.flags)
@@ -58,51 +71,91 @@ func (h *Hasher) rootNode() guts.Node {
 	return n
 }
 
+// compressBuffers compresses the full buffers in p, and pushes the chaining
+// value of each eigentree they form onto the stack.
+func (h *Hasher) compressBuffers(p []byte) {
+	numBufs := len(p) / len(h.buf)
+	// NOTE: a few buffers are compressed serially, so their chaining values
+	// can live on the stack; more than that are compressed in parallel, which
+	// requires allocating.
+	var few [3][8]uint32
+	if numBufs <= len(few) {
+		for i := range few[:numBufs] {
+			buf := (*[len(h.buf)]byte)(p[i*len(h.buf):])
+			few[i] = guts.ChainingValue(guts.CompressBuffer(buf, len(buf), &h.key, h.counter+uint64(i)*guts.MaxSIMD, h.flags))
+		}
+		h.pushEigentrees(few[:numBufs])
+	} else {
+		cvs := make([][8]uint32, numBufs)
+		guts.CompressBuffers(cvs, p, &h.key, h.counter, h.flags)
+		h.pushEigentrees(cvs)
+	}
+}
+
+// pushEigentrees merges the chaining values of consecutive buffers into
+// eigentrees, and pushes each one onto the stack. It overwrites cvs.
+func (h *Hasher) pushEigentrees(cvs [][8]uint32) {
+	const bufHeight = 4 // log2(guts.MaxSIMD)
+	var trees [64]int
+	for _, height := range guts.Eigentrees(trees[:0], h.counter, uint64(len(cvs))*guts.MaxSIMD) {
+		tree := cvs[:1<<(height-bufHeight)]
+		cv := tree[0]
+		if len(tree) > 1 {
+			cv = guts.ChainingValue(guts.MergeEigentree(tree, &h.key, h.flags))
+		}
+		h.pushSubtree(cv, height)
+		cvs = cvs[len(tree):]
+	}
+}
+
 // Write implements hash.Hash.
 func (h *Hasher) Write(p []byte) (int, error) {
+	const bufHeight = 4 // log2(guts.MaxSIMD)
 	lenp := len(p)
+	if lenp == 0 {
+		return 0, nil
+	}
 
-	// align to chunk boundary
+	// more input has arrived, so the last buffer was not the final one
+	if h.haveLast {
+		h.pushSubtree(guts.ChainingValue(h.last), bufHeight)
+		h.haveLast = false
+	}
+
+	// fill the buffer, if it is partially full
 	if h.buflen > 0 {
 		n := copy(h.buf[h.buflen:], p)
 		h.buflen += n
 		p = p[n:]
-	}
-	if h.buflen == len(h.buf) && len(p) > 0 {
-		n := guts.CompressChunk(h.buf[:], &h.key, h.counter, h.flags)
-		h.pushSubtree(guts.ChainingValue(n), 0)
+		if h.buflen < len(h.buf) {
+			return lenp, nil
+		}
+		node := guts.CompressBuffer(&h.buf, h.buflen, &h.key, h.counter, h.flags)
 		h.buflen = 0
+		if len(p) == 0 {
+			h.last, h.haveLast = node, true
+			return lenp, nil
+		}
+		h.pushSubtree(guts.ChainingValue(node), bufHeight)
 	}
 
-	// process full chunks
-	if len(p) > len(h.buf) {
-		rem := len(p) % len(h.buf)
-		if rem == 0 {
-			rem = len(h.buf) // don't prematurely compress
+	// compress full buffers directly from p
+	if len(p) >= len(h.buf) {
+		full := p[:len(p)-len(p)%len(h.buf)]
+		p = p[len(full):]
+		if len(p) == 0 {
+			// p ends on a buffer boundary
+			final := (*[len(h.buf)]byte)(full[len(full)-len(h.buf):])
+			h.compressBuffers(full[:len(full)-len(h.buf)])
+			h.last = guts.CompressBuffer(final, len(final), &h.key, h.counter, h.flags)
+			h.haveLast = true
+			return lenp, nil
 		}
-		eigenbuf := bytes.NewBuffer(p[:len(p)-rem])
-		trees := guts.Eigentrees(h.counter, uint64(eigenbuf.Len()/guts.ChunkSize))
-		cvs := make([][8]uint32, len(trees))
-		counter := h.counter
-		var wg sync.WaitGroup
-		for i, height := range trees {
-			wg.Add(1)
-			go func(i int, buf []byte, counter uint64) {
-				defer wg.Done()
-				cvs[i] = guts.ChainingValue(guts.CompressEigentree(buf, &h.key, counter, h.flags))
-			}(i, eigenbuf.Next((1<<height)*guts.ChunkSize), counter)
-			counter += 1 << height
-		}
-		wg.Wait()
-		for i, height := range trees {
-			h.pushSubtree(cvs[i], height)
-		}
-		p = p[len(p)-rem:]
+		h.compressBuffers(full)
 	}
 
-	// buffer remaining partial chunk
-	n := copy(h.buf[h.buflen:], p)
-	h.buflen += n
+	// buffer the remainder
+	h.buflen = copy(h.buf[:], p)
 
 	return lenp, nil
 }
@@ -133,6 +186,7 @@ func (h *Hasher) Sum(b []byte) (sum []byte) {
 func (h *Hasher) Reset() {
 	h.counter = 0
 	h.buflen = 0
+	h.haveLast = false
 }
 
 // BlockSize implements hash.Hash.
@@ -169,12 +223,28 @@ func New(size int, key []byte) *Hasher {
 	return newHasher(keyWords, guts.FlagKeyedHash, size)
 }
 
-// Sum256 and Sum512 always use the same hasher state, so we can save some time
-// when hashing small inputs by constructing the hasher ahead of time.
-var defaultHasher = New(64, nil)
+// Hashers are large, so Sum256 and Sum512 reuse them.
+var hasherPool = sync.Pool{
+	New: func() any { return New(64, nil) },
+}
+
+// sumBlock returns the output of the root node of an input no longer than a
+// block.
+//
+// NOTE: this is written to avoid copying, since at this size even a few
+// copies are a measurable fraction of the total.
+func sumBlock(b []byte) (words [16]uint32) {
+	block := guts.PadBlock(b)
+	guts.Compress(&words, &guts.IV, &block, 0, uint32(len(b)), guts.FlagChunkStart|guts.FlagChunkEnd|guts.FlagRoot)
+	return
+}
 
 // Sum256 returns the unkeyed BLAKE3 hash of b, truncated to 256 bits.
 func Sum256(b []byte) (out [32]byte) {
+	if len(b) <= guts.BlockSize {
+		out512 := guts.WordsToBytes(sumBlock(b))
+		return [32]byte(out512[:32])
+	}
 	out512 := Sum512(b)
 	copy(out[:], out512[:])
 	return
@@ -184,21 +254,20 @@ func Sum256(b []byte) (out [32]byte) {
 func Sum512(b []byte) (out [64]byte) {
 	var n guts.Node
 	if len(b) <= guts.BlockSize {
-		var block [64]byte
-		copy(block[:], b)
-		return guts.WordsToBytes(guts.CompressNode(guts.Node{
-			CV:       guts.IV,
-			Block:    guts.BytesToWords(block),
-			BlockLen: uint32(len(b)),
-			Flags:    guts.FlagChunkStart | guts.FlagChunkEnd | guts.FlagRoot,
-		}))
-	} else if len(b) <= guts.ChunkSize {
-		n = guts.CompressChunk(b, &guts.IV, 0, 0)
+		return guts.WordsToBytes(sumBlock(b))
+	} else if len(b) <= guts.MaxSIMD*guts.ChunkSize {
+		n = guts.CompressSlice(b, &guts.IV, 0, 0)
 		n.Flags |= guts.FlagRoot
 	} else {
-		h := *defaultHasher
-		h.Write(b)
-		n = h.rootNode()
+		// compress everything but the final buffer, then compress that
+		// buffer in place, rather than copying it into the Hasher
+		const bufsize = guts.MaxSIMD * guts.ChunkSize
+		final := (len(b) - 1) / bufsize * bufsize
+		h := hasherPool.Get().(*Hasher)
+		h.Reset()
+		h.compressBuffers(b[:final])
+		n = h.finalize(guts.CompressSlice(b[final:], &h.key, h.counter, h.flags))
+		hasherPool.Put(h)
 	}
 	return guts.WordsToBytes(guts.CompressNode(n))
 }

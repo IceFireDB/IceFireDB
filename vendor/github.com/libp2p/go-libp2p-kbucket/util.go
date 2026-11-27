@@ -1,6 +1,7 @@
 package kbucket
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -26,10 +27,10 @@ const PeerIDPreimageMaxCpl uint = 15
 // peer.ID or a util.Key. This unifies the keyspace
 type ID []byte
 
-func (id ID) less(other ID) bool {
-	a := ks.Key{Space: ks.XORKeySpace, Bytes: id}
-	b := ks.Key{Space: ks.XORKeySpace, Bytes: other}
-	return a.Less(b)
+// compare compares two IDs in the XOR keyspace, where the distance ordering is
+// the lexicographic ordering of the raw bytes.
+func (id ID) compare(other ID) int {
+	return bytes.Compare(id, other)
 }
 
 func Xor(a, b ID) ID {
@@ -60,7 +61,7 @@ func Closer(a, b peer.ID, key string) bool {
 	adist := Xor(aid, tgt)
 	bdist := Xor(bid, tgt)
 
-	return adist.less(bdist)
+	return adist.compare(bdist) < 0
 }
 
 // GenRandPeerID generates a random peerID sharing a common prefix of length

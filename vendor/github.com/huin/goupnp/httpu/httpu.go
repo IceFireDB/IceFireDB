@@ -69,13 +69,20 @@ func NewHTTPUClient() (*HTTPUClient, error) {
 }
 
 // NewHTTPUClientAddr creates a new HTTPUClient which will broadcast packets
-// from the specified address, opening up a new UDP socket for the purpose
+// from the specified address, opening up a new UDP socket for the purpose on a random port
 func NewHTTPUClientAddr(addr string) (*HTTPUClient, error) {
 	ip := net.ParseIP(addr)
 	if ip == nil {
 		return nil, errors.New("Invalid listening address")
 	}
-	conn, err := net.ListenPacket("udp", ip.String()+":0")
+
+	return NewHTTPUClientAddrWithPort(ip.String() + ":0")
+}
+
+// NewHTTPUClientAddrWithPort creates a new HTTPUClient which will broadcast packets
+// from the specified address, opening up a new UDP socket for the purpose on a specific port
+func NewHTTPUClientAddrWithPort(addr string) (*HTTPUClient, error) {
+	conn, err := net.ListenPacket("udp", addr)
 	if err != nil {
 		return nil, err
 	}
@@ -146,17 +153,22 @@ func (httpu *HTTPUClient) DoWithContext(
 
 	// Handle context deadline/timeout
 	ctx := req.Context()
-	deadline, ok := ctx.Deadline()
-	if ok {
-		if err = httpu.conn.SetDeadline(deadline); err != nil {
-			return nil, err
-		}
+	deadline, _ := ctx.Deadline()
+	// A zero deadline clears any deadline left by a previous request.
+	if err = httpu.conn.SetDeadline(deadline); err != nil {
+		return nil, err
 	}
 
 	// Handle context cancelation
 	done := make(chan struct{})
-	defer close(done)
+	stopped := make(chan struct{})
+	defer func() {
+		close(done)
+		// Finish cancellation before another request can acquire connLock.
+		<-stopped
+	}()
 	go func() {
+		defer close(stopped)
 		select {
 		case <-ctx.Done():
 			// if context is cancelled, stop any connections by setting time in the past.

@@ -37,7 +37,7 @@ func httpuClient() (httpu.ClientInterfaceCtx, func(), error) {
 	return httpu.NewMultiClientCtx(delegates), closer, nil
 }
 
-// localIPv2MCastAddrs returns the set of IPv4 addresses on multicast-able
+// localIPv4MCastAddrs returns the set of IPv4 addresses on multicast-able
 // network interfaces.
 func localIPv4MCastAddrs() ([]string, error) {
 	ifaces, err := net.Interfaces()

@@ -39,9 +39,7 @@ func (dht *IpfsDHT) startNetworkSubscriber() error {
 		return fmt.Errorf("dht could not subscribe to eventbus events: %w", err)
 	}
 
-	dht.wg.Add(1)
-	go func() {
-		defer dht.wg.Done()
+	dht.wg.Go(func() {
 		defer subs.Close()
 
 		for {
@@ -59,7 +57,7 @@ func (dht *IpfsDHT) startNetworkSubscriber() error {
 					// to our closet peers & so in the true spirit of Zen, searching for ourself in the network really is the best way
 					// to to forge connections with those matter.
 					if dht.autoRefresh || dht.testAddressUpdateProcessing {
-						dht.rtRefreshManager.RefreshNoWait()
+						dht.requestRefresh()
 					}
 				case event.EvtPeerProtocolsUpdated:
 					handlePeerChangeEvent(dht, evt.Peer)
@@ -84,7 +82,7 @@ func (dht *IpfsDHT) startNetworkSubscriber() error {
 				return
 			}
 		}
-	}()
+	})
 
 	return nil
 }

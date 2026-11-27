@@ -36,7 +36,7 @@ func (l List) marshalSFV(b *strings.Builder) error {
 // https://httpwg.org/specs/rfc9651.html#parse-list.
 func UnmarshalList(v []string) (List, error) {
 	s := &scanner{
-		data: strings.Join(v, ","),
+		data: strings.Join(v, ", "),
 	}
 
 	s.scanWhileSp()

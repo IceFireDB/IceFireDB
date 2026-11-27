@@ -1,5 +1,8 @@
-*.exe
 *~
+_build/
 default.pgo
 tags
 tmp/
+
+# based on: github.com/koron-go/_skeleton/.gitignore
+# $Hash:5a3c17c5622fdc625b42fe51022e3652e31c8b4bbdc0143ba4efdfd3$

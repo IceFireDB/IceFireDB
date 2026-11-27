@@ -51,7 +51,7 @@ func (srv *Server) ListenAndServe() error {
 
 	var addr *net.UDPAddr
 	if addr, err = net.ResolveUDPAddr("udp", srv.Addr); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	var conn net.PacketConn

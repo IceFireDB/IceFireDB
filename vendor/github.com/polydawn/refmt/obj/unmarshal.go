@@ -8,14 +8,14 @@ import (
 )
 
 /*
-	Allocates the machinery for treating an in-memory object like a `TokenSink`.
-	This machinery will walk over values,	using received tokens to fill in
-	fields as it visits them.
+Allocates the machinery for treating an in-memory object like a `TokenSink`.
+This machinery will walk over values,	using received tokens to fill in
+fields as it visits them.
 
-	Initialization must be finished by calling `Bind` to set the value to visit;
-	after this, the `Step` function is ready to be pumped.
-	Subsequent calls to `Bind` do a full reset, leaving `Step` ready to call
-	again and making all of the machinery reusable without re-allocating.
+Initialization must be finished by calling `Bind` to set the value to visit;
+after this, the `Step` function is ready to be pumped.
+Subsequent calls to `Bind` do a full reset, leaving `Step` ready to call
+again and making all of the machinery reusable without re-allocating.
 */
 func NewUnmarshaller(atl atlas.Atlas) *Unmarshaller {
 	d := &Unmarshaller{
@@ -75,20 +75,20 @@ func (d *Unmarshaller) Step(tok *Token) (bool, error) {
 }
 
 /*
-	Starts the process of recursing unmarshalling over value `rv`.
+Starts the process of recursing unmarshalling over value `rv`.
 
-	Caller provides the machine to use (this is an optimization for maps and slices,
-	which already know the machine and keep reusing it for all their entries).
-	This method pushes the first step with `tok` (the upstream tends to have peeked at
-	it in order to decide what to do, but if recursing, it belongs to the next obj),
-	then saves this new machine onto the driver's stack: future calls to step
-	the driver will then continuing stepping the new machine it returns a done status,
-	at which point we'll finally "return" by popping back to the last machine on the stack
-	(which is presumably the same one that just called this Recurse method).
+Caller provides the machine to use (this is an optimization for maps and slices,
+which already know the machine and keep reusing it for all their entries).
+This method pushes the first step with `tok` (the upstream tends to have peeked at
+it in order to decide what to do, but if recursing, it belongs to the next obj),
+then saves this new machine onto the driver's stack: future calls to step
+the driver will then continuing stepping the new machine it returns a done status,
+at which point we'll finally "return" by popping back to the last machine on the stack
+(which is presumably the same one that just called this Recurse method).
 
-	In other words, your UnmarshalMachine calls this when it wants to deal
-	with an object, and by the time we call back to your machine again,
-	that object will be traversed and the stream ready for you to continue.
+In other words, your UnmarshalMachine calls this when it wants to deal
+with an object, and by the time we call back to your machine again,
+that object will be traversed and the stream ready for you to continue.
 */
 func (d *Unmarshaller) Recurse(tok *Token, rv reflect.Value, rt reflect.Type, nextMach UnmarshalMachine) (err error) {
 	//	fmt.Printf(">>> pushing into recursion with %#v\n", nextMach)

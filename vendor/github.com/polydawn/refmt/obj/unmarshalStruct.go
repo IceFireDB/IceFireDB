@@ -97,7 +97,7 @@ func (mach *unmarshalMachineStructAtlas) Step(driver *Unmarshaller, slab *unmars
 			mach.value = true
 			break
 		}
-		if mach.value == false {
+		if !mach.value {
 			// FUTURE: it should be configurable per atlas.StructMap whether this is considered an error or to be tolerated.
 			// Currently we're being extremely strict about it, which is a divergence from the stdlib json behavior.
 			return true, ErrNoSuchField{tok.Str, mach.cfg.Type.String()}

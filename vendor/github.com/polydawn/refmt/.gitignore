@@ -1,2 +1,5 @@
 .gopath/pkg
 .gopath/tmp
+
+# Binary built from cmd/refmt when running `go build` at repo root.
+/refmt

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"slices"
 	"strconv"
@@ -25,15 +24,15 @@ import (
 
 // MessageSender option defaults.
 const (
-	// DefaultMaxRetries specifies how many requests to make to available
-	// HTTP endpoints in case of failure.
+	// DefaultMaxRetries specifies how many requests to make to available HTTP
+	// endpoints in case of failure.
 	DefaultMaxRetries = 1
-	// DefaultSendTimeout specifies sending each individual HTTP
-	// request can take.
+	// DefaultSendTimeout specifies sending each individual HTTP request can
+	// take.
 	DefaultSendTimeout = 5 * time.Second
-	// SendErrorBackoff specifies how long to wait between retries to the
-	// same endpoint after failure. It is overridden by Retry-After
-	// headers and must be at least 50ms.
+	// SendErrorBackoff specifies how long to wait between retries to the same
+	// endpoint after failure. It is overridden by Retry-After headers and must
+	// be at least 50ms.
 	DefaultSendErrorBackoff = time.Second
 )
 
@@ -118,8 +117,8 @@ func (sender *httpMsgSender) sortURLS() []*senderURL {
 
 // bestURL calls sortURLS are returns the first one of the list that is not in
 // the ignore list. The returned senderURL can be nil when no valid URL was
-// found (i.e. there are valid urls but they are also in the ignore list).
-// An error is only returned when all urls have exceeded maxRetries (abort).
+// found (i.e. there are valid urls but they are also in the ignore list). An
+// error is only returned when all urls have exceeded maxRetries (abort).
 func (sender *httpMsgSender) bestURL(ignore []*senderURL) (*senderURL, error) {
 	urls := sender.sortURLS()
 
@@ -158,13 +157,14 @@ const (
 	typeClient senderErrorType = 1
 	// Usually errors that signal issues in the server.
 	typeServer senderErrorType = 2
-	// Usually errors due to cancelled contexts or timeouts.
+	// Usually errors due to canceled contexts or timeouts.
 	typeContext senderErrorType = 3
 	// Errors due to 429 and 503 (retry later)
 	typeRetryLater senderErrorType = 4
 )
 
-// senderError attatches type to a regular error. Implements the Error interface.
+// senderError attaches type to a regular error. Implements the Error
+// interface.
 type senderError struct {
 	Type senderErrorType
 	Err  error
@@ -177,8 +177,8 @@ func (err senderError) Error() string {
 
 // tryURL attempts to make a request to the given URL using the given entry.
 // Blocks, Haves etc. are recorded in the given response. cancellations are
-// processed. tryURL returns an error so that it can be decided what to do next:
-// i.e. retry, or move to next item in wantlist, or abort completely.
+// processed. tryURL returns an error so that it can be decided what to do
+// next: i.e. retry, or move to next item in wantlist, or abort completely.
 func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsmsg.Entry) (blocks.Block, *senderError) {
 	var method string
 
@@ -192,18 +192,27 @@ func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsm
 	}
 
 	if dl := u.cooldown.Load().(time.Time); !dl.IsZero() {
-		err := fmt.Errorf("cooldown (%s): %s %q ", dl, method, u.URL)
-		log.Debug(err)
-		return nil, &senderError{
-			Type: typeRetryLater,
-			Err:  err,
+		if time.Now().Before(dl) {
+			err := fmt.Errorf("cooldown (%s): %s %q ", dl, method, u.URL)
+			log.Debug(err)
+			return nil, &senderError{
+				Type: typeRetryLater,
+				Err:  err,
+			}
 		}
+		// The deadline passed while this sender was alive. Clear the
+		// snapshot and proceed, otherwise a sender created during a
+		// cooldown treats it as permanent. CompareAndSwap, so a fresh
+		// deadline stored by a concurrent worker survives; losing the
+		// swap only lets this one request through, same as any request
+		// already in flight when a cooldown starts.
+		u.cooldown.CompareAndSwap(dl, time.Time{})
 	}
 
-	// We do not abort ongoing requests.  This is known to cause "http2:
-	// server sent GOAWAY and closed the connection" Losing a connection
-	// is worse than downloading some extra bytes.  We do abort if the
-	// context WAS already cancelled before making the request.
+	// We do not abort ongoing requests. This is known to cause "http2: server
+	// sent GOAWAY and closed the connection" Losing a connection is worse than
+	// downloading some extra bytes. We do abort if the context WAS already
+	// canceled before making the request.
 	if err := ctx.Err(); err != nil {
 		log.Debugf("aborted before sending: %s %q", method, u.URL)
 		return nil, &senderError{
@@ -225,17 +234,18 @@ func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsm
 	log.Debugf("%d/%d %s %q", u.serverErrors.Load(), sender.opts.MaxRetries, method, req.URL)
 	atomic.AddUint64(&sender.ht.stats.MessagesSent, 1)
 	sender.ht.metrics.RequestsInFlight.Inc()
+	reqStart := time.Now()
 	resp, err := sender.ht.client.Do(req)
 	if err != nil {
 		err = fmt.Errorf("error making request to %q: %w", req.URL, err)
 		sender.ht.metrics.RequestsFailure.Inc()
 		sender.ht.metrics.RequestsInFlight.Dec()
 		log.Debug(err)
-		// Something prevents us from making a request.  We cannot
-		// dial, or setup the connection perhaps.  This counts as
-		// server error (unless context cancellation).  This means we
-		// allow ourselves to hit this a maximum of MaxRetries per url.
-		// and Disconnect() the peer when no urls work.
+		// Something prevents us from making a request. We cannot dial, or
+		// setup the connection perhaps. This counts as server error (unless
+		// context cancellation). This means we allow ourselves to hit this a
+		// maximum of MaxRetries per url. and Disconnect() the peer when no
+		// urls work.
 		serr := &senderError{
 			Type: typeServer,
 			Err:  err,
@@ -248,6 +258,12 @@ func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsm
 		return nil, serr
 	}
 	defer resp.Body.Close()
+
+	// Time to response headers, comparable to the connect-probe round trip
+	// that seeds the latency estimate. Only recorded below for responses
+	// the server understood, so throttling and server errors cannot skew
+	// the estimate.
+	respLatency := time.Since(reqStart)
 
 	// Record request size
 	var buf bytes.Buffer
@@ -276,15 +292,14 @@ func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsm
 	// special cases in response handling. Happens here to simplify
 	// metrics/handling below.
 	statusCode := resp.StatusCode
-	// 1) Observed that some gateway implementation returns 500 instead of
-	// 404.
+	// 1) Observed that some gateway implementation returns 500 instead of 404.
 	if statusCode != 200 && isKnownNotFoundError(string(body)) {
 		statusCode = 404
 		log.Debugf("treating as 404: %q -> %d: %q", req.URL, resp.StatusCode, string(body))
 	}
 
-	// Calculate full response size with headers and everything.
-	// So this is comparable to bitswap message response sizes.
+	// Calculate full response size with headers and everything. So this is
+	// comparable to bitswap message response sizes.
 	resp.Body = nil
 	var respBuf bytes.Buffer
 	resp.Write(&respBuf)
@@ -292,7 +307,7 @@ func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsm
 
 	sender.ht.metrics.ResponseSizes.Observe(float64(respLen))
 	sender.ht.metrics.RequestsInFlight.Dec()
-	host, _, _ := net.SplitHostPort(u.URL.Host)
+	host := u.URL.Hostname()
 	// updateStatusCounter
 	sender.ht.metrics.updateStatusCounter(req.Method, statusCode, host)
 
@@ -316,6 +331,7 @@ func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsm
 			sender.ht.cooldownTracker.remove(req.URL.Host)
 			u.cooldown.Store(time.Time{})
 		}
+		sender.ht.pinger.recordLatencyIfConnected(sender.peer, respLatency)
 
 		return nil, &senderError{
 			Type: typeClient,
@@ -327,6 +343,7 @@ func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsm
 			sender.ht.cooldownTracker.remove(req.URL.Host)
 			u.cooldown.Store(time.Time{})
 		}
+		sender.ht.pinger.recordLatencyIfConnected(sender.peer, respLatency)
 		log.Debugf("%s %q -> %d (%d bytes)", req.Method, req.URL, statusCode, len(body))
 
 		if req.Method == http.MethodHead {
@@ -336,8 +353,7 @@ func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsm
 		b, err := bsmsg.NewWantlistBlock(body, entry.Cid, entry.Cid.Prefix())
 		if err != nil {
 			log.Debugf("error making wantlist block for %s: %s", entry.Cid, err)
-			// avoid entertaining servers that send us wrong data
-			// too much.
+			// avoid entertaining servers that send us wrong data too much.
 			return nil, &senderError{
 				Type: typeServer,
 				Err:  err,
@@ -350,11 +366,11 @@ func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsm
 		http.StatusServiceUnavailable,
 		http.StatusBadGateway,
 		http.StatusGatewayTimeout:
-		// See path-gateway spec. All these codes SHOULD return
-		// Retry-After. They are used to signal that a block cannot
-		// be fetched too, not only fatal server issues, which poses a
-		// difficult overlap. Current approach treats these errors as
-		// non fatal if they don't happen repeatedly:
+		// See path-gateway spec. All these codes SHOULD return Retry-After.
+		// They are used to signal that a block cannot be fetched too, not only
+		// fatal server issues, which poses a difficult overlap. Current
+		// approach treats these errors as non fatal if they don't happen
+		// repeatedly:
 		// - By default we disconnect on server errors: MaxRetries = 1.
 		// - First try errors. We add default backoff if non specified.
 		// - Retry same CID. If it fails again, count that as server
@@ -362,12 +378,11 @@ func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsm
 		// - If we have no more urls to try, will move to next cid.
 		// - If we hit the MaxRetries for all urls, abort all.
 
-		// In practice, our wantlists should be 1/3 elements. It
-		// doesn't make sense to tolerate 5 server errors for 3
-		// requests as we will repeatedly hit broken servers that way.
-		// It is always better if endpoints keep these errors for
-		// server issues, and simply return 404 when they cannot find
-		// the content but everything else is fine.
+		// In practice, our wantlists should be 1/3 elements. It doesn't make
+		// sense to tolerate 5 server errors for 3 requests as we will
+		// repeatedly hit broken servers that way. It is always better if
+		// endpoints keep these errors for server issues, and simply return 404
+		// when they cannot find the content but everything else is fine.
 		err := fmt.Errorf("%s %q -> %d: %q", req.Method, req.URL, statusCode, string(body))
 		log.Warn(err)
 		retryAfter := resp.Header.Get("Retry-After")
@@ -385,10 +400,9 @@ func (sender *httpMsgSender) tryURL(ctx context.Context, u *senderURL, entry bsm
 			Err:  err,
 		}
 
-	// For any other code, we assume we must temporally
-	// backoff from the URL per the options.
-	// Tolerance for server errors per url is low. If after waiting etc.
-	// it fails MaxRetries, we will fully disconnect.
+	// For any other code, we assume we must temporally backoff from the URL
+	// per the options. Tolerance for server errors per url is low. If after
+	// waiting etc. it fails MaxRetries, we will fully disconnect.
 	default:
 		err := fmt.Errorf("%q -> %d: %q", req.URL, statusCode, string(body))
 		log.Warn(err)
@@ -421,15 +435,14 @@ func isKnownNotFoundError(body string) bool {
 		strings.HasPrefix(body, "failed to load root node")
 }
 
-// SendMsg performs an http request for the wanted cids per the msg's
-// Wantlist. It reads the response and records it in a response BitswapMessage
-// which is forwarded to the receivers (in a separate goroutine).
+// SendMsg performs an http request for the wanted cids per the msg's Wantlist.
+// It reads the response and records it in a response BitswapMessage which is
+// forwarded to the receivers (in a separate goroutine).
 func (sender *httpMsgSender) SendMsg(ctx context.Context, msg bsmsg.BitSwapMessage) error {
-	// SendMsg gets called from MessageQueue and returning an error
-	// results in a MessageQueue shutdown. Errors are only returned when
-	// we are unable to obtain a single valid Block/Has response. When a
-	// URL errors in a bad way (connection, 500s), we continue checking
-	// with the next available one.
+	// SendMsg gets called from MessageQueue and returning an error results in
+	// a MessageQueue shutdown. Errors are only returned when we are unable to
+	// obtain a single valid Block/Has response. When a URL errors in a bad way
+	// (connection, 500s), we continue checking with the next available one.
 
 	// unless we have a wantlist, we bailout.
 	wantlist := msg.Wantlist()
@@ -459,10 +472,10 @@ func (sender *httpMsgSender) SendMsg(ctx context.Context, msg bsmsg.BitSwapMessa
 
 	var err error
 
-	// obtain contexts for all the entries in the wantlits.  This allows
-	// us to react when cancels arrive to wantlists that we are going
-	// through.  We use a Background context because requests will be
-	// ongoing when we return and the parent context is cancelled.
+	// obtain contexts for all the entries in the wantlits. This allows us to
+	// react when cancels arrive to wantlists that we are going through. We use
+	// a Background context because requests will be ongoing when we return and
+	// the parent context is canceled.
 	parentCtx := context.Background()
 	entryCtxs := make([]context.Context, len(wantlist))
 	entryCancels := make([]context.CancelFunc, len(wantlist))
@@ -485,9 +498,8 @@ WANTLIST_LOOP:
 		if entry.Cancel { // shortcut cancel entries.
 			sender.ht.requestTracker.cancelRequest(entry.Cid)
 			sender.ht.metrics.updateStatusCounter("CANCEL", 0, "")
-			// Do not observe request time for cancel requests as
-			// they cost us nothing, so it is unfair to compare
-			// against bsnet requests-time.
+			// Do not observe request time for cancel requests as they cost us
+			// nothing, so it is unfair to compare against bsnet requests-time.
 			// sender.ht.metrics.RequestTime.Observe(float64(time.Since(reqStart))
 			// / float64(time.Second))
 			log.Debugf("wantlist msg %d/%d: %s %s cancel", i, lenWantlist-1, sender.peer, entry.Cid)
@@ -505,7 +517,7 @@ WANTLIST_LOOP:
 
 		select {
 		case <-ctx.Done():
-			// our context cancelled so we must abort.
+			// our context canceled so we must abort.
 			err = ctx.Err()
 			break WANTLIST_LOOP
 		case sender.ht.httpRequests <- reqInfo:
@@ -517,9 +529,8 @@ WANTLIST_LOOP:
 		return nil
 	}
 
-	// We are finished sending. Like bitswap/bsnet, we return.
-	// Receiving results is async and we leave a goroutine taking care of
-	// that.
+	// We are finished sending. Like bitswap/bsnet, we return. Receiving
+	// results is async and we leave a goroutine taking care of that.
 	go func() {
 		bsresp := bsmsg.New(false)
 		totalResponses := 0
@@ -546,8 +557,8 @@ WANTLIST_LOOP:
 					log.Warnf("disconnecting from %s: %s", sender.peer, result.err.Err)
 					sender.ht.DisconnectFrom(ctx, sender.peer)
 					err = result.err
-					// continue processing responses as workers
-					// might have done other requests in parallel
+					// continue processing responses as workers might have done
+					// other requests in parallel
 				case typeClient:
 					totalClientErrors++
 					if entry.SendDontHave {
@@ -559,8 +570,7 @@ WANTLIST_LOOP:
 					panic("unexpected returned error type")
 				}
 			}
-			// Leave loop when we read all what we
-			// expected.
+			// Leave loop when we read all what we expected.
 			totalResponses++
 			if totalResponses >= totalSent {
 				close(resultsCollector)
@@ -585,10 +595,9 @@ WANTLIST_LOOP:
 		sendErrors(err)
 	}()
 
-	// We never return error once we started sending. Whatever happened,
-	// we will be cooling down urls etc. but we don't need to disconnect
-	// or report that "peer is down" for the moment, as we disconnect
-	// manually on error.
+	// We never return error once we started sending. Whatever happened, we
+	// will be cooling down urls etc. but we don't need to disconnect or report
+	// that "peer is down" for the moment, as we disconnect manually on error.
 	return nil
 }
 
@@ -618,8 +627,8 @@ func (sender *httpMsgSender) Reset() error {
 	return nil
 }
 
-// SupportsHave indicates whether the peer answers to HEAD requests.
-// This has been probed during Connect().
+// SupportsHave indicates whether the peer answers to HEAD requests. This has
+// been probed during Connect().
 func (sender *httpMsgSender) SupportsHave() bool {
 	return supportsHave(sender.ht.host.Peerstore(), sender.peer)
 }
@@ -637,8 +646,8 @@ func supportsHave(pstore peerstore.Peerstore, p peer.ID) bool {
 	return haveSupport
 }
 
-// parseRetryAfter returns how many seconds the Retry-After header header
-// wants us to wait.
+// parseRetryAfter returns how many seconds the Retry-After header header wants
+// us to wait.
 func parseRetryAfter(ra string) (time.Time, bool) {
 	if len(ra) == 0 {
 		return time.Time{}, false
@@ -647,6 +656,11 @@ func parseRetryAfter(ra string) (time.Time, bool) {
 	if err != nil {
 		date, err := time.Parse(time.RFC1123, ra)
 		if err != nil {
+			return time.Time{}, false
+		}
+		// A date at or before now (cached response, clock skew) is not
+		// a usable deadline; callers fall back to their own backoff.
+		if !date.After(time.Now()) {
 			return time.Time{}, false
 		}
 		return date, true

@@ -79,6 +79,21 @@ type Config struct {
 	// is being proxied by other service, which wants to use the error message.
 	DisableHTMLErrors bool
 
+	// DeprecatedXIpfsPath configures the gateway to send the legacy
+	// X-Ipfs-Path response header, deprecated by [IPIP-0548]. Disabled by
+	// default: the legacy value cannot represent all UnixFS file names (raw
+	// non-ASCII bytes are mangled per RFC 9110 field-value rules) and it is
+	// superseded by the Ipfs-Uri header, which is sent whenever the content
+	// root can be normalized. Enable only for backward compatibility with
+	// legacy consumers that still expect X-Ipfs-Path. When enabled, pair it
+	// with [Headers.WithDeprecatedXIpfsPath] so the header is also listed in
+	// Access-Control-Expose-Headers. Even when enabled, the header is
+	// omitted for content paths that contain bytes that cannot appear in an
+	// HTTP field value (Section 5.5 of RFC 9110), per [IPIP-0548].
+	//
+	// [IPIP-0548]: https://github.com/ipfs/specs/pull/548
+	DeprecatedXIpfsPath bool
+
 	// PublicGateways configures the behavior of known public gateways. Each key is
 	// a fully qualified domain name (FQDN). To be used with WithHostname.
 	PublicGateways map[string]*PublicGateway
@@ -149,6 +164,31 @@ type Config struct {
 	// This provides protection against CDN/proxy issues with large files
 	// (e.g., Cloudflare's 5GB limit). A value of 0 disables this limit.
 	MaxRangeRequestFileSize int64
+
+	// MaxDeserializedResponseSize is the maximum file or directory DAG size
+	// in bytes for deserialized responses. When set to a value greater than 0,
+	// requests for UnixFS content larger than this limit will return
+	// 410 Gone, directing users to run their own IPFS node for large content.
+	// This applies to both regular and range requests: if the underlying file
+	// exceeds the limit, even a small range is rejected.
+	// No additional block fetches are needed; size is already available from
+	// the request's normal processing of the UnixFS root block.
+	// A value of 0 disables this limit. Only affects deserialized responses;
+	// trustless formats (application/vnd.ipld.raw, application/vnd.ipld.car)
+	// are not affected.
+	MaxDeserializedResponseSize int64
+
+	// MaxUnixFSDAGResponseSize is the maximum UnixFS file or directory DAG
+	// size in bytes, applied to all response formats: deserialized, raw
+	// blocks, CAR, and TAR. When set to a value greater than 0, any request
+	// whose resolved content exceeds this limit will return 410 Gone,
+	// regardless of response format. This allows gateway operators to cap
+	// bandwidth across all response types.
+	// Most handlers reuse the size already available from normal request
+	// processing; the CAR handler performs a lightweight Head call (root
+	// block is then cached for the subsequent CAR traversal).
+	// A value of 0 disables this limit.
+	MaxUnixFSDAGResponseSize int64
 
 	// MaxRequestDuration is the maximum total time a request can take.
 	// Unlike RetrievalTimeout (which resets on each data write and catches

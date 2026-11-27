@@ -13,6 +13,7 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	swarm "github.com/libp2p/go-libp2p/p2p/net/swarm"
+	ma "github.com/multiformats/go-multiaddr"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -48,6 +49,16 @@ type findProviderRequest struct {
 // libp2p.Host
 type ProviderQueryDialer interface {
 	Connect(context.Context, peer.AddrInfo) error
+}
+
+// ProviderQueryPeerRouter is the subset of routing.PeerRouting used by the
+// FindPeer fallback configured with WithFindPeerFallback: when a dial to a
+// provider fails, the manager asks for fresh addresses for that peer and
+// retries the dial once, but only if FindPeer returned at least one
+// address that wasn't already in the routing-record AddrInfo. Typically
+// satisfied by a kademlia DHT client.
+type ProviderQueryPeerRouter interface {
+	FindPeer(context.Context, peer.ID) (peer.AddrInfo, error)
 }
 
 type providerQueryMessage interface {
@@ -90,6 +101,7 @@ type ProviderQueryManager struct {
 	closing                    chan struct{}
 	dialer                     ProviderQueryDialer
 	router                     routing.ContentDiscovery
+	peerRouting                ProviderQueryPeerRouter
 	providerQueryMessages      chan providerQueryMessage
 	providerRequestsProcessing *chanqueue.ChanQueue[*findProviderRequest]
 
@@ -141,6 +153,23 @@ func WithIgnoreProviders(peers ...peer.ID) Option {
 		for _, p := range peers {
 			mgr.ignorePeers[p] = struct{}{}
 		}
+		return nil
+	}
+}
+
+// WithFindPeerFallback enables a one-shot FindPeer fallback: when the first
+// dial to a provider fails, the manager asks the supplied peer router for
+// fresh addresses and retries the dial once, but only if FindPeer returned
+// at least one address that wasn't already in the routing-record AddrInfo
+// just attempted. This rescues providers whose routing-record snapshot is
+// thin or stale but whose actual addresses can still be reached, without
+// wasting a retry when the peer router would only hand back the same set.
+//
+// Pass nil (or omit the option) to disable. Typically wired with a DHT
+// client, e.g. WithFindPeerFallback(myDHT).
+func WithFindPeerFallback(pr ProviderQueryPeerRouter) Option {
+	return func(mgr *ProviderQueryManager) error {
+		mgr.peerRouting = pr
 		return nil
 	}
 }
@@ -392,6 +421,19 @@ func (pqm *ProviderQueryManager) findProviderWorker() {
 					}
 
 					err := pqm.dialer.Connect(findProviderCtx, p)
+					if err != nil && err != swarm.ErrDialToSelf && pqm.peerRouting != nil {
+						// One-shot rescue: ask the peer router for a fresh
+						// AddrInfo and retry once, but only if FindPeer
+						// surfaced at least one address that wasn't in the
+						// routing-record set we just tried. Retrying with
+						// the same addresses would just burn another dial
+						// round for nothing.
+						refreshed, ferr := pqm.peerRouting.FindPeer(findProviderCtx, p.ID)
+						if ferr == nil && hasNewAddrs(refreshed.Addrs, p.Addrs) {
+							span.AddEvent("RetryAfterFindPeer", trace.WithAttributes(attribute.Stringer("peer", p.ID)))
+							err = pqm.dialer.Connect(findProviderCtx, refreshed)
+						}
+					}
 					if err != nil && err != swarm.ErrDialToSelf {
 						span.RecordError(err, trace.WithAttributes(attribute.Stringer("peer", p.ID)))
 						log.Debugf("failed to connect to provider %s: %s", p.ID, err)
@@ -435,6 +477,25 @@ func (pqm *ProviderQueryManager) cleanupInProcessRequests() {
 		}
 		requestStatus.cancelFn()
 	}
+}
+
+// hasNewAddrs reports whether candidate contains at least one multiaddr
+// that isn't already in existing. Used to decide whether a FindPeer
+// fallback returned anything worth retrying a dial with.
+func hasNewAddrs(candidate, existing []ma.Multiaddr) bool {
+	if len(candidate) == 0 {
+		return false
+	}
+	seen := make(map[string]struct{}, len(existing))
+	for _, a := range existing {
+		seen[a.String()] = struct{}{}
+	}
+	for _, a := range candidate {
+		if _, ok := seen[a.String()]; !ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (pqm *ProviderQueryManager) run() {

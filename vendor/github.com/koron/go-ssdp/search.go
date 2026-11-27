@@ -33,7 +33,7 @@ type Service struct {
 	maxAge    *int
 }
 
-var rxMaxAge = regexp.MustCompile(`\bmax-age\s*=\s*(\d+)\b`)
+var rxMaxAge = regexp.MustCompile(`(?i)\bmax-age\s*=\s*(\d+)\b`)
 
 func extractMaxAge(s string, value int) int {
 	if m := rxMaxAge.FindStringSubmatch(s); m != nil {

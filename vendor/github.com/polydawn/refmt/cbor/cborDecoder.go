@@ -46,8 +46,6 @@ func (d *Decoder) Reset() {
 	d.left = d.left[0:0]
 }
 
-type decoderStep func(tokenSlot *Token) (done bool, err error)
-
 func (d *Decoder) Step(tokenSlot *Token) (done bool, err error) {
 	switch d.phase {
 	case decoderPhase_acceptValue:
@@ -225,23 +223,38 @@ func (d *Decoder) stepHelper_acceptValue(majorByte byte, tokenSlot *Token) (done
 		tokenSlot.Bool = true
 		return true, nil
 	case cborSigilFloat16, cborSigilFloat32, cborSigilFloat64:
+		if d.cfg.RejectNarrowFloat && majorByte != cborSigilFloat64 {
+			return true, ErrNarrowFloat
+		}
 		tokenSlot.Type = TFloat64
 		tokenSlot.Float64, err = d.decodeFloat(majorByte)
 		return true, err
 	case cborSigilIndefiniteBytes:
+		if d.cfg.RejectIndefinite {
+			return true, ErrIndefiniteLength
+		}
 		tokenSlot.Type = TBytes
 		tokenSlot.Bytes, err = d.decodeBytesIndefinite(nil)
 		return true, err
 	case cborSigilIndefiniteString:
+		if d.cfg.RejectIndefinite {
+			return true, ErrIndefiniteLength
+		}
 		tokenSlot.Type = TString
 		tokenSlot.Str, err = d.decodeStringIndefinite()
 		return true, err
 	case cborSigilIndefiniteArray:
+		if d.cfg.RejectIndefinite {
+			return true, ErrIndefiniteLength
+		}
 		tokenSlot.Type = TArrOpen
 		tokenSlot.Length = -1
 		d.pushPhase(decoderPhase_acceptArrValueOrBreak)
 		return false, nil
 	case cborSigilIndefiniteMap:
+		if d.cfg.RejectIndefinite {
+			return true, ErrIndefiniteLength
+		}
 		tokenSlot.Type = TMapOpen
 		tokenSlot.Length = -1
 		d.pushPhase(decoderPhase_acceptMapIndefKey)
@@ -303,7 +316,7 @@ func (d *Decoder) stepHelper_acceptValue(majorByte byte, tokenSlot *Token) (done
 			}
 			return d.stepHelper_acceptValue(majorByte, tokenSlot)
 		default:
-			return true, fmt.Errorf("Invalid majorByte: 0x%x", majorByte)
+			return true, fmt.Errorf("invalid majorByte: 0x%x", majorByte)
 		}
 	}
 }
